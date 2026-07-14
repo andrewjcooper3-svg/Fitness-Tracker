@@ -1,0 +1,82 @@
+WORKOUT TRACKER — GOOGLE SHEET AUTO-LOG SETUP
+==============================================
+
+This connects your Workout_Tracker_AutoLog.html page to a Google Sheet so
+every completed session is logged automatically when you click
+"Generate Session Summary".
+
+--------------------------------------------------
+STEP 1 — Deploy the Google Apps Script
+--------------------------------------------------
+1. Go to https://script.google.com and click "New project".
+2. Delete any starter code in the editor and paste in the full contents
+   of code.gs (included in this delivery).
+3. Rename the project (top left) to something like "Workout Tracker Log".
+4. Click the "Run" button (▷) with the function selector set to
+   "setup" — this creates the Google Sheet and prints its URL to the
+   execution log (View > Logs / Executions).
+   - The first run will prompt you to authorize the script. Click
+     "Review permissions" > pick your Google account > "Advanced" >
+     "Go to Workout Tracker Log (unsafe)" > "Allow". This is expected —
+     it's your own script, running only in your own account.
+5. Click "Deploy" > "New deployment".
+6. Click the gear icon next to "Select type" and choose "Web app".
+7. Fill in:
+   - Description: "Workout log endpoint" (optional)
+   - Execute as: Me (your Google account)
+   - Who has access: Anyone
+8. Click "Deploy".
+9. Copy the "Web app URL" shown — it looks like:
+   https://script.google.com/macros/s/AKfycb.../exec
+   This is your DEPLOYMENT_URL.
+
+--------------------------------------------------
+STEP 2 — Connect the HTML tracker
+--------------------------------------------------
+1. Open Workout_Tracker_AutoLog.html in a browser.
+2. Tap "⚙ Google Sheet Sync" near the top to expand the config box.
+3. Paste the Web app URL from Step 1 into the input field.
+4. Click "Save". The status line should turn green:
+   "✓ Connected — workouts will auto-log to your Sheet."
+   (This is saved in your browser's local storage, so you only need to
+   do this once per device/browser.)
+
+--------------------------------------------------
+STEP 3 — Verify it works
+--------------------------------------------------
+1. Pick a day, fill in a few sets, check some boxes, enter a pushup count.
+2. Click "Generate Session Summary".
+3. You should see:
+   - The usual text summary
+   - A green "✓ Logged to Sheet" status box underneath
+4. Open your Google Sheet (Google Drive > "Workout Tracker Log") and
+   confirm a new row (or rows — one per exercise) appears with the
+   timestamp, day, exercise name, target weight/reps, sets completed,
+   pushups, and notes.
+
+--------------------------------------------------
+TROUBLESHOOTING
+--------------------------------------------------
+- "⚠ No Sheet URL configured" — you haven't pasted a deployment URL yet,
+  or it wasn't saved. Re-open the config box and click Save again.
+- "⚠ Could not reach Sheet" — check your internet connection and that
+  the deployment URL was copied in full (no trailing spaces). Click
+  "Retry" once you've confirmed it.
+- "📴 Offline — saved locally" — no internet connection was detected.
+  The entry is stored in the browser and will resend automatically the
+  next time the page is open with a connection (or you click Retry).
+- Nothing shows up in the Sheet at all — reopen the Apps Script project,
+  go to "Deploy" > "Manage deployments", and confirm the deployment is
+  still active. If you edit code.gs after deploying, you must create a
+  "New deployment" (or a new version of the existing one) for changes
+  to take effect — editing the script alone does not update a live
+  Web app URL.
+- 401/403 errors — double check "Who has access" is set to "Anyone" in
+  the deployment settings.
+
+--------------------------------------------------
+SHARING THE SHEET FOR REVIEW
+--------------------------------------------------
+The Sheet is created in the Google Drive of the account you deployed as.
+To let someone else (e.g. a coach or assistant) review it, open the
+Sheet from Drive and use the normal "Share" button.
