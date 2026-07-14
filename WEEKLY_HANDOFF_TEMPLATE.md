@@ -34,26 +34,29 @@ not a research-citation case.
 ## What's needed each week
 
 - This week's data from the Sheet: the current week's tab, either
-  exported as CSV or its rows pasted in (Timestamp, Day, Exercise, Target
-  Weight, Target Reps, Sets Completed, Sets Planned, Total Reps, Notes).
+  exported as CSV or its rows pasted in (Timestamp, Day, Exercise, Set,
+  Target Weight, Actual Weight, Target Reps, Actual Reps, Completed,
+  Notes). One row per set, not per exercise — so per-set detail (e.g. a
+  weight drop on a later set) is visible directly, not averaged away.
 
 ## How to decide progression
 
-For each exercise, look at Sets Completed vs. Sets Planned, Total Reps vs.
-target, and any Notes (pain, fatigue, "felt easy," left/right imbalance,
-etc.), then use ordinary progressive-overload judgment:
-- Cleanly hit all sets at target weight/reps → progress it: a small
-  weight increase (roughly 2.5-10 lb depending on the lift) or an added
-  rep/set next week.
-- Missed sets or reps, or notes mention strain/pain → hold at the current
-  weight, or back off slightly; don't progress an exercise the log shows
-  struggling.
+For each exercise, compare Actual Weight/Reps against Target across all
+its sets (not just the first), and read any Notes (pain, fatigue, "felt
+easy," left/right imbalance, etc.), then use ordinary progressive-overload
+judgment:
+- Every set at or above target, all marked Completed → progress it: a
+  small weight increase (roughly 2.5-10 lb depending on the lift) or an
+  added rep/set next week.
+- Actual consistently below target on later sets (fatigue fade), missed
+  reps, or Completed = No → hold at the current weight, or back off
+  slightly; don't progress an exercise the log shows struggling.
 - Notes flag something specific (e.g. "left arm still lagging") → adjust
   that exercise or add a corrective, using judgment (and research where
   relevant).
 - No data logged for a day/exercise (skipped session) → leave it as-is
   and call that out explicitly in the summary rather than guessing.
-- Pushups: adjust the sets-of-N breakdown if the weekly total is
+- Pushups: adjust the sets-of-N breakdown if the weekly actual reps are
   consistently over/under target, keeping the set count reasonable (2-4
   sets) and the total matching that day's `data-pushup-target`.
 

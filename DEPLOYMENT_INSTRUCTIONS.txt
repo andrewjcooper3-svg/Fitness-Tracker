@@ -51,11 +51,12 @@ STEP 3 — Verify it works
    - The usual text summary
    - A green "✓ Logged to Sheet" status box underneath
 4. Open your Google Sheet (Google Drive > "Workout Tracker Log") and
-   confirm a new row appears for each exercise — including one for
-   "Pushups" — with the timestamp, day, target weight/reps, sets
-   completed, total reps, and notes. It lands in a tab named after the
-   current week (e.g. "Week of Jul 13 - Jul 19, 2026"); a new tab is
-   created automatically the first time each week is logged.
+   confirm a new row appears for each set of each exercise — including
+   "Pushups" — with the timestamp, day, set number, target vs. actual
+   weight/reps, whether it was completed, and notes. It lands in a tab
+   named after the current week (e.g. "Week of Jul 13 - Jul 19, 2026");
+   a new tab is created automatically the first time each week is
+   logged.
 
 --------------------------------------------------
 TROUBLESHOOTING

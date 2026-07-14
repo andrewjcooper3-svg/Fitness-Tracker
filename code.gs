@@ -2,11 +2,13 @@
  * Workout Tracker - Google Apps Script Web Endpoint
  *
  * Receives POST requests from the workout tracker HTML page and logs
- * each completed exercise (pushups included, logged like any other
- * exercise) as rows in a Google Sheet. Each calendar week gets its own
- * tab, named from the Monday-Sunday date range (e.g. "Week of Jul 13 -
- * Jul 19, 2026"), so a fresh copy of the HTML tracker each week keeps
- * logging into the same spreadsheet without the tabs running together.
+ * one row per set (pushups included, logged like any other exercise),
+ * with both the plan's target and what was actually entered, so a
+ * different weight/reps on set 3 vs. set 1 isn't lost to an
+ * exercise-level average. Each calendar week gets its own tab, named
+ * from the Monday-Sunday date range (e.g. "Week of Jul 13 - Jul 19,
+ * 2026"), so a fresh copy of the HTML tracker each week keeps logging
+ * into the same spreadsheet without the tabs running together.
  *
  * Setup:
  *   1. Paste this file into a new Apps Script project (script.google.com).
@@ -16,8 +18,8 @@
  *   4. Copy the deployment URL into the HTML tracker's DEPLOYMENT_URL field.
  */
 
-const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Target Weight', 'Target Reps', 'Sets Completed', 'Sets Planned', 'Total Reps', 'Notes'];
-const COLUMN_WIDTHS = [140, 90, 190, 100, 100, 110, 100, 100, 240];
+const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Set', 'Target Weight', 'Actual Weight', 'Target Reps', 'Actual Reps', 'Completed', 'Notes'];
+const COLUMN_WIDTHS = [140, 90, 190, 50, 100, 100, 90, 90, 90, 240];
 
 // One pastel per day of week so blocks of rows are easy to tell apart at a glance.
 const DAY_COLORS = {
@@ -85,8 +87,8 @@ function formatNewSheet_(sheet) {
     sheet.setColumnWidth(i + 1, width);
   });
 
-  // Center the numeric columns (Target Weight through Total Reps) for the whole sheet.
-  sheet.getRange(1, 4, sheet.getMaxRows(), 5).setHorizontalAlignment('center');
+  // Center the numeric-ish columns (Set through Completed) for the whole sheet.
+  sheet.getRange(1, 4, sheet.getMaxRows(), 6).setHorizontalAlignment('center');
 }
 
 function getOrCreateWeekSheet_(weekLabel) {
@@ -163,27 +165,41 @@ function doPost(e) {
       sheet.getRange(rowIndex, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss');
     }
 
+    let rowsAdded = 0;
+
     if (exercises.length > 0) {
       exercises.forEach(function (ex) {
-        appendRow([
-          timestamp,
-          day,
-          ex.name || '',
-          ex.targetWeight != null ? ex.targetWeight : '',
-          ex.targetReps != null ? ex.targetReps : '',
-          ex.setsCompleted != null ? ex.setsCompleted : '',
-          ex.setsPlanned != null ? ex.setsPlanned : '',
-          ex.totalReps != null ? ex.totalReps : '',
-          ex.notes || ''
-        ]);
+        const sets = Array.isArray(ex.sets) ? ex.sets : [];
+        if (sets.length > 0) {
+          sets.forEach(function (s) {
+            appendRow([
+              timestamp,
+              day,
+              ex.name || '',
+              s.setNum != null ? s.setNum : '',
+              s.targetWeight != null ? s.targetWeight : '',
+              s.actualWeight != null ? s.actualWeight : '',
+              s.targetReps != null ? s.targetReps : '',
+              s.actualReps != null ? s.actualReps : '',
+              s.completed ? 'Yes' : 'No',
+              s.notes || ''
+            ]);
+            rowsAdded++;
+          });
+        } else {
+          // An exercise with no set data - log a bare placeholder row for it.
+          appendRow([timestamp, day, ex.name || '', '', '', '', '', '', '', '']);
+          rowsAdded++;
+        }
       });
     } else {
       // No exercises for the day (e.g. a rest/cardio-only day) - log a single placeholder row.
-      appendRow([timestamp, day, '', '', '', '', '', '', data.notes || '']);
+      appendRow([timestamp, day, '', '', '', '', '', '', '', data.notes || '']);
+      rowsAdded = 1;
     }
 
     return ContentService
-      .createTextOutput(JSON.stringify({ status: 'success', rowsAdded: Math.max(exercises.length, 1), sheet: weekLabel }))
+      .createTextOutput(JSON.stringify({ status: 'success', rowsAdded: rowsAdded, sheet: weekLabel }))
       .setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {

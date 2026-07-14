@@ -572,6 +572,19 @@ function targetOrTyped(input) {
   return input.placeholder ? input.placeholder : (input.value || '');
 }
 
+// What actually happened in a set: the typed value if there is one,
+// otherwise assume the target (placeholder) was followed as prescribed.
+function actualOrTarget(input) {
+  if (!input) return '';
+  const typed = input.value.trim();
+  return typed ? typed : (input.placeholder || '');
+}
+
+function asNumberOrString(v) {
+  const n = parseFloat(v);
+  return isNaN(n) ? v : n;
+}
+
 // Counts a set's reps toward the total if a number was typed in; if the
 // field was left blank but the set is checked off, assumes the target
 // (placeholder) reps were done rather than counting it as zero.
@@ -597,35 +610,31 @@ function sumReps(card) {
   return total;
 }
 
+// Logs one entry per set (not one per exercise) so a different weight or
+// rep count on set 3 vs. set 1 is preserved, alongside the plan's target
+// for comparison — that gap is exactly what should drive progression
+// calls (increase, hold, or back off).
 function parseExerciseCard(card) {
   const name = getExerciseName(card);
   const rows = card.querySelectorAll('.set-row');
   const firstInputs = rows[0] ? rows[0].querySelectorAll('.set-input') : [];
-  const weightPlaceholder = targetOrTyped(firstInputs[0]);
-  const repsPlaceholder = targetOrTyped(firstInputs[1]);
+  const targetWeight = asNumberOrString(targetOrTyped(firstInputs[0]));
+  const targetReps = targetOrTyped(firstInputs[1]);
 
-  const weightNum = parseFloat(weightPlaceholder);
-  const targetWeight = isNaN(weightNum) ? weightPlaceholder : weightNum;
-  const targetReps = repsPlaceholder;
-
-  let setsCompleted = 0;
-  const notesList = [];
-  rows.forEach(row => {
+  const sets = Array.from(rows).map((row, i) => {
     const inputs = row.querySelectorAll('.set-input');
-    const notes = inputs[2] ? inputs[2].value.trim() : '';
-    if (notes) notesList.push(notes);
-    if (row.querySelector('.set-checkbox').classList.contains('checked')) setsCompleted++;
+    return {
+      setNum: i + 1,
+      targetWeight: targetWeight,
+      targetReps: targetReps,
+      actualWeight: asNumberOrString(actualOrTarget(inputs[0])),
+      actualReps: actualOrTarget(inputs[1]),
+      completed: row.querySelector('.set-checkbox').classList.contains('checked'),
+      notes: inputs[2] ? inputs[2].value.trim() : ''
+    };
   });
 
-  return {
-    name: name,
-    targetWeight: targetWeight,
-    targetReps: targetReps,
-    setsPlanned: rows.length,
-    setsCompleted: setsCompleted,
-    totalReps: sumReps(card),
-    notes: notesList.join('; ')
-  };
+  return { name: name, sets: sets };
 }
 
 /* ---------- Adding sets / exercises + live totals ---------- */

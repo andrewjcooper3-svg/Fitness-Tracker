@@ -40,19 +40,20 @@ Sheet via a Google Apps Script web endpoint.
    day's target (e.g. "Total: 96 / 165 reps"), so you can see running
    progress toward the daily goal as you log sets throughout the day.
 
-## Data logged per exercise
+## Data logged per set
 
-Each exercise in a session is logged as its own row:
+Every individual set is logged as its own row — not just one summary row
+per exercise — so a weight or rep change between sets (e.g. dropping
+weight on set 3 due to fatigue) is preserved instead of averaged away:
 
-`Timestamp | Day | Exercise | Target Weight | Target Reps | Sets Completed | Sets Planned | Total Reps | Notes`
+`Timestamp | Day | Exercise | Set | Target Weight | Actual Weight | Target Reps | Actual Reps | Completed | Notes`
 
-Target weight/reps come from the placeholders on the first set of each
-exercise (the prescribed target); sets completed is the count of checked
-set checkboxes; Total Reps sums whatever was actually typed into each
-set's Reps field (the same number shown live on the card); notes are
-pulled from any per-set notes fields entered during the session. Pushups
-appear in the Sheet as their own "Pushups" exercise row, exactly like any
-gym lift.
+Target weight/reps come from the exercise's first-set placeholder (the
+prescribed plan) and are repeated on every set row for that exercise so
+each row is self-contained. Actual weight/reps use whatever was typed
+into that specific set; if left blank, they fall back to the target
+(assuming the plan was followed as-is). Completed reflects that set's
+checkbox. Pushups log the same way as any gym lift — one row per set.
 
 Days with no structured exercises (e.g. the Saturday cardio checklist
 items) log a single placeholder row instead.
