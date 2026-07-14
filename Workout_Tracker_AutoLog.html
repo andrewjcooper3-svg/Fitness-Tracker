@@ -759,8 +759,8 @@ function generateSummary(day) {
       setRows.forEach(row => {
         const setNum = row.querySelector('.set-num').textContent;
         const inputs = row.querySelectorAll('.set-input');
-        const weight = inputs[0].value || '–';
-        const reps = inputs[1].value || '–';
+        const weight = actualOrTarget(inputs[0]) || '–';
+        const reps = actualOrTarget(inputs[1]) || '–';
         const notes = inputs[2].value || '';
         const isChecked = row.querySelector('.set-checkbox').classList.contains('checked');
         const checkmark = isChecked ? '✓' : '–';
