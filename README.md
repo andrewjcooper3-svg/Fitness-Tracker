@@ -30,6 +30,15 @@ Sheet via a Google Apps Script web endpoint.
 4. If a submission fails (offline or a network error), the payload is
    queued in `localStorage` and automatically retried the next time the
    page loads or the browser regains connectivity.
+5. Every exercise card has a **"+ Add Set"** button to log an extra set
+   beyond the plan, and every day has a **"+ Add Exercise"** button at
+   the bottom of its Workouts list to log something not in the plan
+   (tap the name field to name it). Both are picked up automatically by
+   the summary and Sheet logging — no separate wiring needed.
+6. Each exercise card shows a live **"Total: N reps"** line, summing the
+   reps entered across all its sets. For Pushups this also shows the
+   day's target (e.g. "Total: 96 / 165 reps"), so you can see running
+   progress toward the daily goal as you log sets throughout the day.
 
 ## Data logged per exercise
 

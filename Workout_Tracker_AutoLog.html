@@ -80,6 +80,13 @@
   .set-checkbox { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
   .set-checkbox:hover { border-color: var(--accent); }
   .set-checkbox.checked { background: var(--green); border-color: var(--green); color: white; }
+  .exercise-total { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); padding: 8px 12px; border-top: 1px solid var(--border); }
+  .add-set-btn { display: block; width: 100%; background: transparent; border: none; border-top: 1px dashed var(--border); color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 9px; cursor: pointer; }
+  .add-set-btn:hover { color: var(--accent); background: var(--surface2); }
+  .add-exercise-btn { display: block; width: 100%; background: transparent; border: 1px dashed var(--accent); color: var(--accent); font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 10px; border-radius: 8px; cursor: pointer; margin-bottom: 10px; }
+  .add-exercise-btn:hover { background: #1e1600; }
+  .exercise-name-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 14px; font-weight: 500; font-family: inherit; outline: none; padding: 2px 0; }
+  .exercise-name-input:focus { border-bottom-color: var(--accent); }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
   .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; -webkit-user-select: none; }
   .check-item:last-child { border-bottom: none; }
@@ -138,7 +145,7 @@
 </div>
 
 <!-- MONDAY -->
-<div id="day-mon" class="day-panel active">
+<div id="day-mon" class="day-panel active" data-pushup-target="165">
   <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-gym">🏋 GYM</div></div>
   <div class="alert amber">⏱ <span>Est. time: 45-50 min. Focus: Legs + Back. Left arm emphasis.</span></div>
 
@@ -245,7 +252,7 @@
 </div>
 
 <!-- TUESDAY -->
-<div id="day-tue" class="day-panel">
+<div id="day-tue" class="day-panel" data-pushup-target="165">
   <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-gym">🏋 GYM</div></div>
   <div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Arms + Core.</span></div>
 
@@ -366,7 +373,7 @@
 </div>
 
 <!-- WEDNESDAY -->
-<div id="day-wed" class="day-panel">
+<div id="day-wed" class="day-panel" data-pushup-target="165">
   <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
   <div class="section-label">Workouts</div>
   <div class="exercise-card">
@@ -384,7 +391,7 @@
 </div>
 
 <!-- THURSDAY -->
-<div id="day-thu" class="day-panel">
+<div id="day-thu" class="day-panel" data-pushup-target="165">
   <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
   <div class="section-label">Workouts</div>
   <div class="exercise-card">
@@ -402,7 +409,7 @@
 </div>
 
 <!-- FRIDAY -->
-<div id="day-fri" class="day-panel">
+<div id="day-fri" class="day-panel" data-pushup-target="165">
   <div class="day-header"><div class="day-title">FRI</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
   <div class="section-label">Workouts</div>
   <div class="exercise-card">
@@ -420,7 +427,7 @@
 </div>
 
 <!-- SATURDAY -->
-<div id="day-sat" class="day-panel">
+<div id="day-sat" class="day-panel" data-pushup-target="110">
   <div class="day-header"><div class="day-title">SAT</div><div class="day-badge badge-travel">✈ VO2 MAX</div></div>
   <div class="section-label">Cardio</div>
   <div class="card">
@@ -443,7 +450,7 @@
 </div>
 
 <!-- SUNDAY -->
-<div id="day-sun" class="day-panel">
+<div id="day-sun" class="day-panel" data-pushup-target="165">
   <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
   <div class="section-label">Workouts</div>
   <div class="exercise-card">
@@ -532,12 +539,36 @@ function getDeploymentUrl() {
 
 /* ---------- Data collection ---------- */
 
+function getExerciseName(card) {
+  const nameInput = card.querySelector('.exercise-name-input');
+  if (nameInput) return nameInput.value.trim();
+  return card.querySelector('.exercise-name').textContent.trim();
+}
+
+// Prescribed exercises always carry a placeholder (the target); custom
+// exercises added via "+ Add Exercise" have no placeholder, so fall back
+// to whatever the user actually typed.
+function targetOrTyped(input) {
+  if (!input) return '';
+  return input.placeholder ? input.placeholder : (input.value || '');
+}
+
+function sumReps(card) {
+  let total = 0;
+  card.querySelectorAll('.set-row').forEach(row => {
+    const inputs = row.querySelectorAll('.set-input');
+    const v = inputs[1] ? parseFloat(inputs[1].value) : NaN;
+    if (!isNaN(v)) total += v;
+  });
+  return total;
+}
+
 function parseExerciseCard(card) {
-  const name = card.querySelector('.exercise-name').textContent.trim();
+  const name = getExerciseName(card);
   const rows = card.querySelectorAll('.set-row');
   const firstInputs = rows[0] ? rows[0].querySelectorAll('.set-input') : [];
-  const weightPlaceholder = firstInputs[0] ? (firstInputs[0].placeholder || '') : '';
-  const repsPlaceholder = firstInputs[1] ? (firstInputs[1].placeholder || '') : '';
+  const weightPlaceholder = targetOrTyped(firstInputs[0]);
+  const repsPlaceholder = targetOrTyped(firstInputs[1]);
 
   const weightNum = parseFloat(weightPlaceholder);
   const targetWeight = isNaN(weightNum) ? weightPlaceholder : weightNum;
@@ -562,6 +593,92 @@ function parseExerciseCard(card) {
   };
 }
 
+/* ---------- Adding sets / exercises + live totals ---------- */
+
+function updateExerciseTotal(card) {
+  const setsContainer = card.querySelector('.exercise-sets');
+  const total = sumReps(card);
+
+  let totalEl = setsContainer.querySelector('.exercise-total');
+  if (!totalEl) {
+    totalEl = document.createElement('div');
+    totalEl.className = 'exercise-total';
+    const addBtn = setsContainer.querySelector('.add-set-btn');
+    setsContainer.insertBefore(totalEl, addBtn || null);
+  }
+
+  if (getExerciseName(card).toLowerCase() === 'pushups') {
+    const target = card.closest('.day-panel').dataset.pushupTarget;
+    totalEl.textContent = `Total: ${total} / ${target} reps`;
+  } else {
+    totalEl.textContent = `Total: ${total} reps`;
+  }
+}
+
+function addSet(btn) {
+  const container = btn.parentElement;
+  const rows = container.querySelectorAll('.set-row');
+  const lastRow = rows[rows.length - 1];
+  const lastInputs = lastRow.querySelectorAll('.set-input');
+  const weightPlaceholder = lastInputs[0] ? lastInputs[0].placeholder : '';
+  const repsPlaceholder = lastInputs[1] ? lastInputs[1].placeholder : '';
+
+  const row = document.createElement('div');
+  row.className = 'set-row';
+  row.innerHTML = `<div class="set-num">${rows.length + 1}</div>` +
+    `<div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="${weightPlaceholder}"></div>` +
+    `<div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="${repsPlaceholder}"></div>` +
+    `<div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div>` +
+    `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>`;
+  container.insertBefore(row, btn);
+  updateExerciseTotal(container.closest('.exercise-card'));
+}
+
+function initExerciseSets(card) {
+  const setsContainer = card.querySelector('.exercise-sets');
+  if (!setsContainer.querySelector('.add-set-btn')) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'add-set-btn';
+    btn.textContent = '+ Add Set';
+    btn.onclick = () => addSet(btn);
+    setsContainer.appendChild(btn);
+  }
+  updateExerciseTotal(card);
+}
+
+function addExercise(panel) {
+  const card = document.createElement('div');
+  card.className = 'exercise-card';
+  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><input class="exercise-name-input" type="text" placeholder="Exercise name" onclick="event.stopPropagation()"></div><div class="exercise-meta">Custom</div></div>` +
+    `<div class="exercise-sets expanded"><div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div></div>`;
+
+  const addBtn = panel.querySelector(':scope > .add-exercise-btn');
+  panel.insertBefore(card, addBtn);
+  initExerciseSets(card);
+  card.querySelector('.exercise-name-input').focus();
+}
+
+function initAddExerciseButtons() {
+  document.querySelectorAll('.day-panel').forEach(panel => {
+    const cards = panel.querySelectorAll(':scope > .exercise-card');
+    if (cards.length === 0) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'add-exercise-btn';
+    btn.textContent = '+ Add Exercise';
+    btn.onclick = () => addExercise(panel);
+    cards[cards.length - 1].insertAdjacentElement('afterend', btn);
+  });
+}
+
+document.addEventListener('input', function (e) {
+  if (e.target.classList.contains('set-input')) {
+    const card = e.target.closest('.exercise-card');
+    if (card) updateExerciseTotal(card);
+  }
+});
+
 function buildPayload(day) {
   const panel = document.getElementById('day-' + day);
   const exercises = Array.from(panel.querySelectorAll('.exercise-card')).map(parseExerciseCard);
@@ -583,7 +700,7 @@ function generateSummary(day) {
   if (exercises.length > 0) {
     lines.push(''); lines.push('EXERCISES:');
     exercises.forEach(exc => {
-      const name = exc.querySelector('.exercise-name').textContent;
+      const name = getExerciseName(exc);
       const meta = exc.querySelector('.exercise-meta').textContent;
       lines.push(`\n${name} — ${meta}`);
 
@@ -602,6 +719,13 @@ function generateSummary(day) {
         setLine += ` ${checkmark}`;
         lines.push(setLine);
       });
+
+      const total = sumReps(exc);
+      if (name.toLowerCase() === 'pushups') {
+        lines.push(`  Total: ${total} / ${panel.dataset.pushupTarget} reps`);
+      } else {
+        lines.push(`  Total: ${total} reps`);
+      }
     });
   }
 
@@ -731,6 +855,9 @@ document.querySelectorAll('.exercise-sets').forEach((el, i) => {
     el.previousElementSibling.querySelector('.exercise-toggle').textContent = '▾';
   }
 });
+
+document.querySelectorAll('.exercise-card').forEach(initExerciseSets);
+initAddExerciseButtons();
 
 loadDeploymentUrl();
 flushPendingLogs();
