@@ -14,9 +14,10 @@ Sheet via a Google Apps Script web endpoint.
 
 ## How it works
 
-1. Each day (Mon–Sun) has a panel with exercise cards (sets/reps/weight
-   inputs + a checkbox per completed set) or a simpler pushup/cardio
-   checklist for non-gym days.
+1. Each day (Mon–Sun) has a panel of exercise cards — sets/reps/weight
+   inputs plus a checkbox per completed set. Pushups are logged the same
+   way as any gym exercise (bodyweight, sets × reps), so every day's
+   plan uses one consistent format.
 2. Clicking **"Generate Session Summary"**:
    - Builds a plain-text summary (unchanged from the original tracker).
    - Builds a JSON payload of the day's data and POSTs it to the Apps
@@ -34,15 +35,16 @@ Sheet via a Google Apps Script web endpoint.
 
 Each exercise in a session is logged as its own row:
 
-`Timestamp | Day | Exercise | Target Weight | Target Reps | Sets Completed | Sets Planned | Pushups Completed | Notes`
+`Timestamp | Day | Exercise | Target Weight | Target Reps | Sets Completed | Sets Planned | Notes`
 
 Target weight/reps come from the placeholders on the first set of each
 exercise (the prescribed target); sets completed is the count of checked
 set checkboxes; notes are pulled from any per-set notes fields entered
-during the session.
+during the session. Pushups appear in the Sheet as their own "Pushups"
+exercise row, exactly like any gym lift.
 
-Days with no structured exercises (pure pushup or cardio days) log a
-single summary row instead.
+Days with no structured exercises (e.g. the Saturday cardio checklist
+items) log a single placeholder row instead.
 
 ## Setup
 

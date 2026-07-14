@@ -90,10 +90,6 @@
   .item-body { flex: 1; min-width: 0; }
   .item-name { font-size: 13px; font-weight: 500; }
   .item-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 1px; }
-  .pushup-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 12px; }
-  .pushup-row .item-name { font-size: 13px; font-weight: 500; }
-  .pushup-count { width: 72px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; outline: none; text-align: right; }
-  .pushup-count:focus { border-color: var(--accent); }
   .summary-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 12px; margin-top: 12px; width: 100%; transition: all 0.15s; }
   .summary-btn:hover { background: var(--surface2); border-color: var(--accent); }
   .summary-output { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--green); white-space: pre-wrap; word-break: break-all; display: none; }
@@ -233,9 +229,13 @@
     </div>
   </div>
 
-  <div class="section-label">Pushups</div>
-  <div class="card">
-    <div class="pushup-row"><div class="item-name">Pushups — Target 165</div><input type="number" class="pushup-count" id="mon-pu" placeholder="0" min="0"></div>
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
   </div>
 
   <button class="summary-btn" onclick="generateSummary('mon')">📋 Generate Session Summary</button>
@@ -350,9 +350,13 @@
     </div>
   </div>
 
-  <div class="section-label">Pushups</div>
-  <div class="card">
-    <div class="pushup-row"><div class="item-name">Pushups — Target 165</div><input type="number" class="pushup-count" id="tue-pu" placeholder="0" min="0"></div>
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
   </div>
 
   <button class="summary-btn" onclick="generateSummary('tue')">📋 Generate Session Summary</button>
@@ -364,9 +368,14 @@
 <!-- WEDNESDAY -->
 <div id="day-wed" class="day-panel">
   <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="section-label">Admin</div>
-  <div class="card">
-    <div class="pushup-row"><div class="item-name">Pushups — Target 165</div><input type="number" class="pushup-count" id="wed-pu" placeholder="0" min="0"></div>
+  <div class="section-label">Workouts</div>
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
   </div>
   <button class="summary-btn" onclick="generateSummary('wed')">📋 Session Summary</button>
   <div class="summary-output" id="wed-summary"></div>
@@ -377,9 +386,14 @@
 <!-- THURSDAY -->
 <div id="day-thu" class="day-panel">
   <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="section-label">Admin</div>
-  <div class="card">
-    <div class="pushup-row"><div class="item-name">Pushups — Target 165</div><input type="number" class="pushup-count" id="thu-pu" placeholder="0" min="0"></div>
+  <div class="section-label">Workouts</div>
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
   </div>
   <button class="summary-btn" onclick="generateSummary('thu')">📋 Session Summary</button>
   <div class="summary-output" id="thu-summary"></div>
@@ -390,9 +404,14 @@
 <!-- FRIDAY -->
 <div id="day-fri" class="day-panel">
   <div class="day-header"><div class="day-title">FRI</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="section-label">Admin</div>
-  <div class="card">
-    <div class="pushup-row"><div class="item-name">Pushups — Target 165</div><input type="number" class="pushup-count" id="fri-pu" placeholder="0" min="0"></div>
+  <div class="section-label">Workouts</div>
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
   </div>
   <button class="summary-btn" onclick="generateSummary('fri')">📋 Session Summary</button>
   <div class="summary-output" id="fri-summary"></div>
@@ -409,9 +428,13 @@
     <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">8-10 intervals: 90s hard / 90s easy</div></div></div>
     <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">5 min cool-down (easy pace)</div></div></div>
   </div>
-  <div class="section-label">Admin</div>
-  <div class="card">
-    <div class="pushup-row"><div class="item-name">Pushups — Target 110</div><input type="number" class="pushup-count" id="sat-pu" placeholder="0" min="0"></div>
+  <div class="section-label">Workouts</div>
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 2 × 55</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
   </div>
   <button class="summary-btn" onclick="generateSummary('sat')">📋 Session Summary</button>
   <div class="summary-output" id="sat-summary"></div>
@@ -422,10 +445,16 @@
 <!-- SUNDAY -->
 <div id="day-sun" class="day-panel">
   <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="section-label">Admin</div>
-  <div class="card">
-    <div class="pushup-row"><div class="item-name">Pushups — Target 165</div><input type="number" class="pushup-count" id="sun-pu" placeholder="0" min="0"></div>
+  <div class="section-label">Workouts</div>
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
   </div>
+  <div class="section-label">Admin</div>
   <div class="card">
     <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Book InBody Scan</div><div class="item-meta">Track progress</div></div></div>
   </div>
@@ -438,7 +467,6 @@
 <script>
 const dayKeys = ['mon','tue','wed','thu','fri','sat','sun'];
 const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday', sun:'Sunday' };
-const targets = { mon:165, tue:165, wed:165, thu:165, fri:165, sat:110, sun:165 };
 const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
 const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 
@@ -536,15 +564,11 @@ function parseExerciseCard(card) {
 
 function buildPayload(day) {
   const panel = document.getElementById('day-' + day);
-  const puInput = document.getElementById(day + '-pu');
-  const pushups = puInput && puInput.value !== '' ? Number(puInput.value) : 0;
-
   const exercises = Array.from(panel.querySelectorAll('.exercise-card')).map(parseExerciseCard);
 
   return {
     day: dayNames[day],
     exercises: exercises,
-    pushups: pushups,
     timestamp: new Date().toISOString()
   };
 }
@@ -554,12 +578,6 @@ function buildPayload(day) {
 function generateSummary(day) {
   const panel = document.getElementById('day-' + day);
   let lines = [`SESSION SUMMARY — ${dayNames[day].toUpperCase()}`, '─────────────────────────────'];
-
-  const puInput = document.getElementById(day + '-pu');
-  if (puInput) {
-    const val = puInput.value || '?';
-    lines.push(`PUSHUPS: ${val} / ${targets[day]} target`);
-  }
 
   const exercises = panel.querySelectorAll('.exercise-card');
   if (exercises.length > 0) {

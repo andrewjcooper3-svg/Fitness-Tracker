@@ -44,15 +44,16 @@ STEP 2 — Connect the HTML tracker
 --------------------------------------------------
 STEP 3 — Verify it works
 --------------------------------------------------
-1. Pick a day, fill in a few sets, check some boxes, enter a pushup count.
+1. Pick a day, fill in a few sets (including the Pushups card), and
+   check off the sets you completed.
 2. Click "Generate Session Summary".
 3. You should see:
    - The usual text summary
    - A green "✓ Logged to Sheet" status box underneath
 4. Open your Google Sheet (Google Drive > "Workout Tracker Log") and
-   confirm a new row (or rows — one per exercise) appears with the
-   timestamp, day, exercise name, target weight/reps, sets completed,
-   pushups, and notes.
+   confirm a new row appears for each exercise — including one for
+   "Pushups" — with the timestamp, day, target weight/reps, sets
+   completed, and notes.
 
 --------------------------------------------------
 TROUBLESHOOTING

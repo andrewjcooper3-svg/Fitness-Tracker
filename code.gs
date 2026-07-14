@@ -2,7 +2,8 @@
  * Workout Tracker - Google Apps Script Web Endpoint
  *
  * Receives POST requests from the workout tracker HTML page and logs
- * each completed exercise (plus pushups) as rows in a Google Sheet.
+ * each completed exercise (pushups included, logged like any other
+ * exercise) as rows in a Google Sheet.
  *
  * Setup:
  *   1. Paste this file into a new Apps Script project (script.google.com).
@@ -12,7 +13,7 @@
  */
 
 const SHEET_NAME = 'Workout Log';
-const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Target Weight', 'Target Reps', 'Sets Completed', 'Sets Planned', 'Pushups Completed', 'Notes'];
+const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Target Weight', 'Target Reps', 'Sets Completed', 'Sets Planned', 'Notes'];
 
 function getOrCreateSheet_() {
   const props = PropertiesService.getScriptProperties();
@@ -82,7 +83,6 @@ function doPost(e) {
 
     const day = data.day || '';
     const timestamp = data.timestamp ? new Date(data.timestamp) : new Date();
-    const pushups = data.pushups != null ? data.pushups : '';
     const exercises = Array.isArray(data.exercises) ? data.exercises : [];
 
     if (exercises.length > 0) {
@@ -95,13 +95,12 @@ function doPost(e) {
           ex.targetReps != null ? ex.targetReps : '',
           ex.setsCompleted != null ? ex.setsCompleted : '',
           ex.setsPlanned != null ? ex.setsPlanned : '',
-          pushups,
           ex.notes || ''
         ]);
       });
     } else {
-      // No exercises for the day (e.g. pushups-only or cardio day) - log a single summary row.
-      sheet.appendRow([timestamp, day, '', '', '', '', '', pushups, data.notes || '']);
+      // No exercises for the day (e.g. a rest/cardio-only day) - log a single placeholder row.
+      sheet.appendRow([timestamp, day, '', '', '', '', '', data.notes || '']);
     }
 
     return ContentService
