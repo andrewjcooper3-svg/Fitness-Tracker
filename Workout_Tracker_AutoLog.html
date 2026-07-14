@@ -479,6 +479,12 @@ const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday',
 const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
 const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 
+// Baked-in default so the tracker works out of the box (e.g. a Home
+// Screen icon, whose storage doesn't share with regular Safari tabs)
+// without needing to re-paste this after every fresh install. The
+// config box below can still override it per-device via localStorage.
+const DEFAULT_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbzibd9VwYYvj8pcmApGKplDNW70tiZZjnT54K8kVHJJKQOxMEp21CNdWUYz2KVvPzxr/exec';
+
 // Monday-Sunday of the current week, e.g. "Week of Jul 13 - Jul 19, 2026".
 // Sent with every submission so the Apps Script can file it into a
 // matching weekly Sheet tab.
@@ -529,7 +535,7 @@ function toggleConfig() {
 }
 
 function loadDeploymentUrl() {
-  const url = localStorage.getItem(STORAGE_URL_KEY) || '';
+  const url = localStorage.getItem(STORAGE_URL_KEY) || DEFAULT_DEPLOYMENT_URL;
   document.getElementById('deploymentUrl').value = url;
   updateConfigStatus(url);
 }
@@ -553,7 +559,7 @@ function updateConfigStatus(url) {
 }
 
 function getDeploymentUrl() {
-  return localStorage.getItem(STORAGE_URL_KEY) || '';
+  return localStorage.getItem(STORAGE_URL_KEY) || DEFAULT_DEPLOYMENT_URL;
 }
 
 /* ---------- Data collection ---------- */
