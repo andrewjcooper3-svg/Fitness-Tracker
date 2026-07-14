@@ -510,6 +510,8 @@ function toggleExercise(header) {
 
 function toggleSetCheck(el) {
   el.classList.toggle('checked');
+  const card = el.closest('.exercise-card');
+  if (card) updateExerciseTotal(card);
 }
 
 function toggleCheck(el) {
@@ -570,12 +572,27 @@ function targetOrTyped(input) {
   return input.placeholder ? input.placeholder : (input.value || '');
 }
 
+// Counts a set's reps toward the total if a number was typed in; if the
+// field was left blank but the set is checked off, assumes the target
+// (placeholder) reps were done rather than counting it as zero.
 function sumReps(card) {
   let total = 0;
   card.querySelectorAll('.set-row').forEach(row => {
     const inputs = row.querySelectorAll('.set-input');
-    const v = inputs[1] ? parseFloat(inputs[1].value) : NaN;
-    if (!isNaN(v)) total += v;
+    const repsInput = inputs[1];
+    if (!repsInput) return;
+
+    const typed = parseFloat(repsInput.value);
+    if (!isNaN(typed)) {
+      total += typed;
+      return;
+    }
+
+    const checked = row.querySelector('.set-checkbox').classList.contains('checked');
+    if (checked) {
+      const target = parseFloat(repsInput.placeholder);
+      if (!isNaN(target)) total += target;
+    }
   });
   return total;
 }
