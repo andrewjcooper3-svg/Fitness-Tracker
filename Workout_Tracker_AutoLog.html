@@ -108,9 +108,83 @@
   .log-status.error { display: flex; background: #2a0e0e; color: var(--red); border: 1px solid var(--red); }
   .log-retry-btn { font-family: 'IBM Plex Mono', monospace; font-size: 10px; background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 4px; padding: 4px 8px; cursor: pointer; flex-shrink: 0; }
   .header-week { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); margin-top: 4px; }
+
+  .app-tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-bottom: 14px; }
+  .app-tab { flex: 1; text-align: center; padding: 9px 0; border-radius: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.4px; color: var(--muted); cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
+  .app-tab.active { background: var(--surface2); color: var(--text); font-weight: 600; }
+  .app-view { display: none; }
+  .app-view.active { display: block; }
+
+  .ov-hero { background: linear-gradient(135deg, var(--surface2), var(--surface)); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 12px; }
+  .ov-hero-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .ov-hero-week { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); margin-top: 3px; margin-bottom: 16px; }
+  .ov-hero-number { font-family: 'Bebas Neue', sans-serif; font-size: 44px; letter-spacing: 1px; line-height: 1; }
+  .ov-hero-sub { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .ov-progress-track { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; margin-top: 14px; }
+  .ov-progress-fill { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.4s ease; width: 0%; }
+
+  .ov-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .ov-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 13px 10px; }
+  .ov-tile-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .ov-tile-value { font-family: 'Bebas Neue', sans-serif; font-size: 24px; line-height: 1; }
+
+  .ov-days-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 8px; margin-bottom: 12px; }
+  .ov-days-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; padding: 0 6px 10px; }
+  .ov-days { display: flex; justify-content: space-between; }
+  .ov-day-chip { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ov-day-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-family: 'IBM Plex Mono', monospace; border: 2px solid var(--border); color: var(--muted); }
+  .ov-day-dot.done { background: var(--green); border-color: var(--green); color: #06210f; font-weight: 600; }
+  .ov-day-dot.partial { background: transparent; border-color: var(--accent); color: var(--accent); }
+  .ov-day-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); text-transform: uppercase; }
+
+  .ov-open-btn { display: block; width: 100%; text-align: center; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 10px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .ov-open-btn:hover { border-color: var(--accent); background: var(--surface2); }
+
+  .ov-note { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); text-align: center; margin-top: 12px; line-height: 1.6; }
 </style>
 </head>
 <body>
+
+<div class="app-tabs">
+  <div class="app-tab active" onclick="showAppView('overview')">Overview</div>
+  <div class="app-tab" onclick="showAppView('tracker')">Tracker</div>
+</div>
+
+<div id="view-overview" class="app-view active">
+  <div class="ov-hero">
+    <div class="ov-hero-label">Pushups this week</div>
+    <div class="ov-hero-week" id="ovWeekLabel"></div>
+    <div class="ov-hero-number" id="ovHeroNumber">0 / 0</div>
+    <div class="ov-hero-sub">toward this week's total target</div>
+    <div class="ov-progress-track"><div class="ov-progress-fill" id="ovHeroFill"></div></div>
+  </div>
+
+  <div class="ov-grid">
+    <div class="ov-tile">
+      <div class="ov-tile-label">Sets</div>
+      <div class="ov-tile-value" id="ovSets">0 / 0</div>
+    </div>
+    <div class="ov-tile">
+      <div class="ov-tile-label">Total Reps</div>
+      <div class="ov-tile-value" id="ovReps">0</div>
+    </div>
+    <div class="ov-tile">
+      <div class="ov-tile-label">Days Active</div>
+      <div class="ov-tile-value" id="ovDaysActive">0 / 7</div>
+    </div>
+  </div>
+
+  <div class="ov-days-card">
+    <div class="ov-days-label">This week, by day</div>
+    <div class="ov-days" id="ovDayChips"></div>
+  </div>
+
+  <button class="ov-open-btn" onclick="showAppView('tracker')">Open Tracker →</button>
+
+  <div class="ov-note">Reflects what's checked off in this browser session right now.<br>Reopening the app after it's fully closed resets this view until sets are marked again.</div>
+</div>
+
+<div id="view-tracker" class="app-view">
 
 <div class="header">
   <div class="header-top">
@@ -473,6 +547,8 @@
   <div class="log-status" id="sun-log-status"></div>
 </div>
 
+</div>
+
 <script>
 const dayKeys = ['mon','tue','wed','thu','fri','sat','sun'];
 const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday', sun:'Sunday' };
@@ -498,6 +574,77 @@ function getWeekLabel() {
   sunday.setDate(monday.getDate() + 6);
   const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return `Week of ${fmt(monday)} - ${fmt(sunday)}, ${sunday.getFullYear()}`;
+}
+
+/* ---------- Weekly Overview tab ---------- */
+
+function showAppView(view) {
+  document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.app-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.app-tab')[view === 'overview' ? 0 : 1].classList.add('active');
+  if (view === 'overview') renderOverview();
+}
+
+// Aggregates every day panel's current in-page state (all 7 days live in
+// the DOM at once, just hidden/shown via the day tabs) into weekly totals.
+function computeWeekStats() {
+  const days = dayKeys.map(key => {
+    const panel = document.getElementById('day-' + key);
+    const cards = panel.querySelectorAll('.exercise-card');
+    let setsPlanned = 0, setsCompleted = 0, totalReps = 0, pushupTotal = 0;
+    const pushupTarget = parseFloat(panel.dataset.pushupTarget) || 0;
+
+    cards.forEach(card => {
+      const rows = card.querySelectorAll('.set-row');
+      setsPlanned += rows.length;
+      rows.forEach(row => {
+        if (row.querySelector('.set-checkbox').classList.contains('checked')) setsCompleted++;
+      });
+      const reps = sumReps(card);
+      totalReps += reps;
+      if (getExerciseName(card).toLowerCase() === 'pushups') pushupTotal += reps;
+    });
+
+    return { key, setsPlanned, setsCompleted, totalReps, pushupTotal, pushupTarget };
+  });
+
+  const totals = days.reduce((acc, d) => ({
+    setsPlanned: acc.setsPlanned + d.setsPlanned,
+    setsCompleted: acc.setsCompleted + d.setsCompleted,
+    totalReps: acc.totalReps + d.totalReps,
+    pushupTotal: acc.pushupTotal + d.pushupTotal,
+    pushupTarget: acc.pushupTarget + d.pushupTarget
+  }), { setsPlanned: 0, setsCompleted: 0, totalReps: 0, pushupTotal: 0, pushupTarget: 0 });
+
+  return { days, totals };
+}
+
+function renderOverview() {
+  const { days, totals } = computeWeekStats();
+
+  document.getElementById('ovWeekLabel').textContent = getWeekLabel();
+
+  const pushupPct = totals.pushupTarget ? Math.min(100, Math.round(totals.pushupTotal / totals.pushupTarget * 100)) : 0;
+  document.getElementById('ovHeroNumber').textContent = `${totals.pushupTotal} / ${totals.pushupTarget}`;
+  document.getElementById('ovHeroFill').style.width = pushupPct + '%';
+
+  document.getElementById('ovSets').textContent = `${totals.setsCompleted} / ${totals.setsPlanned}`;
+  document.getElementById('ovReps').textContent = totals.totalReps;
+  const activeDays = days.filter(d => d.setsCompleted > 0).length;
+  document.getElementById('ovDaysActive').textContent = `${activeDays} / 7`;
+
+  const dayLabels = { mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S' };
+  const chipsEl = document.getElementById('ovDayChips');
+  chipsEl.innerHTML = '';
+  days.forEach(d => {
+    const pct = d.setsPlanned ? d.setsCompleted / d.setsPlanned : 0;
+    const dotClass = pct >= 1 ? 'done' : pct > 0 ? 'partial' : '';
+    const chip = document.createElement('div');
+    chip.className = 'ov-day-chip';
+    chip.innerHTML = `<div class="ov-day-dot ${dotClass}">${pct >= 1 ? '✓' : ''}</div><div class="ov-day-lbl">${dayLabels[d.key]}</div>`;
+    chipsEl.appendChild(chip);
+  });
 }
 
 function showDay(day) {
@@ -913,6 +1060,7 @@ initAddExerciseButtons();
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
 flushPendingLogs();
+renderOverview();
 </script>
 </body>
 </html>
