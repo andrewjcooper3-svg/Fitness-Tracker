@@ -1,33 +1,41 @@
 # Workout Tracker — Weekly Update Handoff
 
-Paste this whole document into a new Claude chat along with the current
-`Workout_Tracker_AutoLog.html` and this week's logged data from the
-Google Sheet (export the current week's tab as CSV, or copy/paste the
-rows — see "What to bring" below).
+Reference notes for the weekly training review done in this session/repo
+(Claude Code, with direct write access to `Workout_Tracker_AutoLog.html`
+and GitHub Pages hosting it live). Kept here so the ground rules survive
+even if this conversation gets summarized or a future session picks the
+repo back up.
 
 ## What this file is
 
-A single-page HTML workout tracker. It has two parts:
+A single-page HTML workout tracker, hosted via GitHub Pages. It has two
+parts:
 1. **The workout plan** (exercise names, sets/reps/weight targets, day
-   layout) — this is what you, acting as my trainer, update week to week.
+   layout) — this is what gets updated week to week.
 2. **Auto-log wiring** (JavaScript + a bit of CSS) that POSTs completed
    workouts to a Google Sheet when "Generate Session Summary" is
    clicked. This must NOT change — it's already deployed and working.
 
-## Your role
+## The role
 
-Act as my trainer. I'm not going to tell you what to change — review the
-logged data from this past week and decide the next week's plan yourself,
-the way a coach would after reviewing a client's training log. Then apply
-those decisions directly to the HTML (following the rules below) and
-explain your reasoning afterward.
+Act as trainer: review the logged data from this past week and decide
+the next week's plan, the way a coach would after reviewing a client's
+training log — not just apply changes the user dictates. Apply those
+decisions directly to the HTML (following the rules below), commit and
+push so the hosted page updates, and explain the reasoning afterward.
 
-## What to bring to the chat
+Use web search where it actually informs a judgment call (progressive
+overload rates, deload timing, rep ranges for hypertrophy vs. strength,
+etc.) and say what it's based on. For anything that reads as pain, injury,
+or needing a real diagnosis rather than normal training fatigue, flag it
+instead of programming around it — that's a "see a professional" case,
+not a research-citation case.
 
-- The current `Workout_Tracker_AutoLog.html`.
-- This week's data: either the Sheet tab exported as CSV, or the rows
-  copy/pasted (Timestamp, Day, Exercise, Target Weight, Target Reps, Sets
-  Completed, Sets Planned, Total Reps, Notes).
+## What's needed each week
+
+- This week's data from the Sheet: the current week's tab, either
+  exported as CSV or its rows pasted in (Timestamp, Day, Exercise, Target
+  Weight, Target Reps, Sets Completed, Sets Planned, Total Reps, Notes).
 
 ## How to decide progression
 
@@ -41,14 +49,15 @@ etc.), then use ordinary progressive-overload judgment:
   weight, or back off slightly; don't progress an exercise the log shows
   struggling.
 - Notes flag something specific (e.g. "left arm still lagging") → adjust
-  that exercise or add a corrective, using your judgment.
+  that exercise or add a corrective, using judgment (and research where
+  relevant).
 - No data logged for a day/exercise (skipped session) → leave it as-is
-  and call that out explicitly in your summary rather than guessing.
+  and call that out explicitly in the summary rather than guessing.
 - Pushups: adjust the sets-of-N breakdown if the weekly total is
   consistently over/under target, keeping the set count reasonable (2-4
   sets) and the total matching that day's `data-pushup-target`.
 
-If the data is ambiguous or you're unsure whether to progress something,
+If the data is ambiguous or it's unclear whether to progress something,
 say so and ask rather than guessing.
 
 ## DO NOT MODIFY
@@ -106,10 +115,11 @@ Rules:
   other exercise. Its 3-sets-of-N breakdown should sum to the day's
   pushup target (165 weekdays/Sunday, 110 Saturday).
 
-## Verification before you hand it back
+## Before pushing an update
 
-Please confirm, then give me a plain-text summary of what changed and
-why (per exercise), so I know what to expect walking into the week:
+Confirm, then give a plain-text summary of what changed and why (per
+exercise), so there's a clear record of what to expect walking into the
+week:
 
 - [ ] `<script>` and `<style>` blocks are byte-for-byte unchanged
 - [ ] Every set-row still has exactly 3 `.set-input`s + 1 `.set-checkbox`
@@ -117,3 +127,4 @@ why (per exercise), so I know what to expect walking into the week:
 - [ ] All 7 day-panel ids and `data-pushup-target` attributes are present
 - [ ] Pushups still appears as an `.exercise-card` on every day, summing
       to that day's target
+- [ ] Committed and pushed so the GitHub Pages link reflects the update
