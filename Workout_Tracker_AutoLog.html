@@ -107,6 +107,7 @@
   .log-status.ok { display: flex; background: #0e2a1e; color: var(--green); border: 1px solid var(--green); }
   .log-status.error { display: flex; background: #2a0e0e; color: var(--red); border: 1px solid var(--red); }
   .log-retry-btn { font-family: 'IBM Plex Mono', monospace; font-size: 10px; background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 4px; padding: 4px 8px; cursor: pointer; flex-shrink: 0; }
+  .header-week { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -116,6 +117,7 @@
     <div>
       <div class="header-title">TRAINER</div>
       <div class="header-sub">Balanced Growth - 100% Lean</div>
+      <div class="header-week" id="weekLabel"></div>
     </div>
   </div>
 </div>
@@ -477,6 +479,21 @@ const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday',
 const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
 const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 
+// Monday-Sunday of the current week, e.g. "Week of Jul 13 - Jul 19, 2026".
+// Sent with every submission so the Apps Script can file it into a
+// matching weekly Sheet tab.
+function getWeekLabel() {
+  const now = new Date();
+  const dow = now.getDay();
+  const diffToMonday = (dow === 0 ? -6 : 1) - dow;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `Week of ${fmt(monday)} - ${fmt(sunday)}, ${sunday.getFullYear()}`;
+}
+
 function showDay(day) {
   document.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('active'));
@@ -589,6 +606,7 @@ function parseExerciseCard(card) {
     targetReps: targetReps,
     setsPlanned: rows.length,
     setsCompleted: setsCompleted,
+    totalReps: sumReps(card),
     notes: notesList.join('; ')
   };
 }
@@ -685,6 +703,7 @@ function buildPayload(day) {
 
   return {
     day: dayNames[day],
+    week: getWeekLabel(),
     exercises: exercises,
     timestamp: new Date().toISOString()
   };
@@ -694,7 +713,7 @@ function buildPayload(day) {
 
 function generateSummary(day) {
   const panel = document.getElementById('day-' + day);
-  let lines = [`SESSION SUMMARY — ${dayNames[day].toUpperCase()}`, '─────────────────────────────'];
+  let lines = [`SESSION SUMMARY — ${dayNames[day].toUpperCase()}`, getWeekLabel(), '─────────────────────────────'];
 
   const exercises = panel.querySelectorAll('.exercise-card');
   if (exercises.length > 0) {
@@ -859,6 +878,7 @@ document.querySelectorAll('.exercise-sets').forEach((el, i) => {
 document.querySelectorAll('.exercise-card').forEach(initExerciseSets);
 initAddExerciseButtons();
 
+document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
 flushPendingLogs();
 </script>

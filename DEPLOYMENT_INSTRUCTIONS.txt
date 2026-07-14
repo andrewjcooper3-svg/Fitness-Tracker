@@ -53,7 +53,9 @@ STEP 3 — Verify it works
 4. Open your Google Sheet (Google Drive > "Workout Tracker Log") and
    confirm a new row appears for each exercise — including one for
    "Pushups" — with the timestamp, day, target weight/reps, sets
-   completed, and notes.
+   completed, total reps, and notes. It lands in a tab named after the
+   current week (e.g. "Week of Jul 13 - Jul 19, 2026"); a new tab is
+   created automatically the first time each week is logged.
 
 --------------------------------------------------
 TROUBLESHOOTING
@@ -74,6 +76,11 @@ TROUBLESHOOTING
   Web app URL.
 - 401/403 errors — double check "Who has access" is set to "Anyone" in
   the deployment settings.
+- Already had this deployed before? Paste the updated code.gs over the
+  old script, then "Deploy" > "Manage deployments" > edit (pencil icon)
+  > select "New version" > Deploy. Your existing "Workout Log" tab (if
+  you have one from before weekly tabs existed) is left as-is; new
+  submissions start filing into weekly tabs going forward.
 
 --------------------------------------------------
 SHARING THE SHEET FOR REVIEW

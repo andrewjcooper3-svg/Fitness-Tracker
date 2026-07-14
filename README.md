@@ -44,16 +44,32 @@ Sheet via a Google Apps Script web endpoint.
 
 Each exercise in a session is logged as its own row:
 
-`Timestamp | Day | Exercise | Target Weight | Target Reps | Sets Completed | Sets Planned | Notes`
+`Timestamp | Day | Exercise | Target Weight | Target Reps | Sets Completed | Sets Planned | Total Reps | Notes`
 
 Target weight/reps come from the placeholders on the first set of each
 exercise (the prescribed target); sets completed is the count of checked
-set checkboxes; notes are pulled from any per-set notes fields entered
-during the session. Pushups appear in the Sheet as their own "Pushups"
-exercise row, exactly like any gym lift.
+set checkboxes; Total Reps sums whatever was actually typed into each
+set's Reps field (the same number shown live on the card); notes are
+pulled from any per-set notes fields entered during the session. Pushups
+appear in the Sheet as their own "Pushups" exercise row, exactly like any
+gym lift.
 
 Days with no structured exercises (e.g. the Saturday cardio checklist
 items) log a single placeholder row instead.
+
+## Sheet organization
+
+- The header shows the current Monday–Sunday range (e.g. "Week of Jul 13
+  - Jul 19, 2026"), computed automatically from the device's date — no
+  need to edit it by hand.
+- Every submission includes that week label, and the Apps Script files
+  the row into a Sheet **tab** named after it, creating the tab the first
+  time a given week is logged. Reopen the same tracker file all week and
+  everything lands in the same tab; get a fresh tracker next week and it
+  starts a new tab automatically — all inside the same spreadsheet.
+- Rows are tinted by day of week (Monday through Sunday each get a fixed
+  pastel color) with a divider line where the day changes, so a week's
+  tab is easy to scan at a glance.
 
 ## Setup
 
