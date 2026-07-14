@@ -181,7 +181,7 @@
 
   <button class="ov-open-btn" onclick="showAppView('tracker')">Open Tracker →</button>
 
-  <div class="ov-note">Reflects what's checked off in this browser session right now.<br>Reopening the app after it's fully closed resets this view until sets are marked again.</div>
+  <div class="ov-note">Reflects what's checked off this week, saved on this device.<br>Automatically resets once a new week begins.</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -554,6 +554,8 @@ const dayKeys = ['mon','tue','wed','thu','fri','sat','sun'];
 const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday', sun:'Sunday' };
 const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
 const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
+const STORAGE_STATE_KEY = 'WORKOUT_TRACKER_STATE';
+let isRestoringState = false;
 
 // Baked-in default so the tracker works out of the box (e.g. a Home
 // Screen icon, whose storage doesn't share with regular Safari tabs)
@@ -574,6 +576,100 @@ function getWeekLabel() {
   sunday.setDate(monday.getDate() + 6);
   const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return `Week of ${fmt(monday)} - ${fmt(sunday)}, ${sunday.getFullYear()}`;
+}
+
+/* ---------- Local persistence (resets automatically each new week) ---------- */
+
+function serializeDay(day) {
+  const panel = document.getElementById('day-' + day);
+  const exercises = Array.from(panel.querySelectorAll('.exercise-card')).map(card => {
+    const nameInput = card.querySelector('.exercise-name-input');
+    const sets = Array.from(card.querySelectorAll('.set-row')).map(row => {
+      const inputs = row.querySelectorAll('.set-input');
+      return {
+        weight: inputs[0] ? inputs[0].value : '',
+        reps: inputs[1] ? inputs[1].value : '',
+        notes: inputs[2] ? inputs[2].value : '',
+        checked: row.querySelector('.set-checkbox').classList.contains('checked')
+      };
+    });
+    return { custom: !!nameInput, name: nameInput ? nameInput.value : '', sets: sets };
+  });
+
+  const checkItems = Array.from(panel.querySelectorAll('.check-item')).map(item => ({
+    checked: item.classList.contains('checked')
+  }));
+
+  return { exercises: exercises, checkItems: checkItems };
+}
+
+function saveState() {
+  if (isRestoringState) return;
+  const state = { week: getWeekLabel(), days: {} };
+  dayKeys.forEach(day => { state.days[day] = serializeDay(day); });
+  localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
+}
+
+function restoreDay(day, savedDay) {
+  if (!savedDay) return;
+  const panel = document.getElementById('day-' + day);
+
+  savedDay.exercises.forEach((savedEx, i) => {
+    let card = panel.querySelectorAll('.exercise-card')[i];
+    if (!card) {
+      // Beyond what's currently rendered - it was a custom "+ Add Exercise" card.
+      addExercise(panel, true);
+      card = panel.querySelectorAll('.exercise-card')[i];
+      const nameInput = card.querySelector('.exercise-name-input');
+      if (nameInput) nameInput.value = savedEx.name;
+    }
+
+    let rows = card.querySelectorAll('.set-row');
+    while (rows.length < savedEx.sets.length) {
+      addSet(card.querySelector('.add-set-btn'));
+      rows = card.querySelectorAll('.set-row');
+    }
+
+    rows.forEach((row, si) => {
+      const savedSet = savedEx.sets[si];
+      if (!savedSet) return;
+      const inputs = row.querySelectorAll('.set-input');
+      if (inputs[0]) inputs[0].value = savedSet.weight || '';
+      if (inputs[1]) inputs[1].value = savedSet.reps || '';
+      if (inputs[2]) inputs[2].value = savedSet.notes || '';
+      if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
+    });
+
+    updateExerciseTotal(card);
+  });
+
+  const checkItems = panel.querySelectorAll('.check-item');
+  checkItems.forEach((item, i) => {
+    const saved = savedDay.checkItems[i];
+    if (saved && saved.checked) {
+      item.classList.add('checked');
+      item.querySelector('.checkbox').textContent = '✓';
+    }
+  });
+}
+
+function restoreState() {
+  let saved;
+  try {
+    saved = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null');
+  } catch (e) {
+    saved = null;
+  }
+
+  if (!saved || saved.week !== getWeekLabel()) {
+    // No saved state, or the week has rolled over - start this week fresh.
+    saveState();
+    return;
+  }
+
+  isRestoringState = true;
+  dayKeys.forEach(day => restoreDay(day, saved.days[day]));
+  isRestoringState = false;
 }
 
 /* ---------- Weekly Overview tab ---------- */
@@ -665,11 +761,13 @@ function toggleSetCheck(el) {
   el.classList.toggle('checked');
   const card = el.closest('.exercise-card');
   if (card) updateExerciseTotal(card);
+  saveState();
 }
 
 function toggleCheck(el) {
   el.classList.toggle('checked');
   el.querySelector('.checkbox').textContent = el.classList.contains('checked') ? '✓' : '';
+  saveState();
 }
 
 /* ---------- Config: deployment URL ---------- */
@@ -829,6 +927,7 @@ function addSet(btn) {
     `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>`;
   container.insertBefore(row, btn);
   updateExerciseTotal(container.closest('.exercise-card'));
+  saveState();
 }
 
 function initExerciseSets(card) {
@@ -844,7 +943,7 @@ function initExerciseSets(card) {
   updateExerciseTotal(card);
 }
 
-function addExercise(panel) {
+function addExercise(panel, skipFocus) {
   const card = document.createElement('div');
   card.className = 'exercise-card';
   card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><input class="exercise-name-input" type="text" placeholder="Exercise name" onclick="event.stopPropagation()"></div><div class="exercise-meta">Custom</div></div>` +
@@ -853,7 +952,8 @@ function addExercise(panel) {
   const addBtn = panel.querySelector(':scope > .add-exercise-btn');
   panel.insertBefore(card, addBtn);
   initExerciseSets(card);
-  card.querySelector('.exercise-name-input').focus();
+  if (!skipFocus) card.querySelector('.exercise-name-input').focus();
+  saveState();
 }
 
 function initAddExerciseButtons() {
@@ -873,6 +973,9 @@ document.addEventListener('input', function (e) {
   if (e.target.classList.contains('set-input')) {
     const card = e.target.closest('.exercise-card');
     if (card) updateExerciseTotal(card);
+  }
+  if (e.target.closest('.day-panel')) {
+    saveState();
   }
 });
 
@@ -1056,6 +1159,7 @@ document.querySelectorAll('.exercise-sets').forEach((el, i) => {
 
 document.querySelectorAll('.exercise-card').forEach(initExerciseSets);
 initAddExerciseButtons();
+restoreState();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
