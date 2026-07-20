@@ -1207,6 +1207,37 @@ function escapeHtml_(str) {
   return div.innerHTML;
 }
 
+// Computes "today through N days from now" as absolute UTC instants,
+// anchored to US Eastern time regardless of the device's own timezone
+// setting - the Worker itself has no correct notion of "today" (it runs
+// on UTC), so the browser has to resolve this and hand over exact range.
+function getEasternDateRange(daysAhead) {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23'
+  });
+  const parts = {};
+  fmt.formatToParts(now).forEach(p => { parts[p.type] = p.value; });
+
+  // Eastern's wall-clock reading right now, misread as if it were UTC -
+  // comparing that to the real "now" reveals Eastern's current UTC offset
+  // (EST vs EDT, correctly, since Intl already applied the DST rule).
+  const asIfUTC = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour), Number(parts.minute), Number(parts.second)
+  );
+  const offsetMs = asIfUTC - now.getTime();
+
+  const midnightAsIfUTC = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 0, 0, 0);
+  const start = new Date(midnightAsIfUTC - offsetMs);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + daysAhead);
+  return { start, end };
+}
+
 async function loadCalendarEvents() {
   const statusEl = document.getElementById('calStatus');
   const listEl = document.getElementById('calEventList');
@@ -1223,7 +1254,8 @@ async function loadCalendarEvents() {
   statusEl.className = 'cal-status';
 
   try {
-    const res = await fetch(url + '?days=14');
+    const { start, end } = getEasternDateRange(14);
+    const res = await fetch(url + `?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`);
     const data = await res.json();
     if (data.status !== 'success') throw new Error(data.message || 'Unknown error');
 

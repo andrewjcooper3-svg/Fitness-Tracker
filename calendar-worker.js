@@ -186,15 +186,14 @@ function parseICSDate(value, allDay) {
   return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s));
 }
 
-async function getUpcomingCalendarEvents(days, env) {
+// start/end are Dates already resolved to absolute UTC instants by the
+// caller - the Worker itself has no concept of "today" that matches the
+// user's timezone (it effectively runs on UTC), so it must never compute
+// that boundary itself.
+async function getUpcomingCalendarEvents(start, end, env) {
   const auth = basicAuthHeader(env.APPLE_ID, env.APPLE_APP_PASSWORD);
   const homeUrl = await getCalDavHomeUrl(auth);
   const calendars = await listCalendars(homeUrl, auth);
-
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + days);
 
   const allEvents = [];
   for (const cal of calendars) {
@@ -235,8 +234,28 @@ export default {
         throw new Error('Set APPLE_ID and APPLE_APP_PASSWORD as Worker secrets (Settings > Variables and Secrets).');
       }
       const url = new URL(request.url);
-      const days = parseInt(url.searchParams.get('days') || '14', 10);
-      const events = await getUpcomingCalendarEvents(days, env);
+      const startParam = url.searchParams.get('start');
+      const endParam = url.searchParams.get('end');
+
+      let start, end;
+      if (startParam && endParam) {
+        // Preferred path: the caller (the webapp, in the browser) already
+        // knows the user's real local timezone and sent an exact UTC
+        // instant range for "today through N days from now" in it.
+        start = new Date(startParam);
+        end = new Date(endParam);
+      } else {
+        // Fallback for a bare/manual request with no range specified -
+        // this uses the Worker's own (UTC) notion of "today", which will
+        // be off by however many hours the caller is behind UTC.
+        const days = parseInt(url.searchParams.get('days') || '14', 10);
+        start = new Date();
+        start.setUTCHours(0, 0, 0, 0);
+        end = new Date(start);
+        end.setUTCDate(end.getUTCDate() + days);
+      }
+
+      const events = await getUpcomingCalendarEvents(start, end, env);
       return new Response(JSON.stringify({ status: 'success', events }), {
         headers: { 'Content-Type': 'application/json', ...cors }
       });
