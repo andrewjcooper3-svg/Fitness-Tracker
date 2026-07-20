@@ -245,7 +245,7 @@
     </div>
   </div>
 
-  <div class="ov-note">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Includes the reviewed totals from the week of Jul 13 onward.</div>
+  <div class="ov-note">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Year total starts from a 26,395 balance as of Jul 19, plus what's logged here since.</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -742,6 +742,7 @@ const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
 const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 const STORAGE_STATE_KEY = 'WORKOUT_TRACKER_STATE';
 const STORAGE_PUSHUP_LEDGER_KEY = 'WORKOUT_PUSHUP_LEDGER';
+const STORAGE_YEAR_CARRY_KEY = 'WORKOUT_YEAR_CARRY_FORWARD';
 const PUSHUP_DAILY_BASELINE = 165;
 const PUSHUP_YEAR_GOAL = 50000;
 let isRestoringState = false;
@@ -850,6 +851,19 @@ function seedHistoricalPushupLedger() {
   });
   localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(ledger));
   localStorage.setItem(PUSHUP_LEDGER_SEED_KEY, '1');
+}
+
+// The day-by-day ledger only exists from the week of Jul 13 onward, but the
+// real year-to-date total (tracked outside this app before now) is much
+// higher - 26,395 as of Jul 19. Stored as a one-time starting balance so
+// the Year ring reflects reality: yearActual = carry total + only the
+// ledger days strictly after asOf (never double-counts Jul 13-18, which
+// are already folded into that 26,395).
+const YEAR_CARRY_SEED_KEY = 'WORKOUT_YEAR_CARRY_SEEDED_V1';
+function seedYearCarryForward() {
+  if (localStorage.getItem(YEAR_CARRY_SEED_KEY)) return;
+  localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify({ asOf: '2026-07-19', total: 26395 }));
+  localStorage.setItem(YEAR_CARRY_SEED_KEY, '1');
 }
 
 function restoreDay(day, savedDay) {
@@ -1078,12 +1092,24 @@ function renderPushupsTab() {
   }
   setGoalRing('puMonthRing', 'puMonthPct', 'puMonthValue', monthActual, monthTarget);
 
-  // This year: fixed 50,000 goal, actual summed across the whole year.
-  const yearStart = new Date(today.getFullYear(), 0, 1);
+  // This year: fixed 50,000 goal. Starts from the real carried-forward
+  // total (tracked outside this ledger) and adds only the days logged
+  // strictly after that baseline's date, so Jul 13-18 never gets counted
+  // twice (they're both in the daily ledger and already inside the carry).
   const yearEnd = new Date(today.getFullYear(), 11, 31);
+  const carry = JSON.parse(localStorage.getItem(STORAGE_YEAR_CARRY_KEY) || 'null');
   let yearActual = 0;
-  for (let d = new Date(yearStart); d <= yearEnd; d.setDate(d.getDate() + 1)) {
-    yearActual += ledger[dateKey(d)] || 0;
+  if (carry) {
+    yearActual = carry.total;
+    const carryDate = new Date(carry.asOf + 'T00:00:00');
+    for (let d = new Date(carryDate); d <= yearEnd; d.setDate(d.getDate() + 1)) {
+      if (d > carryDate) yearActual += ledger[dateKey(d)] || 0;
+    }
+  } else {
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+    for (let d = new Date(yearStart); d <= yearEnd; d.setDate(d.getDate() + 1)) {
+      yearActual += ledger[dateKey(d)] || 0;
+    }
   }
   setGoalRing('puYearRing', 'puYearPct', 'puYearValue', yearActual, PUSHUP_YEAR_GOAL);
 
@@ -1614,6 +1640,7 @@ document.querySelectorAll('.exercise-card').forEach(initExerciseSets);
 initAddExerciseButtons();
 tagExerciseIds();
 seedHistoricalPushupLedger();
+seedYearCarryForward();
 restoreState();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
