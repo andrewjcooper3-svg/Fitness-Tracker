@@ -265,13 +265,27 @@
 </div>
 
 <div id="view-calendar" class="app-view">
+  <div class="config-box">
+    <div class="config-toggle" onclick="toggleCalendarConfig()">
+      <div class="config-title">⚙ Calendar Worker</div>
+      <div class="config-chevron" id="calendarConfigChevron">▸</div>
+    </div>
+    <div class="config-body" id="calendarConfigBody">
+      <div class="config-row">
+        <input type="text" id="calendarWorkerUrl" class="config-input" placeholder="Paste Cloudflare Worker URL">
+        <button class="config-save" onclick="saveCalendarWorkerUrl()">Save</button>
+      </div>
+      <div class="config-status" id="calendarConfigStatus">Not connected — paste your Worker URL above.</div>
+    </div>
+  </div>
+
   <div class="cal-header">
     <div class="cal-title">Upcoming</div>
     <button class="cal-refresh-btn" onclick="loadCalendarEvents()" title="Refresh">↻</button>
   </div>
   <div id="calStatus" class="cal-status"></div>
   <div id="calEventList"></div>
-  <div class="ov-note">Reads your iCloud Calendar via CalDAV through the same backend as Sheet logging.<br>Requires an Apple app-specific password configured in the Apps Script's properties.</div>
+  <div class="ov-note">Reads your iCloud Calendar via a small Cloudflare Worker (CalDAV bridge) - kept separate from the Sheet-logging backend since Apps Script can't make the requests CalDAV needs.</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -765,6 +779,7 @@
 const dayKeys = ['mon','tue','wed','thu','fri','sat','sun'];
 const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday', sun:'Sunday' };
 const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
+const STORAGE_CALENDAR_WORKER_KEY = 'WORKOUT_CALENDAR_WORKER_URL';
 const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 const STORAGE_STATE_KEY = 'WORKOUT_TRACKER_STATE';
 const STORAGE_PUSHUP_LEDGER_KEY = 'WORKOUT_PUSHUP_LEDGER';
@@ -1196,9 +1211,9 @@ async function loadCalendarEvents() {
   const listEl = document.getElementById('calEventList');
   listEl.innerHTML = '';
 
-  const url = getDeploymentUrl();
+  const url = getCalendarWorkerUrl();
   if (!url) {
-    statusEl.textContent = '⚠ No Sheet URL configured — set it in the Tracker tab first.';
+    statusEl.textContent = '⚠ No Calendar Worker URL configured — paste it above first.';
     statusEl.className = 'cal-status error';
     return;
   }
@@ -1207,7 +1222,7 @@ async function loadCalendarEvents() {
   statusEl.className = 'cal-status';
 
   try {
-    const res = await fetch(url + '?action=calendar&days=14');
+    const res = await fetch(url + '?days=14');
     const data = await res.json();
     if (data.status !== 'success') throw new Error(data.message || 'Unknown error');
 
@@ -1322,6 +1337,43 @@ function updateConfigStatus(url) {
 
 function getDeploymentUrl() {
   return localStorage.getItem(STORAGE_URL_KEY) || DEFAULT_DEPLOYMENT_URL;
+}
+
+/* ---------- Config: calendar worker URL ---------- */
+
+function toggleCalendarConfig() {
+  const body = document.getElementById('calendarConfigBody');
+  const chevron = document.getElementById('calendarConfigChevron');
+  body.classList.toggle('expanded');
+  chevron.textContent = body.classList.contains('expanded') ? '▾' : '▸';
+}
+
+function loadCalendarWorkerUrl() {
+  const url = localStorage.getItem(STORAGE_CALENDAR_WORKER_KEY) || '';
+  document.getElementById('calendarWorkerUrl').value = url;
+  updateCalendarConfigStatus(url);
+}
+
+function saveCalendarWorkerUrl() {
+  const url = document.getElementById('calendarWorkerUrl').value.trim();
+  localStorage.setItem(STORAGE_CALENDAR_WORKER_KEY, url);
+  updateCalendarConfigStatus(url);
+  loadCalendarEvents();
+}
+
+function updateCalendarConfigStatus(url) {
+  const status = document.getElementById('calendarConfigStatus');
+  if (url) {
+    status.textContent = '✓ Connected — reading events from your Worker.';
+    status.className = 'config-status ok';
+  } else {
+    status.textContent = 'Not connected — paste your Worker URL above.';
+    status.className = 'config-status warn';
+  }
+}
+
+function getCalendarWorkerUrl() {
+  return localStorage.getItem(STORAGE_CALENDAR_WORKER_KEY) || '';
 }
 
 /* ---------- Data collection ---------- */
@@ -1750,6 +1802,7 @@ restoreState();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
+loadCalendarWorkerUrl();
 flushPendingLogs();
 renderOverview();
 </script>
