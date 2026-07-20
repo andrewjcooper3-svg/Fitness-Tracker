@@ -138,20 +138,29 @@ async function fetchEventsForCalendar(calUrl, startDate, endDate, auth) {
   const events = [];
   dataBlocks.forEach(block => {
     const ics = extractTag(block, 'calendar-data');
-    if (ics) events.push(...parseICSEvents(decodeXmlEntities(ics)));
+    if (!ics) return;
+    // The server's time-range filter matches a recurring VEVENT if *any*
+    // of its occurrences fall in range, but still returns the master
+    // event's original DTSTART/RRULE, not the specific matching
+    // occurrence - so recurring events need expanding against the same
+    // range here to find which occurrence(s) are actually relevant.
+    parseICSEvents(decodeXmlEntities(ics)).forEach(ev => {
+      events.push(...expandRecurrence(ev, startDate, endDate));
+    });
   });
   return events;
 }
 
-// Minimal VEVENT parser - handles SUMMARY, DTSTART, DTEND (date-only and
-// dateTime forms). Enough for a read-only display list; not a full
-// RFC 5545 implementation (no recurrence expansion, no timezone tables).
+// Minimal VEVENT parser - handles SUMMARY, DTSTART, DTEND, RRULE, EXDATE
+// (date-only and dateTime forms). Enough for a read-only display list;
+// not a full RFC 5545 implementation (no RDATE, no RECURRENCE-ID
+// overrides for individually-edited occurrences).
 function parseICSEvents(icsText) {
   const events = [];
   const veventBlocks = icsText.split('BEGIN:VEVENT').slice(1);
   veventBlocks.forEach(block => {
     const lines = block.split('END:VEVENT')[0].split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const event = { summary: '', start: null, end: null, allDay: false };
+    const event = { summary: '', start: null, end: null, allDay: false, rrule: null, exdates: [] };
     lines.forEach(line => {
       const idx = line.indexOf(':');
       if (idx === -1) return;
@@ -170,10 +179,76 @@ function parseICSEvents(icsText) {
       if (key === 'DTEND') {
         event.end = parseICSDate(value, keyPart.includes('VALUE=DATE') && !keyPart.includes('VALUE=DATE-TIME'), tzid);
       }
+      if (key === 'RRULE') event.rrule = parseRRule(value);
+      if (key === 'EXDATE') {
+        const exAllDay = keyPart.includes('VALUE=DATE') && !keyPart.includes('VALUE=DATE-TIME');
+        value.split(',').forEach(v => event.exdates.push(parseICSDate(v, exAllDay, tzid).getTime()));
+      }
     });
     if (event.summary && event.start) events.push(event);
   });
   return events;
+}
+
+function parseRRule(value) {
+  const rule = {};
+  value.split(';').forEach(part => {
+    const [k, v] = part.split('=');
+    if (k) rule[k] = v;
+  });
+  return rule;
+}
+
+// Expands a (possibly recurring) event into every occurrence that
+// overlaps [rangeStart, rangeEnd]. Supports FREQ=DAILY/WEEKLY/MONTHLY/
+// YEARLY with INTERVAL/COUNT/UNTIL - covers ordinary bills, paydays, and
+// similar simple recurring events; does not implement BYDAY/BYMONTHDAY/
+// BYSETPOS or other fine-grained RRULE parts.
+function expandRecurrence(event, rangeStart, rangeEnd) {
+  const duration = event.end ? (event.end.getTime() - event.start.getTime()) : 0;
+
+  if (!event.rrule) {
+    const occEnd = event.end || event.start;
+    if (occEnd >= rangeStart && event.start <= rangeEnd) {
+      return [{ summary: event.summary, allDay: event.allDay, start: event.start, end: event.end }];
+    }
+    return [];
+  }
+
+  const freq = event.rrule.FREQ;
+  const interval = parseInt(event.rrule.INTERVAL || '1', 10) || 1;
+  const count = event.rrule.COUNT ? parseInt(event.rrule.COUNT, 10) : null;
+  const until = event.rrule.UNTIL ? parseICSDate(event.rrule.UNTIL, !event.rrule.UNTIL.includes('T'), null) : null;
+  const exdateSet = new Set(event.exdates);
+
+  const occurrences = [];
+  const current = new Date(event.start);
+  let occurrenceIndex = 0;
+  let iterations = 0;
+  const maxIterations = 2000; // safety cap against unbounded/malformed rules
+
+  while (iterations < maxIterations) {
+    iterations++;
+    if (count != null && occurrenceIndex >= count) break;
+    if (until && current > until) break;
+    if (current > rangeEnd) break;
+
+    if (!exdateSet.has(current.getTime())) {
+      const occEnd = duration ? new Date(current.getTime() + duration) : null;
+      if ((occEnd || current) >= rangeStart && current <= rangeEnd) {
+        occurrences.push({ summary: event.summary, allDay: event.allDay, start: new Date(current), end: occEnd });
+      }
+    }
+
+    occurrenceIndex++;
+    if (freq === 'DAILY') current.setUTCDate(current.getUTCDate() + interval);
+    else if (freq === 'WEEKLY') current.setUTCDate(current.getUTCDate() + 7 * interval);
+    else if (freq === 'MONTHLY') current.setUTCMonth(current.getUTCMonth() + interval);
+    else if (freq === 'YEARLY') current.setUTCFullYear(current.getUTCFullYear() + interval);
+    else break; // unsupported FREQ - stop rather than loop forever
+  }
+
+  return occurrences;
 }
 
 // Resolves a named IANA zone's UTC offset at a given instant (DST-aware)
