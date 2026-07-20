@@ -107,7 +107,15 @@ async function listCalendars(homeUrl, auth) {
   const calendars = [];
   responses.forEach(resp => {
     const resourcetypeBlock = extractTag(resp, 'resourcetype');
-    if (!resourcetypeBlock || !/<[^:>]*:?calendar\b/i.test(resourcetypeBlock)) return;
+    if (!resourcetypeBlock) return;
+    // Apple marks a calendar you added via "Subscribe to Calendar" (e.g. a
+    // public F1/sports/holiday feed) with <CS:subscribed/> in resourcetype
+    // instead of - not in addition to - the standard <C:calendar/> element
+    // used for calendars you own or that were shared with you directly.
+    // Both need accepting, or subscribed calendars never surface.
+    const isCalendar = /<[^:>]*:?calendar\b/i.test(resourcetypeBlock);
+    const isSubscribed = /<[^:>]*:?subscribed\b/i.test(resourcetypeBlock);
+    if (!isCalendar && !isSubscribed) return;
     const href = extractTag(resp, 'href');
     const name = extractTag(resp, 'displayname');
     if (!href) return;
