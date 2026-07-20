@@ -159,13 +159,16 @@ function parseICSEvents(icsText) {
       const value = line.slice(idx + 1);
       const key = keyPart.split(';')[0];
 
+      const tzidMatch = keyPart.match(/TZID=([^;]+)/);
+      const tzid = tzidMatch ? tzidMatch[1] : null;
+
       if (key === 'SUMMARY') event.summary = value.replace(/\\,/g, ',').replace(/\\n/gi, ' ');
       if (key === 'DTSTART') {
         event.allDay = keyPart.includes('VALUE=DATE') && !keyPart.includes('VALUE=DATE-TIME');
-        event.start = parseICSDate(value, event.allDay);
+        event.start = parseICSDate(value, event.allDay, tzid);
       }
       if (key === 'DTEND') {
-        event.end = parseICSDate(value, keyPart.includes('VALUE=DATE') && !keyPart.includes('VALUE=DATE-TIME'));
+        event.end = parseICSDate(value, keyPart.includes('VALUE=DATE') && !keyPart.includes('VALUE=DATE-TIME'), tzid);
       }
     });
     if (event.summary && event.start) events.push(event);
@@ -173,17 +176,60 @@ function parseICSEvents(icsText) {
   return events;
 }
 
-function parseICSDate(value, allDay) {
+// Resolves a named IANA zone's UTC offset at a given instant (DST-aware)
+// using Intl, the same trick used client-side for Eastern time - Workers
+// ship full ICU data so this works for any zone, not just one hardcoded.
+function getTzOffsetMs(instant, tzid) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: tzid,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23'
+  });
+  const parts = {};
+  fmt.formatToParts(instant).forEach(p => { parts[p.type] = p.value; });
+  const asIfUTC = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour), Number(parts.minute), Number(parts.second)
+  );
+  return asIfUTC - instant.getTime();
+}
+
+// Converts a wall-clock Y/M/D H:M:S reading in a named zone to the true
+// UTC instant it represents. Two passes to converge correctly even right
+// at a DST transition edge, where the offset used to make the first
+// guess might not match the offset actually in effect.
+function convertNamedTzToUtc(y, mo, d, h, mi, s, tzid) {
+  let guess = new Date(Date.UTC(y, mo, d, h, mi, s));
+  for (let i = 0; i < 2; i++) {
+    const offsetMs = getTzOffsetMs(guess, tzid);
+    guess = new Date(Date.UTC(y, mo, d, h, mi, s) - offsetMs);
+  }
+  return guess;
+}
+
+// DTSTART/DTEND values come in three shapes: a bare date (all-day, no
+// time/zone at all), a UTC instant suffixed with "Z", or - very common
+// for events created directly in Apple Calendar - a local wall-clock
+// value paired with a TZID parameter that must be resolved to know what
+// UTC instant it actually is.
+function parseICSDate(value, allDay, tzid) {
   if (allDay) {
     const y = value.slice(0, 4), m = value.slice(4, 6), d = value.slice(6, 8);
-    return new Date(Number(y), Number(m) - 1, Number(d));
+    return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
   }
-  const y = value.slice(0, 4), mo = value.slice(4, 6), d = value.slice(6, 8);
-  const h = value.slice(9, 11), mi = value.slice(11, 13), s = value.slice(13, 15);
+  const y = Number(value.slice(0, 4)), mo = Number(value.slice(4, 6)), d = Number(value.slice(6, 8));
+  const h = Number(value.slice(9, 11)), mi = Number(value.slice(11, 13)), s = Number(value.slice(13, 15) || '0');
+
   if (value.slice(-1) === 'Z') {
-    return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s)));
+    return new Date(Date.UTC(y, mo - 1, d, h, mi, s));
   }
-  return new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s));
+  if (tzid) {
+    return convertNamedTzToUtc(y, mo - 1, d, h, mi, s, tzid);
+  }
+  // No TZID and no Z suffix: a "floating" time with no defined zone at
+  // all (rare from iCloud in practice). UTC is the least-wrong fallback.
+  return new Date(Date.UTC(y, mo - 1, d, h, mi, s));
 }
 
 // start/end are Dates already resolved to absolute UTC instants by the
