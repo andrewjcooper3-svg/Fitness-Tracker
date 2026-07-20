@@ -376,7 +376,7 @@ export default {
         // Fallback for a bare/manual request with no range specified -
         // this uses the Worker's own (UTC) notion of "today", which will
         // be off by however many hours the caller is behind UTC.
-        const days = parseInt(url.searchParams.get('days') || '14', 10);
+        const days = parseInt(url.searchParams.get('days') || '30', 10);
         start = new Date();
         start.setUTCHours(0, 0, 0, 0);
         end = new Date(start);

@@ -1254,13 +1254,13 @@ async function loadCalendarEvents() {
   statusEl.className = 'cal-status';
 
   try {
-    const { start, end } = getEasternDateRange(14);
+    const { start, end } = getEasternDateRange(30);
     const res = await fetch(url + `?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`);
     const data = await res.json();
     if (data.status !== 'success') throw new Error(data.message || 'Unknown error');
 
     if (!data.events || data.events.length === 0) {
-      statusEl.textContent = 'No upcoming events in the next 14 days.';
+      statusEl.textContent = 'No upcoming events in the next 30 days.';
       statusEl.className = 'cal-status';
       return;
     }
