@@ -166,13 +166,9 @@ function doGet(e) {
 /**
  * ---------- iCloud Calendar (CalDAV, read-only) ----------
  *
- * Reads events straight from iCloud over CalDAV using an Apple ID +
- * app-specific password, stored only in this script's Script Properties
- * (Project Settings > Script Properties) - never sent to or stored by
- * the webapp itself:
- *   APPLE_ID            your Apple ID email
- *   APPLE_APP_PASSWORD  an app-specific password from appleid.apple.com
- *                        (Sign-In and Security > App-Specific Passwords)
+ * Reads events straight from iCloud over CalDAV using the APPLE_ID /
+ * APPLE_APP_PASSWORD constants set at the top of this file - those never
+ * get sent to or stored by the webapp itself, only used server-side here.
  *
  * This is a minimal CalDAV client - enough to discover your calendars and
  * pull upcoming VEVENTs for read-only display, not a full RFC 4791/5545
