@@ -20,13 +20,17 @@
  * Optional - Calendar tab (reads iCloud Calendar via CalDAV):
  *   5. At appleid.apple.com, generate an app-specific password (Sign-In
  *      and Security > App-Specific Passwords).
- *   6. In this Apps Script project: Project Settings > Script Properties
- *      > Add script property, twice:
- *        APPLE_ID            = your Apple ID email
- *        APPLE_APP_PASSWORD  = the app-specific password from step 5
+ *   6. Fill in APPLE_ID and APPLE_APP_PASSWORD below with your real values.
  *   7. Re-deploy (Deploy > Manage deployments > edit > New version) so the
  *      live Web App picks up the code change.
+ *
+ * This file lives in a public repo with placeholder credentials - once you
+ * fill in your real Apple ID/password, keep that copy only in the Apps
+ * Script editor. Don't paste the filled-in version back into the repo.
  */
+
+const APPLE_ID = 'YOUR_APPLE_ID@icloud.com';
+const APPLE_APP_PASSWORD = 'xxxx-xxxx-xxxx-xxxx';
 
 const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Set', 'Target Weight', 'Actual Weight', 'Target Reps', 'Actual Reps', 'Completed', 'Notes'];
 const COLUMN_WIDTHS = [140, 90, 190, 50, 100, 100, 90, 90, 90, 240];
@@ -176,13 +180,10 @@ function doGet(e) {
  */
 
 function getAppleCredentials_() {
-  const props = PropertiesService.getScriptProperties();
-  const appleId = props.getProperty('APPLE_ID');
-  const appPassword = props.getProperty('APPLE_APP_PASSWORD');
-  if (!appleId || !appPassword) {
-    throw new Error('Apple ID / app-specific password not configured. Add APPLE_ID and APPLE_APP_PASSWORD in Script Properties.');
+  if (!APPLE_ID || !APPLE_APP_PASSWORD || APPLE_ID.indexOf('YOUR_APPLE_ID') !== -1) {
+    throw new Error('Set APPLE_ID and APPLE_APP_PASSWORD near the top of this file.');
   }
-  return { appleId: appleId, appPassword: appPassword };
+  return { appleId: APPLE_ID, appPassword: APPLE_APP_PASSWORD };
 }
 
 // Issues a CalDAV request, manually following redirects (iCloud's root
