@@ -172,6 +172,21 @@
   .pu-ring-pct { position: relative; z-index: 1; font-family: var(--font); font-weight: 800; font-size: 16px; letter-spacing: -0.2px; }
   .pu-ring-label { font-family: var(--font); font-size: 12px; font-weight: 700; }
   .pu-ring-value { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .cal-title { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
+  .cal-refresh-btn { background: var(--surface); border: none; color: var(--accent); width: 34px; height: 34px; border-radius: 10px; font-size: 16px; cursor: pointer; transition: all 0.15s; }
+  .cal-refresh-btn:hover { background: var(--surface2); }
+  .cal-status { font-family: var(--font); font-size: 13px; color: var(--muted); text-align: center; padding: 24px 12px; line-height: 1.5; }
+  .cal-status.error { color: var(--red); }
+  .cal-day-group { margin-bottom: 14px; }
+  .cal-day-label { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
+  .cal-event-row { display: flex; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+  .cal-event-row:last-child { border-bottom: none; }
+  .cal-event-time { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--accent); width: 60px; flex-shrink: 0; }
+  .cal-event-body { min-width: 0; }
+  .cal-event-title { font-family: var(--font); font-size: 14px; font-weight: 600; }
+  .cal-event-cal { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -180,6 +195,7 @@
   <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">Overview</div>
   <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">Tracker</div>
   <div class="app-tab" data-view="pushups" onclick="showAppView('pushups')">Pushups</div>
+  <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">Calendar</div>
 </div>
 
 <div id="view-overview" class="app-view active">
@@ -246,6 +262,16 @@
   </div>
 
   <div class="ov-note">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Year total starts from a 26,395 balance as of Jul 19, plus what's logged here since.</div>
+</div>
+
+<div id="view-calendar" class="app-view">
+  <div class="cal-header">
+    <div class="cal-title">Upcoming</div>
+    <button class="cal-refresh-btn" onclick="loadCalendarEvents()" title="Refresh">↻</button>
+  </div>
+  <div id="calStatus" class="cal-status"></div>
+  <div id="calEventList"></div>
+  <div class="ov-note">Reads your iCloud Calendar via CalDAV through the same backend as Sheet logging.<br>Requires an Apple app-specific password configured in the Apps Script's properties.</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -746,6 +772,7 @@ const STORAGE_YEAR_CARRY_KEY = 'WORKOUT_YEAR_CARRY_FORWARD';
 const PUSHUP_DAILY_BASELINE = 165;
 const PUSHUP_YEAR_GOAL = 50000;
 let isRestoringState = false;
+let calendarLoadedOnce = false;
 
 // Baked-in default so the tracker works out of the box (e.g. a Home
 // Screen icon, whose storage doesn't share with regular Safari tabs)
@@ -997,6 +1024,7 @@ function showAppView(view) {
   document.querySelector(`.app-tab[data-view="${view}"]`).classList.add('active');
   if (view === 'overview') renderOverview();
   if (view === 'pushups') renderPushupsTab();
+  if (view === 'calendar' && !calendarLoadedOnce) { calendarLoadedOnce = true; loadCalendarEvents(); }
 }
 
 // Aggregates every day panel's current in-page state (all 7 days live in
@@ -1153,6 +1181,83 @@ function renderPushupsTab() {
     badgeEl.textContent = ahead ? 'On Pace' : 'Behind';
     subEl.textContent = ahead ? 'reps ahead of pace' : 'reps behind pace';
   }
+}
+
+/* ---------- Calendar tab (reads iCloud Calendar via the Apps Script backend) ---------- */
+
+function escapeHtml_(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : str;
+  return div.innerHTML;
+}
+
+async function loadCalendarEvents() {
+  const statusEl = document.getElementById('calStatus');
+  const listEl = document.getElementById('calEventList');
+  listEl.innerHTML = '';
+
+  const url = getDeploymentUrl();
+  if (!url) {
+    statusEl.textContent = '⚠ No Sheet URL configured — set it in the Tracker tab first.';
+    statusEl.className = 'cal-status error';
+    return;
+  }
+
+  statusEl.textContent = 'Loading…';
+  statusEl.className = 'cal-status';
+
+  try {
+    const res = await fetch(url + '?action=calendar&days=14');
+    const data = await res.json();
+    if (data.status !== 'success') throw new Error(data.message || 'Unknown error');
+
+    if (!data.events || data.events.length === 0) {
+      statusEl.textContent = 'No upcoming events in the next 14 days.';
+      statusEl.className = 'cal-status';
+      return;
+    }
+
+    statusEl.textContent = '';
+    renderCalendarEvents(data.events);
+  } catch (err) {
+    statusEl.textContent = '⚠ ' + err.message;
+    statusEl.className = 'cal-status error';
+  }
+}
+
+function renderCalendarEvents(events) {
+  const listEl = document.getElementById('calEventList');
+  listEl.innerHTML = '';
+
+  const groups = {};
+  const order = [];
+  events.forEach(ev => {
+    const key = new Date(ev.start).toDateString();
+    if (!groups[key]) { groups[key] = []; order.push(key); }
+    groups[key].push(ev);
+  });
+
+  order.forEach(key => {
+    const dayGroup = document.createElement('div');
+    dayGroup.className = 'cal-day-group';
+    const label = new Date(groups[key][0].start).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    groups[key].forEach(ev => {
+      const time = ev.allDay ? 'All Day' : new Date(ev.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const row = document.createElement('div');
+      row.className = 'cal-event-row';
+      row.innerHTML = `<div class="cal-event-time">${escapeHtml_(time)}</div>` +
+        `<div class="cal-event-body"><div class="cal-event-title">${escapeHtml_(ev.summary)}</div>` +
+        (ev.calendar ? `<div class="cal-event-cal">${escapeHtml_(ev.calendar)}</div>` : '') + `</div>`;
+      card.appendChild(row);
+    });
+
+    dayGroup.innerHTML = `<div class="cal-day-label">${escapeHtml_(label)}</div>`;
+    dayGroup.appendChild(card);
+    listEl.appendChild(dayGroup);
+  });
 }
 
 function showDay(day) {
