@@ -151,16 +151,27 @@
 
   .ov-note { font-family: var(--font); font-size: 12px; color: var(--muted); text-align: center; margin-top: 12px; line-height: 1.5; }
 
-  .pu-deficit-hero .ov-hero-number { transition: color 0.15s; }
+  .pu-deficit-hero { transition: background 0.4s ease; }
+  .pu-deficit-hero.ahead { background: radial-gradient(circle at 100% 0%, rgba(48,209,88,0.14), var(--surface) 65%); }
+  .pu-deficit-hero.behind { background: radial-gradient(circle at 100% 0%, rgba(255,69,58,0.14), var(--surface) 65%); }
+  .pu-deficit-top { display: flex; justify-content: space-between; align-items: center; }
+  .pu-status-badge { font-family: var(--font); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; white-space: nowrap; }
+  .pu-status-badge.ahead { background: rgba(48,209,88,0.16); color: var(--green); }
+  .pu-status-badge.behind { background: rgba(255,69,58,0.16); color: var(--red); }
+  .pu-deficit-hero .ov-hero-number { transition: color 0.3s ease; font-size: 48px; }
   .pu-deficit-hero .ov-hero-number.ahead { color: var(--green); }
   .pu-deficit-hero .ov-hero-number.behind { color: var(--red); }
-  .pu-goal-card { background: var(--surface); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
-  .pu-goal-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
-  .pu-goal-label { font-family: var(--font); font-size: 14px; font-weight: 600; }
-  .pu-goal-value { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .pu-fill-week { background: var(--accent); }
-  .pu-fill-month { background: var(--purple); }
-  .pu-fill-year { background: var(--teal); }
+
+  .pu-rings-card { background: var(--surface); border-radius: 20px; padding: 22px 12px 18px; margin-bottom: 12px; display: flex; justify-content: space-around; }
+  .pu-ring-item { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+  .pu-ring { width: 86px; height: 86px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; background: conic-gradient(var(--ring-color) calc(var(--pct, 0) * 3.6deg), var(--surface2) 0deg); transition: background 0.6s ease; }
+  .pu-ring::after { content: ''; position: absolute; inset: 8px; background: var(--surface); border-radius: 50%; }
+  .pu-ring-week { --ring-color: var(--accent); }
+  .pu-ring-month { --ring-color: var(--purple); }
+  .pu-ring-year { --ring-color: var(--teal); }
+  .pu-ring-pct { position: relative; z-index: 1; font-family: var(--font); font-weight: 800; font-size: 16px; letter-spacing: -0.2px; }
+  .pu-ring-label { font-family: var(--font); font-size: 12px; font-weight: 700; }
+  .pu-ring-value { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -206,38 +217,35 @@
 </div>
 
 <div id="view-pushups" class="app-view">
-  <div class="ov-hero pu-deficit-hero">
-    <div class="ov-hero-label">Pushup Deficit</div>
+  <div class="ov-hero pu-deficit-hero" id="puDeficitHero">
+    <div class="pu-deficit-top">
+      <div class="ov-hero-label">Pushup Deficit</div>
+      <div class="pu-status-badge" id="puStatusBadge">On Pace</div>
+    </div>
     <div class="ov-hero-week" id="puDeficitSince"></div>
     <div class="ov-hero-number" id="puDeficitNumber">0</div>
     <div class="ov-hero-sub" id="puDeficitSub"></div>
   </div>
 
-  <div class="pu-goal-card">
-    <div class="pu-goal-head">
-      <div class="pu-goal-label">This Week</div>
-      <div class="pu-goal-value" id="puWeekValue">0 / 0</div>
+  <div class="pu-rings-card">
+    <div class="pu-ring-item">
+      <div class="pu-ring pu-ring-week" id="puWeekRing"><div class="pu-ring-pct" id="puWeekPct">0%</div></div>
+      <div class="pu-ring-label">Week</div>
+      <div class="pu-ring-value" id="puWeekValue">0 / 0</div>
     </div>
-    <div class="ov-progress-track"><div class="ov-progress-fill pu-fill-week" id="puWeekFill"></div></div>
+    <div class="pu-ring-item">
+      <div class="pu-ring pu-ring-month" id="puMonthRing"><div class="pu-ring-pct" id="puMonthPct">0%</div></div>
+      <div class="pu-ring-label">Month</div>
+      <div class="pu-ring-value" id="puMonthValue">0 / 0</div>
+    </div>
+    <div class="pu-ring-item">
+      <div class="pu-ring pu-ring-year" id="puYearRing"><div class="pu-ring-pct" id="puYearPct">0%</div></div>
+      <div class="pu-ring-label">Year</div>
+      <div class="pu-ring-value" id="puYearValue">0 / 50,000</div>
+    </div>
   </div>
 
-  <div class="pu-goal-card">
-    <div class="pu-goal-head">
-      <div class="pu-goal-label">This Month</div>
-      <div class="pu-goal-value" id="puMonthValue">0 / 0</div>
-    </div>
-    <div class="ov-progress-track"><div class="ov-progress-fill pu-fill-month" id="puMonthFill"></div></div>
-  </div>
-
-  <div class="pu-goal-card">
-    <div class="pu-goal-head">
-      <div class="pu-goal-label">This Year</div>
-      <div class="pu-goal-value" id="puYearValue">0 / 50,000</div>
-    </div>
-    <div class="ov-progress-track"><div class="ov-progress-fill pu-fill-year" id="puYearFill"></div></div>
-  </div>
-
-  <div class="ov-note">Builds up from pushups logged in this app on this device.<br>History isn't retroactive — the deficit clock starts from your first logged day.</div>
+  <div class="ov-note">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Includes the reviewed totals from the week of Jul 13 onward.</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -820,6 +828,30 @@ function updatePushupLedger() {
   localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(ledger));
 }
 
+// One-time seed of the Week-of-Jul-13 reps actually reviewed from the
+// user's Sheet/PDF log, from before this ledger existed to track them
+// automatically - without this the deficit clock would start from
+// whenever this feature shipped instead of the week it's really about.
+// Never overwrites real data and never re-runs once applied.
+const PUSHUP_LEDGER_SEED_KEY = 'WORKOUT_PUSHUP_LEDGER_SEEDED_V1';
+function seedHistoricalPushupLedger() {
+  if (localStorage.getItem(PUSHUP_LEDGER_SEED_KEY)) return;
+  const seed = {
+    '2026-07-13': 165, // Monday - confirmed logged
+    '2026-07-14': 0,   // Tuesday - not logged
+    '2026-07-15': 0,   // Wednesday - no data
+    '2026-07-16': 50,  // Thursday - self-reported, not captured in the Sheet
+    '2026-07-17': 0,   // Friday - no data
+    '2026-07-18': 0    // Saturday - no data
+  };
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  Object.keys(seed).forEach(key => {
+    if (!(key in ledger)) ledger[key] = seed[key];
+  });
+  localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(ledger));
+  localStorage.setItem(PUSHUP_LEDGER_SEED_KEY, '1');
+}
+
 function restoreDay(day, savedDay) {
   if (!savedDay) return;
   const panel = document.getElementById('day-' + day);
@@ -1016,10 +1048,11 @@ function renderOverview() {
 
 /* ---------- Pushups tab (week/month/year goals + running deficit) ---------- */
 
-function setGoalBar(valueId, fillId, actual, target) {
+function setGoalRing(ringId, pctId, valueId, actual, target) {
   const pct = target ? Math.min(100, Math.round(actual / target * 100)) : 0;
+  document.getElementById(ringId).style.setProperty('--pct', pct);
+  document.getElementById(pctId).textContent = pct + '%';
   document.getElementById(valueId).textContent = `${actual.toLocaleString()} / ${target.toLocaleString()}`;
-  document.getElementById(fillId).style.width = pct + '%';
 }
 
 function renderPushupsTab() {
@@ -1028,11 +1061,11 @@ function renderPushupsTab() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // This week's bar reuses whatever target is configured on the live day
+  // This week's ring reuses whatever target is configured on the live day
   // panels, so it automatically reflects catch-up weeks vs. the normal
   // baseline without any special-casing here.
   const weekTotals = computeWeekStats().totals;
-  setGoalBar('puWeekValue', 'puWeekFill', weekTotals.pushupTotal, weekTotals.pushupTarget);
+  setGoalRing('puWeekRing', 'puWeekPct', 'puWeekValue', weekTotals.pushupTotal, weekTotals.pushupTarget);
 
   // This month: baseline pace (165/day, every day but Sunday) across the
   // whole calendar month, actual pulled from whatever's logged so far.
@@ -1043,7 +1076,7 @@ function renderPushupsTab() {
     monthActual += ledger[dateKey(d)] || 0;
     if (d.getDay() !== 0) monthTarget += PUSHUP_DAILY_BASELINE;
   }
-  setGoalBar('puMonthValue', 'puMonthFill', monthActual, monthTarget);
+  setGoalRing('puMonthRing', 'puMonthPct', 'puMonthValue', monthActual, monthTarget);
 
   // This year: fixed 50,000 goal, actual summed across the whole year.
   const yearStart = new Date(today.getFullYear(), 0, 1);
@@ -1052,12 +1085,15 @@ function renderPushupsTab() {
   for (let d = new Date(yearStart); d <= yearEnd; d.setDate(d.getDate() + 1)) {
     yearActual += ledger[dateKey(d)] || 0;
   }
-  setGoalBar('puYearValue', 'puYearFill', yearActual, PUSHUP_YEAR_GOAL);
+  setGoalRing('puYearRing', 'puYearPct', 'puYearValue', yearActual, PUSHUP_YEAR_GOAL);
 
   // Running deficit: actual vs. the 165/day baseline pace, from the first
-  // day this device has any logged data (can't reconstruct history from
-  // before this tab existed, so the clock honestly starts there).
+  // day this device has any logged data - which now includes the seeded
+  // Week-of-Jul-13 totals, so the clock starts from when the plan really
+  // began rather than from whenever this tab shipped.
   const loggedDates = Object.keys(ledger).sort();
+  const heroEl = document.getElementById('puDeficitHero');
+  const badgeEl = document.getElementById('puStatusBadge');
   const sinceEl = document.getElementById('puDeficitSince');
   const numEl = document.getElementById('puDeficitNumber');
   const subEl = document.getElementById('puDeficitSub');
@@ -1066,6 +1102,9 @@ function renderPushupsTab() {
     sinceEl.textContent = 'No pushups logged yet';
     numEl.textContent = '0';
     numEl.classList.remove('ahead', 'behind');
+    heroEl.classList.remove('ahead', 'behind');
+    badgeEl.classList.remove('ahead', 'behind');
+    badgeEl.textContent = 'No Data';
     subEl.textContent = 'Log a set to start tracking';
   } else {
     const startDate = new Date(loggedDates[0] + 'T00:00:00');
@@ -1075,12 +1114,18 @@ function renderPushupsTab() {
       actual += ledger[dateKey(d)] || 0;
     }
     const deficit = actual - expected;
+    const ahead = deficit >= 0;
     const since = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     sinceEl.textContent = `Since ${since}, vs. ${PUSHUP_DAILY_BASELINE}/day pace`;
-    numEl.textContent = (deficit >= 0 ? '+' : '−') + Math.abs(deficit).toLocaleString();
-    numEl.classList.toggle('ahead', deficit >= 0);
-    numEl.classList.toggle('behind', deficit < 0);
-    subEl.textContent = deficit >= 0 ? 'reps ahead of pace' : 'reps behind pace';
+    numEl.textContent = (ahead ? '+' : '−') + Math.abs(deficit).toLocaleString();
+    numEl.classList.toggle('ahead', ahead);
+    numEl.classList.toggle('behind', !ahead);
+    heroEl.classList.toggle('ahead', ahead);
+    heroEl.classList.toggle('behind', !ahead);
+    badgeEl.classList.toggle('ahead', ahead);
+    badgeEl.classList.toggle('behind', !ahead);
+    badgeEl.textContent = ahead ? 'On Pace' : 'Behind';
+    subEl.textContent = ahead ? 'reps ahead of pace' : 'reps behind pace';
   }
 }
 
@@ -1568,6 +1613,7 @@ document.querySelectorAll('.exercise-sets').forEach((el, i) => {
 document.querySelectorAll('.exercise-card').forEach(initExerciseSets);
 initAddExerciseButtons();
 tagExerciseIds();
+seedHistoricalPushupLedger();
 restoreState();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
