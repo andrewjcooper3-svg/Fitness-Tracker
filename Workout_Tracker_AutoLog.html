@@ -150,13 +150,25 @@
   .ov-open-btn:hover { background: var(--surface2); }
 
   .ov-note { font-family: var(--font); font-size: 12px; color: var(--muted); text-align: center; margin-top: 12px; line-height: 1.5; }
+
+  .pu-deficit-hero .ov-hero-number { transition: color 0.15s; }
+  .pu-deficit-hero .ov-hero-number.ahead { color: var(--green); }
+  .pu-deficit-hero .ov-hero-number.behind { color: var(--red); }
+  .pu-goal-card { background: var(--surface); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+  .pu-goal-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .pu-goal-label { font-family: var(--font); font-size: 14px; font-weight: 600; }
+  .pu-goal-value { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pu-fill-week { background: var(--accent); }
+  .pu-fill-month { background: var(--purple); }
+  .pu-fill-year { background: var(--teal); }
 </style>
 </head>
 <body>
 
 <div class="app-tabs">
-  <div class="app-tab active" onclick="showAppView('overview')">Overview</div>
-  <div class="app-tab" onclick="showAppView('tracker')">Tracker</div>
+  <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">Overview</div>
+  <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">Tracker</div>
+  <div class="app-tab" data-view="pushups" onclick="showAppView('pushups')">Pushups</div>
 </div>
 
 <div id="view-overview" class="app-view active">
@@ -191,6 +203,41 @@
   <button class="ov-open-btn" onclick="showAppView('tracker')">Open Tracker →</button>
 
   <div class="ov-note">Reflects what's checked off this week, saved on this device.<br>Automatically resets once a new week begins.</div>
+</div>
+
+<div id="view-pushups" class="app-view">
+  <div class="ov-hero pu-deficit-hero">
+    <div class="ov-hero-label">Pushup Deficit</div>
+    <div class="ov-hero-week" id="puDeficitSince"></div>
+    <div class="ov-hero-number" id="puDeficitNumber">0</div>
+    <div class="ov-hero-sub" id="puDeficitSub"></div>
+  </div>
+
+  <div class="pu-goal-card">
+    <div class="pu-goal-head">
+      <div class="pu-goal-label">This Week</div>
+      <div class="pu-goal-value" id="puWeekValue">0 / 0</div>
+    </div>
+    <div class="ov-progress-track"><div class="ov-progress-fill pu-fill-week" id="puWeekFill"></div></div>
+  </div>
+
+  <div class="pu-goal-card">
+    <div class="pu-goal-head">
+      <div class="pu-goal-label">This Month</div>
+      <div class="pu-goal-value" id="puMonthValue">0 / 0</div>
+    </div>
+    <div class="ov-progress-track"><div class="ov-progress-fill pu-fill-month" id="puMonthFill"></div></div>
+  </div>
+
+  <div class="pu-goal-card">
+    <div class="pu-goal-head">
+      <div class="pu-goal-label">This Year</div>
+      <div class="pu-goal-value" id="puYearValue">0 / 50,000</div>
+    </div>
+    <div class="ov-progress-track"><div class="ov-progress-fill pu-fill-year" id="puYearFill"></div></div>
+  </div>
+
+  <div class="ov-note">Builds up from pushups logged in this app on this device.<br>History isn't retroactive — the deficit clock starts from your first logged day.</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -686,6 +733,9 @@ const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday',
 const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
 const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 const STORAGE_STATE_KEY = 'WORKOUT_TRACKER_STATE';
+const STORAGE_PUSHUP_LEDGER_KEY = 'WORKOUT_PUSHUP_LEDGER';
+const PUSHUP_DAILY_BASELINE = 165;
+const PUSHUP_YEAR_GOAL = 50000;
 let isRestoringState = false;
 
 // Baked-in default so the tracker works out of the box (e.g. a Home
@@ -694,19 +744,32 @@ let isRestoringState = false;
 // config box below can still override it per-device via localStorage.
 const DEFAULT_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbzibd9VwYYvj8pcmApGKplDNW70tiZZjnT54K8kVHJJKQOxMEp21CNdWUYz2KVvPzxr/exec';
 
-// Monday-Sunday of the current week, e.g. "Week of Jul 13 - Jul 19, 2026".
-// Sent with every submission so the Apps Script can file it into a
-// matching weekly Sheet tab.
-function getWeekLabel() {
+function getWeekMonday() {
   const now = new Date();
   const dow = now.getDay();
   const diffToMonday = (dow === 0 ? -6 : 1) - dow;
   const monday = new Date(now);
   monday.setDate(now.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+// Monday-Sunday of the current week, e.g. "Week of Jul 13 - Jul 19, 2026".
+// Sent with every submission so the Apps Script can file it into a
+// matching weekly Sheet tab.
+function getWeekLabel() {
+  const monday = getWeekMonday();
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return `Week of ${fmt(monday)} - ${fmt(sunday)}, ${sunday.getFullYear()}`;
+}
+
+function dateKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /* ---------- Local persistence (resets automatically each new week) ---------- */
@@ -739,6 +802,22 @@ function saveState() {
   const state = { week: getWeekLabel(), days: {} };
   dayKeys.forEach(day => { state.days[day] = serializeDay(day); });
   localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
+  updatePushupLedger();
+}
+
+// Unlike WORKOUT_TRACKER_STATE (which resets every new week), this ledger
+// accumulates indefinitely - it's the only thing that lets the Pushups tab
+// show week/month/year/deficit totals that span past week resets.
+function updatePushupLedger() {
+  const { days } = computeWeekStats();
+  const monday = getWeekMonday();
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  days.forEach((d, i) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    ledger[dateKey(date)] = d.pushupTotal;
+  });
+  localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(ledger));
 }
 
 function restoreDay(day, savedDay) {
@@ -869,8 +948,9 @@ function showAppView(view) {
   document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.app-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
-  document.querySelectorAll('.app-tab')[view === 'overview' ? 0 : 1].classList.add('active');
+  document.querySelector(`.app-tab[data-view="${view}"]`).classList.add('active');
   if (view === 'overview') renderOverview();
+  if (view === 'pushups') renderPushupsTab();
 }
 
 // Aggregates every day panel's current in-page state (all 7 days live in
@@ -932,6 +1012,76 @@ function renderOverview() {
     chip.innerHTML = `<div class="ov-day-dot ${dotClass}">${pct >= 1 ? '✓' : ''}</div><div class="ov-day-lbl">${dayLabels[d.key]}</div>`;
     chipsEl.appendChild(chip);
   });
+}
+
+/* ---------- Pushups tab (week/month/year goals + running deficit) ---------- */
+
+function setGoalBar(valueId, fillId, actual, target) {
+  const pct = target ? Math.min(100, Math.round(actual / target * 100)) : 0;
+  document.getElementById(valueId).textContent = `${actual.toLocaleString()} / ${target.toLocaleString()}`;
+  document.getElementById(fillId).style.width = pct + '%';
+}
+
+function renderPushupsTab() {
+  updatePushupLedger();
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // This week's bar reuses whatever target is configured on the live day
+  // panels, so it automatically reflects catch-up weeks vs. the normal
+  // baseline without any special-casing here.
+  const weekTotals = computeWeekStats().totals;
+  setGoalBar('puWeekValue', 'puWeekFill', weekTotals.pushupTotal, weekTotals.pushupTarget);
+
+  // This month: baseline pace (165/day, every day but Sunday) across the
+  // whole calendar month, actual pulled from whatever's logged so far.
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  let monthActual = 0, monthTarget = 0;
+  for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+    monthActual += ledger[dateKey(d)] || 0;
+    if (d.getDay() !== 0) monthTarget += PUSHUP_DAILY_BASELINE;
+  }
+  setGoalBar('puMonthValue', 'puMonthFill', monthActual, monthTarget);
+
+  // This year: fixed 50,000 goal, actual summed across the whole year.
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  const yearEnd = new Date(today.getFullYear(), 11, 31);
+  let yearActual = 0;
+  for (let d = new Date(yearStart); d <= yearEnd; d.setDate(d.getDate() + 1)) {
+    yearActual += ledger[dateKey(d)] || 0;
+  }
+  setGoalBar('puYearValue', 'puYearFill', yearActual, PUSHUP_YEAR_GOAL);
+
+  // Running deficit: actual vs. the 165/day baseline pace, from the first
+  // day this device has any logged data (can't reconstruct history from
+  // before this tab existed, so the clock honestly starts there).
+  const loggedDates = Object.keys(ledger).sort();
+  const sinceEl = document.getElementById('puDeficitSince');
+  const numEl = document.getElementById('puDeficitNumber');
+  const subEl = document.getElementById('puDeficitSub');
+
+  if (loggedDates.length === 0) {
+    sinceEl.textContent = 'No pushups logged yet';
+    numEl.textContent = '0';
+    numEl.classList.remove('ahead', 'behind');
+    subEl.textContent = 'Log a set to start tracking';
+  } else {
+    const startDate = new Date(loggedDates[0] + 'T00:00:00');
+    let expected = 0, actual = 0;
+    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0) expected += PUSHUP_DAILY_BASELINE;
+      actual += ledger[dateKey(d)] || 0;
+    }
+    const deficit = actual - expected;
+    const since = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    sinceEl.textContent = `Since ${since}, vs. ${PUSHUP_DAILY_BASELINE}/day pace`;
+    numEl.textContent = (deficit >= 0 ? '+' : '−') + Math.abs(deficit).toLocaleString();
+    numEl.classList.toggle('ahead', deficit >= 0);
+    numEl.classList.toggle('behind', deficit < 0);
+    subEl.textContent = deficit >= 0 ? 'reps ahead of pace' : 'reps behind pace';
+  }
 }
 
 function showDay(day) {
