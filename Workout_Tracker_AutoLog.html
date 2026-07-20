@@ -42,18 +42,22 @@
   .day-tab.gym.active { background: rgba(255, 159, 10, 0.16); }
   .day-tab.home.active { background: rgba(48, 209, 88, 0.16); }
   .day-tab.travel.active { background: rgba(100, 210, 255, 0.16); }
+  .day-tab.rest.active { background: rgba(191, 90, 242, 0.16); }
   .tab-lbl { font-family: var(--font); font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; color: var(--muted); }
   .day-tab.gym .tab-lbl { color: var(--amber); }
   .day-tab.home .tab-lbl { color: var(--green); }
   .day-tab.travel .tab-lbl { color: var(--teal); }
+  .day-tab.rest .tab-lbl { color: var(--purple); }
   .tab-dot { width: 6px; height: 6px; border-radius: 50%; margin: 0 auto 3px; background: var(--muted); }
   .day-tab.gym .tab-dot { background: var(--amber); }
   .day-tab.home .tab-dot { background: var(--green); }
   .day-tab.travel .tab-dot { background: var(--teal); }
+  .day-tab.rest .tab-dot { background: var(--purple); }
   .tab-type { font-size: 9px; font-weight: 500; line-height: 1.2; color: var(--muted); }
   .day-tab.gym .tab-type { color: var(--amber); }
   .day-tab.home .tab-type { color: var(--green); }
   .day-tab.travel .tab-type { color: var(--teal); }
+  .day-tab.rest .tab-type { color: var(--purple); }
   .day-panel { display: none; }
   .day-panel.active { display: block; }
   .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -62,15 +66,18 @@
   .badge-gym { background: rgba(255, 159, 10, 0.16); color: var(--amber); }
   .badge-home { background: rgba(48, 209, 88, 0.16); color: var(--green); }
   .badge-travel { background: rgba(100, 210, 255, 0.16); color: var(--teal); }
+  .badge-rest { background: rgba(191, 90, 242, 0.16); color: var(--purple); }
   .section-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin: 14px 0 8px; }
   .exercise-card { background: var(--surface); border-radius: 16px; overflow: hidden; margin-bottom: 10px; }
   .exercise-header { display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; user-select: none; -webkit-user-select: none; border-bottom: 1px solid var(--border); }
   .exercise-toggle { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); flex-shrink: 0; }
   .exercise-name { font-family: var(--font); font-size: 15px; font-weight: 600; flex: 1; }
   .exercise-meta { font-family: var(--font); font-size: 13px; color: var(--muted); }
+  .exercise-delete-btn { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--muted); cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
+  .exercise-delete-btn:hover { background: rgba(255, 69, 58, 0.16); color: var(--red); }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
-  .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 30px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+  .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
   .set-row:last-child { border-bottom: none; }
   .set-num { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; }
   .set-input-group { display: flex; flex-direction: column; gap: 2px; }
@@ -80,6 +87,8 @@
   .set-checkbox { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
   .set-checkbox:hover { border-color: var(--accent); }
   .set-checkbox.checked { background: var(--green); border-color: var(--green); color: white; }
+  .set-delete-btn { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
+  .set-delete-btn:hover { background: rgba(255, 69, 58, 0.16); color: var(--red); }
   .exercise-total { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--muted); padding: 9px 14px; border-top: 1px solid var(--border); }
   .add-set-btn { display: block; width: 100%; background: transparent; border: none; border-top: 1px solid var(--border); color: var(--accent); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 10px; cursor: pointer; }
   .add-set-btn:hover { background: var(--surface2); }
@@ -217,7 +226,7 @@
   <div class="day-tab home" onclick="showDay('thu')"><div class="tab-lbl">Thu</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
   <div class="day-tab gym" onclick="showDay('fri')"><div class="tab-lbl">Fri</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
   <div class="day-tab travel" onclick="showDay('sat')"><div class="tab-lbl">Sat</div><div class="tab-dot"></div><div class="tab-type">VO2</div></div>
-  <div class="day-tab home" onclick="showDay('sun')"><div class="tab-lbl">Sun</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
+  <div class="day-tab rest" onclick="showDay('sun')"><div class="tab-lbl">Sun</div><div class="tab-dot"></div><div class="tab-type">Rest</div></div>
 </div>
 
 <!-- MONDAY -->
@@ -660,20 +669,9 @@
 </div>
 
 <!-- SUNDAY -->
-<div id="day-sun" class="day-panel" data-pushup-target="330">
-  <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="section-label">Workouts</div>
-  <div class="exercise-card">
-    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 6 × 55</div></div>
-    <div class="exercise-sets">
-      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">4</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">5</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">6</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-    </div>
-  </div>
+<div id="day-sun" class="day-panel" data-pushup-target="0">
+  <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-rest">😴 REST</div></div>
+  <div class="alert amber">🧘 <span>Full rest day — no lifting, no pushups. Let the week's work absorb.</span></div>
   <div class="section-label">Admin</div>
   <div class="card">
     <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Book InBody Scan</div><div class="item-meta">Track progress</div></div></div>
@@ -730,7 +728,7 @@ function serializeDay(day) {
         checked: row.querySelector('.set-checkbox').classList.contains('checked')
       };
     });
-    return { custom: !!nameInput, name: nameInput ? nameInput.value : '', sets: sets };
+    return { id: card.dataset.exId, custom: !!nameInput, name: nameInput ? nameInput.value : '', sets: sets };
   });
 
   const checkItems = Array.from(panel.querySelectorAll('.check-item')).map(item => ({
@@ -751,12 +749,21 @@ function restoreDay(day, savedDay) {
   if (!savedDay) return;
   const panel = document.getElementById('day-' + day);
 
-  savedDay.exercises.forEach((savedEx, i) => {
-    let card = panel.querySelectorAll('.exercise-card')[i];
+  // Drop any pre-rendered exercise the user deleted last session - it has
+  // no matching id in the saved state at all.
+  const savedIds = new Set(savedDay.exercises.map(e => e.id));
+  Array.from(panel.querySelectorAll('.exercise-card')).forEach(card => {
+    if (!savedIds.has(card.dataset.exId)) card.remove();
+  });
+
+  savedDay.exercises.forEach(savedEx => {
+    let card = Array.from(panel.querySelectorAll('.exercise-card')).find(c => c.dataset.exId === savedEx.id);
     if (!card) {
-      // Beyond what's currently rendered - it was a custom "+ Add Exercise" card.
+      // No matching id left - it was a custom "+ Add Exercise" card.
       addExercise(panel, true);
-      card = panel.querySelectorAll('.exercise-card')[i];
+      const cards = panel.querySelectorAll('.exercise-card');
+      card = cards[cards.length - 1];
+      card.dataset.exId = savedEx.id;
       const nameInput = card.querySelector('.exercise-name-input');
       if (nameInput) nameInput.value = savedEx.name;
     }
@@ -766,6 +773,11 @@ function restoreDay(day, savedDay) {
       addSet(card.querySelector('.add-set-btn'));
       rows = card.querySelectorAll('.set-row');
     }
+    while (rows.length > savedEx.sets.length) {
+      rows[rows.length - 1].remove();
+      rows = card.querySelectorAll('.set-row');
+    }
+    renumberSets(card);
 
     rows.forEach((row, si) => {
       const savedSet = savedEx.sets[si];
@@ -1047,6 +1059,42 @@ function updateExerciseTotal(card) {
   }
 }
 
+function renumberSets(card) {
+  card.querySelectorAll('.set-row').forEach((row, i) => {
+    row.querySelector('.set-num').textContent = i + 1;
+  });
+}
+
+function initSetDeleteBtn(row) {
+  if (row.querySelector('.set-delete-btn')) return;
+  const delBtn = document.createElement('div');
+  delBtn.className = 'set-delete-btn';
+  delBtn.textContent = '✕';
+  delBtn.onclick = () => deleteSet(delBtn);
+  row.appendChild(delBtn);
+}
+
+// Sets can be deleted freely, but an exercise always keeps at least one row
+// (delete the whole exercise instead of emptying it - addSet() relies on a
+// last row existing to inherit placeholders from).
+function deleteSet(btn) {
+  const row = btn.closest('.set-row');
+  const card = row.closest('.exercise-card');
+  const rows = card.querySelectorAll('.set-row');
+  if (rows.length <= 1) return;
+  row.remove();
+  renumberSets(card);
+  updateExerciseTotal(card);
+  saveState();
+}
+
+function deleteExercise(btn) {
+  const card = btn.closest('.exercise-card');
+  if (!confirm('Delete this exercise?')) return;
+  card.remove();
+  saveState();
+}
+
 function addSet(btn) {
   const container = btn.parentElement;
   const rows = container.querySelectorAll('.set-row');
@@ -1063,6 +1111,7 @@ function addSet(btn) {
     `<div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div>` +
     `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>`;
   container.insertBefore(row, btn);
+  initSetDeleteBtn(row);
   updateExerciseTotal(container.closest('.exercise-card'));
   saveState();
 }
@@ -1077,12 +1126,26 @@ function initExerciseSets(card) {
     btn.onclick = () => addSet(btn);
     setsContainer.appendChild(btn);
   }
+
+  const header = card.querySelector('.exercise-header');
+  if (!header.querySelector('.exercise-delete-btn')) {
+    const delBtn = document.createElement('div');
+    delBtn.className = 'exercise-delete-btn';
+    delBtn.textContent = '✕';
+    delBtn.onclick = (e) => { e.stopPropagation(); deleteExercise(delBtn); };
+    header.appendChild(delBtn);
+  }
+
+  card.querySelectorAll('.set-row').forEach(initSetDeleteBtn);
   updateExerciseTotal(card);
 }
+
+let nextCustomExId = 1;
 
 function addExercise(panel, skipFocus) {
   const card = document.createElement('div');
   card.className = 'exercise-card';
+  card.dataset.exId = 'custom-' + Date.now() + '-' + (nextCustomExId++);
   card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><input class="exercise-name-input" type="text" placeholder="Exercise name" onclick="event.stopPropagation()"></div><div class="exercise-meta">Custom</div></div>` +
     `<div class="exercise-sets expanded"><div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div></div>`;
 
@@ -1096,13 +1159,29 @@ function addExercise(panel, skipFocus) {
 function initAddExerciseButtons() {
   document.querySelectorAll('.day-panel').forEach(panel => {
     const cards = panel.querySelectorAll(':scope > .exercise-card');
-    if (cards.length === 0) return;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'add-exercise-btn';
     btn.textContent = '+ Add Exercise';
     btn.onclick = () => addExercise(panel);
-    cards[cards.length - 1].insertAdjacentElement('afterend', btn);
+    if (cards.length > 0) {
+      cards[cards.length - 1].insertAdjacentElement('afterend', btn);
+    } else {
+      const summaryBtn = panel.querySelector(':scope > .summary-btn');
+      panel.insertBefore(btn, summaryBtn);
+    }
+  });
+}
+
+// Every exercise-card (prescribed or custom) gets a stable id so deletions
+// persist correctly across a same-week reload - serializeDay/restoreDay
+// match by this id rather than by DOM position, since position shifts as
+// exercises get deleted.
+function tagExerciseIds() {
+  document.querySelectorAll('.day-panel').forEach(panel => {
+    panel.querySelectorAll(':scope > .exercise-card').forEach((card, i) => {
+      if (!card.dataset.exId) card.dataset.exId = 'ex' + i;
+    });
   });
 }
 
@@ -1296,6 +1375,7 @@ document.querySelectorAll('.exercise-sets').forEach((el, i) => {
 
 document.querySelectorAll('.exercise-card').forEach(initExerciseSets);
 initAddExerciseButtons();
+tagExerciseIds();
 restoreState();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
