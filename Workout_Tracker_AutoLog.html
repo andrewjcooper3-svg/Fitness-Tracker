@@ -672,10 +672,6 @@
 <div id="day-sun" class="day-panel" data-pushup-target="0">
   <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-rest">😴 REST</div></div>
   <div class="alert amber">🧘 <span>Full rest day — no lifting, no pushups. Let the week's work absorb.</span></div>
-  <div class="section-label">Admin</div>
-  <div class="card">
-    <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Book InBody Scan</div><div class="item-meta">Track progress</div></div></div>
-  </div>
   <button class="summary-btn" onclick="generateSummary('sun')">📋 Generate Week Summary</button>
   <div class="summary-output" id="sun-summary"></div>
   <button class="copy-btn" id="sun-copy" onclick="copySummary('sun')">📎 Copy to Clipboard</button>
@@ -749,48 +745,89 @@ function restoreDay(day, savedDay) {
   if (!savedDay) return;
   const panel = document.getElementById('day-' + day);
 
-  // Drop any pre-rendered exercise the user deleted last session - it has
-  // no matching id in the saved state at all.
-  const savedIds = new Set(savedDay.exercises.map(e => e.id));
-  Array.from(panel.querySelectorAll('.exercise-card')).forEach(card => {
-    if (!savedIds.has(card.dataset.exId)) card.remove();
-  });
+  // Saved state from before exercise ids existed (or a day that's never had
+  // any exercises, like a rest day) has no ids at all - in either case there
+  // is nothing safe to prune or restore against, so leave the freshly
+  // rendered default cards exactly as they are rather than risk wiping them.
+  const savedExercises = savedDay.exercises || [];
+  const hasIds = savedExercises.length > 0 && savedExercises.every(e => e.id);
 
-  savedDay.exercises.forEach(savedEx => {
-    let card = Array.from(panel.querySelectorAll('.exercise-card')).find(c => c.dataset.exId === savedEx.id);
-    if (!card) {
-      // No matching id left - it was a custom "+ Add Exercise" card.
-      addExercise(panel, true);
-      const cards = panel.querySelectorAll('.exercise-card');
-      card = cards[cards.length - 1];
-      card.dataset.exId = savedEx.id;
-      const nameInput = card.querySelector('.exercise-name-input');
-      if (nameInput) nameInput.value = savedEx.name;
-    }
-
-    let rows = card.querySelectorAll('.set-row');
-    while (rows.length < savedEx.sets.length) {
-      addSet(card.querySelector('.add-set-btn'));
-      rows = card.querySelectorAll('.set-row');
-    }
-    while (rows.length > savedEx.sets.length) {
-      rows[rows.length - 1].remove();
-      rows = card.querySelectorAll('.set-row');
-    }
-    renumberSets(card);
-
-    rows.forEach((row, si) => {
-      const savedSet = savedEx.sets[si];
-      if (!savedSet) return;
-      const inputs = row.querySelectorAll('.set-input');
-      if (inputs[0]) inputs[0].value = savedSet.weight || '';
-      if (inputs[1]) inputs[1].value = savedSet.reps || '';
-      if (inputs[2]) inputs[2].value = savedSet.notes || '';
-      if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
+  if (hasIds) {
+    // Drop any pre-rendered exercise the user deleted last session - it has
+    // no matching id in the saved state at all.
+    const savedIds = new Set(savedExercises.map(e => e.id));
+    Array.from(panel.querySelectorAll('.exercise-card')).forEach(card => {
+      if (!savedIds.has(card.dataset.exId)) card.remove();
     });
+  }
 
-    updateExerciseTotal(card);
-  });
+  if (hasIds) {
+    savedExercises.forEach(savedEx => {
+      let card = Array.from(panel.querySelectorAll('.exercise-card')).find(c => c.dataset.exId === savedEx.id);
+      if (!card) {
+        // No matching id left - it was a custom "+ Add Exercise" card.
+        addExercise(panel, true);
+        const cards = panel.querySelectorAll('.exercise-card');
+        card = cards[cards.length - 1];
+        card.dataset.exId = savedEx.id;
+        const nameInput = card.querySelector('.exercise-name-input');
+        if (nameInput) nameInput.value = savedEx.name;
+      }
+
+      let rows = card.querySelectorAll('.set-row');
+      while (rows.length < savedEx.sets.length) {
+        addSet(card.querySelector('.add-set-btn'));
+        rows = card.querySelectorAll('.set-row');
+      }
+      while (rows.length > savedEx.sets.length) {
+        rows[rows.length - 1].remove();
+        rows = card.querySelectorAll('.set-row');
+      }
+      renumberSets(card);
+
+      rows.forEach((row, si) => {
+        const savedSet = savedEx.sets[si];
+        if (!savedSet) return;
+        const inputs = row.querySelectorAll('.set-input');
+        if (inputs[0]) inputs[0].value = savedSet.weight || '';
+        if (inputs[1]) inputs[1].value = savedSet.reps || '';
+        if (inputs[2]) inputs[2].value = savedSet.notes || '';
+        if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
+      });
+
+      updateExerciseTotal(card);
+    });
+  } else {
+    // Legacy format (no ids yet): restore positionally, same as before ids
+    // existed, and tag each card with an id so future saves upgrade cleanly.
+    savedExercises.forEach((savedEx, i) => {
+      let card = panel.querySelectorAll('.exercise-card')[i];
+      if (!card) {
+        addExercise(panel, true);
+        card = panel.querySelectorAll('.exercise-card')[i];
+        const nameInput = card.querySelector('.exercise-name-input');
+        if (nameInput) nameInput.value = savedEx.name;
+      }
+
+      let rows = card.querySelectorAll('.set-row');
+      while (rows.length < savedEx.sets.length) {
+        addSet(card.querySelector('.add-set-btn'));
+        rows = card.querySelectorAll('.set-row');
+      }
+
+      rows.forEach((row, si) => {
+        const savedSet = savedEx.sets[si];
+        if (!savedSet) return;
+        const inputs = row.querySelectorAll('.set-input');
+        if (inputs[0]) inputs[0].value = savedSet.weight || '';
+        if (inputs[1]) inputs[1].value = savedSet.reps || '';
+        if (inputs[2]) inputs[2].value = savedSet.notes || '';
+        if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
+      });
+
+      updateExerciseTotal(card);
+    });
+  }
 
   const checkItems = panel.querySelectorAll('.check-item');
   checkItems.forEach((item, i) => {
