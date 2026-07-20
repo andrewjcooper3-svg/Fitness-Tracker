@@ -794,6 +794,7 @@ let calendarLoadedOnce = false;
 // without needing to re-paste this after every fresh install. The
 // config box below can still override it per-device via localStorage.
 const DEFAULT_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbzibd9VwYYvj8pcmApGKplDNW70tiZZjnT54K8kVHJJKQOxMEp21CNdWUYz2KVvPzxr/exec';
+const DEFAULT_CALENDAR_WORKER_URL = 'https://personalassistant.andrewjcooper3.workers.dev';
 
 function getWeekMonday() {
   const now = new Date();
@@ -1349,7 +1350,7 @@ function toggleCalendarConfig() {
 }
 
 function loadCalendarWorkerUrl() {
-  const url = localStorage.getItem(STORAGE_CALENDAR_WORKER_KEY) || '';
+  const url = localStorage.getItem(STORAGE_CALENDAR_WORKER_KEY) || DEFAULT_CALENDAR_WORKER_URL;
   document.getElementById('calendarWorkerUrl').value = url;
   updateCalendarConfigStatus(url);
 }
@@ -1373,7 +1374,7 @@ function updateCalendarConfigStatus(url) {
 }
 
 function getCalendarWorkerUrl() {
-  return localStorage.getItem(STORAGE_CALENDAR_WORKER_KEY) || '';
+  return localStorage.getItem(STORAGE_CALENDAR_WORKER_KEY) || DEFAULT_CALENDAR_WORKER_URL;
 }
 
 /* ---------- Data collection ---------- */
