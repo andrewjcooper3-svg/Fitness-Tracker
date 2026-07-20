@@ -749,8 +749,13 @@ function restoreDay(day, savedDay) {
   // any exercises, like a rest day) has no ids at all - in either case there
   // is nothing safe to prune or restore against, so leave the freshly
   // rendered default cards exactly as they are rather than risk wiping them.
+  // (A saved id of the literal string "undefined" is also treated as
+  // missing - a bug in an earlier version of this file could persist that
+  // exact value, and without this guard it would keep re-triggering on
+  // every load instead of self-healing.)
+  const isValidExId = id => typeof id === 'string' && id !== '' && id !== 'undefined' && id !== 'null';
   const savedExercises = savedDay.exercises || [];
-  const hasIds = savedExercises.length > 0 && savedExercises.every(e => e.id);
+  const hasIds = savedExercises.length > 0 && savedExercises.every(e => isValidExId(e.id));
 
   if (hasIds) {
     // Drop any pre-rendered exercise the user deleted last session - it has
