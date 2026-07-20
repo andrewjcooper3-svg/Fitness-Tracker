@@ -242,25 +242,32 @@ async function getUpcomingCalendarEvents(start, end, env) {
   const calendars = await listCalendars(homeUrl, auth);
 
   const allEvents = [];
+  const calendarSummaries = [];
   for (const cal of calendars) {
     try {
       const events = await fetchEventsForCalendar(cal.url, start, end, auth);
       events.forEach(ev => (ev.calendar = cal.name));
       allEvents.push(...events);
+      calendarSummaries.push({ name: cal.name, eventCount: events.length });
     } catch (e) {
-      // Skip a calendar that errors rather than failing the whole request.
+      // Skip a calendar that errors rather than failing the whole request,
+      // but surface it in the diagnostics below instead of silently
+      // dropping it.
+      calendarSummaries.push({ name: cal.name, error: e.message });
     }
   }
 
   allEvents.sort((a, b) => a.start - b.start);
 
-  return allEvents.map(ev => ({
+  const events = allEvents.map(ev => ({
     summary: ev.summary,
     start: ev.start.toISOString(),
     end: ev.end ? ev.end.toISOString() : null,
     allDay: ev.allDay,
     calendar: ev.calendar
   }));
+
+  return { events, calendars: calendarSummaries };
 }
 
 export default {
@@ -301,8 +308,8 @@ export default {
         end.setUTCDate(end.getUTCDate() + days);
       }
 
-      const events = await getUpcomingCalendarEvents(start, end, env);
-      return new Response(JSON.stringify({ status: 'success', events }), {
+      const { events, calendars } = await getUpcomingCalendarEvents(start, end, env);
+      return new Response(JSON.stringify({ status: 'success', events, calendars }), {
         headers: { 'Content-Type': 'application/json', ...cors }
       });
     } catch (err) {
