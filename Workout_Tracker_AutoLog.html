@@ -430,6 +430,10 @@
           <div class="ov-ring-stat-label">Year</div>
           <div class="ov-ring-stat-value" id="ovMiniYear">0%</div>
         </div>
+        <div class="ov-ring-stat">
+          <div class="ov-ring-stat-label">Elapsed</div>
+          <div class="ov-ring-stat-value" id="ovMiniYearElapsed">0%</div>
+        </div>
         <div class="ov-week-wheel-item" onclick="event.stopPropagation(); showAppView('tracker')">
           <svg viewBox="0 0 44 44" class="ov-week-wheel"><g transform="rotate(-90 22 22)" id="ovWeekWheelSegs"></g></svg>
           <div class="ov-week-wheel-count" id="ovWeekWheelLabel">0/7</div>
@@ -1767,6 +1771,12 @@ function renderOverviewPushupMini() {
   }
   const yearPct = stats.year.target ? Math.min(100, Math.round(stats.year.actual / stats.year.target * 100)) : 0;
   document.getElementById('ovMiniYear').textContent = yearPct + '%';
+
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const startOfNextYear = new Date(now.getFullYear() + 1, 0, 1);
+  const dayOfYearElapsedPct = Math.round((now - startOfYear) / (startOfNextYear - startOfYear) * 100);
+  document.getElementById('ovMiniYearElapsed').textContent = dayOfYearElapsedPct + '%';
 }
 
 function renderOverviewCalendarPreview() {
