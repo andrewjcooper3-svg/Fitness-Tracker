@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#17140f">
@@ -151,9 +151,10 @@
   .ov-hero-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 4px; }
 
   /* Overview page header - plain text sitting on the page, no card chrome */
-  .ov-page-head { padding: 4px 2px 14px; }
+  .ov-page-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 4px 2px 14px; }
   .ov-page-week { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); }
   .ov-page-title { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.4px; margin-top: 2px; }
+  .ov-edit-btn { font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
 
   /* Big activity-ring hero (Apple Fitness style) - sits directly on the
      page background, no card box, so it reads as clearly primary versus
@@ -169,29 +170,41 @@
   .ov-ring-info { flex: 1; min-width: 0; }
   .ov-ring-info-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 16px; }
   .ov-ring-title { font-family: var(--font); font-size: 15px; font-weight: 700; }
-  .ov-ring-stats { display: flex; gap: 22px; }
+  .ov-ring-stats { display: flex; align-items: flex-end; gap: 18px; }
   .ov-ring-stat-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
   .ov-ring-stat-value { font-family: var(--font); font-size: 19px; font-weight: 800; letter-spacing: -0.2px; }
   .ov-ring-stat-value.ahead { color: var(--green); }
   .ov-ring-stat-value.behind { color: var(--red); }
+  .ov-week-wheel-item { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-left: auto; }
+  .ov-week-wheel { width: 36px; height: 36px; }
+  .ov-week-wheel-count { font-family: var(--font); font-size: 10px; font-weight: 700; color: var(--muted); }
 
-  /* Resizable widget board (small/wide/large, cycled by the user, saved
-     per-device) - a real bento grid instead of a stack of identical cards. */
+  /* Resizable widget board (small/wide/large) - a real bento grid instead
+     of a stack of identical cards. Resizing and reordering both live
+     behind the Edit button, not cluttering the normal view. */
   .ov-board { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
   .ov-widget { position: relative; background: var(--surface); border-radius: 20px; border: 1px solid rgba(245,230,210,0.06); padding: 14px 16px; grid-column: span 2; transition: background 0.15s; }
   .ov-widget[data-size="small"] { grid-column: span 1; }
   .ov-widget[onclick] { cursor: pointer; }
-  .ov-widget[onclick]:active { background: var(--surface2); }
-  .ov-widget-resize { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: var(--surface2); border: none; color: var(--muted); font-size: 12px; cursor: pointer; z-index: 2; }
-  .ov-widget-resize:active { color: var(--accent); }
-  .ov-widget-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; padding-right: 24px; }
-  .ov-widget-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-right: 24px; }
-  .ov-widget-head .ov-widget-label { margin-bottom: 0; padding-right: 0; }
+  .ov-board:not(.editing) .ov-widget[onclick]:active { background: var(--surface2); }
+  .ov-widget-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
+  .ov-widget-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .ov-widget-head .ov-widget-label { margin-bottom: 0; }
   .ov-widget-compact { display: none; font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
-  .ov-widget[data-size="small"] .ov-days { display: none; }
-  .ov-widget[data-size="small"] .ov-widget-compact { display: block; }
   .ov-widget[data-size="small"] .sp-playlists,
   .ov-widget[data-size="small"] .sp-np-artist { display: none; }
+
+  .ov-widget-edit-bar, .ov-widget-sizepicker { display: none; }
+  .ov-board.editing .ov-widget { border-color: rgba(224,122,63,0.35); padding-top: 40px; }
+  .ov-board.editing .ov-widget-edit-bar { display: flex; gap: 6px; position: absolute; top: 8px; right: 8px; z-index: 2; }
+  .ov-widget-move { width: 24px; height: 24px; border-radius: 50%; background: var(--surface2); border: none; color: var(--muted); font-size: 11px; cursor: pointer; }
+  .ov-widget-move:active { color: var(--accent); }
+  .ov-board.editing .ov-widget-sizepicker { display: flex; gap: 6px; margin-top: 12px; }
+  .ov-widget-sizepicker button { flex: 1; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface2); border: 1px solid transparent; border-radius: 10px; padding: 7px 0; cursor: pointer; }
+  .ov-widget-sizepicker button:active { color: var(--text); }
+  .ov-widget[data-size="small"] .ov-widget-sizepicker button:nth-child(1),
+  .ov-widget[data-size="wide"] .ov-widget-sizepicker button:nth-child(2),
+  .ov-widget[data-size="large"] .ov-widget-sizepicker button:nth-child(3) { color: var(--accent); border-color: var(--accent); }
 
   /* One grouped card with three internal columns (dividers, not separate
      shadowed boxes) - the Apple Health "summary row" pattern instead of
@@ -374,8 +387,11 @@
 
 <div id="view-overview" class="app-view active">
   <div class="ov-page-head">
-    <div class="ov-page-week" id="ovWeekLabel"></div>
-    <div class="ov-page-title">Overview</div>
+    <div>
+      <div class="ov-page-week" id="ovWeekLabel"></div>
+      <div class="ov-page-title">Overview</div>
+    </div>
+    <button class="ov-edit-btn" id="ovEditBtn" onclick="toggleOverviewEdit()">Edit</button>
   </div>
 
   <div class="ov-ring-hero" id="ovPushupHero" onclick="showAppView('pushups')">
@@ -399,20 +415,20 @@
           <div class="ov-ring-stat-label">Year</div>
           <div class="ov-ring-stat-value" id="ovMiniYear">0%</div>
         </div>
+        <div class="ov-week-wheel-item">
+          <svg viewBox="0 0 44 44" class="ov-week-wheel"><g transform="rotate(-90 22 22)" id="ovWeekWheelSegs"></g></svg>
+          <div class="ov-week-wheel-count" id="ovWeekWheelLabel">0/7</div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="ov-board" id="ovBoard">
-    <div class="ov-widget" data-widget="days" data-size="wide">
-      <button class="ov-widget-resize" onclick="cycleWidgetSize(event, this)" title="Resize">⤢</button>
-      <div class="ov-widget-label">This week, by day</div>
-      <div class="ov-days" id="ovDayChips"></div>
-      <div class="ov-widget-compact" id="ovDaysCompact"></div>
-    </div>
-
     <div class="ov-widget" data-widget="spotify" data-size="wide" onclick="handleWidgetTap(event, 'music')">
-      <button class="ov-widget-resize" onclick="cycleWidgetSize(event, this)" title="Resize">⤢</button>
+      <div class="ov-widget-edit-bar">
+        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
+        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+      </div>
       <div class="ov-widget-head">
         <div class="ov-widget-label">Spotify</div>
         <div class="sp-status-dot" id="spStatusDot"></div>
@@ -432,16 +448,29 @@
           <div class="sp-playlists-empty">Pin playlists in the Music tab</div>
         </div>
       </div>
+      <div class="ov-widget-sizepicker">
+        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
+        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
+        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
+      </div>
     </div>
 
     <div class="ov-widget" data-widget="upcoming" data-size="wide" onclick="handleWidgetTap(event, 'calendar')">
-      <button class="ov-widget-resize" onclick="cycleWidgetSize(event, this)" title="Resize">⤢</button>
+      <div class="ov-widget-edit-bar">
+        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
+        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+      </div>
       <div class="ov-widget-label">Upcoming</div>
       <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-widget-sizepicker">
+        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
+        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
+        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
+      </div>
     </div>
   </div>
 
-  <div class="ov-note">Tap ⤢ on a widget to resize it. Reflects what's checked off this week, saved on this device.<br>Automatically resets once a new week begins.</div>
+  <div class="ov-note">Reflects what's checked off this week, saved on this device.<br>Automatically resets once a new week begins.</div>
 </div>
 
 <div id="view-pushups" class="app-view">
@@ -1552,24 +1581,48 @@ function computeWeekStats() {
   return { days, totals };
 }
 
-// Overview's "days/spotify/upcoming" widgets can be resized like iOS home
-// screen widgets - small (half-width, headline only), wide (full-width,
-// default amount of content), or large (full-width, more content). The
-// choice is per-device and persists across reloads.
+// Overview's Spotify/Upcoming widgets can be resized like iOS home screen
+// widgets - small (half-width, headline only), wide (full-width, default
+// content), or large (full-width, more content) - and reordered. Both are
+// only editable behind the Edit button, and persist per-device.
 const STORAGE_OVERVIEW_WIDGET_SIZES = 'WORKOUT_OVERVIEW_WIDGET_SIZES';
-const WIDGET_SIZE_CYCLE = { small: 'wide', wide: 'large', large: 'small' };
+const STORAGE_OVERVIEW_WIDGET_ORDER = 'WORKOUT_OVERVIEW_WIDGET_ORDER';
+let overviewEditing = false;
+
+function toggleOverviewEdit() {
+  overviewEditing = !overviewEditing;
+  document.getElementById('ovBoard').classList.toggle('editing', overviewEditing);
+  document.getElementById('ovEditBtn').textContent = overviewEditing ? 'Done' : 'Edit';
+  updateViewportHeight('overview', true);
+}
 
 function handleWidgetTap(event, view) {
+  if (overviewEditing) return; // editing uses the move/size controls instead of navigating
   showAppView(view);
 }
 
-function cycleWidgetSize(event, btn) {
+function setWidgetSize(event, btn, size) {
   event.stopPropagation();
   const widget = btn.closest('.ov-widget');
   if (!widget) return;
-  widget.dataset.size = WIDGET_SIZE_CYCLE[widget.dataset.size || 'wide'];
+  widget.dataset.size = size;
   saveWidgetSizes();
   renderOverview();
+  updateViewportHeight('overview', true);
+}
+
+function moveWidget(event, btn, direction) {
+  event.stopPropagation();
+  const widget = btn.closest('.ov-widget');
+  const board = document.getElementById('ovBoard');
+  if (!widget || !board) return;
+  const widgets = Array.from(board.querySelectorAll('.ov-widget'));
+  const idx = widgets.indexOf(widget);
+  const swapIdx = idx + direction;
+  if (swapIdx < 0 || swapIdx >= widgets.length) return;
+  if (direction < 0) board.insertBefore(widget, widgets[swapIdx]);
+  else board.insertBefore(widgets[swapIdx], widget);
+  saveWidgetOrder();
   updateViewportHeight('overview', true);
 }
 
@@ -1586,6 +1639,47 @@ function loadWidgetSizes() {
   });
 }
 
+function saveWidgetOrder() {
+  const order = Array.from(document.querySelectorAll('.ov-widget')).map(w => w.dataset.widget);
+  localStorage.setItem(STORAGE_OVERVIEW_WIDGET_ORDER, JSON.stringify(order));
+}
+
+function loadWidgetOrder() {
+  const order = JSON.parse(localStorage.getItem(STORAGE_OVERVIEW_WIDGET_ORDER) || 'null');
+  if (!order) return;
+  const board = document.getElementById('ovBoard');
+  if (!board) return;
+  order.forEach(key => {
+    const w = board.querySelector(`.ov-widget[data-widget="${key}"]`);
+    if (w) board.appendChild(w);
+  });
+}
+
+// Small 7-segment ring (Apple "Screen Time" style) replacing the old
+// 7-dot row - built from 7 layered circles, each drawing just one arc via
+// stroke-dasharray/dashoffset, so every day gets its own distinct wedge
+// instead of a single proportional arc.
+function renderWeekWheel(days) {
+  const segsEl = document.getElementById('ovWeekWheelSegs');
+  const labelEl = document.getElementById('ovWeekWheelLabel');
+  if (!segsEl) return;
+
+  const r = 17, cx = 22, cy = 22;
+  const circumference = 2 * Math.PI * r;
+  const segArc = circumference / 7;
+  const dashLen = Math.max(0, segArc - 3);
+
+  let activeCount = 0;
+  segsEl.innerHTML = days.map((d, i) => {
+    const pct = d.setsPlanned ? d.setsCompleted / d.setsPlanned : 0;
+    if (d.setsCompleted > 0) activeCount++;
+    const color = pct >= 1 ? 'var(--accent)' : pct > 0 ? 'var(--amber)' : 'var(--surface2)';
+    const offset = -(i * segArc);
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${dashLen} ${circumference - dashLen}" stroke-dashoffset="${offset}"></circle>`;
+  }).join('');
+  if (labelEl) labelEl.textContent = `${activeCount}/7`;
+}
+
 function renderOverview() {
   const { days, totals } = computeWeekStats();
 
@@ -1596,22 +1690,7 @@ function renderOverview() {
   document.getElementById('ovHeroTarget').textContent = 'of ' + totals.pushupTarget;
   document.getElementById('ovRingBig').style.setProperty('--pct', pushupPct);
 
-  const dayLabels = { mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S' };
-  const chipsEl = document.getElementById('ovDayChips');
-  chipsEl.innerHTML = '';
-  let activeDayCount = 0;
-  days.forEach(d => {
-    const pct = d.setsPlanned ? d.setsCompleted / d.setsPlanned : 0;
-    if (d.setsCompleted > 0) activeDayCount++;
-    const dotClass = pct >= 1 ? 'done' : pct > 0 ? 'partial' : '';
-    const chip = document.createElement('div');
-    chip.className = 'ov-day-chip';
-    chip.innerHTML = `<div class="ov-day-dot ${dotClass}">${pct >= 1 ? '✓' : ''}</div><div class="ov-day-lbl">${dayLabels[d.key]}</div>`;
-    chipsEl.appendChild(chip);
-  });
-  const daysCompactEl = document.getElementById('ovDaysCompact');
-  if (daysCompactEl) daysCompactEl.textContent = `${activeDayCount} / 7`;
-
+  renderWeekWheel(days);
   renderOverviewPushupMini();
   ensureCalendarLoaded();
 }
@@ -3564,6 +3643,7 @@ flushPendingLogs();
 renderTrainerStats();
 initViewportHeightObserver();
 startPuAnimLoop();
+loadWidgetOrder();
 loadWidgetSizes();
 goToView('overview', false);
 
