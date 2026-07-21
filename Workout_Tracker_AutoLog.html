@@ -32,7 +32,7 @@
   .config-input { flex: 1; font-family: var(--font); font-size: 13px; color: var(--text); background: var(--surface2); border: none; border-radius: 10px; padding: 10px 12px; outline: none; min-width: 0; }
   .config-input:focus { box-shadow: 0 0 0 2px var(--accent); }
   .config-save { font-family: var(--font); font-size: 13px; font-weight: 600; background: var(--accent); border: none; color: var(--text); border-radius: 10px; padding: 10px 16px; cursor: pointer; flex-shrink: 0; transition: opacity 0.15s; }
-  .config-save:hover { opacity: 0.85; }
+  .config-save:hover, .config-save:active { opacity: 0.85; }
   .config-status { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 8px; }
   .config-status.ok { color: var(--green); }
   .config-status.warn { color: var(--red); }
@@ -74,7 +74,7 @@
   .exercise-name { font-family: var(--font); font-size: 15px; font-weight: 600; flex: 1; }
   .exercise-meta { font-family: var(--font); font-size: 13px; color: var(--muted); }
   .exercise-delete-btn { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--muted); cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
-  .exercise-delete-btn:hover { background: rgba(193, 87, 58, 0.16); color: var(--red); }
+  .exercise-delete-btn:hover, .exercise-delete-btn:active { background: rgba(193, 87, 58, 0.16); color: var(--red); }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
   .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
@@ -85,15 +85,15 @@
   .set-input { font-family: var(--font); font-size: 14px; color: var(--text); background: transparent; border: none; border-bottom: 1px solid var(--border); outline: none; padding: 4px 2px; width: 100%; font-variant-numeric: tabular-nums; }
   .set-input:focus { border-bottom-color: var(--accent); }
   .set-checkbox { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
-  .set-checkbox:hover { border-color: var(--accent); }
+  .set-checkbox:hover, .set-checkbox:active { border-color: var(--accent); }
   .set-checkbox.checked { background: var(--green); border-color: var(--green); color: white; }
   .set-delete-btn { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
-  .set-delete-btn:hover { background: rgba(193, 87, 58, 0.16); color: var(--red); }
+  .set-delete-btn:hover, .set-delete-btn:active { background: rgba(193, 87, 58, 0.16); color: var(--red); }
   .exercise-total { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--muted); padding: 9px 14px; border-top: 1px solid var(--border); }
   .add-set-btn { display: block; width: 100%; background: transparent; border: none; border-top: 1px solid var(--border); color: var(--accent); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 10px; cursor: pointer; }
-  .add-set-btn:hover { background: var(--surface2); }
+  .add-set-btn:hover, .add-set-btn:active { background: var(--surface2); }
   .add-exercise-btn { display: block; width: 100%; background: var(--surface); border: none; color: var(--accent); font-family: var(--font); font-size: 14px; font-weight: 600; padding: 12px; border-radius: 14px; cursor: pointer; margin-bottom: 10px; transition: all 0.15s; }
-  .add-exercise-btn:hover { background: var(--surface2); }
+  .add-exercise-btn:hover, .add-exercise-btn:active { background: var(--surface2); }
   .exercise-name-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 15px; font-weight: 600; font-family: inherit; outline: none; padding: 2px 0; }
   .exercise-name-input:focus { border-bottom-color: var(--accent); }
   .card { background: var(--surface); border-radius: 16px; overflow: hidden; margin-bottom: 10px; }
@@ -107,10 +107,10 @@
   .item-name { font-family: var(--font); font-size: 14px; font-weight: 600; }
   .item-meta { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 1px; }
   .summary-btn { background: var(--accent); border: none; color: var(--text); padding: 13px 14px; border-radius: 14px; cursor: pointer; font-family: var(--font); font-size: 15px; font-weight: 600; margin-top: 12px; width: 100%; transition: opacity 0.15s; }
-  .summary-btn:hover { opacity: 0.88; }
+  .summary-btn:hover, .summary-btn:active { opacity: 0.88; }
   .summary-output { background: var(--surface2); border-radius: 14px; padding: 14px; margin-top: 10px; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; color: var(--text); white-space: pre-wrap; word-break: break-all; display: none; }
   .copy-btn { background: var(--surface); border: none; color: var(--text); padding: 10px 12px; border-radius: 12px; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600; margin-top: 8px; width: 100%; transition: all 0.15s; display: none; }
-  .copy-btn:hover { background: var(--surface2); }
+  .copy-btn:hover, .copy-btn:active { background: var(--surface2); }
   .log-status { font-family: var(--font); font-size: 13px; font-weight: 500; margin-top: 8px; padding: 10px 12px; border-radius: 12px; display: none; align-items: center; justify-content: space-between; gap: 8px; }
   .log-status.pending { display: flex; background: rgba(217, 164, 65, 0.14); color: var(--amber); }
   .log-status.ok { display: flex; background: rgba(124, 154, 94, 0.14); color: var(--green); }
@@ -126,10 +126,11 @@
     padding: 8px 6px calc(6px + env(safe-area-inset-bottom, 0px));
   }
   .app-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0 2px; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
-  .app-tab-icon { font-size: 21px; line-height: 1; filter: grayscale(1) opacity(0.55); transition: filter 0.15s, transform 0.15s; }
+  .app-tab-icon { width: 22px; height: 22px; color: var(--muted); transition: color 0.15s, transform 0.15s; }
   .app-tab-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); transition: color 0.15s; }
-  .app-tab.active .app-tab-icon { filter: none; transform: scale(1.08); }
+  .app-tab.active .app-tab-icon { color: var(--accent); transform: scale(1.08); }
   .app-tab.active .app-tab-label { color: var(--accent); }
+  .icon { width: 22px; height: 22px; display: block; flex-shrink: 0; }
   .ptr-bar { display: flex; align-items: center; justify-content: center; overflow: hidden; height: 0; }
   .ptr-spinner { width: 28px; height: 28px; border-radius: 50%; background: var(--surface); box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--accent); }
   .ptr-spinner.spinning { animation: ptr-spin 0.7s linear infinite; }
@@ -152,7 +153,7 @@
   .ov-progress-track { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; margin-top: 14px; }
   .ov-progress-fill { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.4s ease; width: 0%; }
 
-  .ov-hero-combined { cursor: pointer; transition: background 0.4s ease, transform 0.15s ease; border-radius: 18px; padding: 16px; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
+  .ov-hero-combined { cursor: pointer; transition: background 0.4s ease, transform 0.15s ease; border-radius: 18px; padding: 16px; border: 1px solid rgba(245,230,210,0.06); }
   .ov-hero-combined:active { transform: scale(0.99); }
   .ov-hero-combined.ahead { background: linear-gradient(160deg, rgba(124,154,94,0.12), var(--surface) 55%); }
   .ov-hero-combined.behind { background: linear-gradient(160deg, rgba(193,87,58,0.12), var(--surface) 55%); }
@@ -172,12 +173,16 @@
   .ov-hero-stat-value.behind { color: var(--red); }
   .ov-hero-chevron { font-family: var(--font); font-size: 20px; color: var(--muted); flex-shrink: 0; }
 
-  .ov-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-  .ov-tile { background: var(--surface); border-radius: 16px; padding: 14px 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
+  /* One grouped card with three internal columns (dividers, not separate
+     shadowed boxes) - the Apple Health "summary row" pattern instead of
+     three identical tiles sitting side by side. */
+  .ov-grid { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-radius: 18px; padding: 14px 0; margin-bottom: 12px; border: 1px solid rgba(245,230,210,0.06); }
+  .ov-tile { padding: 0 14px; border-left: 1px solid var(--border); }
+  .ov-tile:first-child { border-left: none; }
   .ov-tile-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px; }
   .ov-tile-value { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; line-height: 1; }
 
-  .ov-days-card { background: var(--surface); border-radius: 18px; padding: 14px 8px; margin-bottom: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
+  .ov-days-card { background: var(--surface); border-radius: 18px; padding: 14px 8px; margin-bottom: 12px; border: 1px solid rgba(245,230,210,0.06); }
   .ov-days-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; padding: 0 6px 10px; }
   .ov-days { display: flex; justify-content: space-between; }
   .ov-day-chip { display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -187,10 +192,10 @@
   .ov-day-lbl { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); }
 
   .ov-open-btn { display: block; width: 100%; text-align: center; background: var(--surface); border: none; color: var(--accent); padding: 13px; border-radius: 14px; font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-  .ov-open-btn:hover { background: var(--surface2); }
+  .ov-open-btn:hover, .ov-open-btn:active { background: var(--surface2); }
 
-  .ov-mini-card { background: var(--surface); border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: background 0.15s; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
-  .ov-mini-card:hover { background: var(--surface2); }
+  .ov-mini-card { background: var(--surface); border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: background 0.15s; border: 1px solid rgba(245,230,210,0.06); }
+  .ov-mini-card:hover, .ov-mini-card:active { background: var(--surface2); }
   .ov-mini-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .ov-mini-title { font-family: var(--font); font-size: 14px; font-weight: 600; display: flex; align-items: center; }
   .card-icon-chip { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 9px; font-size: 13px; margin-right: 8px; flex-shrink: 0; }
@@ -230,7 +235,7 @@
   .pu-ring-label { font-family: var(--font); font-size: 12px; font-weight: 700; }
   .pu-ring-value { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-  .pu-anim-card { background: var(--surface); border-radius: 18px; padding: 10px 14px 4px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
+  .pu-anim-card { background: var(--surface); border-radius: 18px; padding: 10px 14px 4px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: center; border: 1px solid rgba(245,230,210,0.06); }
   .pu-anim-svg { width: 150px; height: 105px; cursor: pointer; }
   .pu-anim-ground { stroke: var(--border); stroke-width: 3; stroke-linecap: round; }
   .pu-anim-body, .pu-anim-arm, .pu-anim-arm2 { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
@@ -240,7 +245,7 @@
   .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
   .cal-title { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
   .cal-refresh-btn { background: var(--surface); border: none; color: var(--accent); width: 34px; height: 34px; border-radius: 10px; font-size: 16px; cursor: pointer; transition: all 0.15s; }
-  .cal-refresh-btn:hover { background: var(--surface2); }
+  .cal-refresh-btn:hover, .cal-refresh-btn:active { background: var(--surface2); }
   .cal-status { font-family: var(--font); font-size: 13px; color: var(--muted); text-align: center; padding: 24px 12px; line-height: 1.5; }
   .cal-status.error { color: var(--red); }
   .cal-day-group { margin-bottom: 14px; }
@@ -254,14 +259,14 @@
   .cal-event-cal { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
   .cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-  .sp-card { background: var(--surface); border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
+  .sp-card { background: var(--surface); border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid rgba(245,230,210,0.06); }
   .sp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; }
   .sp-title { font-family: var(--font); font-size: 14px; font-weight: 600; display: flex; align-items: center; }
   .sp-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); opacity: 0.5; }
   .sp-status-dot.live { background: #1DB954; opacity: 1; box-shadow: 0 0 6px rgba(29,185,84,0.6); }
   .sp-body { display: flex; gap: 10px; align-items: stretch; }
   .sp-now-playing { flex: 1.3; min-width: 0; display: flex; align-items: center; gap: 9px; background: var(--surface2); border-radius: 12px; padding: 8px; cursor: pointer; transition: background 0.15s; }
-  .sp-now-playing:hover { background: #3f362c; }
+  .sp-now-playing:hover, .sp-now-playing:active { background: #3f362c; }
   .sp-np-art-wrap { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; }
   .sp-np-art { width: 100%; height: 100%; object-fit: cover; }
   .sp-np-art-fallback { font-size: 16px; }
@@ -271,7 +276,7 @@
   .sp-playlists { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; justify-content: center; }
   .sp-playlists-empty { font-family: var(--font); font-size: 11px; color: var(--muted); padding: 4px; }
   .sp-tile { display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 8px; padding: 3px 4px; transition: background 0.15s; }
-  .sp-tile:hover { background: var(--surface2); }
+  .sp-tile:hover, .sp-tile:active { background: var(--surface2); }
   .sp-tile-art { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
   .sp-tile-art-fallback { display: flex; align-items: center; justify-content: center; font-size: 11px; background: var(--surface2); }
   .sp-tile-name { font-family: var(--font); font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -280,7 +285,7 @@
   .sp-config-hint { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
 
   .sp-shuffle-bar { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, rgba(29,185,84,0.16), var(--surface) 70%); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; cursor: pointer; transition: background 0.15s; }
-  .sp-shuffle-bar:hover { background: linear-gradient(135deg, rgba(29,185,84,0.24), var(--surface2) 70%); }
+  .sp-shuffle-bar:hover, .sp-shuffle-bar:active { background: linear-gradient(135deg, rgba(29,185,84,0.24), var(--surface2) 70%); }
   .sp-shuffle-icon { font-size: 20px; flex-shrink: 0; }
   .sp-shuffle-text { flex: 1; min-width: 0; }
   .sp-shuffle-label { font-family: var(--font); font-size: 11px; font-weight: 700; color: #1DB954; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -304,9 +309,11 @@
   .dj-progress-fill { height: 100%; background: #1DB954; border-radius: 3px; width: 0%; }
 
   .dj-controls { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 12px; }
-  .dj-btn { background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+  .dj-btn { position: relative; background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
   .dj-btn:active { background: var(--surface2); }
   .dj-btn-toggle.active { color: #1DB954; }
+  .dj-repeat-one-dot { display: none; position: absolute; top: 6px; right: 9px; width: 6px; height: 6px; border-radius: 50%; background: #1DB954; }
+  .dj-btn-toggle.repeat-one .dj-repeat-one-dot { display: block; }
   .dj-btn-play { background: #1DB954; color: #05230f; font-size: 24px; width: 62px; height: 62px; }
   .dj-btn-play:active { background: #1ed760; }
 
@@ -350,6 +357,52 @@
 </head>
 <body>
 
+<svg style="position:absolute; width:0; height:0; overflow:hidden;" aria-hidden="true">
+  <symbol id="icon-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 11.5L12 4l8 7.5"/>
+    <path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/>
+  </symbol>
+  <symbol id="icon-dumbbell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="9" width="3" height="6" rx="1"/>
+    <rect x="19" y="9" width="3" height="6" rx="1"/>
+    <rect x="6" y="7" width="2" height="10" rx="1"/>
+    <rect x="16" y="7" width="2" height="10" rx="1"/>
+    <line x1="8" y1="12" x2="16" y2="12"/>
+  </symbol>
+  <symbol id="icon-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2.5c1.2 2.8-2.6 4-2.6 7.6a2.6 2.6 0 0 0 5.2 0c0-.9-.6-1.6-.6-1.6s1.7.9 1.7 3.4a4.7 4.7 0 0 1-9.4 0c0-4.6 3.7-5.8 5.7-9.4z"/>
+  </symbol>
+  <symbol id="icon-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="5" width="18" height="16" rx="2"/>
+    <line x1="3" y1="9" x2="21" y2="9"/>
+    <line x1="7" y1="3" x2="7" y2="7"/>
+    <line x1="17" y1="3" x2="17" y2="7"/>
+  </symbol>
+  <symbol id="icon-music" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18V5l11-2v13"/>
+    <circle cx="6" cy="18" r="3"/>
+    <circle cx="17" cy="16" r="3"/>
+  </symbol>
+  <symbol id="icon-headphones" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 14v-2a8 8 0 0 1 16 0v2"/>
+    <rect x="2" y="14" width="5" height="7" rx="2"/>
+    <rect x="17" y="14" width="5" height="7" rx="2"/>
+  </symbol>
+  <symbol id="icon-shuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="16 3 21 3 21 8"/>
+    <line x1="4" y1="20" x2="21" y2="3"/>
+    <polyline points="21 16 21 21 16 21"/>
+    <line x1="15" y1="15" x2="21" y2="21"/>
+    <line x1="4" y1="4" x2="9" y2="9"/>
+  </symbol>
+  <symbol id="icon-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="17 1 21 5 17 9"/>
+    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+    <polyline points="7 23 3 19 7 15"/>
+    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+  </symbol>
+</svg>
+
 <div class="ptr-bar" id="ptrBar"><div class="ptr-spinner" id="ptrSpinner">↓</div></div>
 
 <div class="app-views-viewport" id="appViewsViewport">
@@ -390,7 +443,7 @@
 
   <div class="sp-card">
     <div class="sp-header" onclick="showAppView('music')">
-      <div class="sp-title"><span class="card-icon-chip chip-orange">🎧</span>Spotify</div>
+      <div class="sp-title"><span class="card-icon-chip chip-orange"><svg class="icon" style="width:14px;height:14px;color:var(--accent);"><use href="#icon-headphones"></use></svg></span>Spotify</div>
       <div class="sp-status-dot" id="spStatusDot"></div>
     </div>
     <div class="sp-body">
@@ -412,7 +465,7 @@
 
   <div class="ov-mini-card" onclick="showAppView('calendar')">
     <div class="ov-mini-head">
-      <div class="ov-mini-title"><span class="card-icon-chip chip-teal">📅</span>Upcoming</div>
+      <div class="ov-mini-title"><span class="card-icon-chip chip-teal"><svg class="icon" style="width:14px;height:14px;color:var(--teal);"><use href="#icon-calendar"></use></svg></span>Upcoming</div>
       <div class="ov-mini-arrow">›</div>
     </div>
     <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
@@ -511,11 +564,11 @@
     </div>
 
     <div class="dj-controls">
-      <button class="dj-btn dj-btn-toggle" id="djShuffleBtn" onclick="toggleSpotifyShuffle()">🔀</button>
+      <button class="dj-btn dj-btn-toggle" id="djShuffleBtn" onclick="toggleSpotifyShuffle()"><svg class="icon"><use href="#icon-shuffle"></use></svg></button>
       <button class="dj-btn" onclick="spotifyPrevious()">⏮</button>
       <button class="dj-btn dj-btn-play" id="djPlayPauseBtn" onclick="toggleSpotifyPlayPause()">▶</button>
       <button class="dj-btn" onclick="spotifyNext()">⏭</button>
-      <button class="dj-btn dj-btn-toggle" id="djRepeatBtn" onclick="cycleSpotifyRepeat()">🔁</button>
+      <button class="dj-btn dj-btn-toggle" id="djRepeatBtn" onclick="cycleSpotifyRepeat()"><svg class="icon"><use href="#icon-repeat"></use></svg><span class="dj-repeat-one-dot" id="djRepeatOneDot"></span></button>
     </div>
 
     <div class="dj-volume-row">
@@ -1083,23 +1136,23 @@
 
 <div class="app-tabs" id="appTabs">
   <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">
-    <div class="app-tab-icon">🏠</div>
+    <svg class="icon app-tab-icon"><use href="#icon-home"></use></svg>
     <div class="app-tab-label">Overview</div>
   </div>
   <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">
-    <div class="app-tab-icon">🏋️</div>
+    <svg class="icon app-tab-icon"><use href="#icon-dumbbell"></use></svg>
     <div class="app-tab-label">Trainer</div>
   </div>
   <div class="app-tab" data-view="pushups" onclick="showAppView('pushups')">
-    <div class="app-tab-icon">💪</div>
+    <svg class="icon app-tab-icon"><use href="#icon-flame"></use></svg>
     <div class="app-tab-label">Pushups</div>
   </div>
   <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">
-    <div class="app-tab-icon">📅</div>
+    <svg class="icon app-tab-icon"><use href="#icon-calendar"></use></svg>
     <div class="app-tab-label">Calendar</div>
   </div>
   <div class="app-tab" data-view="music" onclick="showAppView('music')">
-    <div class="app-tab-icon">🎵</div>
+    <svg class="icon app-tab-icon"><use href="#icon-music"></use></svg>
     <div class="app-tab-label">Music</div>
   </div>
 </div>
@@ -2558,7 +2611,7 @@ function renderDjHero(state) {
   const repeatState = state.repeat_state || 'off';
   repeatBtn.dataset.state = repeatState;
   repeatBtn.classList.toggle('active', repeatState !== 'off');
-  repeatBtn.textContent = repeatState === 'track' ? '🔂' : '🔁';
+  repeatBtn.classList.toggle('repeat-one', repeatState === 'track');
 
   if (state.device && typeof state.device.volume_percent === 'number') {
     volSlider.value = state.device.volume_percent;
@@ -2623,7 +2676,7 @@ async function cycleSpotifyRepeat() {
   const next = nextMap[btn.dataset.state || 'off'];
   btn.dataset.state = next;
   btn.classList.toggle('active', next !== 'off');
-  btn.textContent = next === 'track' ? '🔂' : '🔁';
+  btn.classList.toggle('repeat-one', next === 'track');
   await spotifyApiRequest('PUT', `/me/player/repeat?state=${next}`);
 }
 
