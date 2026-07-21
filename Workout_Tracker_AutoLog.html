@@ -124,8 +124,10 @@
     background: rgba(23,20,15,0.82); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border);
     padding: 8px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+    overflow-x: auto; scrollbar-width: none;
   }
-  .app-tab { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px 0; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
+  .app-tabs::-webkit-scrollbar { display: none; }
+  .app-tab { flex: 0 0 auto; min-width: 72px; display: flex; align-items: center; justify-content: center; padding: 10px 14px; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
   .app-tab-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); transition: color 0.15s; }
   .app-tab.active { background: var(--surface2); }
   .app-tab.active .app-tab-label { color: var(--accent); font-weight: 700; }
@@ -143,6 +145,9 @@
   #view-pushups { order: 2; }
   #view-calendar { order: 3; }
   #view-music { order: 4; }
+  #view-weight { order: 5; }
+  #view-stats { order: 6; }
+  #view-settings { order: 7; }
 
   .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, #2e2519 100%); border-radius: 26px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
   .ov-hero-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -391,6 +396,22 @@
   .dj-recent-tile { flex-shrink: 0; width: 72px; cursor: pointer; }
   .dj-recent-art { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
   .dj-recent-name { font-family: var(--font); font-size: 10px; font-weight: 600; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .settings-field { margin-bottom: 14px; }
+  .settings-field:last-of-type { margin-bottom: 0; }
+  .settings-field input.config-input { width: 100%; box-sizing: border-box; }
+
+  .weight-entry-row { display: flex; gap: 8px; }
+  .weight-history-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .weight-history-row:last-child { border-bottom: none; }
+  .weight-history-date { font-family: var(--font); font-size: 13px; color: var(--muted); flex: 1; min-width: 0; }
+  .weight-history-value { font-family: var(--font); font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .weight-history-del { background: none; border: none; color: var(--muted); font-size: 19px; line-height: 1; cursor: pointer; padding: 4px 2px; flex-shrink: 0; }
+
+  .stats-card { background: var(--surface); border-radius: 18px; padding: 16px; margin-bottom: 12px; border: 1px solid rgba(245,230,210,0.06); }
+  .stats-card-title { font-family: var(--font); font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+  .stats-chart { width: 100%; height: 140px; display: block; overflow: visible; }
+  .stats-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -1147,6 +1168,87 @@
 
 </div>
 
+<div id="view-weight" class="app-view">
+  <div class="ov-page-head">
+    <div>
+      <div class="ov-page-week" id="weightAsOfLabel">No entries yet</div>
+      <div class="ov-page-title">Weight</div>
+    </div>
+  </div>
+
+  <div class="ov-hero">
+    <div class="ov-hero-label">Current</div>
+    <div class="ov-hero-number" id="weightCurrentValue">–</div>
+    <div class="ov-hero-sub" id="weightChangeSub">Log your first weigh-in below</div>
+  </div>
+
+  <div class="config-box">
+    <div class="config-title" style="margin-bottom:10px;">Log a Weigh-In</div>
+    <input type="date" id="weightEntryDate" class="config-input settings-field" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+    <div class="weight-entry-row">
+      <input type="number" id="weightEntryLbs" class="config-input" placeholder="Weight (lbs)" step="0.1" min="0">
+      <input type="number" id="weightEntryBodyFat" class="config-input" placeholder="Body fat % (optional)" step="0.1" min="0" max="100">
+    </div>
+    <button class="ov-open-btn" onclick="saveWeightEntry()" style="margin-top:10px;">Save Entry</button>
+    <div class="config-status" id="weightEntryStatus"></div>
+  </div>
+
+  <div class="config-box" id="weightHistoryCard">
+    <div class="config-title" style="margin-bottom:6px;">History</div>
+    <div id="weightHistoryList"></div>
+  </div>
+
+  <div class="ov-note">Manually entered for now — your Fitdays scale doesn't expose a public API, but it does sync to Apple Health. Ask if you'd like an Apple Shortcut that pulls your latest Health weigh-in in automatically.</div>
+</div>
+
+<div id="view-stats" class="app-view">
+  <div class="ov-page-head">
+    <div>
+      <div class="ov-page-week">Trends</div>
+      <div class="ov-page-title">Stats</div>
+    </div>
+  </div>
+
+  <div class="stats-card">
+    <div class="stats-card-title">Pushups — Last 8 Weeks</div>
+    <svg viewBox="0 0 320 140" class="stats-chart" id="statsPushupChart" preserveAspectRatio="none"></svg>
+    <div class="stats-chart-labels" id="statsPushupLabels"></div>
+  </div>
+
+  <div class="stats-card">
+    <div class="stats-card-title">Weight Trend</div>
+    <svg viewBox="0 0 320 140" class="stats-chart" id="statsWeightChart" preserveAspectRatio="none"></svg>
+    <div class="stats-chart-labels" id="statsWeightLabels"></div>
+  </div>
+
+  <div class="ov-note">Pushup totals come from your daily ledger. Weight trend appears once you've logged at least two weigh-ins on the Weight tab.</div>
+</div>
+
+<div id="view-settings" class="app-view">
+  <div class="ov-page-head">
+    <div>
+      <div class="ov-page-week">Configuration</div>
+      <div class="ov-page-title">Settings</div>
+    </div>
+  </div>
+
+  <div class="config-box">
+    <div class="config-title" style="margin-bottom:10px;">Pushup Goals</div>
+    <div class="settings-field">
+      <div class="sp-config-label" style="margin:0 0 6px;">Daily baseline (reps/day, Sunday off)</div>
+      <input type="number" id="settingsDailyBaseline" class="config-input" min="0" step="1">
+    </div>
+    <div class="settings-field">
+      <div class="sp-config-label" style="margin:0 0 6px;">Yearly goal (total reps)</div>
+      <input type="number" id="settingsYearGoal" class="config-input" min="0" step="1000">
+    </div>
+    <button class="ov-open-btn" onclick="saveSettings()" style="margin-top:12px;">Save</button>
+    <div class="config-status" id="settingsStatus"></div>
+  </div>
+
+  <div class="ov-note">Changes apply immediately across Overview, Pushups, and Stats.</div>
+</div>
+
 </div>
 </div>
 
@@ -1189,6 +1291,15 @@
   <div class="app-tab" data-view="music" onclick="showAppView('music')">
     <div class="app-tab-label">Music</div>
   </div>
+  <div class="app-tab" data-view="weight" onclick="showAppView('weight')">
+    <div class="app-tab-label">Weight</div>
+  </div>
+  <div class="app-tab" data-view="stats" onclick="showAppView('stats')">
+    <div class="app-tab-label">Stats</div>
+  </div>
+  <div class="app-tab" data-view="settings" onclick="showAppView('settings')">
+    <div class="app-tab-label">Settings</div>
+  </div>
 </div>
 
 <script>
@@ -1200,8 +1311,217 @@ const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 const STORAGE_STATE_KEY = 'WORKOUT_TRACKER_STATE';
 const STORAGE_PUSHUP_LEDGER_KEY = 'WORKOUT_PUSHUP_LEDGER';
 const STORAGE_YEAR_CARRY_KEY = 'WORKOUT_YEAR_CARRY_FORWARD';
-const PUSHUP_DAILY_BASELINE = 165;
-const PUSHUP_YEAR_GOAL = 50000;
+const STORAGE_SETTINGS_KEY = 'WORKOUT_SETTINGS';
+let PUSHUP_DAILY_BASELINE = 165;
+let PUSHUP_YEAR_GOAL = 50000;
+
+// Overridable from the Settings tab; falls back to the defaults above so
+// existing devices with no saved settings behave exactly as before.
+function loadSettingsIntoState() {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+  if (saved.dailyBaseline > 0) PUSHUP_DAILY_BASELINE = saved.dailyBaseline;
+  if (saved.yearGoal > 0) PUSHUP_YEAR_GOAL = saved.yearGoal;
+}
+
+function renderSettingsTab() {
+  document.getElementById('settingsDailyBaseline').value = PUSHUP_DAILY_BASELINE;
+  document.getElementById('settingsYearGoal').value = PUSHUP_YEAR_GOAL;
+}
+
+function saveSettings() {
+  const statusEl = document.getElementById('settingsStatus');
+  const dailyBaseline = parseFloat(document.getElementById('settingsDailyBaseline').value);
+  const yearGoal = parseFloat(document.getElementById('settingsYearGoal').value);
+  if (!(dailyBaseline > 0) || !(yearGoal > 0)) {
+    statusEl.textContent = 'Both fields need a positive number.';
+    statusEl.classList.add('warn');
+    return;
+  }
+  localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify({ dailyBaseline, yearGoal }));
+  PUSHUP_DAILY_BASELINE = dailyBaseline;
+  PUSHUP_YEAR_GOAL = yearGoal;
+  statusEl.classList.remove('warn');
+  statusEl.textContent = 'Saved.';
+  renderOverview();
+  renderPushupsTab();
+}
+
+// Weight log - purely local (same pattern as the pushup ledger). Fitdays'
+// scale has no public API to pull from directly, so entries are typed in
+// here; it does sync to Apple Health, which is the door left open for a
+// future Shortcuts-based auto-import.
+const STORAGE_WEIGHT_LOG_KEY = 'WORKOUT_WEIGHT_LOG';
+
+function loadWeightLog() {
+  return JSON.parse(localStorage.getItem(STORAGE_WEIGHT_LOG_KEY) || '[]');
+}
+
+function saveWeightLog(entries) {
+  localStorage.setItem(STORAGE_WEIGHT_LOG_KEY, JSON.stringify(entries));
+}
+
+function saveWeightEntry() {
+  const dateEl = document.getElementById('weightEntryDate');
+  const lbsEl = document.getElementById('weightEntryLbs');
+  const bfEl = document.getElementById('weightEntryBodyFat');
+  const statusEl = document.getElementById('weightEntryStatus');
+
+  const date = dateEl.value || dateKey(new Date());
+  const weight = parseFloat(lbsEl.value);
+  if (!(weight > 0)) {
+    statusEl.textContent = 'Enter a valid weight first.';
+    statusEl.classList.add('warn');
+    return;
+  }
+  const bodyFatRaw = bfEl.value.trim();
+  const bodyFat = bodyFatRaw ? parseFloat(bodyFatRaw) : null;
+
+  const log = loadWeightLog().filter(e => e.date !== date);
+  log.push({ date, weight, bodyFat });
+  log.sort((a, b) => a.date.localeCompare(b.date));
+  saveWeightLog(log);
+
+  statusEl.classList.remove('warn');
+  statusEl.textContent = 'Saved.';
+  lbsEl.value = '';
+  bfEl.value = '';
+  renderWeightTab();
+}
+
+function deleteWeightEntry(date) {
+  saveWeightLog(loadWeightLog().filter(e => e.date !== date));
+  renderWeightTab();
+}
+
+function renderWeightTab() {
+  const dateEl = document.getElementById('weightEntryDate');
+  if (dateEl && !dateEl.value) dateEl.value = dateKey(new Date());
+
+  const log = loadWeightLog();
+  const asOfLabel = document.getElementById('weightAsOfLabel');
+  const currentEl = document.getElementById('weightCurrentValue');
+  const subEl = document.getElementById('weightChangeSub');
+
+  const fmtDate = ds => new Date(ds + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  if (log.length === 0) {
+    asOfLabel.textContent = 'No entries yet';
+    currentEl.textContent = '–';
+    subEl.textContent = 'Log your first weigh-in below';
+  } else {
+    const latest = log[log.length - 1];
+    asOfLabel.textContent = 'As of ' + fmtDate(latest.date);
+    currentEl.textContent = latest.weight.toFixed(1) + ' lb';
+    if (log.length > 1) {
+      const prev = log[log.length - 2];
+      const delta = latest.weight - prev.weight;
+      const sign = delta > 0 ? '+' : (delta < 0 ? '−' : '');
+      subEl.textContent = `${sign}${Math.abs(delta).toFixed(1)} lb since ${fmtDate(prev.date)}`;
+    } else {
+      subEl.textContent = latest.bodyFat != null ? `${latest.bodyFat}% body fat` : 'First entry logged';
+    }
+  }
+
+  const listEl = document.getElementById('weightHistoryList');
+  if (log.length === 0) {
+    listEl.innerHTML = '<div class="ov-mini-empty">No entries yet.</div>';
+  } else {
+    listEl.innerHTML = log.slice().reverse().map(e => {
+      const label = new Date(e.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const bf = e.bodyFat != null ? ` · ${e.bodyFat}% BF` : '';
+      return `<div class="weight-history-row">
+        <div class="weight-history-date">${label}</div>
+        <div class="weight-history-value">${e.weight.toFixed(1)} lb${bf}</div>
+        <button class="weight-history-del" onclick="deleteWeightEntry('${e.date}')">×</button>
+      </div>`;
+    }).join('');
+  }
+}
+
+// Stats tab - charts built from data the app already keeps: the pushup
+// ledger (per-day totals) and the weight log above. No charting library;
+// both charts are plain inline SVG, consistent with the rings/wheels
+// elsewhere in this file.
+function getWeekMondayFor(date) {
+  const d = new Date(date);
+  const dow = d.getDay();
+  const diffToMonday = (dow === 0 ? -6 : 1) - dow;
+  d.setDate(d.getDate() + diffToMonday);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function computeWeeklyPushupHistory(weeks) {
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  const thisMonday = getWeekMondayFor(new Date());
+  const result = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const monday = new Date(thisMonday);
+    monday.setDate(thisMonday.getDate() - i * 7);
+    let total = 0;
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + d);
+      total += ledger[dateKey(day)] || 0;
+    }
+    result.push({ weekStart: monday, total });
+  }
+  return result;
+}
+
+function renderStatsPushupChart() {
+  const weeks = computeWeeklyPushupHistory(8);
+  const svg = document.getElementById('statsPushupChart');
+  const labelsEl = document.getElementById('statsPushupLabels');
+  const weeklyTarget = PUSHUP_DAILY_BASELINE * 6;
+  const maxVal = Math.max(weeklyTarget, ...weeks.map(w => w.total), 1);
+  const chartW = 320, chartH = 132, barGap = 6;
+  const barW = (chartW - barGap * (weeks.length - 1)) / weeks.length;
+
+  let bars = '';
+  weeks.forEach((w, i) => {
+    const h = Math.max(2, (w.total / maxVal) * chartH);
+    const x = i * (barW + barGap);
+    const y = chartH - h;
+    const color = w.total >= weeklyTarget ? 'var(--green)' : 'var(--accent)';
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${color}"></rect>`;
+  });
+  svg.innerHTML = bars;
+  labelsEl.innerHTML = weeks.map(w => `<span>${w.weekStart.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</span>`).join('');
+}
+
+function renderStatsWeightChart() {
+  const svg = document.getElementById('statsWeightChart');
+  const labelsEl = document.getElementById('statsWeightLabels');
+  const log = loadWeightLog();
+
+  if (log.length < 2) {
+    svg.innerHTML = '';
+    labelsEl.innerHTML = '<span class="ov-mini-empty">Log at least 2 weigh-ins to see a trend.</span>';
+    return;
+  }
+
+  const entries = log.slice(-12);
+  const weights = entries.map(e => e.weight);
+  const minW = Math.min(...weights), maxW = Math.max(...weights);
+  const pad = Math.max(1, (maxW - minW) * 0.15);
+  const lo = minW - pad, hi = maxW + pad;
+  const chartW = 320, chartH = 132;
+  const stepX = chartW / (entries.length - 1);
+  const yFor = w => chartH - ((w - lo) / (hi - lo)) * chartH;
+
+  const points = entries.map((e, i) => `${(i * stepX).toFixed(1)},${yFor(e.weight).toFixed(1)}`).join(' ');
+  const dots = entries.map((e, i) => `<circle cx="${(i * stepX).toFixed(1)}" cy="${yFor(e.weight).toFixed(1)}" r="3.5" fill="var(--teal)"></circle>`).join('');
+  svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--teal)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>${dots}`;
+
+  const fmtDate = ds => new Date(ds + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+  labelsEl.innerHTML = `<span>${fmtDate(entries[0].date)} · ${entries[0].weight.toFixed(1)} lb</span><span>${fmtDate(entries[entries.length - 1].date)} · ${entries[entries.length - 1].weight.toFixed(1)} lb</span>`;
+}
+
+function renderStatsTab() {
+  renderStatsPushupChart();
+  renderStatsWeightChart();
+}
 let isRestoringState = false;
 let calendarLoadedOnce = false;
 
@@ -1520,7 +1840,7 @@ function restoreState() {
 
 /* ---------- Weekly Overview tab ---------- */
 
-const viewOrder = ['overview', 'tracker', 'pushups', 'calendar', 'music'];
+const viewOrder = ['overview', 'tracker', 'pushups', 'calendar', 'music', 'weight', 'stats', 'settings'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -1529,6 +1849,9 @@ function renderActiveViewContent(view) {
   if (view === 'pushups') renderPushupsTab();
   if (view === 'calendar') ensureCalendarLoaded();
   if (view === 'music') renderMusicTab();
+  if (view === 'weight') renderWeightTab();
+  if (view === 'stats') renderStatsTab();
+  if (view === 'settings') renderSettingsTab();
 }
 
 // All 4 views live side-by-side in a flex track (CSS `order` maps them to
@@ -3587,6 +3910,18 @@ function refreshCurrentTab() {
   if (view === 'music') {
     return Promise.all([refreshDjPlaybackState(), loadDjPlaylists(), loadDjRecentlyPlayed()]);
   }
+  if (view === 'weight') {
+    renderWeightTab();
+    return Promise.resolve();
+  }
+  if (view === 'stats') {
+    renderStatsTab();
+    return Promise.resolve();
+  }
+  if (view === 'settings') {
+    renderSettingsTab();
+    return Promise.resolve();
+  }
   return Promise.resolve();
 }
 
@@ -3727,6 +4062,7 @@ document.querySelectorAll('.exercise-sets').forEach((el, i) => {
 document.querySelectorAll('.exercise-card').forEach(initExerciseSets);
 initAddExerciseButtons();
 tagExerciseIds();
+loadSettingsIntoState();
 seedHistoricalPushupLedger();
 seedYearCarryForward();
 restoreState();
