@@ -1187,6 +1187,12 @@
     <div class="ov-hero-sub" id="weightChangeSub">Log your first weigh-in below</div>
   </div>
 
+  <div class="stats-card">
+    <div class="stats-card-title">Trend</div>
+    <svg viewBox="0 0 320 140" class="stats-chart" id="weightTrendChart" preserveAspectRatio="none"></svg>
+    <div class="stats-chart-labels" id="weightTrendLabels"></div>
+  </div>
+
   <div class="config-box">
     <div class="config-title" style="margin-bottom:10px;">Log a Weigh-In</div>
     <input type="date" id="weightEntryDate" class="config-input settings-field" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
@@ -1489,6 +1495,8 @@ function renderWeightTab() {
       </div>`;
     }).join('');
   }
+
+  renderWeightLineChart('weightTrendChart', 'weightTrendLabels', 30);
 }
 
 // Stats tab - charts built from data the app already keeps: the pushup
@@ -1587,9 +1595,12 @@ function closeSettingsModal(event) {
   document.getElementById('settingsModalOverlay').classList.remove('open');
 }
 
-function renderStatsWeightChart() {
-  const svg = document.getElementById('statsWeightChart');
-  const labelsEl = document.getElementById('statsWeightLabels');
+// Shared by the Stats tab's compact chart and the Weight tab's larger one -
+// same data, same drawing logic, just a different point count and target
+// elements so the two never drift out of sync with each other.
+function renderWeightLineChart(svgId, labelsId, maxEntries) {
+  const svg = document.getElementById(svgId);
+  const labelsEl = document.getElementById(labelsId);
   const log = loadWeightLog();
 
   if (log.length < 2) {
@@ -1598,7 +1609,7 @@ function renderStatsWeightChart() {
     return;
   }
 
-  const entries = log.slice(-12);
+  const entries = log.slice(-maxEntries);
   const weights = entries.map(e => e.weight);
   const minW = Math.min(...weights), maxW = Math.max(...weights);
   const pad = Math.max(1, (maxW - minW) * 0.15);
@@ -1608,11 +1619,21 @@ function renderStatsWeightChart() {
   const yFor = w => chartH - ((w - lo) / (hi - lo)) * chartH;
 
   const points = entries.map((e, i) => `${(i * stepX).toFixed(1)},${yFor(e.weight).toFixed(1)}`).join(' ');
-  const dots = entries.map((e, i) => `<circle cx="${(i * stepX).toFixed(1)}" cy="${yFor(e.weight).toFixed(1)}" r="3.5" fill="var(--teal)"></circle>`).join('');
+  const minIdx = weights.indexOf(minW), maxIdx = weights.indexOf(maxW);
+  const dots = entries.map((e, i) => {
+    const isExtreme = i === minIdx || i === maxIdx;
+    const r = isExtreme ? 4.5 : 3.5;
+    const color = isExtreme ? 'var(--accent)' : 'var(--teal)';
+    return `<circle cx="${(i * stepX).toFixed(1)}" cy="${yFor(e.weight).toFixed(1)}" r="${r}" fill="${color}"></circle>`;
+  }).join('');
   svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--teal)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>${dots}`;
 
   const fmtDate = ds => new Date(ds + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
   labelsEl.innerHTML = `<span>${fmtDate(entries[0].date)} · ${entries[0].weight.toFixed(1)} lb</span><span>${fmtDate(entries[entries.length - 1].date)} · ${entries[entries.length - 1].weight.toFixed(1)} lb</span>`;
+}
+
+function renderStatsWeightChart() {
+  renderWeightLineChart('statsWeightChart', 'statsWeightLabels', 12);
 }
 
 function renderStatsTab() {
