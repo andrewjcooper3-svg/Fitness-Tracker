@@ -236,12 +236,13 @@
   .cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
   .sp-card { background: var(--surface); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
-  .sp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .sp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; }
   .sp-title { font-family: var(--font); font-size: 14px; font-weight: 600; }
   .sp-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); opacity: 0.5; }
   .sp-status-dot.live { background: #1DB954; opacity: 1; box-shadow: 0 0 6px rgba(29,185,84,0.6); }
   .sp-body { display: flex; gap: 10px; align-items: stretch; }
-  .sp-now-playing { flex: 1.3; min-width: 0; display: flex; align-items: center; gap: 9px; background: var(--surface2); border-radius: 12px; padding: 8px; }
+  .sp-now-playing { flex: 1.3; min-width: 0; display: flex; align-items: center; gap: 9px; background: var(--surface2); border-radius: 12px; padding: 8px; cursor: pointer; transition: background 0.15s; }
+  .sp-now-playing:hover { background: #333336; }
   .sp-np-art-wrap { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; }
   .sp-np-art { width: 100%; height: 100%; object-fit: cover; }
   .sp-np-art-fallback { font-size: 16px; }
@@ -273,24 +274,29 @@
   .dj-track-title { font-family: var(--font); font-size: 18px; font-weight: 800; letter-spacing: -0.2px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dj-track-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 3px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .dj-progress-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+  .dj-progress-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
   .dj-time { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; width: 32px; flex-shrink: 0; }
-  .dj-progress-track { flex: 1; height: 5px; border-radius: 3px; background: var(--surface2); overflow: hidden; cursor: pointer; }
+  /* Padding here enlarges the actual tap/drag target for seeking well
+     past the visible bar's thickness, matching iOS's ~44pt minimum
+     without making the bar itself look thick. */
+  .dj-progress-track { flex: 1; padding: 12px 0; cursor: pointer; }
+  .dj-progress-bar { height: 5px; border-radius: 3px; background: var(--surface2); overflow: hidden; }
   .dj-progress-fill { height: 100%; background: #1DB954; border-radius: 3px; width: 0%; }
 
-  .dj-controls { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 18px; }
-  .dj-btn { background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
-  .dj-btn:hover { background: var(--surface2); }
+  .dj-controls { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 12px; }
+  .dj-btn { background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+  .dj-btn:active { background: var(--surface2); }
   .dj-btn-toggle.active { color: #1DB954; }
-  .dj-btn-play { background: #1DB954; color: #05230f; font-size: 20px; width: 54px; height: 54px; }
-  .dj-btn-play:hover { background: #1ed760; }
+  .dj-btn-play { background: #1DB954; color: #05230f; font-size: 24px; width: 62px; height: 62px; }
+  .dj-btn-play:active { background: #1ed760; }
 
-  .dj-volume-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 0 8px; }
+  .dj-volume-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 8px; }
   .dj-volume-icon { font-size: 14px; flex-shrink: 0; }
-  .dj-volume-slider { flex: 1; accent-color: #1DB954; }
+  .dj-volume-slider { flex: 1; accent-color: #1DB954; height: 30px; }
 
-  .dj-devices { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
-  .dj-device-chip { font-family: var(--font); font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 20px; background: var(--surface2); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .dj-devices { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+  .dj-device-chip { font-family: var(--font); font-size: 12px; font-weight: 600; padding: 9px 15px; border-radius: 20px; background: var(--surface2); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .dj-device-chip:active { background: #3a3a3d; }
   .dj-device-chip.active { background: rgba(29,185,84,0.2); color: #1DB954; }
 
   .dj-section { margin-bottom: 16px; }
@@ -358,12 +364,12 @@
   </div>
 
   <div class="sp-card">
-    <div class="sp-header">
+    <div class="sp-header" onclick="showAppView('music')">
       <div class="sp-title">🎧 Spotify</div>
       <div class="sp-status-dot" id="spStatusDot"></div>
     </div>
     <div class="sp-body">
-      <div class="sp-now-playing" id="spNowPlaying">
+      <div class="sp-now-playing" id="spNowPlaying" onclick="showAppView('music')">
         <div class="sp-np-art-wrap">
           <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
           <div class="sp-np-art-fallback" id="spNpArtFallback">🎵</div>
@@ -374,32 +380,7 @@
         </div>
       </div>
       <div class="sp-playlists" id="spPlaylistTiles">
-        <div class="sp-playlists-empty">Pin playlists below</div>
-      </div>
-    </div>
-
-    <div class="config-box sp-config-box">
-      <div class="config-toggle" onclick="toggleSpotifyConfig()">
-        <div class="config-title">⚙ Spotify Connection</div>
-        <div class="config-chevron" id="spotifyConfigChevron">▸</div>
-      </div>
-      <div class="config-body" id="spotifyConfigBody">
-        <div class="config-row">
-          <input type="text" id="spotifyClientId" class="config-input" placeholder="Spotify Client ID">
-          <button class="config-save" onclick="saveSpotifyClientId()">Save</button>
-        </div>
-        <div class="config-status" id="spotifyConfigStatus">Not connected — paste your Client ID, save, then connect.</div>
-        <button class="ov-open-btn" id="spotifyConnectBtn" onclick="connectSpotify()" style="margin-top:8px;">Connect Spotify</button>
-
-        <div class="sp-config-label">Pinned playlists (shown on the right, above)</div>
-        <div class="config-row"><input type="text" id="spPin1Link" class="config-input" placeholder="Playlist link 1"></div>
-        <div class="config-row"><input type="text" id="spPin2Link" class="config-input" placeholder="Playlist link 2"></div>
-        <div class="config-row"><input type="text" id="spPin3Link" class="config-input" placeholder="Playlist link 3"></div>
-
-        <div class="sp-config-label">Workout playlist (Trainer tab shuffle button)</div>
-        <div class="config-row"><input type="text" id="spWorkoutPlaylistLink" class="config-input" placeholder="Playlist link"></div>
-
-        <button class="config-save" style="width:100%; margin-top:8px;" onclick="saveSpotifyPlaylists()">Save Playlists</button>
+        <div class="sp-playlists-empty">Pin playlists in the Music tab</div>
       </div>
     </div>
   </div>
@@ -502,7 +483,7 @@
 
     <div class="dj-progress-row">
       <div class="dj-time" id="djTimeElapsed">0:00</div>
-      <div class="dj-progress-track" id="djProgressTrack"><div class="dj-progress-fill" id="djProgressFill"></div></div>
+      <div class="dj-progress-track" id="djProgressTrack"><div class="dj-progress-bar"><div class="dj-progress-fill" id="djProgressFill"></div></div></div>
       <div class="dj-time" id="djTimeTotal">0:00</div>
     </div>
 
@@ -524,7 +505,7 @@
 
   <div class="dj-section">
     <div class="dj-section-label">Quick Access</div>
-    <div class="dj-quick-row" id="djQuickAccess"><div class="sp-playlists-empty">Pin playlists from the Overview tab</div></div>
+    <div class="dj-quick-row" id="djQuickAccess"><div class="sp-playlists-empty">Pin playlists in Spotify Settings below</div></div>
   </div>
 
   <div class="dj-section">
@@ -535,6 +516,31 @@
   <div class="dj-section">
     <div class="dj-section-label">Recently Played</div>
     <div class="dj-recent-row" id="djRecentRow"><div class="sp-playlists-empty">Connect Spotify first</div></div>
+  </div>
+
+  <div class="config-box sp-config-box">
+    <div class="config-toggle" onclick="toggleSpotifyConfig()">
+      <div class="config-title">⚙ Spotify Settings</div>
+      <div class="config-chevron" id="spotifyConfigChevron">▸</div>
+    </div>
+    <div class="config-body" id="spotifyConfigBody">
+      <div class="config-row">
+        <input type="text" id="spotifyClientId" class="config-input" placeholder="Spotify Client ID">
+        <button class="config-save" onclick="saveSpotifyClientId()">Save</button>
+      </div>
+      <div class="config-status" id="spotifyConfigStatus">Not connected — paste your Client ID, save, then connect.</div>
+      <button class="ov-open-btn" id="spotifyConnectBtn" onclick="connectSpotify()" style="margin-top:8px;">Connect Spotify</button>
+
+      <div class="sp-config-label">Pinned playlists (Quick Access + Overview tile)</div>
+      <div class="config-row"><input type="text" id="spPin1Link" class="config-input" placeholder="Playlist link 1"></div>
+      <div class="config-row"><input type="text" id="spPin2Link" class="config-input" placeholder="Playlist link 2"></div>
+      <div class="config-row"><input type="text" id="spPin3Link" class="config-input" placeholder="Playlist link 3"></div>
+
+      <div class="sp-config-label">Workout playlist (Trainer tab shuffle button)</div>
+      <div class="config-row"><input type="text" id="spWorkoutPlaylistLink" class="config-input" placeholder="Playlist link"></div>
+
+      <button class="config-save" style="width:100%; margin-top:8px;" onclick="saveSpotifyPlaylists()">Save Playlists</button>
+    </div>
   </div>
 
   <div class="ov-note">Full playback control via Spotify's Web API - needs Premium and an active device (open Spotify somewhere first).</div>
@@ -2146,7 +2152,7 @@ function renderPinnedPlaylists() {
 
   el.innerHTML = '';
   if (pins.length === 0) {
-    el.innerHTML = '<div class="sp-playlists-empty">Pin playlists below</div>';
+    el.innerHTML = '<div class="sp-playlists-empty">Pin playlists in the Music tab</div>';
     return;
   }
 
@@ -2469,7 +2475,7 @@ function renderDjQuickAccess() {
 
   el.innerHTML = '';
   if (items.length === 0) {
-    el.innerHTML = '<div class="sp-playlists-empty">Pin playlists from the Overview tab</div>';
+    el.innerHTML = '<div class="sp-playlists-empty">Pin playlists in Spotify Settings below</div>';
     return;
   }
   items.forEach(p => {
