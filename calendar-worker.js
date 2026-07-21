@@ -450,6 +450,35 @@ export default {
         });
       }
 
+      // Tests whether a plain GET on the calendar's own collection URL
+      // returns its content directly (some subscribed/read-only calendars
+      // are served this way, as one flat ICS document, rather than
+      // supporting per-event REPORT queries the way owned calendars do).
+      if (url.searchParams.get('debug') === 'get') {
+        const nameFilter = (url.searchParams.get('calendar') || '').toLowerCase();
+        const auth = basicAuthHeader(env.APPLE_ID, env.APPLE_APP_PASSWORD);
+        const homeUrl = await getCalDavHomeUrl(auth);
+        const calendars = await listCalendars(homeUrl, auth);
+        const match = calendars.find(c => c.name.toLowerCase().includes(nameFilter));
+        if (!match) {
+          return new Response(JSON.stringify({ status: 'error', message: `No calendar name contains "${nameFilter}". Found: ${calendars.map(c => c.name).join(', ')}` }), {
+            headers: { 'Content-Type': 'application/json', ...cors }
+          });
+        }
+        const getRes = await fetch(match.url, { method: 'GET', headers: { Authorization: auth } });
+        const getBody = await getRes.text();
+        return new Response(JSON.stringify({
+          status: 'success',
+          calendar: match.name,
+          httpStatus: getRes.status,
+          contentType: getRes.headers.get('Content-Type'),
+          bodyLength: getBody.length,
+          bodySample: getBody.slice(0, 1500)
+        }, null, 2), {
+          headers: { 'Content-Type': 'application/json', ...cors }
+        });
+      }
+
       const startParam = url.searchParams.get('start');
       const endParam = url.searchParams.get('end');
 
