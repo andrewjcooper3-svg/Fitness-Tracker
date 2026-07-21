@@ -179,6 +179,32 @@ async function fetchEventsForCalendar(calUrl, startDate, endDate, auth) {
   return events;
 }
 
+// Same REPORT query as fetchEventsForCalendar, but returns the decoded
+// ICS text untouched - diagnostic only, so the actual VEVENT shape (or
+// the fact that zero calendar-data blocks came back at all) can be seen
+// directly for a calendar returning no events unexpectedly.
+async function fetchRawIcsForCalendar(calUrl, startDate, endDate, auth) {
+  const body = '<?xml version="1.0" encoding="utf-8" ?>' +
+    '<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">' +
+    '<D:prop><D:getetag/><C:calendar-data/></D:prop>' +
+    '<C:filter><C:comp-filter name="VCALENDAR"><C:comp-filter name="VEVENT">' +
+    `<C:time-range start="${fmtICSDate(startDate)}" end="${fmtICSDate(endDate)}"/>` +
+    '</C:comp-filter></C:comp-filter></C:filter>' +
+    '</C:calendar-query>';
+  const res = await caldavRequest(calUrl, 'REPORT', body, auth, { Depth: '1' });
+  if (!res.ok) throw new Error(`CalDAV event query failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+  const xml = await res.text();
+  const dataBlocks = extractAllBlocks(xml, 'calendar-data');
+  if (dataBlocks.length === 0) {
+    // Nothing matched the time-range filter at all - include a slice of
+    // the raw multistatus response so it's clear whether that's because
+    // the query genuinely found nothing, or the response shape is
+    // different than expected (e.g. an error buried in a 207).
+    return { blockCount: 0, rawResponseSample: xml.slice(0, 1000) };
+  }
+  return { blockCount: dataBlocks.length, ics: dataBlocks.map(b => decodeXmlEntities(extractTag(b, 'calendar-data') || '')) };
+}
+
 // Minimal VEVENT parser - handles SUMMARY, DTSTART, DTEND, RRULE, EXDATE
 // (date-only and dateTime forms). Enough for a read-only display list;
 // not a full RFC 5545 implementation (no RDATE, no RECURRENCE-ID
@@ -396,6 +422,30 @@ export default {
         const homeUrl = await getCalDavHomeUrl(auth);
         const collections = await listAllCollectionsRaw(homeUrl, auth);
         return new Response(JSON.stringify({ status: 'success', collections }, null, 2), {
+          headers: { 'Content-Type': 'application/json', ...cors }
+        });
+      }
+
+      // Bypasses all parsing/expansion and returns the exact ICS text
+      // iCloud sends back for one calendar's REPORT query, so a calendar
+      // returning 0 events (like a subscription) can be inspected directly
+      // instead of guessing why the parser found nothing.
+      if (url.searchParams.get('debug') === 'raw') {
+        const nameFilter = (url.searchParams.get('calendar') || '').toLowerCase();
+        const auth = basicAuthHeader(env.APPLE_ID, env.APPLE_APP_PASSWORD);
+        const homeUrl = await getCalDavHomeUrl(auth);
+        const calendars = await listCalendars(homeUrl, auth);
+        const match = calendars.find(c => c.name.toLowerCase().includes(nameFilter));
+        if (!match) {
+          return new Response(JSON.stringify({ status: 'error', message: `No calendar name contains "${nameFilter}". Found: ${calendars.map(c => c.name).join(', ')}` }), {
+            headers: { 'Content-Type': 'application/json', ...cors }
+          });
+        }
+        const days = parseInt(url.searchParams.get('days') || '30', 10);
+        const rawStart = new Date(); rawStart.setUTCHours(0, 0, 0, 0);
+        const rawEnd = new Date(rawStart); rawEnd.setUTCDate(rawEnd.getUTCDate() + days);
+        const raw = await fetchRawIcsForCalendar(match.url, rawStart, rawEnd, auth);
+        return new Response(JSON.stringify({ status: 'success', calendar: match.name, ...raw }, null, 2), {
           headers: { 'Content-Type': 'application/json', ...cors }
         });
       }
