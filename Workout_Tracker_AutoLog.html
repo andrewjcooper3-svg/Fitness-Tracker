@@ -212,9 +212,9 @@
   .pu-ring-value { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   .pu-anim-card { background: var(--surface); border-radius: 18px; padding: 10px 14px 4px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
-  .pu-anim-svg { width: 150px; height: 105px; }
+  .pu-anim-svg { width: 150px; height: 105px; cursor: pointer; }
   .pu-anim-ground { stroke: var(--border); stroke-width: 3; stroke-linecap: round; }
-  .pu-anim-body, .pu-anim-arm { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+  .pu-anim-body, .pu-anim-arm, .pu-anim-arm2 { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
   .pu-anim-head { fill: var(--accent); }
   .pu-anim-caption { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; padding-bottom: 8px; }
 
@@ -440,19 +440,44 @@
   </div>
 
   <div class="pu-anim-card">
-    <div class="pu-anim-caption">Keep going</div>
-    <svg viewBox="0 0 120 90" class="pu-anim-svg" aria-hidden="true">
+    <div class="pu-anim-caption" id="puAnimCaption">Keep going · tap him 💪</div>
+    <svg viewBox="0 0 120 90" class="pu-anim-svg" id="puAnimSvg" onclick="triggerPushupFlex()" aria-hidden="true">
       <line class="pu-anim-ground" x1="8" y1="80" x2="112" y2="80"></line>
+
       <polyline class="pu-anim-body" points="18,76 52,44 86,30">
-        <animate attributeName="points"
+        <animate id="puLoopBody" attributeName="points"
           values="18,76 52,44 86,30; 18,76 52,58 86,62; 18,76 52,44 86,30"
           keyTimes="0; 0.5; 1" dur="1.2s" repeatCount="indefinite" />
+        <animate id="puDetourBody" attributeName="points" begin="indefinite" repeatCount="1"
+          values="18,76 52,44 86,30; 60,76 60,52 60,28; 60,76 60,52 60,28; 60,76 60,52 60,28; 60,76 60,52 60,28; 18,76 52,44 86,30"
+          keyTimes="0; 0.18; 0.36; 0.68; 0.84; 1" dur="2s" />
       </polyline>
-      <line class="pu-anim-arm" x1="86" y1="30" x2="86" y2="76">
-        <animate attributeName="y1" values="30;62;30" keyTimes="0; 0.5; 1" dur="1.2s" repeatCount="indefinite" />
-      </line>
+
+      <polyline class="pu-anim-arm" points="86,30 86,53 86,76">
+        <animate id="puLoopArm" attributeName="points"
+          values="86,30 86,53 86,76; 86,62 94,69 86,76; 86,30 86,53 86,76"
+          keyTimes="0; 0.5; 1" dur="1.2s" repeatCount="indefinite" />
+        <animate id="puDetourArm" attributeName="points" begin="indefinite" repeatCount="1"
+          values="86,30 86,53 86,76; 60,28 66,42 62,54; 60,28 80,32 74,12; 60,28 80,32 74,12; 60,28 66,42 62,54; 86,30 86,53 86,76"
+          keyTimes="0; 0.18; 0.36; 0.68; 0.84; 1" dur="2s" />
+      </polyline>
+
+      <!-- Second arm: invisible during normal pushups (opacity 0, collapsed
+           at the shoulder), only extends out and fades in for the flex. -->
+      <polyline class="pu-anim-arm2" points="86,30 86,30 86,30" opacity="0">
+        <animate id="puDetourArm2" attributeName="points" begin="indefinite" repeatCount="1"
+          values="86,30 86,30 86,30; 60,28 54,42 58,54; 60,28 40,32 46,12; 60,28 40,32 46,12; 60,28 54,42 58,54; 86,30 86,30 86,30"
+          keyTimes="0; 0.18; 0.36; 0.68; 0.84; 1" dur="2s" />
+        <animate id="puDetourArm2Opacity" attributeName="opacity" begin="indefinite" repeatCount="1"
+          values="0; 1; 1; 1; 1; 0" keyTimes="0; 0.18; 0.36; 0.68; 0.84; 1" dur="2s" />
+      </polyline>
+
       <circle class="pu-anim-head" cx="95" cy="22" r="7">
-        <animate attributeName="cy" values="22;54;22" keyTimes="0; 0.5; 1" dur="1.2s" repeatCount="indefinite" />
+        <animate id="puLoopHeadCy" attributeName="cy" values="22;54;22" keyTimes="0; 0.5; 1" dur="1.2s" repeatCount="indefinite" />
+        <animate id="puDetourHeadCx" attributeName="cx" begin="indefinite" repeatCount="1"
+          values="95; 60; 60; 60; 60; 95" keyTimes="0; 0.18; 0.36; 0.68; 0.84; 1" dur="2s" />
+        <animate id="puDetourHeadCy" attributeName="cy" begin="indefinite" repeatCount="1"
+          values="22; 16; 16; 16; 16; 22" keyTimes="0; 0.18; 0.36; 0.68; 0.84; 1" dur="2s" />
       </circle>
     </svg>
   </div>
@@ -1701,6 +1726,49 @@ function renderPushupsTab() {
     badgeEl.textContent = ahead ? 'On Pace' : 'Behind';
     subEl.textContent = ahead ? 'reps ahead of pace' : 'reps behind pace';
   }
+}
+
+// Tapping the stick figure interrupts the pushup loop for a one-shot
+// stand-up-and-flex detour, then resumes pushups automatically. Built as
+// two competing SMIL animations per attribute - an indefinite "loop" and
+// a dormant "detour" (begin="indefinite") - since only one can be active
+// on a given attribute at a time: ending the loop reverts each element to
+// its static base attribute (deliberately kept equal to the pushup "up"
+// pose), which doubles as a clean anchor to both begin the detour from
+// and resume the loop into afterward.
+let pushupFlexing = false;
+
+function triggerPushupFlex() {
+  if (pushupFlexing) return;
+  pushupFlexing = true;
+
+  const loopIds = ['puLoopBody', 'puLoopArm', 'puLoopHeadCy'];
+  const detourIds = ['puDetourBody', 'puDetourArm', 'puDetourArm2', 'puDetourArm2Opacity', 'puDetourHeadCx', 'puDetourHeadCy'];
+  const captionEl = document.getElementById('puAnimCaption');
+
+  loopIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.endElement) el.endElement();
+  });
+
+  if (captionEl) captionEl.textContent = '💪 Nice!';
+
+  const detourBody = document.getElementById('puDetourBody');
+  const onDetourEnd = () => {
+    if (detourBody) detourBody.removeEventListener('endEvent', onDetourEnd);
+    loopIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.beginElement) el.beginElement();
+    });
+    if (captionEl) captionEl.textContent = 'Keep going · tap him 💪';
+    pushupFlexing = false;
+  };
+  if (detourBody) detourBody.addEventListener('endEvent', onDetourEnd);
+
+  detourIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.beginElement) el.beginElement();
+  });
 }
 
 /* ---------- Calendar tab (reads iCloud Calendar via the Apps Script backend) ---------- */
