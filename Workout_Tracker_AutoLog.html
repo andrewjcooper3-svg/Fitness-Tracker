@@ -2086,9 +2086,15 @@ function renderNowPlaying(data) {
   }
 
   const item = data.item;
+  // A podcast episode has no `artists`/`album` (those are track-only) -
+  // its byline is the show name, and its artwork lives directly on the
+  // episode instead of nested under an album.
+  const isEpisode = data.currently_playing_type === 'episode' || !!item.show;
   titleEl.textContent = item.name || '';
-  artistEl.textContent = (item.artists || []).map(a => a.name).join(', ');
-  const images = item.album && item.album.images;
+  artistEl.textContent = isEpisode
+    ? ((item.show && item.show.name) || 'Podcast')
+    : (item.artists || []).map(a => a.name).join(', ');
+  const images = isEpisode ? item.images : (item.album && item.album.images);
   const art = images && images.length ? images[images.length - 1].url : null;
   if (art) {
     artEl.src = art;
@@ -2103,7 +2109,10 @@ function renderNowPlaying(data) {
 
 async function pollNowPlaying() {
   if (!isSpotifyConnected()) { renderNowPlaying(null); return; }
-  const resp = await spotifyApiRequest('GET', '/me/player/currently-playing');
+  // additional_types is required for Spotify to report podcast episodes
+  // at all here - without it the API silently omits anything that isn't
+  // a track, even while an episode is actively playing.
+  const resp = await spotifyApiRequest('GET', '/me/player/currently-playing?additional_types=episode,track');
   renderNowPlaying(resp.ok ? resp.data : null);
 }
 
