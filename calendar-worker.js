@@ -17,9 +17,19 @@
  *                             (Sign-In and Security > App-Specific Passwords)
  *   4. Deploy. Copy the worker's URL (https://<name>.<subdomain>.workers.dev).
  *   5. Paste that URL into the webapp's Calendar tab config box.
+ *
+ * Subscribed calendars (e.g. a public sports/holiday feed you added via
+ * "Subscribe to Calendar"): iCloud lists these alongside your own/shared
+ * calendars, but doesn't serve their actual event data over CalDAV -
+ * only the feed's original publisher does. Add {name, url} pairs to
+ * DIRECT_ICS_FEEDS below to fetch and merge those in directly instead.
  */
 
 const CALDAV_BASE = 'https://caldav.icloud.com';
+
+const DIRECT_ICS_FEEDS = [
+  { name: 'Formula 1', url: 'webcal://ics.ecal.com/ecal-sub/6a5f6eb1b688fd0002865b0e/Formula%201.ics' }
+];
 
 function basicAuthHeader(appleId, appPassword) {
   return 'Basic ' + btoa(`${appleId}:${appPassword}`);
@@ -205,6 +215,32 @@ async function fetchRawIcsForCalendar(calUrl, startDate, endDate, auth) {
   return { blockCount: dataBlocks.length, ics: dataBlocks.map(b => decodeXmlEntities(extractTag(b, 'calendar-data') || '')) };
 }
 
+// Fetches a public ICS feed directly (no CalDAV, no auth) and expands it
+// against the same range as everything else. Follows redirects and does
+// a light content sniff, since a "friendly" subscription URL sometimes
+// serves an HTML landing page instead of the raw feed depending on how
+// it's requested.
+async function fetchDirectIcsFeed(feedUrl, startDate, endDate) {
+  // "webcal://" is just a hint to calendar apps to treat the link as a
+  // subscription - the underlying transport is plain HTTPS, and fetch()
+  // doesn't recognize the webcal: scheme at all.
+  const normalizedUrl = feedUrl.replace(/^webcal:\/\//i, 'https://');
+  const res = await fetch(normalizedUrl, {
+    method: 'GET',
+    headers: { Accept: 'text/calendar, */*' },
+    redirect: 'follow'
+  });
+  if (!res.ok) throw new Error(`Feed request failed (${res.status})`);
+  const body = await res.text();
+  if (!body.includes('BEGIN:VCALENDAR')) {
+    throw new Error(`URL didn't return calendar data (content-type: ${res.headers.get('Content-Type')}, got ${body.length} chars starting with: ${body.slice(0, 120).replace(/\s+/g, ' ')})`);
+  }
+  const baseEvents = parseICSEvents(body);
+  const events = [];
+  baseEvents.forEach(ev => events.push(...expandRecurrence(ev, startDate, endDate)));
+  return events;
+}
+
 // Minimal VEVENT parser - handles SUMMARY, DTSTART, DTEND, RRULE, EXDATE
 // (date-only and dateTime forms). Enough for a read-only display list;
 // not a full RFC 5545 implementation (no RDATE, no RECURRENCE-ID
@@ -368,7 +404,12 @@ function parseICSDate(value, allDay, tzid) {
 async function getUpcomingCalendarEvents(start, end, env) {
   const auth = basicAuthHeader(env.APPLE_ID, env.APPLE_APP_PASSWORD);
   const homeUrl = await getCalDavHomeUrl(auth);
-  const calendars = await listCalendars(homeUrl, auth);
+  const directFeedNames = new Set(DIRECT_ICS_FEEDS.map(f => f.name.toLowerCase()));
+  // A calendar with a direct feed configured is read straight from its
+  // publisher below instead - CalDAV never returns its events anyway
+  // (that's the whole reason it needs a direct feed), so querying it here
+  // too would just add a permanently-empty duplicate entry.
+  const calendars = (await listCalendars(homeUrl, auth)).filter(cal => !directFeedNames.has(cal.name.toLowerCase()));
 
   const allEvents = [];
   const calendarSummaries = [];
@@ -383,6 +424,17 @@ async function getUpcomingCalendarEvents(start, end, env) {
       // but surface it in the diagnostics below instead of silently
       // dropping it.
       calendarSummaries.push({ name: cal.name, error: e.message });
+    }
+  }
+
+  for (const feed of DIRECT_ICS_FEEDS) {
+    try {
+      const events = await fetchDirectIcsFeed(feed.url, start, end);
+      events.forEach(ev => (ev.calendar = feed.name));
+      allEvents.push(...events);
+      calendarSummaries.push({ name: feed.name, eventCount: events.length });
+    } catch (e) {
+      calendarSummaries.push({ name: feed.name, error: e.message });
     }
   }
 
@@ -475,6 +527,26 @@ export default {
           bodyLength: getBody.length,
           bodySample: getBody.slice(0, 1500)
         }, null, 2), {
+          headers: { 'Content-Type': 'application/json', ...cors }
+        });
+      }
+
+      // Tests every configured DIRECT_ICS_FEEDS entry directly, bypassing
+      // CalDAV and the normal 30-day range entirely, and reports either
+      // the parsed event count or exactly what came back if it failed.
+      if (url.searchParams.get('debug') === 'feeds') {
+        const probeStart = new Date(); probeStart.setUTCHours(0, 0, 0, 0);
+        const probeEnd = new Date(probeStart); probeEnd.setUTCDate(probeEnd.getUTCDate() + 365);
+        const results = [];
+        for (const feed of DIRECT_ICS_FEEDS) {
+          try {
+            const events = await fetchDirectIcsFeed(feed.url, probeStart, probeEnd);
+            results.push({ name: feed.name, url: feed.url, eventCount: events.length, sampleEvents: events.slice(0, 3).map(e => ({ summary: e.summary, start: e.start.toISOString() })) });
+          } catch (e) {
+            results.push({ name: feed.name, url: feed.url, error: e.message });
+          }
+        }
+        return new Response(JSON.stringify({ status: 'success', feeds: results }, null, 2), {
           headers: { 'Content-Type': 'application/json', ...cors }
         });
       }
