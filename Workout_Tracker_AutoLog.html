@@ -121,6 +121,11 @@
   .app-tabs { display: flex; gap: 2px; background: var(--surface); border-radius: 12px; padding: 3px; margin-bottom: 14px; }
   .app-tab { flex: 1; text-align: center; padding: 8px 0; border-radius: 9px; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
   .app-tab.active { background: var(--surface2); color: var(--text); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+  .ptr-bar { display: flex; align-items: center; justify-content: center; overflow: hidden; height: 0; }
+  .ptr-spinner { width: 28px; height: 28px; border-radius: 50%; background: var(--surface); box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--accent); }
+  .ptr-spinner.spinning { animation: ptr-spin 0.7s linear infinite; }
+  @keyframes ptr-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
   .app-views-viewport { overflow: hidden; position: relative; transition: height 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
   .app-views-track { display: flex; align-items: flex-start; will-change: transform; }
   .app-view { flex: 0 0 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
@@ -338,6 +343,8 @@
   <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">Calendar</div>
   <div class="app-tab" data-view="music" onclick="showAppView('music')">Music</div>
 </div>
+
+<div class="ptr-bar" id="ptrBar"><div class="ptr-spinner" id="ptrSpinner">↓</div></div>
 
 <div class="app-views-viewport" id="appViewsViewport">
 <div class="app-views-track" id="appViewsTrack">
@@ -3294,15 +3301,48 @@ function flushPendingLogs() {
 
 window.addEventListener('online', flushPendingLogs);
 
-/* ---------- Swipe left/right between the top-level tabs (smooth drag) ---------- */
+/* ---------- Swipe left/right between tabs, and pull-down-to-refresh ---------- */
+
+// Re-runs whatever the active tab's own "refresh" action is - reused by
+// pull-to-refresh below regardless of which of the 5 tabs is showing.
+function refreshCurrentTab() {
+  const view = viewOrder[currentViewIndex];
+  if (view === 'overview') {
+    renderOverview();
+    return Promise.resolve(loadCalendarEvents());
+  }
+  if (view === 'tracker') {
+    renderTrainerStats();
+    return Promise.resolve();
+  }
+  if (view === 'pushups') {
+    renderPushupsTab();
+    return Promise.resolve();
+  }
+  if (view === 'calendar') {
+    return Promise.resolve(loadCalendarEvents());
+  }
+  if (view === 'music') {
+    return Promise.all([refreshDjPlaybackState(), loadDjPlaylists(), loadDjRecentlyPlayed()]);
+  }
+  return Promise.resolve();
+}
 
 (function initTabSwipeNav() {
   const viewport = document.getElementById('appViewsViewport');
   const track = document.getElementById('appViewsTrack');
+  const ptrBar = document.getElementById('ptrBar');
+  const ptrSpinner = document.getElementById('ptrSpinner');
   if (!viewport || !track) return;
 
+  const PTR_THRESHOLD = 60;
+  const PTR_MAX = 90;
+  const PTR_SETTLE = 46;
+  const PTR_RESISTANCE = 0.5;
+
   let startX = null, startY = null, startTarget = null;
-  let decided = false, dragging = false, currentDx = 0;
+  let decided = false, dragging = false, pulling = false, currentDx = 0;
+  let ptrEligible = false, ptrRefreshing = false;
 
   document.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) { startX = null; return; }
@@ -3311,7 +3351,11 @@ window.addEventListener('online', flushPendingLogs);
     startY = e.touches[0].clientY;
     decided = false;
     dragging = false;
+    pulling = false;
     currentDx = 0;
+    // Only a pull that starts at the very top of the page counts - once
+    // scrolled down, the same downward drag should just be normal scroll.
+    ptrEligible = !ptrRefreshing && window.scrollY <= 0;
   }, { passive: true });
 
   document.addEventListener('touchmove', e => {
@@ -3321,45 +3365,81 @@ window.addEventListener('online', flushPendingLogs);
     const dy = touch.clientY - startY;
 
     if (!decided) {
-      // Wait for a small, unambiguous movement before committing to
-      // either a horizontal drag or letting the page's own scroll/tap
-      // behavior proceed untouched.
+      // Wait for a small, unambiguous movement before committing to a
+      // horizontal drag, a pull-down, or letting the page's own
+      // scroll/tap behavior proceed untouched.
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
       decided = true;
       const blocked = startTarget && startTarget.closest &&
         startTarget.closest('input, textarea, button, .set-checkbox, .checkbox, .exercise-header, .day-tab');
-      dragging = !blocked && Math.abs(dx) > Math.abs(dy) * 1.4;
+      const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.4;
+      dragging = !blocked && isHorizontal;
+      pulling = !blocked && !isHorizontal && dy > 0 && ptrEligible;
       if (dragging) track.style.transition = 'none';
+      if (pulling && ptrBar) ptrBar.style.transition = 'none';
     }
 
-    if (!dragging) return;
-
-    // Resist (rather than block) dragging past the first/last tab, so it
-    // still feels alive at the edges instead of just stopping dead.
-    let resisted = dx;
-    if ((currentViewIndex === 0 && dx > 0) || (currentViewIndex === viewOrder.length - 1 && dx < 0)) {
-      resisted = dx * 0.3;
+    if (dragging) {
+      // Resist (rather than block) dragging past the first/last tab, so
+      // it still feels alive at the edges instead of just stopping dead.
+      let resisted = dx;
+      if ((currentViewIndex === 0 && dx > 0) || (currentViewIndex === viewOrder.length - 1 && dx < 0)) {
+        resisted = dx * 0.3;
+      }
+      currentDx = resisted;
+      const width = viewport.getBoundingClientRect().width || 1;
+      const dxPercent = (resisted / width) * 100;
+      track.style.transform = `translateX(calc(${-currentViewIndex * 100}% + ${dxPercent}%))`;
+      e.preventDefault();
+      return;
     }
-    currentDx = resisted;
-    const width = viewport.getBoundingClientRect().width || 1;
-    const dxPercent = (resisted / width) * 100;
-    track.style.transform = `translateX(calc(${-currentViewIndex * 100}% + ${dxPercent}%))`;
-    e.preventDefault();
+
+    if (pulling && ptrBar) {
+      const height = Math.min(PTR_MAX, Math.max(0, dy) * PTR_RESISTANCE);
+      ptrBar.style.height = height + 'px';
+      if (ptrSpinner) ptrSpinner.textContent = height >= PTR_THRESHOLD ? '↑' : '↓';
+      e.preventDefault();
+    }
   }, { passive: false });
+
+  function runPullToRefresh() {
+    ptrRefreshing = true;
+    if (ptrBar) ptrBar.style.height = PTR_SETTLE + 'px';
+    if (ptrSpinner) { ptrSpinner.textContent = '↻'; ptrSpinner.classList.add('spinning'); }
+
+    const minDelay = new Promise(resolve => setTimeout(resolve, 500));
+    Promise.all([refreshCurrentTab(), minDelay]).finally(() => {
+      ptrRefreshing = false;
+      if (ptrSpinner) ptrSpinner.classList.remove('spinning');
+      if (ptrBar) ptrBar.style.height = '0px';
+    });
+  }
 
   document.addEventListener('touchend', () => {
     if (startX == null) return;
     startX = null;
-    if (!dragging) return;
-    dragging = false;
 
-    const width = viewport.getBoundingClientRect().width || 1;
-    const threshold = width * 0.18;
-    let targetIndex = currentViewIndex;
-    if (currentDx <= -threshold && currentViewIndex < viewOrder.length - 1) targetIndex++;
-    else if (currentDx >= threshold && currentViewIndex > 0) targetIndex--;
+    if (dragging) {
+      dragging = false;
+      const width = viewport.getBoundingClientRect().width || 1;
+      const threshold = width * 0.18;
+      let targetIndex = currentViewIndex;
+      if (currentDx <= -threshold && currentViewIndex < viewOrder.length - 1) targetIndex++;
+      else if (currentDx >= threshold && currentViewIndex > 0) targetIndex--;
+      goToView(viewOrder[targetIndex], true);
+      return;
+    }
 
-    goToView(viewOrder[targetIndex], true);
+    if (pulling) {
+      pulling = false;
+      const height = ptrBar ? (parseFloat(ptrBar.style.height) || 0) : 0;
+      if (ptrBar) ptrBar.style.transition = 'height 0.25s ease';
+      if (height >= PTR_THRESHOLD) {
+        runPullToRefresh();
+      } else if (ptrBar) {
+        ptrBar.style.height = '0px';
+      }
+    }
   }, { passive: true });
 
   document.addEventListener('touchcancel', () => {
@@ -3367,6 +3447,10 @@ window.addEventListener('online', flushPendingLogs);
     if (dragging) {
       dragging = false;
       goToView(viewOrder[currentViewIndex], true);
+    }
+    if (pulling) {
+      pulling = false;
+      if (ptrBar) { ptrBar.style.transition = 'height 0.25s ease'; ptrBar.style.height = '0px'; }
     }
   }, { passive: true });
 })();
