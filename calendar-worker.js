@@ -127,6 +127,26 @@ async function listCalendars(homeUrl, auth) {
   return calendars;
 }
 
+// Diagnostic-only: every collection under the home-set, unfiltered, with
+// its raw resourcetype text - used to figure out what marker a calendar
+// that isn't surfacing (e.g. a subscription) actually carries, instead of
+// guessing at another resourcetype variant blind.
+async function listAllCollectionsRaw(homeUrl, auth) {
+  const body = '<?xml version="1.0" encoding="utf-8" ?>' +
+    '<A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">' +
+    '<A:prop><A:resourcetype/><A:displayname/></A:prop></A:propfind>';
+  const res = await caldavRequest(homeUrl, 'PROPFIND', body, auth, { Depth: '1' });
+  if (!res.ok) throw new Error(`CalDAV calendar listing failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+  const xml = await res.text();
+  const responses = extractAllBlocks(xml, 'response');
+
+  return responses.map(resp => ({
+    href: extractTag(resp, 'href'),
+    displayname: extractTag(resp, 'displayname'),
+    resourcetype: extractTag(resp, 'resourcetype')
+  }));
+}
+
 function fmtICSDate(d) {
   return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
@@ -370,6 +390,16 @@ export default {
         throw new Error('Set APPLE_ID and APPLE_APP_PASSWORD as Worker secrets (Settings > Variables and Secrets).');
       }
       const url = new URL(request.url);
+
+      if (url.searchParams.get('debug') === 'collections') {
+        const auth = basicAuthHeader(env.APPLE_ID, env.APPLE_APP_PASSWORD);
+        const homeUrl = await getCalDavHomeUrl(auth);
+        const collections = await listAllCollectionsRaw(homeUrl, auth);
+        return new Response(JSON.stringify({ status: 'success', collections }, null, 2), {
+          headers: { 'Content-Type': 'application/json', ...cors }
+        });
+      }
+
       const startParam = url.searchParams.get('start');
       const endParam = url.searchParams.get('end');
 
