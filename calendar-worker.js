@@ -246,11 +246,16 @@ async function fetchDirectIcsFeed(feedUrl, startDate, endDate) {
 // not a full RFC 5545 implementation (no RDATE, no RECURRENCE-ID
 // overrides for individually-edited occurrences).
 function parseICSEvents(icsText) {
+  // RFC 5545 "folds" long lines across multiple physical lines, with each
+  // continuation starting with a space/tab - DESCRIPTION in particular is
+  // long enough to fold often, so without unfolding first it would get
+  // silently truncated to just its first physical line.
+  const unfolded = icsText.replace(/\r?\n[ \t]/g, '');
   const events = [];
-  const veventBlocks = icsText.split('BEGIN:VEVENT').slice(1);
+  const veventBlocks = unfolded.split('BEGIN:VEVENT').slice(1);
   veventBlocks.forEach(block => {
     const lines = block.split('END:VEVENT')[0].split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const event = { summary: '', start: null, end: null, allDay: false, rrule: null, exdates: [] };
+    const event = { summary: '', start: null, end: null, allDay: false, rrule: null, exdates: [], location: '', description: '' };
     lines.forEach(line => {
       const idx = line.indexOf(':');
       if (idx === -1) return;
@@ -261,7 +266,12 @@ function parseICSEvents(icsText) {
       const tzidMatch = keyPart.match(/TZID=([^;]+)/);
       const tzid = tzidMatch ? tzidMatch[1] : null;
 
-      if (key === 'SUMMARY') event.summary = value.replace(/\\,/g, ',').replace(/\\n/gi, ' ');
+      // ICS text escaping: \, \; \\ and \n all need unescaping for display.
+      const unescapeText = v => v.replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
+
+      if (key === 'SUMMARY') event.summary = unescapeText(value).replace(/\n/g, ' ');
+      if (key === 'LOCATION') event.location = unescapeText(value);
+      if (key === 'DESCRIPTION') event.description = unescapeText(value);
       if (key === 'DTSTART') {
         event.allDay = keyPart.includes('VALUE=DATE') && !keyPart.includes('VALUE=DATE-TIME');
         event.start = parseICSDate(value, event.allDay, tzid);
@@ -300,7 +310,7 @@ function expandRecurrence(event, rangeStart, rangeEnd) {
   if (!event.rrule) {
     const occEnd = event.end || event.start;
     if (occEnd >= rangeStart && event.start <= rangeEnd) {
-      return [{ summary: event.summary, allDay: event.allDay, start: event.start, end: event.end }];
+      return [{ summary: event.summary, allDay: event.allDay, start: event.start, end: event.end, location: event.location, description: event.description }];
     }
     return [];
   }
@@ -326,7 +336,7 @@ function expandRecurrence(event, rangeStart, rangeEnd) {
     if (!exdateSet.has(current.getTime())) {
       const occEnd = duration ? new Date(current.getTime() + duration) : null;
       if ((occEnd || current) >= rangeStart && current <= rangeEnd) {
-        occurrences.push({ summary: event.summary, allDay: event.allDay, start: new Date(current), end: occEnd });
+        occurrences.push({ summary: event.summary, allDay: event.allDay, start: new Date(current), end: occEnd, location: event.location, description: event.description });
       }
     }
 
@@ -445,7 +455,9 @@ async function getUpcomingCalendarEvents(start, end, env) {
     start: ev.start.toISOString(),
     end: ev.end ? ev.end.toISOString() : null,
     allDay: ev.allDay,
-    calendar: ev.calendar
+    calendar: ev.calendar,
+    location: ev.location || '',
+    description: ev.description || ''
   }));
 
   return { events, calendars: calendarSummaries };

@@ -175,7 +175,7 @@
   .ov-ring-stat-value { font-family: var(--font); font-size: 19px; font-weight: 800; letter-spacing: -0.2px; }
   .ov-ring-stat-value.ahead { color: var(--green); }
   .ov-ring-stat-value.behind { color: var(--red); }
-  .ov-week-wheel-item { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-left: auto; }
+  .ov-week-wheel-item { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-left: auto; cursor: pointer; }
   .ov-week-wheel { width: 36px; height: 36px; }
   .ov-week-wheel-count { font-family: var(--font); font-size: 10px; font-weight: 700; color: var(--muted); }
 
@@ -274,7 +274,22 @@
   .cal-day-group { margin-bottom: 14px; }
   .cal-day-label { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
   .cal-day-relative { color: var(--accent); font-weight: 600; }
-  .cal-event-row { display: flex; gap: 12px; padding: 12px 14px 12px 11px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.2s ease; }
+  .cal-event-row { display: flex; gap: 12px; padding: 12px 14px 12px 11px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.2s ease; cursor: pointer; }
+  .cal-event-row:active { filter: brightness(1.25); }
+
+  .event-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 100; display: none; align-items: flex-end; }
+  .event-modal-overlay.open { display: flex; }
+  .event-modal-sheet { background: var(--surface); width: 100%; max-width: 480px; margin: 0 auto; border-radius: 24px 24px 0 0; padding: 10px 20px calc(24px + env(safe-area-inset-bottom, 0px)); max-height: 80vh; overflow-y: auto; }
+  .event-modal-handle { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 16px; }
+  .event-modal-cal { display: flex; align-items: center; gap: 6px; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 8px; }
+  .event-modal-title { font-family: var(--font); font-size: 20px; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 6px; }
+  .event-modal-when { font-family: var(--font); font-size: 14px; color: var(--accent); font-weight: 600; }
+  .event-modal-relative { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 2px; margin-bottom: 16px; }
+  .event-modal-row { margin-bottom: 16px; }
+  .event-modal-row-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+  .event-modal-row-value { font-family: var(--font); font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+  .event-modal-close { display: block; width: 100%; background: var(--surface2); border: none; color: var(--text); padding: 13px; border-radius: 14px; font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .event-modal-close:active { background: var(--surface2); filter: brightness(1.2); }
   .cal-event-row:last-child { border-bottom: none; }
   .cal-event-time { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--accent); width: 60px; flex-shrink: 0; }
   .cal-event-body { min-width: 0; }
@@ -415,7 +430,7 @@
           <div class="ov-ring-stat-label">Year</div>
           <div class="ov-ring-stat-value" id="ovMiniYear">0%</div>
         </div>
-        <div class="ov-week-wheel-item">
+        <div class="ov-week-wheel-item" onclick="event.stopPropagation(); showAppView('tracker')">
           <svg viewBox="0 0 44 44" class="ov-week-wheel"><g transform="rotate(-90 22 22)" id="ovWeekWheelSegs"></g></svg>
           <div class="ov-week-wheel-count" id="ovWeekWheelLabel">0/7</div>
         </div>
@@ -1129,6 +1144,29 @@
 </div>
 
 </div>
+</div>
+
+<!-- Outside the carousel track deliberately - a transform on an ancestor
+     (as .app-views-track has, for the swipe carousel) makes that ancestor
+     the containing block for position:fixed descendants, so this modal
+     has to live outside it to actually behave as fixed-to-viewport. -->
+<div class="event-modal-overlay" id="eventModalOverlay" onclick="closeEventModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="event-modal-cal"><span class="cal-dot" id="eventModalDot"></span><span id="eventModalCalName"></span></div>
+    <div class="event-modal-title" id="eventModalTitle"></div>
+    <div class="event-modal-when" id="eventModalWhen"></div>
+    <div class="event-modal-relative" id="eventModalRelative"></div>
+    <div class="event-modal-row" id="eventModalLocationRow" style="display:none;">
+      <div class="event-modal-row-label">Location</div>
+      <div class="event-modal-row-value" id="eventModalLocation"></div>
+    </div>
+    <div class="event-modal-row" id="eventModalDescRow" style="display:none;">
+      <div class="event-modal-row-label">Details</div>
+      <div class="event-modal-row-value" id="eventModalDesc"></div>
+    </div>
+    <button class="event-modal-close" onclick="closeEventModal(event)">Close</button>
+  </div>
 </div>
 
 <div class="app-tabs" id="appTabs">
@@ -2151,6 +2189,7 @@ function renderCalendarEvents(events) {
       row.innerHTML = `<div class="cal-event-time">${escapeHtml_(time)}</div>` +
         `<div class="cal-event-body"><div class="cal-event-title">${escapeHtml_(ev.summary)}</div>` +
         (ev.calendar ? `<div class="cal-event-cal"><span class="cal-dot" style="background:${color}"></span>${escapeHtml_(ev.calendar)}</div>` : '') + `</div>`;
+      row.addEventListener('click', () => openEventModal(ev));
       card.appendChild(row);
     });
 
@@ -2158,6 +2197,53 @@ function renderCalendarEvents(events) {
     dayGroup.appendChild(card);
     listEl.appendChild(dayGroup);
   });
+}
+
+// Quick-look sheet with everything the Worker knows about a tapped event -
+// full date/time range, calendar, and location/description when present
+// (both only recently added to what the Worker parses/returns).
+function openEventModal(ev) {
+  const color = getCalendarColor(ev.calendar || '');
+  document.getElementById('eventModalDot').style.background = color;
+  document.getElementById('eventModalCalName').textContent = ev.calendar || '';
+  document.getElementById('eventModalTitle').textContent = ev.summary || '(No title)';
+
+  const startDate = new Date(ev.start);
+  const dateLabel = startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  let timeLabel;
+  if (ev.allDay) {
+    timeLabel = 'All day';
+  } else {
+    const startTime = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    timeLabel = ev.end
+      ? `${startTime} – ${new Date(ev.end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+      : startTime;
+  }
+  document.getElementById('eventModalWhen').textContent = `${dateLabel} · ${timeLabel}`;
+  document.getElementById('eventModalRelative').textContent = getRelativeDayLabel(ev.start);
+
+  const locRow = document.getElementById('eventModalLocationRow');
+  if (ev.location) {
+    document.getElementById('eventModalLocation').textContent = ev.location;
+    locRow.style.display = 'block';
+  } else {
+    locRow.style.display = 'none';
+  }
+
+  const descRow = document.getElementById('eventModalDescRow');
+  if (ev.description) {
+    document.getElementById('eventModalDesc').textContent = ev.description;
+    descRow.style.display = 'block';
+  } else {
+    descRow.style.display = 'none';
+  }
+
+  document.getElementById('eventModalOverlay').classList.add('open');
+}
+
+function closeEventModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('eventModalOverlay').classList.remove('open');
 }
 
 /* ---------- Spotify (currently playing + pinned playlists + workout shuffle) ---------- */
