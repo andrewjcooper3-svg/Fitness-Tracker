@@ -866,18 +866,42 @@ function saveState() {
 // typing doesn't hammer the endpoint on every keystroke - only the
 // settled value after a pause gets sent.
 let draftSyncTimer = null;
+let pendingDraftState = null;
 function syncDraftToCloud(state) {
+  pendingDraftState = state;
   if (draftSyncTimer) clearTimeout(draftSyncTimer);
   draftSyncTimer = setTimeout(() => {
-    const url = getDeploymentUrl();
-    if (!url || !navigator.onLine) return;
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'saveDraft', week: state.week, days: state.days })
-    }).catch(() => {}); // best-effort - localStorage already has it regardless
+    draftSyncTimer = null;
+    sendDraftNow(state);
   }, 1500);
 }
+
+function sendDraftNow(state) {
+  const url = getDeploymentUrl();
+  pendingDraftState = null;
+  if (!url || !navigator.onLine) return;
+  const payload = JSON.stringify({ action: 'saveDraft', week: state.week, days: state.days });
+  // sendBeacon is built specifically to survive a page being backgrounded
+  // or torn down - a regular fetch() can get silently cancelled mid-flight
+  // in that situation (e.g. iOS Safari suspending a tab you just switched
+  // away from), which would otherwise drop an edit that never got synced.
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(url, new Blob([payload], { type: 'text/plain;charset=utf-8' }));
+  } else {
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: payload, keepalive: true }).catch(() => {});
+  }
+}
+
+// If the tab is hidden (backgrounded, app-switched away from, or closed)
+// while a debounced sync is still pending, flush it immediately instead
+// of waiting - otherwise a quick edit right before switching apps could
+// be lost if the debounce timer never gets to fire.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && pendingDraftState) {
+    if (draftSyncTimer) { clearTimeout(draftSyncTimer); draftSyncTimer = null; }
+    sendDraftNow(pendingDraftState);
+  }
+});
 
 // Runs once at page load, after the fast local (localStorage) restore -
 // pulls whatever the most recent save from any device left in the cloud
