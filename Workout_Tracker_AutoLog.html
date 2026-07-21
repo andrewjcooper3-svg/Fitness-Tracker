@@ -128,6 +128,7 @@
   #view-tracker { order: 1; }
   #view-pushups { order: 2; }
   #view-calendar { order: 3; }
+  #view-music { order: 4; }
 
   .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, #202024 100%); border-radius: 22px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.04); }
   .ov-hero-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -264,6 +265,50 @@
   .sp-shuffle-label { font-family: var(--font); font-size: 11px; font-weight: 700; color: #1DB954; text-transform: uppercase; letter-spacing: 0.3px; }
   .sp-shuffle-playlist { font-family: var(--font); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
   .sp-shuffle-status { font-family: var(--font); font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; max-width: 90px; }
+
+  .dj-hero { background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 22px; padding: 22px 18px; margin-bottom: 16px; text-align: center; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.04); }
+  .dj-art-wrap { width: 168px; height: 168px; margin: 0 auto 16px; border-radius: 18px; overflow: hidden; background: var(--surface2); display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 30px rgba(0,0,0,0.45); }
+  .dj-art { width: 100%; height: 100%; object-fit: cover; }
+  .dj-art-fallback { font-size: 48px; }
+  .dj-track-title { font-family: var(--font); font-size: 18px; font-weight: 800; letter-spacing: -0.2px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dj-track-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 3px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .dj-progress-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+  .dj-time { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; width: 32px; flex-shrink: 0; }
+  .dj-progress-track { flex: 1; height: 5px; border-radius: 3px; background: var(--surface2); overflow: hidden; cursor: pointer; }
+  .dj-progress-fill { height: 100%; background: #1DB954; border-radius: 3px; width: 0%; }
+
+  .dj-controls { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 18px; }
+  .dj-btn { background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+  .dj-btn:hover { background: var(--surface2); }
+  .dj-btn-toggle.active { color: #1DB954; }
+  .dj-btn-play { background: #1DB954; color: #05230f; font-size: 20px; width: 54px; height: 54px; }
+  .dj-btn-play:hover { background: #1ed760; }
+
+  .dj-volume-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 0 8px; }
+  .dj-volume-icon { font-size: 14px; flex-shrink: 0; }
+  .dj-volume-slider { flex: 1; accent-color: #1DB954; }
+
+  .dj-devices { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .dj-device-chip { font-family: var(--font); font-size: 11px; font-weight: 600; padding: 5px 11px; border-radius: 20px; background: var(--surface2); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .dj-device-chip.active { background: rgba(29,185,84,0.2); color: #1DB954; }
+
+  .dj-section { margin-bottom: 16px; }
+  .dj-section-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
+  .dj-quick-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .dj-quick-tile { flex-shrink: 0; width: 84px; cursor: pointer; }
+  .dj-quick-art { width: 84px; height: 84px; border-radius: 12px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .dj-quick-name { font-family: var(--font); font-size: 11px; font-weight: 600; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .dj-playlist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .dj-playlist-tile { cursor: pointer; }
+  .dj-playlist-art { width: 100%; aspect-ratio: 1; border-radius: 12px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .dj-playlist-name { font-family: var(--font); font-size: 11px; font-weight: 600; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .dj-recent-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .dj-recent-tile { flex-shrink: 0; width: 72px; cursor: pointer; }
+  .dj-recent-art { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+  .dj-recent-name { font-family: var(--font); font-size: 10px; font-weight: 600; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -273,6 +318,7 @@
   <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">Trainer</div>
   <div class="app-tab" data-view="pushups" onclick="showAppView('pushups')">Pushups</div>
   <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">Calendar</div>
+  <div class="app-tab" data-view="music" onclick="showAppView('music')">Music</div>
 </div>
 
 <div class="app-views-viewport" id="appViewsViewport">
@@ -443,6 +489,55 @@
   <div id="calStatus" class="cal-status"></div>
   <div id="calEventList"></div>
   <div class="ov-note">Reads your iCloud Calendar via a small Cloudflare Worker (CalDAV bridge) - kept separate from the Sheet-logging backend since Apps Script can't make the requests CalDAV needs.</div>
+</div>
+
+<div id="view-music" class="app-view">
+  <div class="dj-hero" id="djHero">
+    <div class="dj-art-wrap">
+      <img class="dj-art" id="djArt" alt="" style="display:none;">
+      <div class="dj-art-fallback" id="djArtFallback">🎵</div>
+    </div>
+    <div class="dj-track-title" id="djTitle">Not connected</div>
+    <div class="dj-track-sub" id="djSubtitle"></div>
+
+    <div class="dj-progress-row">
+      <div class="dj-time" id="djTimeElapsed">0:00</div>
+      <div class="dj-progress-track" id="djProgressTrack"><div class="dj-progress-fill" id="djProgressFill"></div></div>
+      <div class="dj-time" id="djTimeTotal">0:00</div>
+    </div>
+
+    <div class="dj-controls">
+      <button class="dj-btn dj-btn-toggle" id="djShuffleBtn" onclick="toggleSpotifyShuffle()">🔀</button>
+      <button class="dj-btn" onclick="spotifyPrevious()">⏮</button>
+      <button class="dj-btn dj-btn-play" id="djPlayPauseBtn" onclick="toggleSpotifyPlayPause()">▶</button>
+      <button class="dj-btn" onclick="spotifyNext()">⏭</button>
+      <button class="dj-btn dj-btn-toggle" id="djRepeatBtn" onclick="cycleSpotifyRepeat()">🔁</button>
+    </div>
+
+    <div class="dj-volume-row">
+      <div class="dj-volume-icon">🔊</div>
+      <input type="range" class="dj-volume-slider" id="djVolumeSlider" min="0" max="100" value="50" oninput="onSpotifyVolumeInput(this.value)">
+    </div>
+
+    <div class="dj-devices" id="djDevices"></div>
+  </div>
+
+  <div class="dj-section">
+    <div class="dj-section-label">Quick Access</div>
+    <div class="dj-quick-row" id="djQuickAccess"><div class="sp-playlists-empty">Pin playlists from the Overview tab</div></div>
+  </div>
+
+  <div class="dj-section">
+    <div class="dj-section-label">Your Playlists</div>
+    <div class="dj-playlist-grid" id="djPlaylistGrid"><div class="sp-playlists-empty">Connect Spotify to see your playlists</div></div>
+  </div>
+
+  <div class="dj-section">
+    <div class="dj-section-label">Recently Played</div>
+    <div class="dj-recent-row" id="djRecentRow"><div class="sp-playlists-empty">Connect Spotify first</div></div>
+  </div>
+
+  <div class="ov-note">Full playback control via Spotify's Web API - needs Premium and an active device (open Spotify somewhere first).</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -1288,7 +1383,7 @@ function restoreState() {
 
 /* ---------- Weekly Overview tab ---------- */
 
-const viewOrder = ['overview', 'tracker', 'pushups', 'calendar'];
+const viewOrder = ['overview', 'tracker', 'pushups', 'calendar', 'music'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -1296,6 +1391,7 @@ function renderActiveViewContent(view) {
   if (view === 'tracker') renderTrainerStats();
   if (view === 'pushups') renderPushupsTab();
   if (view === 'calendar') ensureCalendarLoaded();
+  if (view === 'music') renderMusicTab();
 }
 
 // All 4 views live side-by-side in a flex track (CSS `order` maps them to
@@ -1321,6 +1417,7 @@ function updateViewportHeight(view, animate) {
 function goToView(view, animate) {
   const idx = viewOrder.indexOf(view);
   if (idx === -1) return;
+  const previousView = viewOrder[currentViewIndex];
   currentViewIndex = idx;
 
   const track = document.getElementById('appViewsTrack');
@@ -1329,6 +1426,11 @@ function goToView(view, animate) {
 
   document.querySelectorAll('.app-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`.app-tab[data-view="${view}"]`).classList.add('active');
+
+  // The DJ tab polls playback state on its own faster cadence while it's
+  // actually the visible tab - stop that as soon as it's left, rather
+  // than leaving a second timer running alongside the Overview one.
+  if (previousView === 'music' && view !== 'music') stopDjPolling();
 
   updateViewportHeight(view, animate);
   renderActiveViewContent(view);
@@ -1768,7 +1870,11 @@ function renderCalendarEvents(events) {
 // it automatically matches wherever this file is actually hosted (must be
 // registered exactly as-is in the Spotify app's dashboard).
 const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
-const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state';
+// playlist-read-private/-collaborative and user-read-recently-played were
+// added for the Music (DJ) tab's playlist grid and recently-played strip -
+// anyone who connected before those existed needs to disconnect/reconnect
+// once to re-consent to the wider scope.
+const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative user-read-recently-played';
 const STORAGE_SPOTIFY_CLIENT_ID = 'WORKOUT_SPOTIFY_CLIENT_ID';
 const STORAGE_SPOTIFY_TOKENS = 'WORKOUT_SPOTIFY_TOKENS';
 const STORAGE_SPOTIFY_PLAYLISTS = 'WORKOUT_SPOTIFY_PLAYLISTS';
@@ -1833,8 +1939,11 @@ async function connectSpotify() {
 function disconnectSpotify() {
   localStorage.removeItem(STORAGE_SPOTIFY_TOKENS);
   stopSpotifyPolling();
+  stopDjPolling();
   updateSpotifyConfigStatus();
   renderNowPlaying(null);
+  renderDjHero(null);
+  djPlaylistsLoaded = false;
 }
 
 function getSpotifyTokens() {
@@ -2163,6 +2272,320 @@ async function shufflePlayWorkoutPlaylist() {
     statusEl.textContent = '⚠ Could not start playback';
   }
   setTimeout(() => { statusEl.textContent = ''; }, 4000);
+}
+
+/* ---------- Music tab (full playback control - the "DJ page") ---------- */
+
+function formatMs(ms) {
+  const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function updateDjProgressDisplay(progressMs, durationMs) {
+  const fillEl = document.getElementById('djProgressFill');
+  const elapsedEl = document.getElementById('djTimeElapsed');
+  const totalEl = document.getElementById('djTimeTotal');
+  if (!fillEl) return;
+  const pct = durationMs ? Math.min(100, (progressMs / durationMs) * 100) : 0;
+  fillEl.style.width = pct + '%';
+  elapsedEl.textContent = formatMs(progressMs);
+  totalEl.textContent = formatMs(durationMs);
+}
+
+// Snapshot from the last poll, used to interpolate the progress bar once
+// per second locally in between polls instead of hitting the API that
+// often just to move a progress bar.
+let djLastSnapshot = null;
+let djProgressTimer = null;
+
+function startDjProgressTicker() {
+  stopDjProgressTicker();
+  djProgressTimer = setInterval(() => {
+    if (!djLastSnapshot || !djLastSnapshot.isPlaying) return;
+    const projected = djLastSnapshot.progressMs + (Date.now() - djLastSnapshot.capturedAt);
+    updateDjProgressDisplay(Math.min(projected, djLastSnapshot.durationMs), djLastSnapshot.durationMs);
+  }, 1000);
+}
+function stopDjProgressTicker() {
+  if (djProgressTimer) { clearInterval(djProgressTimer); djProgressTimer = null; }
+}
+
+function initDjProgressSeek() {
+  const track = document.getElementById('djProgressTrack');
+  if (!track) return;
+  track.addEventListener('click', async (e) => {
+    if (!isSpotifyConnected() || !djLastSnapshot || !djLastSnapshot.durationMs) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const seekMs = Math.round(ratio * djLastSnapshot.durationMs);
+    updateDjProgressDisplay(seekMs, djLastSnapshot.durationMs);
+    djLastSnapshot.progressMs = seekMs;
+    djLastSnapshot.capturedAt = Date.now();
+    await spotifyApiRequest('PUT', `/me/player/seek?position_ms=${seekMs}`);
+  });
+}
+
+function renderDjHero(state) {
+  const titleEl = document.getElementById('djTitle');
+  const subEl = document.getElementById('djSubtitle');
+  const artEl = document.getElementById('djArt');
+  const fallbackEl = document.getElementById('djArtFallback');
+  const playBtn = document.getElementById('djPlayPauseBtn');
+  const shuffleBtn = document.getElementById('djShuffleBtn');
+  const repeatBtn = document.getElementById('djRepeatBtn');
+  const volSlider = document.getElementById('djVolumeSlider');
+  if (!titleEl) return;
+
+  if (!isSpotifyConnected() || !state || !state.item) {
+    titleEl.textContent = isSpotifyConnected() ? 'Nothing playing' : 'Not connected';
+    subEl.textContent = isSpotifyConnected() ? '' : 'Connect Spotify from the Overview tab';
+    artEl.style.display = 'none';
+    fallbackEl.style.display = 'flex';
+    playBtn.textContent = '▶';
+    shuffleBtn.classList.remove('active');
+    repeatBtn.classList.remove('active');
+    djLastSnapshot = null;
+    stopDjProgressTicker();
+    updateDjProgressDisplay(0, 0);
+    renderDjDevices([]);
+    return;
+  }
+
+  const item = state.item;
+  const isEpisode = state.currently_playing_type === 'episode' || !!item.show;
+  titleEl.textContent = item.name || '';
+  subEl.textContent = isEpisode
+    ? ((item.show && item.show.name) || 'Podcast')
+    : (item.artists || []).map(a => a.name).join(', ');
+
+  const images = isEpisode ? item.images : (item.album && item.album.images);
+  const art = images && images.length ? images[0].url : null;
+  if (art) { artEl.src = art; artEl.style.display = 'block'; fallbackEl.style.display = 'none'; }
+  else { artEl.style.display = 'none'; fallbackEl.style.display = 'flex'; }
+
+  playBtn.textContent = state.is_playing ? '⏸' : '▶';
+  shuffleBtn.classList.toggle('active', !!state.shuffle_state);
+  const repeatState = state.repeat_state || 'off';
+  repeatBtn.dataset.state = repeatState;
+  repeatBtn.classList.toggle('active', repeatState !== 'off');
+  repeatBtn.textContent = repeatState === 'track' ? '🔂' : '🔁';
+
+  if (state.device && typeof state.device.volume_percent === 'number') {
+    volSlider.value = state.device.volume_percent;
+  }
+
+  djLastSnapshot = {
+    progressMs: state.progress_ms || 0,
+    durationMs: item.duration_ms || 0,
+    isPlaying: !!state.is_playing,
+    capturedAt: Date.now()
+  };
+  updateDjProgressDisplay(djLastSnapshot.progressMs, djLastSnapshot.durationMs);
+  if (djLastSnapshot.isPlaying) startDjProgressTicker(); else stopDjProgressTicker();
+}
+
+function renderDjDevices(devices, activeDeviceId) {
+  const el = document.getElementById('djDevices');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!isSpotifyConnected()) return;
+  if (!devices || devices.length === 0) {
+    el.innerHTML = '<div class="sp-playlists-empty">No active devices — open Spotify somewhere</div>';
+    return;
+  }
+  devices.forEach(d => {
+    const chip = document.createElement('div');
+    chip.className = 'dj-device-chip' + ((d.is_active || d.id === activeDeviceId) ? ' active' : '');
+    chip.textContent = d.name;
+    chip.addEventListener('click', () => transferSpotifyPlayback(d.id));
+    el.appendChild(chip);
+  });
+}
+
+async function transferSpotifyPlayback(deviceId) {
+  await spotifyApiRequest('PUT', '/me/player', { device_ids: [deviceId], play: true });
+  setTimeout(refreshDjPlaybackState, 600);
+}
+
+async function toggleSpotifyPlayPause() {
+  const playBtn = document.getElementById('djPlayPauseBtn');
+  const isPlaying = playBtn.textContent.trim() === '⏸';
+  await spotifyApiRequest('PUT', isPlaying ? '/me/player/pause' : '/me/player/play');
+  setTimeout(refreshDjPlaybackState, 400);
+}
+async function spotifyNext() {
+  await spotifyApiRequest('POST', '/me/player/next');
+  setTimeout(refreshDjPlaybackState, 500);
+}
+async function spotifyPrevious() {
+  await spotifyApiRequest('POST', '/me/player/previous');
+  setTimeout(refreshDjPlaybackState, 500);
+}
+async function toggleSpotifyShuffle() {
+  const btn = document.getElementById('djShuffleBtn');
+  const next = !btn.classList.contains('active');
+  btn.classList.toggle('active', next);
+  await spotifyApiRequest('PUT', `/me/player/shuffle?state=${next}`);
+}
+async function cycleSpotifyRepeat() {
+  const btn = document.getElementById('djRepeatBtn');
+  const nextMap = { off: 'context', context: 'track', track: 'off' };
+  const next = nextMap[btn.dataset.state || 'off'];
+  btn.dataset.state = next;
+  btn.classList.toggle('active', next !== 'off');
+  btn.textContent = next === 'track' ? '🔂' : '🔁';
+  await spotifyApiRequest('PUT', `/me/player/repeat?state=${next}`);
+}
+
+let djVolumeDebounce = null;
+function onSpotifyVolumeInput(value) {
+  if (djVolumeDebounce) clearTimeout(djVolumeDebounce);
+  djVolumeDebounce = setTimeout(() => {
+    spotifyApiRequest('PUT', `/me/player/volume?volume_percent=${value}`);
+  }, 400);
+}
+
+async function playSpotifyPlaylist(id) {
+  if (!id) return;
+  await spotifyApiRequest('PUT', '/me/player/play', { context_uri: 'spotify:playlist:' + id });
+  setTimeout(refreshDjPlaybackState, 600);
+}
+async function playSpotifyTrackUri(uri) {
+  await spotifyApiRequest('PUT', '/me/player/play', { uris: [uri] });
+  setTimeout(refreshDjPlaybackState, 600);
+}
+
+// Reuses the same pinned/workout playlist config from the Overview tab's
+// Spotify card, but tapping here actually starts playback via the API
+// instead of just deep-linking out to the app.
+function renderDjQuickAccess() {
+  const el = document.getElementById('djQuickAccess');
+  if (!el) return;
+  const cfg = getSpotifyPlaylistConfig();
+  const items = (cfg.pins || []).filter(Boolean).slice();
+  if (cfg.workout) items.push(cfg.workout);
+
+  el.innerHTML = '';
+  if (items.length === 0) {
+    el.innerHTML = '<div class="sp-playlists-empty">Pin playlists from the Overview tab</div>';
+    return;
+  }
+  items.forEach(p => {
+    const tile = document.createElement('div');
+    tile.className = 'dj-quick-tile';
+    tile.addEventListener('click', () => playSpotifyPlaylist(p.id));
+    const art = document.createElement(p.image ? 'img' : 'div');
+    art.className = 'dj-quick-art';
+    if (p.image) art.src = p.image; else art.textContent = '🎵';
+    const name = document.createElement('div');
+    name.className = 'dj-quick-name';
+    name.textContent = p.name || 'Playlist';
+    tile.appendChild(art);
+    tile.appendChild(name);
+    el.appendChild(tile);
+  });
+}
+
+// Fetched once per connected session (not re-fetched on every tab visit)
+// since a user's playlist library rarely changes mid-session.
+let djPlaylistsLoaded = false;
+async function loadDjPlaylists() {
+  const el = document.getElementById('djPlaylistGrid');
+  if (!el) return;
+  if (!isSpotifyConnected()) { el.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to see your playlists</div>'; return; }
+
+  const resp = await spotifyApiRequest('GET', '/me/playlists?limit=24');
+  if (!resp.ok || !resp.data || !resp.data.items) {
+    el.innerHTML = '<div class="sp-playlists-empty">Could not load playlists</div>';
+    return;
+  }
+
+  el.innerHTML = '';
+  resp.data.items.forEach(pl => {
+    const tile = document.createElement('div');
+    tile.className = 'dj-playlist-tile';
+    tile.addEventListener('click', () => playSpotifyPlaylist(pl.id));
+    const images = pl.images;
+    const art = document.createElement(images && images.length ? 'img' : 'div');
+    art.className = 'dj-playlist-art';
+    if (images && images.length) art.src = images[0].url; else art.textContent = '🎵';
+    const name = document.createElement('div');
+    name.className = 'dj-playlist-name';
+    name.textContent = pl.name;
+    tile.appendChild(art);
+    tile.appendChild(name);
+    el.appendChild(tile);
+  });
+  djPlaylistsLoaded = true;
+}
+
+async function loadDjRecentlyPlayed() {
+  const el = document.getElementById('djRecentRow');
+  if (!el) return;
+  if (!isSpotifyConnected()) { el.innerHTML = '<div class="sp-playlists-empty">Connect Spotify first</div>'; return; }
+
+  const resp = await spotifyApiRequest('GET', '/me/player/recently-played?limit=15');
+  if (!resp.ok || !resp.data || !resp.data.items) {
+    el.innerHTML = '<div class="sp-playlists-empty">Could not load recent plays</div>';
+    return;
+  }
+
+  el.innerHTML = '';
+  const seen = new Set();
+  resp.data.items.forEach(entry => {
+    const track = entry.track;
+    if (!track || seen.has(track.uri)) return; // de-dupe repeats from one long listen
+    seen.add(track.uri);
+    const tile = document.createElement('div');
+    tile.className = 'dj-recent-tile';
+    tile.addEventListener('click', () => playSpotifyTrackUri(track.uri));
+    const images = track.album && track.album.images;
+    const art = document.createElement(images && images.length ? 'img' : 'div');
+    art.className = 'dj-recent-art';
+    if (images && images.length) art.src = images[images.length - 1].url; else art.textContent = '🎵';
+    const name = document.createElement('div');
+    name.className = 'dj-recent-name';
+    name.textContent = track.name;
+    tile.appendChild(art);
+    tile.appendChild(name);
+    el.appendChild(tile);
+  });
+}
+
+async function refreshDjPlaybackState() {
+  if (!isSpotifyConnected()) { renderDjHero(null); return; }
+  const resp = await spotifyApiRequest('GET', '/me/player?additional_types=episode,track');
+  const state = resp.ok ? resp.data : null;
+  renderDjHero(state);
+  // Always fetch the full device list (not just whichever one is
+  // currently active) - otherwise there's nothing to switch to.
+  loadDjDevices();
+}
+
+async function loadDjDevices() {
+  const resp = await spotifyApiRequest('GET', '/me/player/devices');
+  const devices = (resp.ok && resp.data && resp.data.devices) ? resp.data.devices : [];
+  renderDjDevices(devices);
+}
+
+let djPollTimer = null;
+function startDjPolling() {
+  if (djPollTimer || !isSpotifyConnected()) return;
+  refreshDjPlaybackState();
+  djPollTimer = setInterval(refreshDjPlaybackState, 10000);
+}
+function stopDjPolling() {
+  if (djPollTimer) { clearInterval(djPollTimer); djPollTimer = null; }
+  stopDjProgressTicker();
+}
+
+function renderMusicTab() {
+  renderDjQuickAccess();
+  startDjPolling();
+  if (!djPlaylistsLoaded) loadDjPlaylists();
+  loadDjRecentlyPlayed();
 }
 
 function showDay(day) {
@@ -2783,6 +3206,8 @@ goToView('overview', false);
   updateSpotifyConfigStatus();
   renderPinnedPlaylists();
   renderShuffleBar();
+  initDjProgressSeek();
+  renderDjHero(null);
   if (isSpotifyConnected()) {
     startSpotifyPolling();
     refreshSpotifyPlaylistMetadata();
