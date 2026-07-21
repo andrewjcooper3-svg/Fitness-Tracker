@@ -856,6 +856,52 @@ function saveState() {
   dayKeys.forEach(day => { state.days[day] = serializeDay(day); });
   localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
   updatePushupLedger();
+  syncDraftToCloud(state);
+}
+
+// Mirrors the in-progress state (everything typed/checked so far, before
+// any "Generate Summary" actually logs to the Sheet) to the same Apps
+// Script backend, so opening the tracker on a different device picks up
+// where the last one left off instead of starting blank. Debounced so
+// typing doesn't hammer the endpoint on every keystroke - only the
+// settled value after a pause gets sent.
+let draftSyncTimer = null;
+function syncDraftToCloud(state) {
+  if (draftSyncTimer) clearTimeout(draftSyncTimer);
+  draftSyncTimer = setTimeout(() => {
+    const url = getDeploymentUrl();
+    if (!url || !navigator.onLine) return;
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveDraft', week: state.week, days: state.days })
+    }).catch(() => {}); // best-effort - localStorage already has it regardless
+  }, 1500);
+}
+
+// Runs once at page load, after the fast local (localStorage) restore -
+// pulls whatever the most recent save from any device left in the cloud
+// and applies it on top, so a phone-then-laptop (or vice versa) session
+// picks up mid-week edits rather than only whatever this exact device
+// last saved locally. Silently gives up if offline or unconfigured; the
+// already-restored local state stands as-is in that case.
+async function fetchAndApplyRemoteDraft() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadDraft');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.draft || data.draft.week !== getWeekLabel()) return;
+
+    isRestoringState = true;
+    dayKeys.forEach(day => restoreDay(day, data.draft.days[day]));
+    isRestoringState = false;
+
+    saveState();
+    if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
+  } catch (e) {
+    // Offline/unreachable - the local-only restore already in place stands.
+  }
 }
 
 // Unlike WORKOUT_TRACKER_STATE (which resets every new week), this ledger
@@ -1862,6 +1908,7 @@ tagExerciseIds();
 seedHistoricalPushupLedger();
 seedYearCarryForward();
 restoreState();
+fetchAndApplyRemoteDraft();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();

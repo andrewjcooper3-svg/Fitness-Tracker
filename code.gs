@@ -131,7 +131,33 @@ function getSheetId() {
   return getOrCreateSpreadsheet_().getUrl();
 }
 
+// The draft is the same {week, days} blob the webapp already keeps in its
+// own localStorage - stored here too (one slot, since it always resets
+// weekly the same way locally) so opening the tracker on a different
+// device picks up whatever was typed/checked on the last one, even
+// before a day's "Generate Summary" actually logs anything to the Sheet.
+const DRAFT_STATE_KEY = 'DRAFT_STATE';
+
+function saveDraftState_(week, days) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(DRAFT_STATE_KEY, JSON.stringify({ week: week, days: days, savedAt: new Date().toISOString() }));
+}
+
+function loadDraftState_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(DRAFT_STATE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
 function doGet(e) {
+  const action = e && e.parameter ? e.parameter.action : null;
+
+  if (action === 'loadDraft') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', draft: loadDraftState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId() }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -144,6 +170,14 @@ function doPost(e) {
     }
 
     const data = JSON.parse(e.postData.contents);
+
+    if (data.action === 'saveDraft') {
+      saveDraftState_(data.week || getCurrentWeekLabel_(), data.days || {});
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     const weekLabel = data.week || getCurrentWeekLabel_();
     const sheet = getOrCreateWeekSheet_(weekLabel);
 
