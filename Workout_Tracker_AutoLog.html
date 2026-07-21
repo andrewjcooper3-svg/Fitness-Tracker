@@ -233,6 +233,37 @@
   .cal-event-title { font-family: var(--font); font-size: 14px; font-weight: 600; }
   .cal-event-cal { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
   .cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .sp-card { background: var(--surface); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
+  .sp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .sp-title { font-family: var(--font); font-size: 14px; font-weight: 600; }
+  .sp-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); opacity: 0.5; }
+  .sp-status-dot.live { background: #1DB954; opacity: 1; box-shadow: 0 0 6px rgba(29,185,84,0.6); }
+  .sp-body { display: flex; gap: 10px; align-items: stretch; }
+  .sp-now-playing { flex: 1.3; min-width: 0; display: flex; align-items: center; gap: 9px; background: var(--surface2); border-radius: 12px; padding: 8px; }
+  .sp-np-art-wrap { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+  .sp-np-art { width: 100%; height: 100%; object-fit: cover; }
+  .sp-np-art-fallback { font-size: 16px; }
+  .sp-np-body { min-width: 0; }
+  .sp-np-title { font-family: var(--font); font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sp-np-artist { font-family: var(--font); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+  .sp-playlists { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; justify-content: center; }
+  .sp-playlists-empty { font-family: var(--font); font-size: 11px; color: var(--muted); padding: 4px; }
+  .sp-tile { display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 8px; padding: 3px 4px; transition: background 0.15s; }
+  .sp-tile:hover { background: var(--surface2); }
+  .sp-tile-art { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+  .sp-tile-art-fallback { display: flex; align-items: center; justify-content: center; font-size: 11px; background: var(--surface2); }
+  .sp-tile-name { font-family: var(--font); font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .sp-config-box { margin-top: 12px; margin-bottom: 0; background: var(--surface2); }
+  .sp-config-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin: 12px 0 6px; }
+
+  .sp-shuffle-bar { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, rgba(29,185,84,0.16), var(--surface) 70%); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; cursor: pointer; transition: background 0.15s; }
+  .sp-shuffle-bar:hover { background: linear-gradient(135deg, rgba(29,185,84,0.24), var(--surface2) 70%); }
+  .sp-shuffle-icon { font-size: 20px; flex-shrink: 0; }
+  .sp-shuffle-text { flex: 1; min-width: 0; }
+  .sp-shuffle-label { font-family: var(--font); font-size: 11px; font-weight: 700; color: #1DB954; text-transform: uppercase; letter-spacing: 0.3px; }
+  .sp-shuffle-playlist { font-family: var(--font); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+  .sp-shuffle-status { font-family: var(--font); font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; max-width: 90px; }
 </style>
 </head>
 <body>
@@ -278,6 +309,53 @@
   <div class="ov-days-card">
     <div class="ov-days-label">This week, by day</div>
     <div class="ov-days" id="ovDayChips"></div>
+  </div>
+
+  <div class="sp-card">
+    <div class="sp-header">
+      <div class="sp-title">🎧 Spotify</div>
+      <div class="sp-status-dot" id="spStatusDot"></div>
+    </div>
+    <div class="sp-body">
+      <div class="sp-now-playing" id="spNowPlaying">
+        <div class="sp-np-art-wrap">
+          <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
+          <div class="sp-np-art-fallback" id="spNpArtFallback">🎵</div>
+        </div>
+        <div class="sp-np-body">
+          <div class="sp-np-title" id="spNpTitle">Not connected</div>
+          <div class="sp-np-artist" id="spNpArtist"></div>
+        </div>
+      </div>
+      <div class="sp-playlists" id="spPlaylistTiles">
+        <div class="sp-playlists-empty">Pin playlists below</div>
+      </div>
+    </div>
+
+    <div class="config-box sp-config-box">
+      <div class="config-toggle" onclick="toggleSpotifyConfig()">
+        <div class="config-title">⚙ Spotify Connection</div>
+        <div class="config-chevron" id="spotifyConfigChevron">▸</div>
+      </div>
+      <div class="config-body" id="spotifyConfigBody">
+        <div class="config-row">
+          <input type="text" id="spotifyClientId" class="config-input" placeholder="Spotify Client ID">
+          <button class="config-save" onclick="saveSpotifyClientId()">Save</button>
+        </div>
+        <div class="config-status" id="spotifyConfigStatus">Not connected — paste your Client ID, save, then connect.</div>
+        <button class="ov-open-btn" id="spotifyConnectBtn" onclick="connectSpotify()" style="margin-top:8px;">Connect Spotify</button>
+
+        <div class="sp-config-label">Pinned playlists (shown on the right, above)</div>
+        <div class="config-row"><input type="text" id="spPin1Link" class="config-input" placeholder="Playlist link 1"></div>
+        <div class="config-row"><input type="text" id="spPin2Link" class="config-input" placeholder="Playlist link 2"></div>
+        <div class="config-row"><input type="text" id="spPin3Link" class="config-input" placeholder="Playlist link 3"></div>
+
+        <div class="sp-config-label">Workout playlist (Trainer tab shuffle button)</div>
+        <div class="config-row"><input type="text" id="spWorkoutPlaylistLink" class="config-input" placeholder="Playlist link"></div>
+
+        <button class="config-save" style="width:100%; margin-top:8px;" onclick="saveSpotifyPlaylists()">Save Playlists</button>
+      </div>
+    </div>
   </div>
 
   <div class="ov-mini-card" onclick="showAppView('calendar')">
@@ -377,6 +455,15 @@
       <div class="header-week" id="weekLabel"></div>
     </div>
   </div>
+</div>
+
+<div class="sp-shuffle-bar" id="spShuffleBar" onclick="shufflePlayWorkoutPlaylist()">
+  <div class="sp-shuffle-icon">🔀</div>
+  <div class="sp-shuffle-text">
+    <div class="sp-shuffle-label">Shuffle Play</div>
+    <div class="sp-shuffle-playlist" id="spShufflePlaylistName">Not configured — set a playlist link in Spotify config</div>
+  </div>
+  <div class="sp-shuffle-status" id="spShuffleStatus"></div>
 </div>
 
 <div class="ov-grid">
@@ -1674,6 +1761,401 @@ function renderCalendarEvents(events) {
   });
 }
 
+/* ---------- Spotify (currently playing + pinned playlists + workout shuffle) ---------- */
+
+// Authorization Code + PKCE - no client secret needed, so this can run
+// entirely client-side. redirect_uri is derived from the page's own URL so
+// it automatically matches wherever this file is actually hosted (must be
+// registered exactly as-is in the Spotify app's dashboard).
+const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
+const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state';
+const STORAGE_SPOTIFY_CLIENT_ID = 'WORKOUT_SPOTIFY_CLIENT_ID';
+const STORAGE_SPOTIFY_TOKENS = 'WORKOUT_SPOTIFY_TOKENS';
+const STORAGE_SPOTIFY_PLAYLISTS = 'WORKOUT_SPOTIFY_PLAYLISTS';
+const SPOTIFY_CODE_VERIFIER_KEY = 'WORKOUT_SPOTIFY_CODE_VERIFIER';
+
+function spotifyBase64UrlEncode(bytes) {
+  let str = '';
+  bytes.forEach(b => { str += String.fromCharCode(b); });
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function generateSpotifyCodeVerifier() {
+  const arr = new Uint8Array(64);
+  crypto.getRandomValues(arr);
+  return spotifyBase64UrlEncode(arr);
+}
+
+async function generateSpotifyCodeChallenge(verifier) {
+  const data = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return spotifyBase64UrlEncode(new Uint8Array(digest));
+}
+
+function getSpotifyClientId() {
+  return localStorage.getItem(STORAGE_SPOTIFY_CLIENT_ID) || '';
+}
+
+function saveSpotifyClientId() {
+  const val = document.getElementById('spotifyClientId').value.trim();
+  localStorage.setItem(STORAGE_SPOTIFY_CLIENT_ID, val);
+  updateSpotifyConfigStatus();
+}
+
+function loadSpotifyClientId() {
+  document.getElementById('spotifyClientId').value = getSpotifyClientId();
+}
+
+function toggleSpotifyConfig() {
+  const body = document.getElementById('spotifyConfigBody');
+  const chevron = document.getElementById('spotifyConfigChevron');
+  body.classList.toggle('expanded');
+  chevron.textContent = body.classList.contains('expanded') ? '▾' : '▸';
+}
+
+async function connectSpotify() {
+  const clientId = getSpotifyClientId();
+  if (!clientId) { alert('Paste your Spotify Client ID above and save it first.'); return; }
+  const verifier = generateSpotifyCodeVerifier();
+  sessionStorage.setItem(SPOTIFY_CODE_VERIFIER_KEY, verifier);
+  const challenge = await generateSpotifyCodeChallenge(verifier);
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+    code_challenge_method: 'S256',
+    code_challenge: challenge,
+    scope: SPOTIFY_SCOPES
+  });
+  window.location.href = 'https://accounts.spotify.com/authorize?' + params.toString();
+}
+
+function disconnectSpotify() {
+  localStorage.removeItem(STORAGE_SPOTIFY_TOKENS);
+  stopSpotifyPolling();
+  updateSpotifyConfigStatus();
+  renderNowPlaying(null);
+}
+
+function getSpotifyTokens() {
+  return JSON.parse(localStorage.getItem(STORAGE_SPOTIFY_TOKENS) || 'null');
+}
+
+function isSpotifyConnected() {
+  const t = getSpotifyTokens();
+  return !!(t && t.refresh_token);
+}
+
+function storeSpotifyTokens(data) {
+  const existing = getSpotifyTokens() || {};
+  localStorage.setItem(STORAGE_SPOTIFY_TOKENS, JSON.stringify({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token || existing.refresh_token,
+    expires_at: Date.now() + (data.expires_in * 1000)
+  }));
+}
+
+// If the page just got redirected back from Spotify's consent screen,
+// exchange the ?code= for tokens and strip it from the URL either way so
+// a reload doesn't try to redeem it again.
+async function handleSpotifyRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  if (!code) return;
+
+  const verifier = sessionStorage.getItem(SPOTIFY_CODE_VERIFIER_KEY);
+  history.replaceState({}, '', window.location.pathname);
+  const clientId = getSpotifyClientId();
+  if (!verifier || !clientId) return;
+
+  try {
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: SPOTIFY_REDIRECT_URI,
+        code_verifier: verifier
+      })
+    });
+    const data = await res.json();
+    if (data.access_token) storeSpotifyTokens(data);
+  } catch (err) {
+    console.error('Spotify token exchange failed', err);
+  }
+}
+
+async function ensureSpotifyAccessToken() {
+  const tokens = getSpotifyTokens();
+  if (!tokens) return null;
+  if (tokens.expires_at && Date.now() < tokens.expires_at - 30000) return tokens.access_token;
+
+  const clientId = getSpotifyClientId();
+  if (!clientId || !tokens.refresh_token) return null;
+  try {
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refresh_token
+      })
+    });
+    const data = await res.json();
+    if (!data.access_token) return null;
+    storeSpotifyTokens(data);
+    return data.access_token;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function spotifyApiRequest(method, path, body) {
+  const token = await ensureSpotifyAccessToken();
+  if (!token) return { ok: false, status: 0, data: null };
+  const res = await fetch('https://api.spotify.com/v1' + path, {
+    method: method,
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (res.status === 204 || res.status === 202) return { ok: true, status: res.status, data: null };
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* no body */ }
+  return { ok: res.ok, status: res.status, data: data };
+}
+
+function updateSpotifyConfigStatus() {
+  const statusEl = document.getElementById('spotifyConfigStatus');
+  const btn = document.getElementById('spotifyConnectBtn');
+  if (isSpotifyConnected()) {
+    statusEl.textContent = '✓ Connected to Spotify.';
+    statusEl.className = 'config-status ok';
+    btn.textContent = 'Disconnect Spotify';
+    btn.onclick = disconnectSpotify;
+  } else {
+    const hasClientId = !!getSpotifyClientId();
+    statusEl.textContent = hasClientId ? 'Client ID saved — tap Connect to log in.' : 'Not connected — paste your Client ID, save, then connect.';
+    statusEl.className = hasClientId ? 'config-status' : 'config-status warn';
+    btn.textContent = 'Connect Spotify';
+    btn.onclick = connectSpotify;
+  }
+}
+
+// Accepts open.spotify.com links or spotify: URIs and pulls out the bare
+// playlist id from either form.
+function extractSpotifyPlaylistId(link) {
+  if (!link) return null;
+  const m = link.match(/playlist[:/]([a-zA-Z0-9]+)/);
+  return m ? m[1] : null;
+}
+
+function getSpotifyPlaylistConfig() {
+  return JSON.parse(localStorage.getItem(STORAGE_SPOTIFY_PLAYLISTS) || '{"pins":[null,null,null],"workout":null}');
+}
+
+function loadSpotifyPlaylistInputs() {
+  const cfg = getSpotifyPlaylistConfig();
+  const pins = cfg.pins || [];
+  document.getElementById('spPin1Link').value = (pins[0] && pins[0].link) || '';
+  document.getElementById('spPin2Link').value = (pins[1] && pins[1].link) || '';
+  document.getElementById('spPin3Link').value = (pins[2] && pins[2].link) || '';
+  document.getElementById('spWorkoutPlaylistLink').value = (cfg.workout && cfg.workout.link) || '';
+}
+
+function saveSpotifyPlaylists() {
+  const links = [
+    document.getElementById('spPin1Link').value.trim(),
+    document.getElementById('spPin2Link').value.trim(),
+    document.getElementById('spPin3Link').value.trim()
+  ];
+  const workoutLink = document.getElementById('spWorkoutPlaylistLink').value.trim();
+  const existing = getSpotifyPlaylistConfig();
+
+  // Reuse cached name/artwork when a link hasn't changed, so saving
+  // doesn't re-fetch (or briefly blank out) tiles that are already set.
+  const pins = links.map((link, i) => {
+    if (!link) return null;
+    const prev = existing.pins && existing.pins[i];
+    if (prev && prev.link === link) return prev;
+    return { link: link, id: extractSpotifyPlaylistId(link), name: null, image: null };
+  });
+
+  let workout = null;
+  if (workoutLink) {
+    const prev = existing.workout;
+    workout = (prev && prev.link === workoutLink) ? prev : { link: workoutLink, id: extractSpotifyPlaylistId(workoutLink), name: null };
+  }
+
+  localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify({ pins: pins, workout: workout }));
+  renderPinnedPlaylists();
+  renderShuffleBar();
+  refreshSpotifyPlaylistMetadata();
+}
+
+async function fetchSpotifyPlaylistMeta(id) {
+  const resp = await spotifyApiRequest('GET', `/playlists/${id}?fields=name,images`);
+  if (!resp.ok || !resp.data) return null;
+  const images = resp.data.images;
+  const image = images && images.length ? images[images.length - 1].url : null;
+  return { name: resp.data.name, image: image };
+}
+
+// Fills in display name/artwork for any pinned or workout playlist that's
+// only a raw link so far - only possible once actually connected, since
+// it needs an access token.
+async function refreshSpotifyPlaylistMetadata() {
+  if (!isSpotifyConnected()) return;
+  const cfg = getSpotifyPlaylistConfig();
+  let changed = false;
+
+  for (const pin of (cfg.pins || [])) {
+    if (pin && pin.id && !pin.name) {
+      const meta = await fetchSpotifyPlaylistMeta(pin.id);
+      if (meta) { pin.name = meta.name; pin.image = meta.image; changed = true; }
+    }
+  }
+  if (cfg.workout && cfg.workout.id && !cfg.workout.name) {
+    const meta = await fetchSpotifyPlaylistMeta(cfg.workout.id);
+    if (meta) { cfg.workout.name = meta.name; changed = true; }
+  }
+
+  if (changed) {
+    localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify(cfg));
+    renderPinnedPlaylists();
+    renderShuffleBar();
+  }
+}
+
+function renderPinnedPlaylists() {
+  const el = document.getElementById('spPlaylistTiles');
+  if (!el) return;
+  const cfg = getSpotifyPlaylistConfig();
+  const pins = (cfg.pins || []).filter(Boolean);
+
+  el.innerHTML = '';
+  if (pins.length === 0) {
+    el.innerHTML = '<div class="sp-playlists-empty">Pin playlists below</div>';
+    return;
+  }
+
+  pins.forEach(p => {
+    const tile = document.createElement('div');
+    tile.className = 'sp-tile';
+    tile.addEventListener('click', () => { window.location.href = p.link; });
+
+    const art = document.createElement(p.image ? 'img' : 'div');
+    art.className = 'sp-tile-art' + (p.image ? '' : ' sp-tile-art-fallback');
+    if (p.image) art.src = p.image; else art.textContent = '🎵';
+
+    const name = document.createElement('div');
+    name.className = 'sp-tile-name';
+    name.textContent = p.name || 'Playlist';
+
+    tile.appendChild(art);
+    tile.appendChild(name);
+    el.appendChild(tile);
+  });
+}
+
+function renderNowPlaying(data) {
+  const titleEl = document.getElementById('spNpTitle');
+  const artistEl = document.getElementById('spNpArtist');
+  const artEl = document.getElementById('spNpArt');
+  const fallbackEl = document.getElementById('spNpArtFallback');
+  const dotEl = document.getElementById('spStatusDot');
+  if (!titleEl) return;
+
+  if (!isSpotifyConnected()) {
+    titleEl.textContent = 'Not connected';
+    artistEl.textContent = '';
+    artEl.style.display = 'none';
+    fallbackEl.style.display = 'flex';
+    dotEl.classList.remove('live');
+    return;
+  }
+  if (!data || !data.item) {
+    titleEl.textContent = 'Nothing playing';
+    artistEl.textContent = '';
+    artEl.style.display = 'none';
+    fallbackEl.style.display = 'flex';
+    dotEl.classList.remove('live');
+    return;
+  }
+
+  const item = data.item;
+  titleEl.textContent = item.name || '';
+  artistEl.textContent = (item.artists || []).map(a => a.name).join(', ');
+  const images = item.album && item.album.images;
+  const art = images && images.length ? images[images.length - 1].url : null;
+  if (art) {
+    artEl.src = art;
+    artEl.style.display = 'block';
+    fallbackEl.style.display = 'none';
+  } else {
+    artEl.style.display = 'none';
+    fallbackEl.style.display = 'flex';
+  }
+  dotEl.classList.toggle('live', !!data.is_playing);
+}
+
+async function pollNowPlaying() {
+  if (!isSpotifyConnected()) { renderNowPlaying(null); return; }
+  const resp = await spotifyApiRequest('GET', '/me/player/currently-playing');
+  renderNowPlaying(resp.ok ? resp.data : null);
+}
+
+let spotifyPollTimer = null;
+function startSpotifyPolling() {
+  if (spotifyPollTimer || !isSpotifyConnected()) return;
+  pollNowPlaying();
+  spotifyPollTimer = setInterval(pollNowPlaying, 15000);
+}
+function stopSpotifyPolling() {
+  if (spotifyPollTimer) { clearInterval(spotifyPollTimer); spotifyPollTimer = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopSpotifyPolling(); else startSpotifyPolling();
+});
+
+function renderShuffleBar() {
+  const nameEl = document.getElementById('spShufflePlaylistName');
+  if (!nameEl) return;
+  const cfg = getSpotifyPlaylistConfig();
+  nameEl.textContent = (cfg.workout && (cfg.workout.name || cfg.workout.link)) || 'Not configured — set a playlist link in Spotify config';
+}
+
+async function shufflePlayWorkoutPlaylist() {
+  const statusEl = document.getElementById('spShuffleStatus');
+  const cfg = getSpotifyPlaylistConfig();
+
+  if (!isSpotifyConnected()) {
+    statusEl.textContent = 'Connect Spotify on Overview first';
+    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    return;
+  }
+  if (!cfg.workout || !cfg.workout.id) {
+    statusEl.textContent = 'No workout playlist configured';
+    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    return;
+  }
+
+  statusEl.textContent = 'Starting…';
+  await spotifyApiRequest('PUT', '/me/player/shuffle?state=true');
+  const playResp = await spotifyApiRequest('PUT', '/me/player/play', { context_uri: 'spotify:playlist:' + cfg.workout.id });
+
+  if (playResp.ok) {
+    statusEl.textContent = '▶ Playing on shuffle';
+  } else if (playResp.status === 404) {
+    statusEl.textContent = '⚠ No active device — open Spotify first';
+  } else {
+    statusEl.textContent = '⚠ Could not start playback';
+  }
+  setTimeout(() => { statusEl.textContent = ''; }, 4000);
+}
+
 function showDay(day) {
   document.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('active'));
@@ -2284,6 +2766,21 @@ flushPendingLogs();
 renderTrainerStats();
 initViewportHeightObserver();
 goToView('overview', false);
+
+(async function initSpotify() {
+  await handleSpotifyRedirect();
+  loadSpotifyClientId();
+  loadSpotifyPlaylistInputs();
+  updateSpotifyConfigStatus();
+  renderPinnedPlaylists();
+  renderShuffleBar();
+  if (isSpotifyConnected()) {
+    startSpotifyPolling();
+    refreshSpotifyPlaylistMetadata();
+  } else {
+    renderNowPlaying(null);
+  }
+})();
 </script>
 </body>
 </html>
