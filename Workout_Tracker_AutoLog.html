@@ -258,6 +258,7 @@
   .sp-tile-name { font-family: var(--font); font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .sp-config-box { margin-top: 12px; margin-bottom: 0; background: var(--surface2); }
   .sp-config-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin: 12px 0 6px; }
+  .sp-config-hint { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
 
   .sp-shuffle-bar { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, rgba(29,185,84,0.16), var(--surface) 70%); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; cursor: pointer; transition: background 0.15s; }
   .sp-shuffle-bar:hover { background: linear-gradient(135deg, rgba(29,185,84,0.24), var(--surface2) 70%); }
@@ -301,8 +302,10 @@
 
   .dj-section { margin-bottom: 16px; }
   .dj-section-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
+  .dj-playlist-status { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--amber); min-height: 14px; margin: -4px 0 8px; padding: 0 2px; }
   .dj-quick-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
   .dj-quick-tile { flex-shrink: 0; width: 84px; cursor: pointer; }
+  .dj-quick-art-wrap, .dj-playlist-art-wrap { position: relative; }
   .dj-quick-art { width: 84px; height: 84px; border-radius: 12px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
   .dj-quick-name { font-family: var(--font); font-size: 11px; font-weight: 600; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -310,6 +313,8 @@
   .dj-playlist-tile { cursor: pointer; }
   .dj-playlist-art { width: 100%; aspect-ratio: 1; border-radius: 12px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
   .dj-playlist-name { font-family: var(--font); font-size: 11px; font-weight: 600; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dj-pin-btn { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 14px; color: rgba(255,255,255,0.65); cursor: pointer; }
+  .dj-pin-btn.pinned { color: #1DB954; }
 
   .dj-recent-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
   .dj-recent-tile { flex-shrink: 0; width: 72px; cursor: pointer; }
@@ -505,11 +510,12 @@
 
   <div class="dj-section">
     <div class="dj-section-label">Quick Access</div>
-    <div class="dj-quick-row" id="djQuickAccess"><div class="sp-playlists-empty">Pin playlists in Spotify Settings below</div></div>
+    <div class="dj-quick-row" id="djQuickAccess"><div class="sp-playlists-empty">Pin playlists below with ☆</div></div>
   </div>
 
   <div class="dj-section">
     <div class="dj-section-label">Your Playlists</div>
+    <div class="dj-playlist-status" id="djPlaylistStatus"></div>
     <div class="dj-playlist-grid" id="djPlaylistGrid"><div class="sp-playlists-empty">Connect Spotify to see your playlists</div></div>
   </div>
 
@@ -531,15 +537,12 @@
       <div class="config-status" id="spotifyConfigStatus">Not connected — paste your Client ID, save, then connect.</div>
       <button class="ov-open-btn" id="spotifyConnectBtn" onclick="connectSpotify()" style="margin-top:8px;">Connect Spotify</button>
 
-      <div class="sp-config-label">Pinned playlists (Quick Access + Overview tile)</div>
-      <div class="config-row"><input type="text" id="spPin1Link" class="config-input" placeholder="Playlist link 1"></div>
-      <div class="config-row"><input type="text" id="spPin2Link" class="config-input" placeholder="Playlist link 2"></div>
-      <div class="config-row"><input type="text" id="spPin3Link" class="config-input" placeholder="Playlist link 3"></div>
-
       <div class="sp-config-label">Workout playlist (Trainer tab shuffle button)</div>
-      <div class="config-row"><input type="text" id="spWorkoutPlaylistLink" class="config-input" placeholder="Playlist link"></div>
-
-      <button class="config-save" style="width:100%; margin-top:8px;" onclick="saveSpotifyPlaylists()">Save Playlists</button>
+      <div class="config-row">
+        <input type="text" id="spWorkoutPlaylistLink" class="config-input" placeholder="Playlist link">
+        <button class="config-save" onclick="saveSpotifyWorkoutPlaylist()">Save</button>
+      </div>
+      <div class="sp-config-hint">Pin playlists to Quick Access with the ☆ on any tile in Your Playlists, above.</div>
     </div>
   </div>
 
@@ -2073,30 +2076,15 @@ function getSpotifyPlaylistConfig() {
 
 function loadSpotifyPlaylistInputs() {
   const cfg = getSpotifyPlaylistConfig();
-  const pins = cfg.pins || [];
-  document.getElementById('spPin1Link').value = (pins[0] && pins[0].link) || '';
-  document.getElementById('spPin2Link').value = (pins[1] && pins[1].link) || '';
-  document.getElementById('spPin3Link').value = (pins[2] && pins[2].link) || '';
   document.getElementById('spWorkoutPlaylistLink').value = (cfg.workout && cfg.workout.link) || '';
 }
 
-function saveSpotifyPlaylists() {
-  const links = [
-    document.getElementById('spPin1Link').value.trim(),
-    document.getElementById('spPin2Link').value.trim(),
-    document.getElementById('spPin3Link').value.trim()
-  ];
+// The workout playlist is still set by pasting a link (it's a single,
+// rarely-changed setting) - the 3 Quick Access pins are managed instead
+// via the pin star on any tile in Your Playlists, see togglePinPlaylist().
+function saveSpotifyWorkoutPlaylist() {
   const workoutLink = document.getElementById('spWorkoutPlaylistLink').value.trim();
   const existing = getSpotifyPlaylistConfig();
-
-  // Reuse cached name/artwork when a link hasn't changed, so saving
-  // doesn't re-fetch (or briefly blank out) tiles that are already set.
-  const pins = links.map((link, i) => {
-    if (!link) return null;
-    const prev = existing.pins && existing.pins[i];
-    if (prev && prev.link === link) return prev;
-    return { link: link, id: extractSpotifyPlaylistId(link), name: null, image: null };
-  });
 
   let workout = null;
   if (workoutLink) {
@@ -2104,10 +2092,53 @@ function saveSpotifyPlaylists() {
     workout = (prev && prev.link === workoutLink) ? prev : { link: workoutLink, id: extractSpotifyPlaylistId(workoutLink), name: null };
   }
 
-  localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify({ pins: pins, workout: workout }));
-  renderPinnedPlaylists();
+  localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify({ pins: existing.pins || [null, null, null], workout: workout }));
   renderShuffleBar();
   refreshSpotifyPlaylistMetadata();
+}
+
+function isPlaylistPinned(id) {
+  const cfg = getSpotifyPlaylistConfig();
+  return (cfg.pins || []).some(p => p && p.id === id);
+}
+
+function flashDjPlaylistStatus(msg) {
+  const el = document.getElementById('djPlaylistStatus');
+  if (!el) return;
+  el.textContent = msg;
+  setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 3000);
+}
+
+// Toggles a playlist (given as {id, name, image}, straight from an
+// already-fetched tile - no link parsing needed) in or out of the 3
+// Quick Access slots. Storing a constructed open.spotify.com link
+// alongside id/name/image keeps this compatible with the Overview tile's
+// existing "tap to open" behavior, which reads p.link.
+function togglePinPlaylist(playlist) {
+  const cfg = getSpotifyPlaylistConfig();
+  const pins = (cfg.pins || []).filter(Boolean);
+  const idx = pins.findIndex(p => p.id === playlist.id);
+
+  if (idx !== -1) {
+    pins.splice(idx, 1);
+  } else {
+    if (pins.length >= 3) {
+      flashDjPlaylistStatus('Unpin one first — max 3');
+      return;
+    }
+    pins.push({
+      id: playlist.id,
+      name: playlist.name,
+      image: playlist.image,
+      link: 'https://open.spotify.com/playlist/' + playlist.id
+    });
+  }
+  while (pins.length < 3) pins.push(null);
+
+  localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify({ pins: pins, workout: cfg.workout }));
+  renderPinnedPlaylists();
+  renderDjQuickAccess();
+  renderDjPlaylistGrid();
 }
 
 async function fetchSpotifyPlaylistMeta(id) {
@@ -2470,37 +2501,56 @@ function renderDjQuickAccess() {
   const el = document.getElementById('djQuickAccess');
   if (!el) return;
   const cfg = getSpotifyPlaylistConfig();
-  const items = (cfg.pins || []).filter(Boolean).slice();
-  if (cfg.workout) items.push(cfg.workout);
+  const items = (cfg.pins || []).filter(Boolean).map(p => Object.assign({}, p, { isPin: true }));
+  if (cfg.workout) items.push(Object.assign({}, cfg.workout, { isPin: false }));
 
   el.innerHTML = '';
   if (items.length === 0) {
-    el.innerHTML = '<div class="sp-playlists-empty">Pin playlists in Spotify Settings below</div>';
+    el.innerHTML = '<div class="sp-playlists-empty">Pin playlists below with ☆</div>';
     return;
   }
   items.forEach(p => {
     const tile = document.createElement('div');
     tile.className = 'dj-quick-tile';
     tile.addEventListener('click', () => playSpotifyPlaylist(p.id));
+
+    const artWrap = document.createElement('div');
+    artWrap.className = 'dj-quick-art-wrap';
     const art = document.createElement(p.image ? 'img' : 'div');
     art.className = 'dj-quick-art';
     if (p.image) art.src = p.image; else art.textContent = '🎵';
+    artWrap.appendChild(art);
+
+    // Only true pins are unpin-able from here - the workout playlist is
+    // a separate setting (edited in Spotify Settings), not a pin.
+    if (p.isPin) {
+      const unpinBtn = document.createElement('div');
+      unpinBtn.className = 'dj-pin-btn pinned';
+      unpinBtn.textContent = '×';
+      unpinBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePinPlaylist(p); });
+      artWrap.appendChild(unpinBtn);
+    }
+
     const name = document.createElement('div');
     name.className = 'dj-quick-name';
     name.textContent = p.name || 'Playlist';
-    tile.appendChild(art);
+
+    tile.appendChild(artWrap);
     tile.appendChild(name);
     el.appendChild(tile);
   });
 }
 
 // Fetched once per connected session (not re-fetched on every tab visit)
-// since a user's playlist library rarely changes mid-session.
+// since a user's playlist library rarely changes mid-session; cached so
+// toggling a pin can re-render badges without another network round trip.
 let djPlaylistsLoaded = false;
+let djPlaylistsCache = null;
+
 async function loadDjPlaylists() {
   const el = document.getElementById('djPlaylistGrid');
   if (!el) return;
-  if (!isSpotifyConnected()) { el.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to see your playlists</div>'; return; }
+  if (!isSpotifyConnected()) { el.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to see your playlists</div>'; djPlaylistsCache = null; return; }
 
   const resp = await spotifyApiRequest('GET', '/me/playlists?limit=24');
   if (!resp.ok || !resp.data || !resp.data.items) {
@@ -2508,23 +2558,47 @@ async function loadDjPlaylists() {
     return;
   }
 
+  djPlaylistsCache = resp.data.items.map(pl => ({
+    id: pl.id,
+    name: pl.name,
+    image: (pl.images && pl.images.length) ? pl.images[0].url : null
+  }));
+  djPlaylistsLoaded = true;
+  renderDjPlaylistGrid();
+}
+
+function renderDjPlaylistGrid() {
+  const el = document.getElementById('djPlaylistGrid');
+  if (!el || !djPlaylistsCache) return;
+
   el.innerHTML = '';
-  resp.data.items.forEach(pl => {
+  djPlaylistsCache.forEach(pl => {
     const tile = document.createElement('div');
     tile.className = 'dj-playlist-tile';
     tile.addEventListener('click', () => playSpotifyPlaylist(pl.id));
-    const images = pl.images;
-    const art = document.createElement(images && images.length ? 'img' : 'div');
+
+    const artWrap = document.createElement('div');
+    artWrap.className = 'dj-playlist-art-wrap';
+    const art = document.createElement(pl.image ? 'img' : 'div');
     art.className = 'dj-playlist-art';
-    if (images && images.length) art.src = images[0].url; else art.textContent = '🎵';
+    if (pl.image) art.src = pl.image; else art.textContent = '🎵';
+    artWrap.appendChild(art);
+
+    const pinned = isPlaylistPinned(pl.id);
+    const pinBtn = document.createElement('div');
+    pinBtn.className = 'dj-pin-btn' + (pinned ? ' pinned' : '');
+    pinBtn.textContent = pinned ? '★' : '☆';
+    pinBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePinPlaylist(pl); });
+    artWrap.appendChild(pinBtn);
+
     const name = document.createElement('div');
     name.className = 'dj-playlist-name';
     name.textContent = pl.name;
-    tile.appendChild(art);
+
+    tile.appendChild(artWrap);
     tile.appendChild(name);
     el.appendChild(tile);
   });
-  djPlaylistsLoaded = true;
 }
 
 async function loadDjRecentlyPlayed() {
