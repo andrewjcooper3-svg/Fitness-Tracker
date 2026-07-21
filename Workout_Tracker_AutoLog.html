@@ -181,12 +181,13 @@
   .cal-status.error { color: var(--red); }
   .cal-day-group { margin-bottom: 14px; }
   .cal-day-label { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
-  .cal-event-row { display: flex; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+  .cal-event-row { display: flex; gap: 12px; padding: 12px 14px 12px 11px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.2s ease; }
   .cal-event-row:last-child { border-bottom: none; }
   .cal-event-time { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--accent); width: 60px; flex-shrink: 0; }
   .cal-event-body { min-width: 0; }
   .cal-event-title { font-family: var(--font); font-size: 14px; font-weight: 600; }
-  .cal-event-cal { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .cal-event-cal { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+  .cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -1207,6 +1208,32 @@ function escapeHtml_(str) {
   return div.innerHTML;
 }
 
+// Cool-toned pastel palette, one color per calendar - assigned by hashing
+// the calendar's name so the same calendar always lands on the same
+// color across reloads, without needing to track assignments anywhere.
+const CALENDAR_COLOR_PALETTE = [
+  '#5B8DBE', '#4FB8A8', '#6C7BC9', '#3F9EA8', '#4A78A8',
+  '#7C6FBE', '#4E9C82', '#6E8CA0', '#4A9CC7', '#3E7C8C',
+  '#8A9560', '#6E6EA8', '#5AA0B0', '#7A88C0'
+];
+
+function hashString_(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  return Math.abs(hash);
+}
+
+function getCalendarColor(name) {
+  const idx = hashString_(name || '') % CALENDAR_COLOR_PALETTE.length;
+  return CALENDAR_COLOR_PALETTE[idx];
+}
+
+function hexToRgba_(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // Computes "today through N days from now" as absolute UTC instants,
 // anchored to US Eastern time regardless of the device's own timezone
 // setting - the Worker itself has no correct notion of "today" (it runs
@@ -1294,11 +1321,14 @@ function renderCalendarEvents(events) {
     card.className = 'card';
     groups[key].forEach(ev => {
       const time = ev.allDay ? 'All Day' : new Date(ev.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const color = getCalendarColor(ev.calendar || '');
       const row = document.createElement('div');
       row.className = 'cal-event-row';
+      row.style.background = `linear-gradient(135deg, ${hexToRgba_(color, 0.22)}, ${hexToRgba_(color, 0.04)})`;
+      row.style.borderLeft = `3px solid ${color}`;
       row.innerHTML = `<div class="cal-event-time">${escapeHtml_(time)}</div>` +
         `<div class="cal-event-body"><div class="cal-event-title">${escapeHtml_(ev.summary)}</div>` +
-        (ev.calendar ? `<div class="cal-event-cal">${escapeHtml_(ev.calendar)}</div>` : '') + `</div>`;
+        (ev.calendar ? `<div class="cal-event-cal"><span class="cal-dot" style="background:${color}"></span>${escapeHtml_(ev.calendar)}</div>` : '') + `</div>`;
       card.appendChild(row);
     });
 
