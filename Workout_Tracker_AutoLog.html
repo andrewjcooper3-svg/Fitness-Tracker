@@ -15,7 +15,7 @@
     --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: 12px 12px calc(88px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; }
   .header { padding: 16px 2px 14px; margin-bottom: 14px; }
   .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
   .header-title { font-family: var(--font); font-size: 30px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.05; }
@@ -118,9 +118,18 @@
   .log-retry-btn { font-family: var(--font); font-size: 12px; font-weight: 600; background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 8px; padding: 5px 10px; cursor: pointer; flex-shrink: 0; }
   .header-week { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--accent); margin-top: 3px; }
 
-  .app-tabs { display: flex; gap: 2px; background: var(--surface); border-radius: 12px; padding: 3px; margin-bottom: 14px; }
-  .app-tab { flex: 1; text-align: center; padding: 8px 0; border-radius: 9px; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
-  .app-tab.active { background: var(--surface2); color: var(--text); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+  .app-tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 480px;
+    display: flex; gap: 2px; z-index: 50;
+    background: rgba(23,20,15,0.82); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    padding: 8px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  .app-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0 2px; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
+  .app-tab-icon { font-size: 21px; line-height: 1; filter: grayscale(1) opacity(0.55); transition: filter 0.15s, transform 0.15s; }
+  .app-tab-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); transition: color 0.15s; }
+  .app-tab.active .app-tab-icon { filter: none; transform: scale(1.08); }
+  .app-tab.active .app-tab-label { color: var(--accent); }
   .ptr-bar { display: flex; align-items: center; justify-content: center; overflow: hidden; height: 0; }
   .ptr-spinner { width: 28px; height: 28px; border-radius: 50%; background: var(--surface); box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--accent); }
   .ptr-spinner.spinning { animation: ptr-spin 0.7s linear infinite; }
@@ -135,7 +144,7 @@
   #view-calendar { order: 3; }
   #view-music { order: 4; }
 
-  .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, #2e2519 100%); border-radius: 22px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
+  .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, #2e2519 100%); border-radius: 26px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
   .ov-hero-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
   .ov-hero-week { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--accent); margin-top: 2px; margin-bottom: 16px; }
   .ov-hero-number { font-family: var(--font); font-size: 42px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
@@ -180,10 +189,15 @@
   .ov-open-btn { display: block; width: 100%; text-align: center; background: var(--surface); border: none; color: var(--accent); padding: 13px; border-radius: 14px; font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
   .ov-open-btn:hover { background: var(--surface2); }
 
-  .ov-mini-card { background: var(--surface); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: background 0.15s; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
+  .ov-mini-card { background: var(--surface); border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: background 0.15s; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
   .ov-mini-card:hover { background: var(--surface2); }
   .ov-mini-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .ov-mini-title { font-family: var(--font); font-size: 14px; font-weight: 600; }
+  .ov-mini-title { font-family: var(--font); font-size: 14px; font-weight: 600; display: flex; align-items: center; }
+  .card-icon-chip { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 9px; font-size: 13px; margin-right: 8px; flex-shrink: 0; }
+  .chip-orange { background: rgba(224,122,63,0.18); }
+  .chip-teal { background: rgba(91,154,148,0.18); }
+  .chip-olive { background: rgba(124,154,94,0.18); }
+  .chip-mauve { background: rgba(156,107,122,0.18); }
   .ov-mini-arrow { font-family: var(--font); font-size: 18px; color: var(--muted); }
   .ov-mini-empty { font-family: var(--font); font-size: 13px; color: var(--muted); padding: 4px 0; }
   .ov-mini-event { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
@@ -240,9 +254,9 @@
   .cal-event-cal { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
   .cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-  .sp-card { background: var(--surface); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
+  .sp-card { background: var(--surface); border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 6px 16px rgba(0,0,0,0.28); }
   .sp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; }
-  .sp-title { font-family: var(--font); font-size: 14px; font-weight: 600; }
+  .sp-title { font-family: var(--font); font-size: 14px; font-weight: 600; display: flex; align-items: center; }
   .sp-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); opacity: 0.5; }
   .sp-status-dot.live { background: #1DB954; opacity: 1; box-shadow: 0 0 6px rgba(29,185,84,0.6); }
   .sp-body { display: flex; gap: 10px; align-items: stretch; }
@@ -273,7 +287,7 @@
   .sp-shuffle-playlist { font-family: var(--font); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
   .sp-shuffle-status { font-family: var(--font); font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; max-width: 90px; }
 
-  .dj-hero { background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 22px; padding: 22px 18px; margin-bottom: 16px; text-align: center; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
+  .dj-hero { background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 26px; padding: 22px 18px; margin-bottom: 16px; text-align: center; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
   .dj-art-wrap { width: 168px; height: 168px; margin: 0 auto 16px; border-radius: 18px; overflow: hidden; background: var(--surface2); display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 30px rgba(0,0,0,0.45); }
   .dj-art { width: 100%; height: 100%; object-fit: cover; }
   .dj-art-fallback { font-size: 48px; }
@@ -336,14 +350,6 @@
 </head>
 <body>
 
-<div class="app-tabs">
-  <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">Overview</div>
-  <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">Trainer</div>
-  <div class="app-tab" data-view="pushups" onclick="showAppView('pushups')">Pushups</div>
-  <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">Calendar</div>
-  <div class="app-tab" data-view="music" onclick="showAppView('music')">Music</div>
-</div>
-
 <div class="ptr-bar" id="ptrBar"><div class="ptr-spinner" id="ptrSpinner">↓</div></div>
 
 <div class="app-views-viewport" id="appViewsViewport">
@@ -384,7 +390,7 @@
 
   <div class="sp-card">
     <div class="sp-header" onclick="showAppView('music')">
-      <div class="sp-title">🎧 Spotify</div>
+      <div class="sp-title"><span class="card-icon-chip chip-orange">🎧</span>Spotify</div>
       <div class="sp-status-dot" id="spStatusDot"></div>
     </div>
     <div class="sp-body">
@@ -406,7 +412,7 @@
 
   <div class="ov-mini-card" onclick="showAppView('calendar')">
     <div class="ov-mini-head">
-      <div class="ov-mini-title">📅 Upcoming</div>
+      <div class="ov-mini-title"><span class="card-icon-chip chip-teal">📅</span>Upcoming</div>
       <div class="ov-mini-arrow">›</div>
     </div>
     <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
@@ -1073,6 +1079,29 @@
 </div>
 
 </div>
+</div>
+
+<div class="app-tabs" id="appTabs">
+  <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">
+    <div class="app-tab-icon">🏠</div>
+    <div class="app-tab-label">Overview</div>
+  </div>
+  <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">
+    <div class="app-tab-icon">🏋️</div>
+    <div class="app-tab-label">Trainer</div>
+  </div>
+  <div class="app-tab" data-view="pushups" onclick="showAppView('pushups')">
+    <div class="app-tab-icon">💪</div>
+    <div class="app-tab-label">Pushups</div>
+  </div>
+  <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">
+    <div class="app-tab-icon">📅</div>
+    <div class="app-tab-label">Calendar</div>
+  </div>
+  <div class="app-tab" data-view="music" onclick="showAppView('music')">
+    <div class="app-tab-icon">🎵</div>
+    <div class="app-tab-label">Music</div>
+  </div>
 </div>
 
 <script>
