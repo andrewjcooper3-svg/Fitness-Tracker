@@ -113,6 +113,83 @@ function getOrCreateWeekSheet_(weekLabel) {
   return sheet;
 }
 
+const WEIGHT_SHEET_NAME = 'Weight Log';
+const WEIGHT_HEADERS = ['Date', 'Weight (lb)', 'Body Fat %', 'Source', 'Logged At'];
+
+/**
+ * One persistent sheet (not split by week, unlike the workout log) since
+ * weigh-ins are one row a day at most and the whole point is a long-running
+ * trend line - splitting it weekly would just make the Stats/Weight tabs
+ * stitch it back together across dozens of tabs for no benefit.
+ */
+function getOrCreateWeightSheet_() {
+  const ss = getOrCreateSpreadsheet_();
+  let sheet = ss.getSheetByName(WEIGHT_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(WEIGHT_SHEET_NAME);
+  sheet.appendRow(WEIGHT_HEADERS);
+  const headerRange = sheet.getRange(1, 1, 1, WEIGHT_HEADERS.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#1a1d24');
+  headerRange.setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+/**
+ * Upserts by date (one row per calendar day) so a Shortcut that runs more
+ * than once on the same day - or a manual entry made after an automated
+ * one already logged today - overwrites instead of piling up duplicate rows.
+ */
+// Sheets auto-converts a plain "yyyy-MM-dd" string written into a cell into
+// a real Date value, so both the upsert match below and the read-back in
+// getWeightLog_ have to re-format any Date cell through the spreadsheet's
+// own timezone rather than comparing/returning it raw - otherwise the
+// upsert never matches an existing row (silently piling up duplicates)
+// and reads can drift a day depending on the timezone the values pick up.
+function cellDateKey_(rawValue, timeZone) {
+  return rawValue instanceof Date ? Utilities.formatDate(rawValue, timeZone, 'yyyy-MM-dd') : String(rawValue);
+}
+
+function logWeightEntry_(date, weight, bodyFat, source) {
+  const sheet = getOrCreateWeightSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  const now = new Date();
+
+  if (lastRow > 1) {
+    const dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < dates.length; i++) {
+      if (cellDateKey_(dates[i][0], timeZone) === date) {
+        const rowIndex = i + 2;
+        sheet.getRange(rowIndex, 1, 1, WEIGHT_HEADERS.length)
+          .setValues([[date, weight, bodyFat != null ? bodyFat : '', source || '', now]]);
+        return;
+      }
+    }
+  }
+
+  sheet.appendRow([date, weight, bodyFat != null ? bodyFat : '', source || '', now]);
+}
+
+function getWeightLog_() {
+  const sheet = getOrCreateWeightSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, WEIGHT_HEADERS.length).getValues();
+  return rows.map(function (r) {
+    return {
+      date: cellDateKey_(r[0], timeZone),
+      weight: r[1],
+      bodyFat: r[2] === '' ? null : r[2],
+      source: r[3] || ''
+    };
+  }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+}
+
 /**
  * Run this once manually from the Apps Script editor to create the
  * Sheet and this week's tab ahead of time, and print its URL to the
@@ -158,6 +235,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadWeightLog') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', entries: getWeightLog_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId() }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -173,6 +256,16 @@ function doPost(e) {
 
     if (data.action === 'saveDraft') {
       saveDraftState_(data.week || getCurrentWeekLabel_(), data.days || {});
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'logWeight') {
+      if (!data.date || typeof data.weight !== 'number') {
+        throw new Error('logWeight requires a date and a numeric weight');
+      }
+      logWeightEntry_(data.date, data.weight, typeof data.bodyFat === 'number' ? data.bodyFat : null, data.source || 'shortcut');
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
