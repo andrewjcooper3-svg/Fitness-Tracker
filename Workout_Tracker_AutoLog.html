@@ -149,6 +149,22 @@
   .ov-open-btn { display: block; width: 100%; text-align: center; background: var(--surface); border: none; color: var(--accent); padding: 13px; border-radius: 14px; font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
   .ov-open-btn:hover { background: var(--surface2); }
 
+  .ov-mini-card { background: var(--surface); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: background 0.15s; }
+  .ov-mini-card:hover { background: var(--surface2); }
+  .ov-mini-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .ov-mini-title { font-family: var(--font); font-size: 14px; font-weight: 600; }
+  .ov-mini-arrow { font-family: var(--font); font-size: 18px; color: var(--muted); }
+  .ov-mini-row { display: flex; gap: 20px; }
+  .ov-mini-stat-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+  .ov-mini-stat-value { font-family: var(--font); font-size: 20px; font-weight: 800; letter-spacing: -0.2px; }
+  .ov-mini-stat-value.ahead { color: var(--green); }
+  .ov-mini-stat-value.behind { color: var(--red); }
+  .ov-mini-empty { font-family: var(--font); font-size: 13px; color: var(--muted); padding: 4px 0; }
+  .ov-mini-event { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .ov-mini-event-text { display: flex; justify-content: space-between; align-items: baseline; flex: 1; min-width: 0; gap: 8px; }
+  .ov-mini-event-title { font-family: var(--font); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ov-mini-event-date { font-family: var(--font); font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
   .ov-note { font-family: var(--font); font-size: 12px; color: var(--muted); text-align: center; margin-top: 12px; line-height: 1.5; }
 
   .pu-deficit-hero { transition: background 0.4s ease; }
@@ -226,6 +242,31 @@
   <div class="ov-days-card">
     <div class="ov-days-label">This week, by day</div>
     <div class="ov-days" id="ovDayChips"></div>
+  </div>
+
+  <div class="ov-mini-card" onclick="showAppView('pushups')">
+    <div class="ov-mini-head">
+      <div class="ov-mini-title">🔥 Pushup Progress</div>
+      <div class="ov-mini-arrow">›</div>
+    </div>
+    <div class="ov-mini-row">
+      <div class="ov-mini-stat">
+        <div class="ov-mini-stat-label">Deficit</div>
+        <div class="ov-mini-stat-value" id="ovMiniDeficit">–</div>
+      </div>
+      <div class="ov-mini-stat">
+        <div class="ov-mini-stat-label">This Year</div>
+        <div class="ov-mini-stat-value" id="ovMiniYear">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ov-mini-card" onclick="showAppView('calendar')">
+    <div class="ov-mini-head">
+      <div class="ov-mini-title">📅 Upcoming</div>
+      <div class="ov-mini-arrow">›</div>
+    </div>
+    <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
   </div>
 
   <button class="ov-open-btn" onclick="showAppView('tracker')">Open Tracker →</button>
@@ -1111,7 +1152,7 @@ function showAppView(view) {
   document.querySelector(`.app-tab[data-view="${view}"]`).classList.add('active');
   if (view === 'overview') renderOverview();
   if (view === 'pushups') renderPushupsTab();
-  if (view === 'calendar' && !calendarLoadedOnce) { calendarLoadedOnce = true; loadCalendarEvents(); }
+  if (view === 'calendar') ensureCalendarLoaded();
 }
 
 // Aggregates every day panel's current in-page state (all 7 days live in
@@ -1173,6 +1214,48 @@ function renderOverview() {
     chip.innerHTML = `<div class="ov-day-dot ${dotClass}">${pct >= 1 ? '✓' : ''}</div><div class="ov-day-lbl">${dayLabels[d.key]}</div>`;
     chipsEl.appendChild(chip);
   });
+
+  renderOverviewPushupMini();
+  ensureCalendarLoaded();
+}
+
+function renderOverviewPushupMini() {
+  const stats = computePushupStats();
+  const deficitEl = document.getElementById('ovMiniDeficit');
+  if (stats.deficit === null) {
+    deficitEl.textContent = '–';
+    deficitEl.classList.remove('ahead', 'behind');
+  } else {
+    const ahead = stats.deficit >= 0;
+    deficitEl.textContent = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
+    deficitEl.classList.toggle('ahead', ahead);
+    deficitEl.classList.toggle('behind', !ahead);
+  }
+  const yearPct = stats.year.target ? Math.min(100, Math.round(stats.year.actual / stats.year.target * 100)) : 0;
+  document.getElementById('ovMiniYear').textContent = yearPct + '%';
+}
+
+function renderOverviewCalendarPreview() {
+  const el = document.getElementById('ovUpcomingPreview');
+  if (!el) return;
+
+  if (lastCalendarEvents === null) {
+    el.innerHTML = '<div class="ov-mini-empty">Loading…</div>';
+    return;
+  }
+  if (lastCalendarEvents.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">Nothing in the next 30 days</div>';
+    return;
+  }
+
+  const sorted = lastCalendarEvents.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
+  el.innerHTML = sorted.slice(0, 3).map(ev => {
+    const color = getCalendarColor(ev.calendar || '');
+    const dateLabel = new Date(ev.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `<div class="ov-mini-event"><span class="cal-dot" style="background:${color}"></span>` +
+      `<div class="ov-mini-event-text"><span class="ov-mini-event-title">${escapeHtml_(ev.summary)}</span>` +
+      `<span class="ov-mini-event-date">${escapeHtml_(dateLabel)}</span></div></div>`;
+  }).join('');
 }
 
 /* ---------- Pushups tab (week/month/year goals + running deficit) ---------- */
@@ -1184,17 +1267,18 @@ function setGoalRing(ringId, pctId, valueId, actual, target) {
   document.getElementById(valueId).textContent = `${actual.toLocaleString()} / ${target.toLocaleString()}`;
 }
 
-function renderPushupsTab() {
+// Shared by the full Pushups tab and the Overview mini-card, so the two
+// never drift out of sync with each other.
+function computePushupStats() {
   updatePushupLedger();
   const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // This week's ring reuses whatever target is configured on the live day
-  // panels, so it automatically reflects catch-up weeks vs. the normal
-  // baseline without any special-casing here.
+  // This week's figure reuses whatever target is configured on the live
+  // day panels, so it automatically reflects catch-up weeks vs. the
+  // normal baseline without any special-casing here.
   const weekTotals = computeWeekStats().totals;
-  setGoalRing('puWeekRing', 'puWeekPct', 'puWeekValue', weekTotals.pushupTotal, weekTotals.pushupTarget);
 
   // This month: baseline pace (165/day, every day but Sunday) across the
   // whole calendar month, actual pulled from whatever's logged so far.
@@ -1205,7 +1289,6 @@ function renderPushupsTab() {
     monthActual += ledger[dateKey(d)] || 0;
     if (d.getDay() !== 0) monthTarget += PUSHUP_DAILY_BASELINE;
   }
-  setGoalRing('puMonthRing', 'puMonthPct', 'puMonthValue', monthActual, monthTarget);
 
   // This year: fixed 50,000 goal. Starts from the real carried-forward
   // total (tracked outside this ledger) and adds only the days logged
@@ -1226,20 +1309,46 @@ function renderPushupsTab() {
       yearActual += ledger[dateKey(d)] || 0;
     }
   }
-  setGoalRing('puYearRing', 'puYearPct', 'puYearValue', yearActual, PUSHUP_YEAR_GOAL);
 
   // Running deficit: actual vs. the 165/day baseline pace, from the first
   // day this device has any logged data - which now includes the seeded
   // Week-of-Jul-13 totals, so the clock starts from when the plan really
   // began rather than from whenever this tab shipped.
   const loggedDates = Object.keys(ledger).sort();
+  let deficit = null, deficitSinceLabel = null;
+  if (loggedDates.length > 0) {
+    const startDate = new Date(loggedDates[0] + 'T00:00:00');
+    let expected = 0, actual = 0;
+    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0) expected += PUSHUP_DAILY_BASELINE;
+      actual += ledger[dateKey(d)] || 0;
+    }
+    deficit = actual - expected;
+    deficitSinceLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  return {
+    week: { actual: weekTotals.pushupTotal, target: weekTotals.pushupTarget },
+    month: { actual: monthActual, target: monthTarget },
+    year: { actual: yearActual, target: PUSHUP_YEAR_GOAL },
+    deficit: deficit,
+    deficitSinceLabel: deficitSinceLabel
+  };
+}
+
+function renderPushupsTab() {
+  const stats = computePushupStats();
+  setGoalRing('puWeekRing', 'puWeekPct', 'puWeekValue', stats.week.actual, stats.week.target);
+  setGoalRing('puMonthRing', 'puMonthPct', 'puMonthValue', stats.month.actual, stats.month.target);
+  setGoalRing('puYearRing', 'puYearPct', 'puYearValue', stats.year.actual, stats.year.target);
+
   const heroEl = document.getElementById('puDeficitHero');
   const badgeEl = document.getElementById('puStatusBadge');
   const sinceEl = document.getElementById('puDeficitSince');
   const numEl = document.getElementById('puDeficitNumber');
   const subEl = document.getElementById('puDeficitSub');
 
-  if (loggedDates.length === 0) {
+  if (stats.deficit === null) {
     sinceEl.textContent = 'No pushups logged yet';
     numEl.textContent = '0';
     numEl.classList.remove('ahead', 'behind');
@@ -1248,17 +1357,9 @@ function renderPushupsTab() {
     badgeEl.textContent = 'No Data';
     subEl.textContent = 'Log a set to start tracking';
   } else {
-    const startDate = new Date(loggedDates[0] + 'T00:00:00');
-    let expected = 0, actual = 0;
-    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
-      if (d.getDay() !== 0) expected += PUSHUP_DAILY_BASELINE;
-      actual += ledger[dateKey(d)] || 0;
-    }
-    const deficit = actual - expected;
-    const ahead = deficit >= 0;
-    const since = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    sinceEl.textContent = `Since ${since}, vs. ${PUSHUP_DAILY_BASELINE}/day pace`;
-    numEl.textContent = (ahead ? '+' : '−') + Math.abs(deficit).toLocaleString();
+    const ahead = stats.deficit >= 0;
+    sinceEl.textContent = `Since ${stats.deficitSinceLabel}, vs. ${PUSHUP_DAILY_BASELINE}/day pace`;
+    numEl.textContent = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
     numEl.classList.toggle('ahead', ahead);
     numEl.classList.toggle('behind', !ahead);
     heroEl.classList.toggle('ahead', ahead);
@@ -1335,6 +1436,22 @@ function getEasternDateRange(daysAhead) {
   return { start, end };
 }
 
+// Cached so the Overview tab's "Upcoming" mini-card can show the same
+// events without a second network round-trip, whichever tab triggers
+// the fetch first.
+let lastCalendarEvents = null;
+
+// Both the Overview and Calendar tabs gate on this, so opening either one
+// first fetches once and the other reuses the result.
+function ensureCalendarLoaded() {
+  if (!calendarLoadedOnce) {
+    calendarLoadedOnce = true;
+    loadCalendarEvents();
+  } else if (lastCalendarEvents) {
+    renderOverviewCalendarPreview();
+  }
+}
+
 async function loadCalendarEvents() {
   const statusEl = document.getElementById('calStatus');
   const listEl = document.getElementById('calEventList');
@@ -1344,6 +1461,7 @@ async function loadCalendarEvents() {
   if (!url) {
     statusEl.textContent = '⚠ No Calendar Worker URL configured — paste it above first.';
     statusEl.className = 'cal-status error';
+    renderOverviewCalendarPreview();
     return;
   }
 
@@ -1356,17 +1474,22 @@ async function loadCalendarEvents() {
     const data = await res.json();
     if (data.status !== 'success') throw new Error(data.message || 'Unknown error');
 
-    if (!data.events || data.events.length === 0) {
+    lastCalendarEvents = data.events || [];
+    renderOverviewCalendarPreview();
+
+    if (lastCalendarEvents.length === 0) {
       statusEl.textContent = 'No upcoming events in the next 30 days.';
       statusEl.className = 'cal-status';
       return;
     }
 
     statusEl.textContent = '';
-    renderCalendarEvents(data.events);
+    renderCalendarEvents(lastCalendarEvents);
   } catch (err) {
     statusEl.textContent = '⚠ ' + err.message;
     statusEl.className = 'cal-status error';
+    lastCalendarEvents = null;
+    renderOverviewCalendarPreview();
   }
 }
 
@@ -1374,9 +1497,10 @@ function renderCalendarEvents(events) {
   const listEl = document.getElementById('calEventList');
   listEl.innerHTML = '';
 
+  const sortedEvents = events.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
   const groups = {};
   const order = [];
-  events.forEach(ev => {
+  sortedEvents.forEach(ev => {
     const key = new Date(ev.start).toDateString();
     if (!groups[key]) { groups[key] = []; order.push(key); }
     groups[key].push(ev);
@@ -1918,6 +2042,41 @@ function flushPendingLogs() {
 }
 
 window.addEventListener('online', flushPendingLogs);
+
+/* ---------- Swipe left/right between the top-level tabs ---------- */
+
+(function initTabSwipeNav() {
+  const viewOrder = ['overview', 'tracker', 'pushups', 'calendar'];
+  let startX = null, startY = null, startTarget = null;
+
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) { startX = null; return; }
+    startTarget = e.target;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (startX == null) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    startX = null;
+
+    // Don't hijack dragging inside text inputs, buttons, or the
+    // expand/collapse exercise headers - only a deliberate, clearly
+    // horizontal swipe on open space should change tabs.
+    if (startTarget && startTarget.closest && startTarget.closest('input, textarea, button, .set-checkbox, .checkbox, .exercise-header, .day-tab')) return;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+    const activeTab = document.querySelector('.app-tab.active');
+    const idx = activeTab ? viewOrder.indexOf(activeTab.dataset.view) : -1;
+    if (idx === -1) return;
+
+    if (dx < 0 && idx < viewOrder.length - 1) showAppView(viewOrder[idx + 1]);
+    else if (dx > 0 && idx > 0) showAppView(viewOrder[idx - 1]);
+  }, { passive: true });
+})();
 
 document.querySelectorAll('.exercise-sets').forEach((el, i) => {
   if (i === 0) {
