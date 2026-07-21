@@ -197,6 +197,7 @@
   .cal-status.error { color: var(--red); }
   .cal-day-group { margin-bottom: 14px; }
   .cal-day-label { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
+  .cal-day-relative { color: var(--accent); font-weight: 600; }
   .cal-event-row { display: flex; gap: 12px; padding: 12px 14px 12px 11px; border-bottom: 1px solid var(--border); align-items: center; transition: background 0.2s ease; }
   .cal-event-row:last-child { border-bottom: none; }
   .cal-event-time { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--accent); width: 60px; flex-shrink: 0; }
@@ -1251,7 +1252,13 @@ function renderOverviewCalendarPreview() {
   const sorted = lastCalendarEvents.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
   el.innerHTML = sorted.slice(0, 3).map(ev => {
     const color = getCalendarColor(ev.calendar || '');
-    const dateLabel = new Date(ev.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const relative = getRelativeDayLabel(ev.start);
+    // "Today"/"Tomorrow" reads better standalone; anything further out
+    // gets the weekday too (e.g. "Tue, Jul 21") since a bare date alone
+    // doesn't say what day of the week that lands on.
+    const dateLabel = (relative === 'Today' || relative === 'Tomorrow')
+      ? relative
+      : new Date(ev.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     return `<div class="ov-mini-event"><span class="cal-dot" style="background:${color}"></span>` +
       `<div class="ov-mini-event-text"><span class="ov-mini-event-title">${escapeHtml_(ev.summary)}</span>` +
       `<span class="ov-mini-event-date">${escapeHtml_(dateLabel)}</span></div></div>`;
@@ -1377,6 +1384,19 @@ function escapeHtml_(str) {
   const div = document.createElement('div');
   div.textContent = str == null ? '' : str;
   return div.innerHTML;
+}
+
+// "Today" / "Tomorrow" / "In N days" (or "N days ago" for a past date,
+// which shouldn't normally come up here but keeps this safe to reuse).
+function getRelativeDayLabel(date) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(date); target.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((target - today) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays === -1) return 'Yesterday';
+  if (diffDays > 1) return `In ${diffDays} days`;
+  return `${Math.abs(diffDays)} days ago`;
 }
 
 // Cool-toned pastel palette, one color per calendar - assigned by hashing
@@ -1509,7 +1529,9 @@ function renderCalendarEvents(events) {
   order.forEach(key => {
     const dayGroup = document.createElement('div');
     dayGroup.className = 'cal-day-group';
-    const label = new Date(groups[key][0].start).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    const groupDate = groups[key][0].start;
+    const label = new Date(groupDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    const relative = getRelativeDayLabel(groupDate);
 
     const card = document.createElement('div');
     card.className = 'card';
@@ -1526,7 +1548,7 @@ function renderCalendarEvents(events) {
       card.appendChild(row);
     });
 
-    dayGroup.innerHTML = `<div class="cal-day-label">${escapeHtml_(label)}</div>`;
+    dayGroup.innerHTML = `<div class="cal-day-label">${escapeHtml_(label)} <span class="cal-day-relative">· ${escapeHtml_(relative)}</span></div>`;
     dayGroup.appendChild(card);
     listEl.appendChild(dayGroup);
   });
