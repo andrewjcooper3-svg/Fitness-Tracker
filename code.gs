@@ -262,10 +262,16 @@ function doPost(e) {
     }
 
     if (data.action === 'logWeight') {
-      if (!data.date || typeof data.weight !== 'number') {
+      // Coerce rather than strictly require a JS number - a hand-built
+      // Shortcut whose JSON field wasn't explicitly set to "Number" type
+      // sends the weight as a quoted string (e.g. "182.5"), which is
+      // otherwise indistinguishable from a real client error.
+      const weight = Number(data.weight);
+      const bodyFat = data.bodyFat != null && data.bodyFat !== '' ? Number(data.bodyFat) : null;
+      if (!data.date || isNaN(weight)) {
         throw new Error('logWeight requires a date and a numeric weight');
       }
-      logWeightEntry_(data.date, data.weight, typeof data.bodyFat === 'number' ? data.bodyFat : null, data.source || 'shortcut');
+      logWeightEntry_(data.date, weight, bodyFat != null && !isNaN(bodyFat) ? bodyFat : null, data.source || 'shortcut');
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
