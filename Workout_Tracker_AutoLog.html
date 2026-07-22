@@ -414,6 +414,9 @@
   .stats-card-title { font-family: var(--font); font-size: 13px; font-weight: 700; margin-bottom: 12px; }
   .stats-chart { width: 100%; height: 140px; display: block; overflow: visible; }
   .stats-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  .ov-mini-weight-value { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
+  .ov-mini-weight-sub { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -507,6 +510,20 @@
       </div>
       <div class="ov-widget-label">Upcoming</div>
       <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-widget-sizepicker">
+        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
+        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
+        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
+      </div>
+    </div>
+
+    <div class="ov-widget" data-widget="weight" data-size="wide" onclick="handleWidgetTap(event, 'weight')">
+      <div class="ov-widget-edit-bar">
+        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
+        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+      </div>
+      <div class="ov-widget-label">Weight</div>
+      <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
       <div class="ov-widget-sizepicker">
         <button onclick="setWidgetSize(event, this, 'small')">Small</button>
         <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
@@ -1402,6 +1419,7 @@ function saveWeightEntry() {
   lbsEl.value = '';
   bfEl.value = '';
   renderWeightTab();
+  renderOverviewWeightPreview();
 }
 
 // Fire-and-forget, mirroring sendDraftNow - a failed/offline sync just
@@ -1450,6 +1468,7 @@ async function loadRemoteWeightLog() {
 function deleteWeightEntry(date) {
   saveWeightLog(loadWeightLog().filter(e => e.date !== date));
   renderWeightTab();
+  renderOverviewWeightPreview();
 }
 
 function renderWeightTab() {
@@ -2174,6 +2193,7 @@ function renderOverview() {
 
   renderWeekWheel(days);
   renderOverviewPushupMini();
+  renderOverviewWeightPreview();
   ensureCalendarLoaded();
 }
 
@@ -2247,6 +2267,42 @@ function renderOverviewCalendarPreview() {
       `<div class="ov-mini-event-text"><span class="ov-mini-event-title">${escapeHtml_(ev.summary)}</span>` +
       `<span class="ov-mini-event-date">${escapeHtml_(weekday)} <span class="ov-mini-event-relative">· ${escapeHtml_(relative)}</span></span></div></div>`;
   }).join('');
+}
+
+function renderOverviewWeightPreview() {
+  const el = document.getElementById('ovWeightPreview');
+  if (!el) return;
+
+  const log = loadWeightLog();
+  if (log.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">Log a weigh-in on the Weight tab</div>';
+    return;
+  }
+
+  const widget = el.closest('.ov-widget');
+  const size = widget ? widget.dataset.size : 'wide';
+  const latest = log[log.length - 1];
+  const prev = log.length > 1 ? log[log.length - 2] : null;
+  const fmtDate = ds => new Date(ds + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  let sub = 'First entry logged';
+  if (prev) {
+    const delta = latest.weight - prev.weight;
+    const sign = delta > 0 ? '+' : (delta < 0 ? '−' : '');
+    sub = `${sign}${Math.abs(delta).toFixed(1)} lb since ${fmtDate(prev.date)}`;
+  }
+
+  const headline = `<div class="ov-mini-weight-value">${latest.weight.toFixed(1)} lb</div><div class="ov-mini-weight-sub">${sub}</div>`;
+
+  if (size === 'large' && log.length >= 2) {
+    el.innerHTML = headline +
+      `<svg viewBox="0 0 320 140" class="stats-chart" id="ovWeightSparkline" preserveAspectRatio="none" style="height:70px; margin-top:8px;"></svg>` +
+      `<div class="stats-chart-labels" id="ovWeightSparklineLabels"></div>`;
+    renderWeightLineChart('ovWeightSparkline', 'ovWeightSparklineLabels', 8);
+    return;
+  }
+
+  el.innerHTML = headline;
 }
 
 /* ---------- Pushups tab (week/month/year goals + running deficit) ---------- */
