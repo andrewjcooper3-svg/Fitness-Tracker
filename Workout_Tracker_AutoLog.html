@@ -2552,10 +2552,21 @@ function getRelativeDayLabel(date) {
 // Cool-toned pastel palette, one color per calendar - assigned by hashing
 // the calendar's name so the same calendar always lands on the same
 // color across reloads, without needing to track assignments anywhere.
+// Spread across the full hue wheel (not just orange/brown variations, which
+// were nearly indistinguishable from each other at a glance) while keeping
+// the same muted, mid-century saturation/lightness register as the rest of
+// the app's palette.
 const CALENDAR_COLOR_PALETTE = [
-  '#D9834A', '#C1673D', '#D9A441', '#8A9A5B', '#5B9A94',
-  '#A8674B', '#B8794F', '#7C8F6B', '#C2542E', '#94714F',
-  '#4F8A82', '#BF8C3E', '#9C6B4E', '#6E8C6C'
+  '#E0793D', // burnt orange
+  '#C1573A', // terracotta red
+  '#D9A441', // mustard
+  '#8FA34A', // olive-lime
+  '#5B9A6E', // leaf green
+  '#4F9A94', // teal
+  '#4F82AA', // slate blue
+  '#6B6FB0', // indigo
+  '#9A5BA8', // plum
+  '#B05B84'  // rose/mauve
 ];
 
 function hashString_(str) {
@@ -2564,8 +2575,30 @@ function hashString_(str) {
   return Math.abs(hash);
 }
 
+// Assigns each distinct calendar name the next unused palette slot, in the
+// order they're first seen, rather than hashing straight to a color - a
+// hash can (and with only a handful of real calendars, easily does) collide
+// two different calendars onto the same color. First-seen assignment
+// guarantees every calendar gets a unique color as long as there are no
+// more distinct calendars than palette entries, and it's persisted so a
+// given calendar keeps the same color across reloads instead of shifting
+// around whenever another calendar is added or removed.
+const STORAGE_CALENDAR_COLOR_MAP_KEY = 'WORKOUT_CALENDAR_COLOR_MAP';
+
 function getCalendarColor(name) {
-  const idx = hashString_(name || '') % CALENDAR_COLOR_PALETTE.length;
+  const key = name || '';
+  const map = JSON.parse(localStorage.getItem(STORAGE_CALENDAR_COLOR_MAP_KEY) || '{}');
+  if (map[key] !== undefined) return CALENDAR_COLOR_PALETTE[map[key] % CALENDAR_COLOR_PALETTE.length];
+
+  const used = new Set(Object.values(map));
+  let idx = 0;
+  while (used.has(idx) && idx < CALENDAR_COLOR_PALETTE.length - 1) idx++;
+  // More distinct calendars than palette slots is the only way this still
+  // collides - fall back to a hash so at least it's stable per name.
+  if (used.has(idx)) idx = hashString_(key) % CALENDAR_COLOR_PALETTE.length;
+
+  map[key] = idx;
+  localStorage.setItem(STORAGE_CALENDAR_COLOR_MAP_KEY, JSON.stringify(map));
   return CALENDAR_COLOR_PALETTE[idx];
 }
 
