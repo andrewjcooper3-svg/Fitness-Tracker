@@ -2258,7 +2258,7 @@ function renderOverviewCalendarPreview() {
 
   const sorted = lastCalendarEvents.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
   el.innerHTML = sorted.slice(0, count).map(ev => {
-    const color = getCalendarColor(ev.calendar || '');
+    const color = getEventColor(ev);
     const relative = getRelativeDayLabel(ev.start);
     const weekday = new Date(ev.start).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     // Always show the weekday/date AND the relative count together (e.g.
@@ -2602,6 +2602,15 @@ function getCalendarColor(name) {
   return CALENDAR_COLOR_PALETTE[idx];
 }
 
+// Prefers the calendar's real iCloud-assigned color (returned per-event by
+// the Worker, which reads it straight from CalDAV) so the dot actually
+// matches what Apple Calendar shows - the palette above is only a fallback
+// for events from a source with no such color (a direct ICS feed, or a
+// Worker deployed before this field existed).
+function getEventColor(ev) {
+  return (ev && ev.color) || getCalendarColor(ev ? ev.calendar : '');
+}
+
 function hexToRgba_(hex, alpha) {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
@@ -2720,7 +2729,7 @@ function renderCalendarEvents(events) {
     card.className = 'card';
     groups[key].forEach(ev => {
       const time = ev.allDay ? 'All Day' : new Date(ev.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      const color = getCalendarColor(ev.calendar || '');
+      const color = getEventColor(ev);
       const row = document.createElement('div');
       row.className = 'cal-event-row';
       row.style.background = `linear-gradient(135deg, ${hexToRgba_(color, 0.22)}, ${hexToRgba_(color, 0.04)})`;
@@ -2742,7 +2751,7 @@ function renderCalendarEvents(events) {
 // full date/time range, calendar, and location/description when present
 // (both only recently added to what the Worker parses/returns).
 function openEventModal(ev) {
-  const color = getCalendarColor(ev.calendar || '');
+  const color = getEventColor(ev);
   document.getElementById('eventModalDot').style.background = color;
   document.getElementById('eventModalCalName').textContent = ev.calendar || '';
   document.getElementById('eventModalTitle').textContent = ev.summary || '(No title)';

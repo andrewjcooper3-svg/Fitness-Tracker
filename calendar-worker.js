@@ -105,10 +105,23 @@ async function getCalDavHomeUrl(auth) {
   return /^https?:\/\//.test(homePath) ? homePath : (CALDAV_BASE + homePath);
 }
 
+// Apple's calendar-color is a WebDAV property in its own "ical" namespace
+// (not part of the base CalDAV/DAV spec), returned as an 8-digit hex RGBA
+// string like "#FF2D55FF" - trimming to the first 6 digits gives a normal
+// #RRGGBB the browser can use directly. Not every calendar has one set
+// (a bare hex-less string, or the property simply absent), so callers must
+// treat a missing/malformed value as "no real color available."
+function normalizeAppleColor(raw) {
+  if (!raw) return null;
+  const hex = raw.trim().replace(/^#/, '');
+  if (!/^[0-9a-fA-F]{6,8}$/.test(hex)) return null;
+  return '#' + hex.slice(0, 6).toUpperCase();
+}
+
 async function listCalendars(homeUrl, auth) {
   const body = '<?xml version="1.0" encoding="utf-8" ?>' +
-    '<A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">' +
-    '<A:prop><A:resourcetype/><A:displayname/></A:prop></A:propfind>';
+    '<A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:I="http://apple.com/ns/ical/">' +
+    '<A:prop><A:resourcetype/><A:displayname/><I:calendar-color/></A:prop></A:propfind>';
   const res = await caldavRequest(homeUrl, 'PROPFIND', body, auth, { Depth: '1' });
   if (!res.ok) throw new Error(`CalDAV calendar listing failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
   const xml = await res.text();
@@ -131,7 +144,8 @@ async function listCalendars(homeUrl, auth) {
     if (!href) return;
     calendars.push({
       url: /^https?:\/\//.test(href) ? href : (CALDAV_BASE + href),
-      name: name || 'Calendar'
+      name: name || 'Calendar',
+      color: normalizeAppleColor(extractTag(resp, 'calendar-color'))
     });
   });
   return calendars;
@@ -426,9 +440,9 @@ async function getUpcomingCalendarEvents(start, end, env) {
   for (const cal of calendars) {
     try {
       const events = await fetchEventsForCalendar(cal.url, start, end, auth);
-      events.forEach(ev => (ev.calendar = cal.name));
+      events.forEach(ev => { ev.calendar = cal.name; ev.color = cal.color; });
       allEvents.push(...events);
-      calendarSummaries.push({ name: cal.name, eventCount: events.length });
+      calendarSummaries.push({ name: cal.name, eventCount: events.length, color: cal.color });
     } catch (e) {
       // Skip a calendar that errors rather than failing the whole request,
       // but surface it in the diagnostics below instead of silently
@@ -456,6 +470,7 @@ async function getUpcomingCalendarEvents(start, end, env) {
     end: ev.end ? ev.end.toISOString() : null,
     allDay: ev.allDay,
     calendar: ev.calendar,
+    color: ev.color || null,
     location: ev.location || '',
     description: ev.description || ''
   }));
