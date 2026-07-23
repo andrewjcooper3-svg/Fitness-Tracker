@@ -1356,14 +1356,20 @@
 
   <div class="kitchen-section" id="kitchenSectionGrocery" style="display:none;">
     <div class="config-box">
-      <div class="config-title" style="margin-bottom:10px;">Add to List</div>
+      <div class="config-title" style="margin-bottom:6px;">Meal Plan</div>
+      <div class="ov-mini-empty" id="mealPlanSummary" style="margin-bottom:8px;"></div>
+      <div id="mealPlanGroceryList"></div>
+    </div>
+
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:10px;">Add to General List</div>
       <div class="weight-entry-row">
         <input type="text" id="groceryManualItem" class="config-input" placeholder="Item to buy">
         <button class="config-save" onclick="addManualGroceryItem()">Add</button>
       </div>
     </div>
     <div class="config-box">
-      <div class="config-title" style="margin-bottom:6px;">Shopping List</div>
+      <div class="config-title" style="margin-bottom:6px;">General List</div>
       <div id="groceryList"></div>
     </div>
   </div>
@@ -1809,6 +1815,7 @@ const STORAGE_INVENTORY_KEY = 'WORKOUT_KITCHEN_INVENTORY';
 const STORAGE_RECIPES_KEY = 'WORKOUT_KITCHEN_RECIPES';
 const STORAGE_MEAL_LOG_KEY = 'WORKOUT_KITCHEN_MEAL_LOG';
 const STORAGE_GROCERY_MANUAL_KEY = 'WORKOUT_KITCHEN_GROCERY_MANUAL';
+const STORAGE_PLANNED_MEALS_KEY = 'WORKOUT_KITCHEN_PLANNED_MEALS';
 
 function genId_() {
   return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -1822,6 +1829,22 @@ function loadMealLog() { return JSON.parse(localStorage.getItem(STORAGE_MEAL_LOG
 function saveMealLog(items) { localStorage.setItem(STORAGE_MEAL_LOG_KEY, JSON.stringify(items)); }
 function loadGroceryManual() { return JSON.parse(localStorage.getItem(STORAGE_GROCERY_MANUAL_KEY) || '[]'); }
 function saveGroceryManual(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_KEY, JSON.stringify(items)); }
+
+// Recipes checked as "making this week" - purely manual (you check/uncheck
+// as you plan), no automatic weekly reset. Kept separate from the recipe
+// itself so planning a meal never touches the saved recipe collection.
+function loadPlannedMeals() { return JSON.parse(localStorage.getItem(STORAGE_PLANNED_MEALS_KEY) || '[]'); }
+function savePlannedMeals(ids) { localStorage.setItem(STORAGE_PLANNED_MEALS_KEY, JSON.stringify(ids)); }
+function isMealPlanned(recipeId) { return loadPlannedMeals().includes(recipeId); }
+
+function togglePlannedMeal(recipeId) {
+  const ids = loadPlannedMeals();
+  const idx = ids.indexOf(recipeId);
+  if (idx === -1) ids.push(recipeId); else ids.splice(idx, 1);
+  savePlannedMeals(ids);
+  renderRecipeList();
+  renderGroceryList();
+}
 
 function renderKitchenTab() {
   renderInventoryList();
@@ -2106,11 +2129,15 @@ function renderRecipeList() {
     const statusHtml = status.canMake
       ? '<span class="kitchen-badge kitchen-badge-green">Ready to make</span>'
       : `<span class="kitchen-badge kitchen-badge-amber">Missing: ${escapeHtml_(status.missing.join(', '))}</span>`;
+    const planned = isMealPlanned(r.id);
     return `<div class="recipe-card">
       ${img}
       <div class="recipe-card-body">
         <div class="recipe-card-name">${escapeHtml_(r.name)}</div>
         ${statusHtml}
+        <label class="kitchen-checkbox-label" style="margin-top:6px;">
+          <input type="checkbox" ${planned ? 'checked' : ''} onchange="togglePlannedMeal('${r.id}')"> Plan this meal (adds its ingredients to the Grocery tab)
+        </label>
         <div class="recipe-card-actions">
           <button class="kitchen-btn-sm" onclick="openRecipeDetailModal('${r.id}')">View</button>
           <button class="kitchen-btn-sm" onclick="logMealMade('${r.id}')">Made This</button>
@@ -2300,7 +2327,72 @@ function computeAutoGroceryItems() {
   return auto;
 }
 
+// Aggregates needed quantity across every planned recipe per resolved
+// ingredient (rather than checking each recipe against inventory in
+// isolation) - two planned meals that both use eggs need their amounts
+// summed before comparing to what's on hand, or each could individually
+// look "covered" while the two together actually aren't.
+function computeMealPlanGroceryItems(recipes) {
+  const inventory = loadInventory();
+  const byKey = {};
+
+  recipes.forEach(recipe => {
+    recipe.ingredients.forEach(ing => {
+      if (ing.notTracked) return;
+      const item = resolveIngredientInventoryItem_(ing, inventory);
+      const key = item ? ('item:' + item.id) : ('name:' + ing.name.trim().toLowerCase());
+      if (!byKey[key]) byKey[key] = { name: item ? item.name : ing.name, item, unit: ing.unit, neededTotal: 0, hasUnspecified: false };
+      const q = neededQty_(ing);
+      if (q > 0) byKey[key].neededTotal += q;
+      else byKey[key].hasUnspecified = true;
+    });
+  });
+
+  const results = [];
+  Object.values(byKey).forEach(entry => {
+    const haveQty = entry.item ? entry.item.qty : 0;
+    if (entry.neededTotal > 0) {
+      const shortfall = entry.neededTotal - haveQty;
+      if (shortfall > 0) results.push({ name: entry.name, amount: shortfall, unit: entry.unit });
+    } else if (entry.hasUnspecified && haveQty <= 0) {
+      results.push({ name: entry.name, amount: null, unit: null });
+    }
+  });
+  return results;
+}
+
+function renderMealPlanGroceryList() {
+  const summaryEl = document.getElementById('mealPlanSummary');
+  const listEl = document.getElementById('mealPlanGroceryList');
+  if (!listEl || !summaryEl) return;
+
+  const plannedIds = loadPlannedMeals();
+  const recipes = loadRecipes().filter(r => plannedIds.includes(r.id));
+
+  if (recipes.length === 0) {
+    summaryEl.textContent = 'No meals planned yet - check "Plan this meal" on a recipe in the Recipes tab.';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  summaryEl.textContent = 'Planning: ' + recipes.map(r => r.name).join(', ');
+  const items = computeMealPlanGroceryItems(recipes);
+  if (items.length === 0) {
+    listEl.innerHTML = '<div class="ov-mini-empty">You have everything for these meals.</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(it => `<div class="weight-history-row">
+    <div class="weight-history-date">${escapeHtml_(it.name)}</div>
+    <div class="weight-history-value kitchen-badge kitchen-badge-amber">${it.amount != null ? 'Need ' + it.amount + (it.unit ? ' ' + escapeHtml_(it.unit) : '') : 'Need some'}</div>
+  </div>`).join('');
+}
+
 function renderGroceryList() {
+  renderMealPlanGroceryList();
+  renderGeneralGroceryList();
+}
+
+function renderGeneralGroceryList() {
   const el = document.getElementById('groceryList');
   if (!el) return;
   const auto = computeAutoGroceryItems();
