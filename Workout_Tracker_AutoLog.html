@@ -1904,6 +1904,7 @@ function addInventoryItem() {
   nameEl.value = ''; qtyEl.value = ''; unitEl.value = ''; categoryEl.value = ''; costEl.value = ''; expEl.value = '';
   notTrackedEl.checked = false;
 
+  relinkAllRecipesToInventory_();
   renderInventoryList();
   renderGroceryList();
   renderRecipeList();
@@ -1976,6 +1977,38 @@ function removeIngredientRow(i) {
   renderIngredientEditor();
 }
 
+// An unlinked ingredient is invisibly excluded from the shortage check
+// entirely (see getRecipeStatus) - which means a recipe whose ingredients
+// were never manually linked to an inventory item will *always* show
+// "Ready to make," no matter what's actually in stock. Auto-linking by an
+// exact (case-insensitive) name match closes that gap for the common case
+// of typing/importing an ingredient whose name matches an inventory item
+// you already have, without requiring a manual pick from the dropdown.
+function autoLinkIngredients_(ingredients, inventory) {
+  const byName = {};
+  inventory.forEach(it => { byName[it.name.trim().toLowerCase()] = it; });
+  ingredients.forEach(ing => {
+    if (ing.inventoryId || ing.notTracked || !ing.name) return;
+    const match = byName[ing.name.trim().toLowerCase()];
+    if (match) ing.inventoryId = match.id;
+  });
+}
+
+// Re-runs auto-linking for every saved recipe - called after adding a new
+// inventory item, since a recipe added *before* that item existed would
+// otherwise stay unlinked (and therefore never flagged for it) forever.
+function relinkAllRecipesToInventory_() {
+  const inventory = loadInventory();
+  const recipes = loadRecipes();
+  let changed = false;
+  recipes.forEach(r => {
+    const before = JSON.stringify(r.ingredients);
+    autoLinkIngredients_(r.ingredients, inventory);
+    if (JSON.stringify(r.ingredients) !== before) changed = true;
+  });
+  if (changed) saveRecipesList(recipes);
+}
+
 function saveRecipe() {
   const name = document.getElementById('recipeName').value.trim();
   const statusEl = document.getElementById('recipeSaveStatus');
@@ -1988,6 +2021,7 @@ function saveRecipe() {
   const image = document.getElementById('recipeImage').value.trim();
   const instructions = document.getElementById('recipeInstructions').value.trim();
   const cleanIngredients = editingIngredients.filter(ing => ing.name && ing.name.trim());
+  autoLinkIngredients_(cleanIngredients, loadInventory());
 
   const recipes = loadRecipes();
   if (editingRecipeId) {
@@ -2025,12 +2059,14 @@ function getRecipeStatus(recipe) {
   const invById = {};
   loadInventory().forEach(i => { invById[i.id] = i; });
   const missing = [];
+  let unlinkedCount = 0;
   recipe.ingredients.forEach(ing => {
-    if (ing.notTracked || !ing.inventoryId) return;
+    if (ing.notTracked) return;
+    if (!ing.inventoryId) { unlinkedCount++; return; }
     const item = invById[ing.inventoryId];
     if (!item || item.qty <= 0 || item.qty < neededQty_(ing)) missing.push(ing.name);
   });
-  return { canMake: missing.length === 0, missing };
+  return { canMake: missing.length === 0, missing, unlinkedCount };
 }
 
 function renderRecipeList() {
@@ -2050,11 +2086,18 @@ function renderRecipeList() {
     const statusHtml = status.canMake
       ? '<span class="kitchen-badge kitchen-badge-green">Ready to make</span>'
       : `<span class="kitchen-badge kitchen-badge-amber">Missing: ${escapeHtml_(status.missing.join(', '))}</span>`;
+    // Called out explicitly rather than left silent - an unlinked ingredient
+    // is invisibly skipped from the shortage check above, so without this
+    // a recipe can sit at "Ready to make" indefinitely for reasons that
+    // have nothing to do with what's actually in stock.
+    const unlinkedHtml = status.unlinkedCount > 0
+      ? `<span class="kitchen-badge kitchen-badge-muted">${status.unlinkedCount} ingredient${status.unlinkedCount === 1 ? '' : 's'} not linked - Edit to link</span>`
+      : '';
     return `<div class="recipe-card">
       ${img}
       <div class="recipe-card-body">
         <div class="recipe-card-name">${escapeHtml_(r.name)}</div>
-        ${statusHtml}
+        ${statusHtml}${unlinkedHtml}
         <div class="recipe-card-actions">
           <button class="kitchen-btn-sm" onclick="openRecipeDetailModal('${r.id}')">View</button>
           <button class="kitchen-btn-sm" onclick="logMealMade('${r.id}')">Made This</button>
