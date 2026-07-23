@@ -147,6 +147,7 @@
   #view-music { order: 4; }
   #view-weight { order: 5; }
   #view-stats { order: 6; }
+  #view-kitchen { order: 7; }
 
   .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, #2e2519 100%); border-radius: 26px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
   .ov-hero-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -417,6 +418,35 @@
 
   .ov-mini-weight-value { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
   .ov-mini-weight-sub { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .kitchen-subtabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); border-radius: 14px; padding: 4px; }
+  .kitchen-subtab { flex: 1; background: none; border: none; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 9px 0; border-radius: 11px; cursor: pointer; }
+  .kitchen-subtab.active { background: var(--surface2); color: var(--accent); }
+  .kitchen-badge { display: inline-block; font-family: var(--font); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px; vertical-align: middle; }
+  .kitchen-badge-red { background: rgba(193,87,58,0.18); color: var(--red); }
+  .kitchen-badge-amber { background: rgba(217,164,65,0.18); color: var(--amber); }
+  .kitchen-badge-green { background: rgba(124,154,94,0.18); color: var(--green); }
+  .kitchen-badge-muted { background: var(--surface2); color: var(--muted); }
+  .kitchen-checkbox-label { display: flex; align-items: center; gap: 8px; font-family: var(--font); font-size: 12px; color: var(--muted); }
+  .kitchen-btn-sm { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--accent); background: var(--surface2); border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+
+  .ingredient-row { background: var(--surface2); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+  .ingredient-row-top { display: flex; gap: 6px; margin-bottom: 6px; }
+  .ingredient-row-top input { flex: 1; }
+  .ingredient-row-bottom { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .ingredient-row-bottom select, .ingredient-row-bottom input[type=number], .ingredient-row-bottom input[type=text] { flex: 1; min-width: 60px; font-size: 12px; padding: 8px; }
+  .ingredient-row-remove { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 0 6px; flex-shrink: 0; }
+
+  .recipe-card { display: flex; gap: 12px; background: var(--surface); border-radius: 16px; padding: 12px; margin-bottom: 10px; border: 1px solid rgba(245,230,210,0.06); }
+  .recipe-card-img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: var(--surface2); }
+  .recipe-card-img-fallback { display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .recipe-card-body { flex: 1; min-width: 0; }
+  .recipe-card-name { font-family: var(--font); font-size: 14px; font-weight: 700; }
+  .recipe-card-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+  .mealdb-result-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .mealdb-result-row:last-child { border-bottom: none; }
+  .mealdb-result-row .recipe-card-name { font-size: 13px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -1252,6 +1282,93 @@
   <div class="ov-note">Pushup totals come from your daily ledger. Weight trend appears once you've logged at least two weigh-ins on the Weight tab.</div>
 </div>
 
+<div id="view-kitchen" class="app-view">
+  <div class="ov-page-head">
+    <div>
+      <div class="ov-page-week">Kitchen</div>
+      <div class="ov-page-title">Kitchen</div>
+    </div>
+  </div>
+
+  <div class="kitchen-subtabs">
+    <button class="kitchen-subtab active" data-section="inventory" onclick="showKitchenSection('inventory')">Inventory</button>
+    <button class="kitchen-subtab" data-section="recipes" onclick="showKitchenSection('recipes')">Recipes</button>
+    <button class="kitchen-subtab" data-section="grocery" onclick="showKitchenSection('grocery')">Grocery</button>
+  </div>
+
+  <div class="kitchen-section" id="kitchenSectionInventory">
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:10px;">Add Item</div>
+      <input type="text" id="invItemName" class="config-input" placeholder="Item name" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+      <div class="weight-entry-row">
+        <input type="number" id="invItemQty" class="config-input" placeholder="Qty" step="0.1" min="0">
+        <input type="text" id="invItemUnit" class="config-input" placeholder="Unit (g, cups, ea...)">
+      </div>
+      <div class="weight-entry-row" style="margin-top:8px;">
+        <input type="text" id="invItemCategory" class="config-input" placeholder="Category (optional)">
+        <input type="number" id="invItemCost" class="config-input" placeholder="Cost $ (optional)" step="0.01" min="0">
+      </div>
+      <input type="date" id="invItemExpiration" class="config-input" style="width:100%; box-sizing:border-box; margin-top:8px;">
+      <label class="kitchen-checkbox-label" style="margin-top:10px;">
+        <input type="checkbox" id="invItemNotTracked"> Pantry staple (salt, oil, etc. - never flagged as missing/low)
+      </label>
+      <button class="ov-open-btn" onclick="addInventoryItem()" style="margin-top:10px;">Add to Inventory</button>
+      <div class="config-status" id="invAddStatus"></div>
+    </div>
+
+    <div class="config-box" id="inventoryListCard">
+      <div class="config-title" style="margin-bottom:6px;">Your Inventory</div>
+      <div id="inventoryList"></div>
+    </div>
+  </div>
+
+  <div class="kitchen-section" id="kitchenSectionRecipes" style="display:none;">
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:10px;">Find a Recipe</div>
+      <div class="weight-entry-row">
+        <input type="text" id="mealdbSearchInput" class="config-input" placeholder="Search recipes (e.g. pasta)">
+        <button class="config-save" onclick="searchMealDb()">Search</button>
+      </div>
+      <div id="mealdbResults"></div>
+    </div>
+
+    <button class="ov-open-btn" onclick="openNewRecipeForm()" style="margin-bottom:12px;">+ Add Recipe Manually</button>
+
+    <div id="recipeEditorCard" class="config-box" style="display:none;">
+      <div class="config-title" id="recipeEditorTitle" style="margin-bottom:10px;">New Recipe</div>
+      <input type="text" id="recipeName" class="config-input" placeholder="Recipe name" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+      <input type="text" id="recipeImage" class="config-input" placeholder="Image URL (optional)" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+      <textarea id="recipeInstructions" class="config-input" placeholder="Instructions" style="width:100%; box-sizing:border-box; min-height:70px; margin-bottom:10px; resize:vertical; font-family:var(--font);"></textarea>
+      <div class="sp-config-label" style="margin:0 0 6px;">Ingredients</div>
+      <div id="ingredientEditorList"></div>
+      <button class="kitchen-btn-sm" style="width:100%; margin-bottom:10px;" onclick="addIngredientRow()">+ Add Ingredient</button>
+      <div style="display:flex; gap:8px;">
+        <button class="config-save" style="flex:1;" onclick="saveRecipe()">Save Recipe</button>
+        <button class="ov-open-btn" style="flex:1;" onclick="closeRecipeEditor()">Cancel</button>
+      </div>
+      <div class="config-status" id="recipeSaveStatus"></div>
+    </div>
+
+    <div id="recipeList"></div>
+  </div>
+
+  <div class="kitchen-section" id="kitchenSectionGrocery" style="display:none;">
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:10px;">Add to List</div>
+      <div class="weight-entry-row">
+        <input type="text" id="groceryManualItem" class="config-input" placeholder="Item to buy">
+        <button class="config-save" onclick="addManualGroceryItem()">Add</button>
+      </div>
+    </div>
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:6px;">Shopping List</div>
+      <div id="groceryList"></div>
+    </div>
+  </div>
+
+  <div class="ov-note">Inventory and recipes are saved on this device. Recipe search pulls from TheMealDB, a free public recipe database - no account or cost required.</div>
+</div>
+
 </div>
 </div>
 
@@ -1331,6 +1448,9 @@
   </div>
   <div class="app-tab" data-view="stats" onclick="showAppView('stats')">
     <div class="app-tab-label">Stats</div>
+  </div>
+  <div class="app-tab" data-view="kitchen" onclick="showAppView('kitchen')">
+    <div class="app-tab-label">Kitchen</div>
   </div>
 </div>
 
@@ -1659,6 +1779,424 @@ function renderStatsTab() {
   renderStatsPushupChart();
   renderStatsWeightChart();
 }
+
+/* ---------- Kitchen tab (inventory, recipes, grocery list) ----------
+   Same local-only pattern as the weight log: plain localStorage arrays,
+   no backend required. Recipe search hits TheMealDB (a free public API,
+   no key/signup) purely client-side - nothing here costs money to run. */
+
+const STORAGE_INVENTORY_KEY = 'WORKOUT_KITCHEN_INVENTORY';
+const STORAGE_RECIPES_KEY = 'WORKOUT_KITCHEN_RECIPES';
+const STORAGE_MEAL_LOG_KEY = 'WORKOUT_KITCHEN_MEAL_LOG';
+const STORAGE_GROCERY_MANUAL_KEY = 'WORKOUT_KITCHEN_GROCERY_MANUAL';
+
+function genId_() {
+  return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function loadInventory() { return JSON.parse(localStorage.getItem(STORAGE_INVENTORY_KEY) || '[]'); }
+function saveInventoryList(items) { localStorage.setItem(STORAGE_INVENTORY_KEY, JSON.stringify(items)); }
+function loadRecipes() { return JSON.parse(localStorage.getItem(STORAGE_RECIPES_KEY) || '[]'); }
+function saveRecipesList(items) { localStorage.setItem(STORAGE_RECIPES_KEY, JSON.stringify(items)); }
+function loadMealLog() { return JSON.parse(localStorage.getItem(STORAGE_MEAL_LOG_KEY) || '[]'); }
+function saveMealLog(items) { localStorage.setItem(STORAGE_MEAL_LOG_KEY, JSON.stringify(items)); }
+function loadGroceryManual() { return JSON.parse(localStorage.getItem(STORAGE_GROCERY_MANUAL_KEY) || '[]'); }
+function saveGroceryManual(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_KEY, JSON.stringify(items)); }
+
+function renderKitchenTab() {
+  renderInventoryList();
+  renderRecipeList();
+  renderGroceryList();
+}
+
+function showKitchenSection(section) {
+  ['inventory', 'recipes', 'grocery'].forEach(s => {
+    const el = document.getElementById('kitchenSection' + s.charAt(0).toUpperCase() + s.slice(1));
+    if (el) el.style.display = s === section ? 'block' : 'none';
+    const tab = document.querySelector(`.kitchen-subtab[data-section="${s}"]`);
+    if (tab) tab.classList.toggle('active', s === section);
+  });
+  updateViewportHeight('kitchen', true);
+}
+
+/* ---- Inventory ---- */
+
+function renderInventoryList() {
+  const el = document.getElementById('inventoryList');
+  if (!el) return;
+  const items = loadInventory();
+  if (items.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">Nothing in inventory yet.</div>';
+    return;
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  el.innerHTML = items.slice().sort((a, b) => a.name.localeCompare(b.name)).map(it => {
+    let expBadge = '';
+    if (it.expirationDate) {
+      const exp = new Date(it.expirationDate + 'T00:00:00');
+      const daysLeft = Math.round((exp - today) / 86400000);
+      if (daysLeft < 0) expBadge = '<span class="kitchen-badge kitchen-badge-red">Expired</span>';
+      else if (daysLeft <= 3) expBadge = `<span class="kitchen-badge kitchen-badge-amber">${daysLeft}d left</span>`;
+    }
+    const staple = it.notTracked ? '<span class="kitchen-badge kitchen-badge-muted">Staple</span>' : '';
+    return `<div class="weight-history-row">
+      <div class="weight-history-date">${escapeHtml_(it.name)}${staple}${expBadge}</div>
+      <div class="weight-history-value">${it.qty}${it.unit ? ' ' + escapeHtml_(it.unit) : ''}</div>
+      <button class="weight-history-del" onclick="deleteInventoryItem('${it.id}')">×</button>
+    </div>`;
+  }).join('');
+}
+
+function addInventoryItem() {
+  const nameEl = document.getElementById('invItemName');
+  const qtyEl = document.getElementById('invItemQty');
+  const unitEl = document.getElementById('invItemUnit');
+  const categoryEl = document.getElementById('invItemCategory');
+  const costEl = document.getElementById('invItemCost');
+  const expEl = document.getElementById('invItemExpiration');
+  const notTrackedEl = document.getElementById('invItemNotTracked');
+  const statusEl = document.getElementById('invAddStatus');
+
+  const name = nameEl.value.trim();
+  const qty = parseFloat(qtyEl.value);
+  if (!name || !(qty >= 0)) {
+    statusEl.textContent = 'Enter a name and quantity.';
+    statusEl.classList.add('warn');
+    return;
+  }
+
+  const items = loadInventory();
+  items.push({
+    id: genId_(),
+    name,
+    qty,
+    unit: unitEl.value.trim(),
+    category: categoryEl.value.trim(),
+    cost: costEl.value ? parseFloat(costEl.value) : null,
+    expirationDate: expEl.value || null,
+    notTracked: notTrackedEl.checked
+  });
+  saveInventoryList(items);
+
+  statusEl.classList.remove('warn');
+  statusEl.textContent = 'Added.';
+  nameEl.value = ''; qtyEl.value = ''; unitEl.value = ''; categoryEl.value = ''; costEl.value = ''; expEl.value = '';
+  notTrackedEl.checked = false;
+
+  renderInventoryList();
+  renderGroceryList();
+  renderRecipeList();
+}
+
+function deleteInventoryItem(id) {
+  saveInventoryList(loadInventory().filter(i => i.id !== id));
+  renderInventoryList();
+  renderGroceryList();
+  renderRecipeList();
+}
+
+/* ---- Recipes ---- */
+
+let editingRecipeId = null;
+let editingIngredients = [];
+
+function openNewRecipeForm(prefill) {
+  editingRecipeId = (prefill && prefill.id) || null;
+  editingIngredients = prefill ? prefill.ingredients.map(i => Object.assign({}, i)) : [];
+
+  document.getElementById('recipeEditorTitle').textContent = editingRecipeId ? 'Edit Recipe' : 'New Recipe';
+  document.getElementById('recipeName').value = prefill ? prefill.name : '';
+  document.getElementById('recipeImage').value = prefill ? (prefill.image || '') : '';
+  document.getElementById('recipeInstructions').value = prefill ? (prefill.instructions || '') : '';
+  document.getElementById('recipeSaveStatus').textContent = '';
+  document.getElementById('recipeSaveStatus').classList.remove('warn');
+
+  renderIngredientEditor();
+  document.getElementById('recipeEditorCard').style.display = 'block';
+  updateViewportHeight('kitchen', true);
+}
+
+function closeRecipeEditor() {
+  editingRecipeId = null;
+  editingIngredients = [];
+  document.getElementById('recipeEditorCard').style.display = 'none';
+  updateViewportHeight('kitchen', true);
+}
+
+function renderIngredientEditor() {
+  const el = document.getElementById('ingredientEditorList');
+  const inventory = loadInventory();
+  el.innerHTML = editingIngredients.map((ing, i) => {
+    const options = inventory.map(it => `<option value="${it.id}" ${ing.inventoryId === it.id ? 'selected' : ''}>${escapeHtml_(it.name)}</option>`).join('');
+    return `<div class="ingredient-row">
+      <div class="ingredient-row-top">
+        <input type="text" class="config-input" value="${escapeHtml_(ing.name || '')}" placeholder="Ingredient" oninput="editingIngredients[${i}].name=this.value">
+        <button class="ingredient-row-remove" onclick="removeIngredientRow(${i})">×</button>
+      </div>
+      <div class="ingredient-row-bottom">
+        <select class="config-input" onchange="editingIngredients[${i}].inventoryId=this.value||null">
+          <option value="">Not linked</option>${options}
+        </select>
+        <input type="number" class="config-input" value="${ing.qty != null ? ing.qty : 1}" step="0.1" min="0" placeholder="Qty" oninput="editingIngredients[${i}].qty=parseFloat(this.value)||0">
+        <input type="text" class="config-input" value="${escapeHtml_(ing.unit || '')}" placeholder="Unit" oninput="editingIngredients[${i}].unit=this.value">
+        <label class="kitchen-checkbox-label"><input type="checkbox" ${ing.notTracked ? 'checked' : ''} onchange="editingIngredients[${i}].notTracked=this.checked"> Staple</label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addIngredientRow() {
+  editingIngredients.push({ name: '', inventoryId: null, qty: 1, unit: '', notTracked: false });
+  renderIngredientEditor();
+}
+
+function removeIngredientRow(i) {
+  editingIngredients.splice(i, 1);
+  renderIngredientEditor();
+}
+
+function saveRecipe() {
+  const name = document.getElementById('recipeName').value.trim();
+  const statusEl = document.getElementById('recipeSaveStatus');
+  if (!name) {
+    statusEl.textContent = 'Enter a recipe name.';
+    statusEl.classList.add('warn');
+    return;
+  }
+
+  const image = document.getElementById('recipeImage').value.trim();
+  const instructions = document.getElementById('recipeInstructions').value.trim();
+  const cleanIngredients = editingIngredients.filter(ing => ing.name && ing.name.trim());
+
+  const recipes = loadRecipes();
+  if (editingRecipeId) {
+    const idx = recipes.findIndex(r => r.id === editingRecipeId);
+    if (idx !== -1) recipes[idx] = Object.assign({}, recipes[idx], { name, image, instructions, ingredients: cleanIngredients });
+  } else {
+    recipes.push({ id: genId_(), name, image, instructions, ingredients: cleanIngredients });
+  }
+  saveRecipesList(recipes);
+  closeRecipeEditor();
+  renderRecipeList();
+}
+
+function editRecipe(id) {
+  const recipe = loadRecipes().find(r => r.id === id);
+  if (recipe) openNewRecipeForm(recipe);
+}
+
+function deleteRecipe(id) {
+  saveRecipesList(loadRecipes().filter(r => r.id !== id));
+  renderRecipeList();
+}
+
+// Ingredients that are unlinked (no inventoryId) or marked as an untracked
+// pantry staple never count against "can I make this" or get subtracted -
+// they're assumed always on hand.
+function getRecipeStatus(recipe) {
+  const invById = {};
+  loadInventory().forEach(i => { invById[i.id] = i; });
+  const missing = [];
+  recipe.ingredients.forEach(ing => {
+    if (ing.notTracked || !ing.inventoryId) return;
+    const item = invById[ing.inventoryId];
+    if (!item || item.qty < ing.qty) missing.push(ing.name);
+  });
+  return { canMake: missing.length === 0, missing };
+}
+
+function renderRecipeList() {
+  const el = document.getElementById('recipeList');
+  if (!el) return;
+  const recipes = loadRecipes();
+  if (recipes.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">No recipes yet - search above or add one manually.</div>';
+    return;
+  }
+
+  el.innerHTML = recipes.map(r => {
+    const status = getRecipeStatus(r);
+    const img = r.image
+      ? `<img class="recipe-card-img" src="${escapeHtml_(r.image)}" alt="">`
+      : '<div class="recipe-card-img recipe-card-img-fallback">🍳</div>';
+    const statusHtml = status.canMake
+      ? '<span class="kitchen-badge kitchen-badge-green">Ready to make</span>'
+      : `<span class="kitchen-badge kitchen-badge-amber">Missing: ${escapeHtml_(status.missing.join(', '))}</span>`;
+    return `<div class="recipe-card">
+      ${img}
+      <div class="recipe-card-body">
+        <div class="recipe-card-name">${escapeHtml_(r.name)}</div>
+        ${statusHtml}
+        <div class="recipe-card-actions">
+          <button class="kitchen-btn-sm" onclick="logMealMade('${r.id}')">Made This</button>
+          <button class="kitchen-btn-sm" onclick="editRecipe('${r.id}')">Edit</button>
+          <button class="weight-history-del" onclick="deleteRecipe('${r.id}')">×</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function logMealMade(recipeId) {
+  const recipe = loadRecipes().find(r => r.id === recipeId);
+  if (!recipe) return;
+
+  const status = getRecipeStatus(recipe);
+  if (!status.canMake && !confirm(`Missing: ${status.missing.join(', ')}. Log anyway?`)) return;
+
+  const inventory = loadInventory();
+  const invById = {};
+  inventory.forEach(i => { invById[i.id] = i; });
+
+  const used = [];
+  recipe.ingredients.forEach(ing => {
+    if (ing.notTracked || !ing.inventoryId) return;
+    const item = invById[ing.inventoryId];
+    if (item) {
+      item.qty = Math.max(0, item.qty - ing.qty);
+      used.push({ inventoryId: item.id, name: item.name, qtyUsed: ing.qty });
+    }
+  });
+  saveInventoryList(inventory);
+
+  const log = loadMealLog();
+  log.push({ id: genId_(), date: dateKey(new Date()), recipeId: recipe.id, recipeName: recipe.name, ingredientsUsed: used });
+  saveMealLog(log);
+
+  renderInventoryList();
+  renderRecipeList();
+  renderGroceryList();
+}
+
+// TheMealDB (themealdb.com) - free public recipe database, no signup/key
+// needed for the shared "1" test endpoint. Its ingredient/measure fields
+// are free text (e.g. "1 1/2 cups"), so imports land unlinked with the
+// whole measure string in the unit field rather than trying to split
+// "amount" from "unit" - cleaning that up is a manual step per ingredient
+// when you actually link one to an inventory item.
+async function searchMealDb() {
+  const q = document.getElementById('mealdbSearchInput').value.trim();
+  const resultsEl = document.getElementById('mealdbResults');
+  if (!q) return;
+  resultsEl.innerHTML = '<div class="ov-mini-empty">Searching…</div>';
+  try {
+    const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    const meals = data.meals || [];
+    if (meals.length === 0) {
+      resultsEl.innerHTML = '<div class="ov-mini-empty">No matches.</div>';
+      return;
+    }
+    resultsEl.innerHTML = meals.map(m => `<div class="mealdb-result-row" onclick="importMealDbRecipe('${m.idMeal}')">
+      <img class="recipe-card-img" src="${escapeHtml_(m.strMealThumb)}" alt="">
+      <div class="recipe-card-name">${escapeHtml_(m.strMeal)}</div>
+    </div>`).join('');
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="ov-mini-empty">Search failed - check your connection.</div>';
+  }
+}
+
+async function importMealDbRecipe(mealId) {
+  try {
+    const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${encodeURIComponent(mealId)}`);
+    const data = await res.json();
+    const meal = data.meals && data.meals[0];
+    if (!meal) return;
+
+    const ingredients = [];
+    for (let i = 1; i <= 20; i++) {
+      const name = (meal['strIngredient' + i] || '').trim();
+      const measure = (meal['strMeasure' + i] || '').trim();
+      if (!name) continue;
+      ingredients.push({ name, inventoryId: null, qty: 1, unit: measure, notTracked: false });
+    }
+
+    openNewRecipeForm({ name: meal.strMeal, image: meal.strMealThumb, instructions: meal.strInstructions, ingredients });
+    document.getElementById('mealdbResults').innerHTML = '';
+    document.getElementById('mealdbSearchInput').value = '';
+  } catch (e) {
+    // Leave the search results as-is so the user can just try again.
+  }
+}
+
+/* ---- Grocery list ---- */
+
+function computeAutoGroceryItems() {
+  const inventory = loadInventory();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const auto = [];
+
+  inventory.forEach(it => {
+    if (it.notTracked) return;
+    if (it.qty <= 0) {
+      auto.push({ name: it.name, reason: 'Out of stock' });
+      return;
+    }
+    if (it.expirationDate) {
+      const exp = new Date(it.expirationDate + 'T00:00:00');
+      const daysLeft = Math.round((exp - today) / 86400000);
+      if (daysLeft >= 0 && daysLeft <= 2) auto.push({ name: it.name, reason: `Expiring in ${daysLeft}d` });
+    }
+  });
+  return auto;
+}
+
+function renderGroceryList() {
+  const el = document.getElementById('groceryList');
+  if (!el) return;
+  const auto = computeAutoGroceryItems();
+  const manual = loadGroceryManual();
+
+  if (auto.length === 0 && manual.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">Nothing needed right now.</div>';
+    return;
+  }
+
+  let html = '';
+  auto.forEach(item => {
+    html += `<div class="weight-history-row">
+      <div class="weight-history-date">${escapeHtml_(item.name)}</div>
+      <div class="weight-history-value kitchen-badge kitchen-badge-muted">${escapeHtml_(item.reason)}</div>
+    </div>`;
+  });
+  manual.forEach(item => {
+    const style = item.checked ? 'text-decoration:line-through; opacity:0.5;' : '';
+    html += `<div class="weight-history-row">
+      <div class="weight-history-date" style="${style}">${escapeHtml_(item.name)}</div>
+      <button class="weight-history-del" onclick="toggleGroceryChecked('${item.id}')">${item.checked ? '↺' : '✓'}</button>
+      <button class="weight-history-del" onclick="removeGroceryManual('${item.id}')">×</button>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function addManualGroceryItem() {
+  const inputEl = document.getElementById('groceryManualItem');
+  const name = inputEl.value.trim();
+  if (!name) return;
+  const list = loadGroceryManual();
+  list.push({ id: genId_(), name, checked: false });
+  saveGroceryManual(list);
+  inputEl.value = '';
+  renderGroceryList();
+}
+
+function toggleGroceryChecked(id) {
+  const list = loadGroceryManual();
+  const item = list.find(i => i.id === id);
+  if (item) item.checked = !item.checked;
+  saveGroceryManual(list);
+  renderGroceryList();
+}
+
+function removeGroceryManual(id) {
+  saveGroceryManual(loadGroceryManual().filter(i => i.id !== id));
+  renderGroceryList();
+}
+
 let isRestoringState = false;
 let calendarLoadedOnce = false;
 
@@ -1977,7 +2515,7 @@ function restoreState() {
 
 /* ---------- Weekly Overview tab ---------- */
 
-const viewOrder = ['overview', 'tracker', 'pushups', 'calendar', 'music', 'weight', 'stats'];
+const viewOrder = ['overview', 'tracker', 'pushups', 'calendar', 'music', 'weight', 'stats', 'kitchen'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -1988,6 +2526,7 @@ function renderActiveViewContent(view) {
   if (view === 'music') renderMusicTab();
   if (view === 'weight') { renderWeightTab(); loadRemoteWeightLog(); }
   if (view === 'stats') renderStatsTab();
+  if (view === 'kitchen') renderKitchenTab();
 }
 
 // All 4 views live side-by-side in a flex track (CSS `order` maps them to
@@ -4131,6 +4670,10 @@ function refreshCurrentTab() {
   }
   if (view === 'stats') {
     renderStatsTab();
+    return Promise.resolve();
+  }
+  if (view === 'kitchen') {
+    renderKitchenTab();
     return Promise.resolve();
   }
   return Promise.resolve();
