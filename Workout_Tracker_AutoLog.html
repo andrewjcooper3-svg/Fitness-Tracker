@@ -1349,6 +1349,7 @@
       <div class="config-status" id="recipeSaveStatus"></div>
     </div>
 
+    <div class="config-status" id="recipeActionStatus" style="margin-bottom:8px;"></div>
     <div id="recipeList"></div>
   </div>
 
@@ -1424,6 +1425,24 @@
     <div class="event-modal-relative" id="weekDetailTotal" style="margin-bottom:14px;"></div>
     <div id="weekDetailDays"></div>
     <button class="event-modal-close" onclick="closeWeekDetailModal(event)">Close</button>
+  </div>
+</div>
+
+<div class="event-modal-overlay" id="recipeDetailModalOverlay" onclick="closeRecipeDetailModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <img id="recipeDetailImage" style="width:100%; height:160px; object-fit:cover; border-radius:14px; margin-bottom:12px; display:none;" alt="">
+    <div class="ov-page-title" id="recipeDetailName" style="margin-bottom:12px;">Recipe</div>
+    <div class="event-modal-row">
+      <div class="event-modal-row-label">Ingredients</div>
+      <div class="event-modal-row-value" id="recipeDetailIngredients"></div>
+    </div>
+    <div class="event-modal-row">
+      <div class="event-modal-row-label">Instructions</div>
+      <div class="event-modal-row-value" id="recipeDetailInstructions"></div>
+    </div>
+    <button class="config-save" style="width:100%; margin-bottom:8px;" onclick="logMealMadeFromModal()">Made This</button>
+    <button class="event-modal-close" onclick="closeRecipeDetailModal(event)">Close</button>
   </div>
 </div>
 
@@ -1939,7 +1958,7 @@ function renderIngredientEditor() {
         <select class="config-input" onchange="editingIngredients[${i}].inventoryId=this.value||null">
           <option value="">Not linked</option>${options}
         </select>
-        <input type="number" class="config-input" value="${ing.qty != null ? ing.qty : 1}" step="0.1" min="0" placeholder="Qty" oninput="editingIngredients[${i}].qty=parseFloat(this.value)||0">
+        <input type="number" class="config-input" value="${ing.qty != null && ing.qty !== '' ? ing.qty : ''}" step="0.1" min="0" placeholder="Qty" oninput="editingIngredients[${i}].qty=this.value===''?null:(parseFloat(this.value)||0)">
         <input type="text" class="config-input" value="${escapeHtml_(ing.unit || '')}" placeholder="Unit" oninput="editingIngredients[${i}].unit=this.value">
         <label class="kitchen-checkbox-label"><input type="checkbox" ${ing.notTracked ? 'checked' : ''} onchange="editingIngredients[${i}].notTracked=this.checked"> Staple</label>
       </div>
@@ -1948,7 +1967,7 @@ function renderIngredientEditor() {
 }
 
 function addIngredientRow() {
-  editingIngredients.push({ name: '', inventoryId: null, qty: 1, unit: '', notTracked: false });
+  editingIngredients.push({ name: '', inventoryId: null, qty: null, unit: '', notTracked: false });
   renderIngredientEditor();
 }
 
@@ -1995,6 +2014,13 @@ function deleteRecipe(id) {
 // Ingredients that are unlinked (no inventoryId) or marked as an untracked
 // pantry staple never count against "can I make this" or get subtracted -
 // they're assumed always on hand.
+// An ingredient with no quantity set (common for a MealDB import before
+// you've linked/cleaned it up) just needs to be in stock at all - it
+// doesn't have a real number to compare against yet.
+function neededQty_(ing) {
+  return (ing.qty != null && ing.qty !== '') ? Number(ing.qty) : 0;
+}
+
 function getRecipeStatus(recipe) {
   const invById = {};
   loadInventory().forEach(i => { invById[i.id] = i; });
@@ -2002,7 +2028,7 @@ function getRecipeStatus(recipe) {
   recipe.ingredients.forEach(ing => {
     if (ing.notTracked || !ing.inventoryId) return;
     const item = invById[ing.inventoryId];
-    if (!item || item.qty < ing.qty) missing.push(ing.name);
+    if (!item || item.qty <= 0 || item.qty < neededQty_(ing)) missing.push(ing.name);
   });
   return { canMake: missing.length === 0, missing };
 }
@@ -2030,6 +2056,7 @@ function renderRecipeList() {
         <div class="recipe-card-name">${escapeHtml_(r.name)}</div>
         ${statusHtml}
         <div class="recipe-card-actions">
+          <button class="kitchen-btn-sm" onclick="openRecipeDetailModal('${r.id}')">View</button>
           <button class="kitchen-btn-sm" onclick="logMealMade('${r.id}')">Made This</button>
           <button class="kitchen-btn-sm" onclick="editRecipe('${r.id}')">Edit</button>
           <button class="weight-history-del" onclick="deleteRecipe('${r.id}')">×</button>
@@ -2039,12 +2066,16 @@ function renderRecipeList() {
   }).join('');
 }
 
+// No blocking confirm() here on purpose - a native confirm dialog is
+// known to be unreliable (can silently no-op) inside a Home Screen-
+// installed web app, which is exactly how this app is meant to be used.
+// Logging always goes through immediately; a shortage is reported
+// afterward as a status message instead of gating the action itself.
 function logMealMade(recipeId) {
   const recipe = loadRecipes().find(r => r.id === recipeId);
   if (!recipe) return;
 
   const status = getRecipeStatus(recipe);
-  if (!status.canMake && !confirm(`Missing: ${status.missing.join(', ')}. Log anyway?`)) return;
 
   const inventory = loadInventory();
   const invById = {};
@@ -2055,8 +2086,9 @@ function logMealMade(recipeId) {
     if (ing.notTracked || !ing.inventoryId) return;
     const item = invById[ing.inventoryId];
     if (item) {
-      item.qty = Math.max(0, item.qty - ing.qty);
-      used.push({ inventoryId: item.id, name: item.name, qtyUsed: ing.qty });
+      const usedQty = neededQty_(ing);
+      item.qty = Math.max(0, item.qty - usedQty);
+      used.push({ inventoryId: item.id, name: item.name, qtyUsed: usedQty });
     }
   });
   saveInventoryList(inventory);
@@ -2065,9 +2097,57 @@ function logMealMade(recipeId) {
   log.push({ id: genId_(), date: dateKey(new Date()), recipeId: recipe.id, recipeName: recipe.name, ingredientsUsed: used });
   saveMealLog(log);
 
+  const statusEl = document.getElementById('recipeActionStatus');
+  if (statusEl) {
+    statusEl.classList.toggle('warn', !status.canMake);
+    statusEl.textContent = status.canMake
+      ? `Logged "${recipe.name}" - inventory updated.`
+      : `Logged "${recipe.name}" - you were short on: ${status.missing.join(', ')}.`;
+  }
+
   renderInventoryList();
   renderRecipeList();
   renderGroceryList();
+}
+
+let recipeDetailId = null;
+
+function formatIngredientLine_(ing) {
+  const qty = (ing.qty != null && ing.qty !== '') ? ing.qty + ' ' : '';
+  const unit = ing.unit ? escapeHtml_(ing.unit) + ' ' : '';
+  return (qty + unit + escapeHtml_(ing.name)).trim();
+}
+
+function openRecipeDetailModal(id) {
+  const recipe = loadRecipes().find(r => r.id === id);
+  if (!recipe) return;
+  recipeDetailId = id;
+
+  const imgEl = document.getElementById('recipeDetailImage');
+  if (recipe.image) {
+    imgEl.src = recipe.image;
+    imgEl.style.display = 'block';
+  } else {
+    imgEl.style.display = 'none';
+  }
+
+  document.getElementById('recipeDetailName').textContent = recipe.name;
+  document.getElementById('recipeDetailIngredients').innerHTML = recipe.ingredients.length
+    ? recipe.ingredients.map(formatIngredientLine_).join('<br>')
+    : '<span class="ov-mini-empty">No ingredients listed.</span>';
+  document.getElementById('recipeDetailInstructions').textContent = recipe.instructions || 'No instructions added.';
+
+  document.getElementById('recipeDetailModalOverlay').classList.add('open');
+}
+
+function closeRecipeDetailModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('recipeDetailModalOverlay').classList.remove('open');
+}
+
+function logMealMadeFromModal() {
+  if (recipeDetailId) logMealMade(recipeDetailId);
+  closeRecipeDetailModal();
 }
 
 // TheMealDB (themealdb.com) - free public recipe database, no signup/key
@@ -2133,7 +2213,7 @@ async function importMealDbRecipe(mealId) {
       const name = (meal['strIngredient' + i] || '').trim();
       const measure = (meal['strMeasure' + i] || '').trim();
       if (!name) continue;
-      ingredients.push({ name, inventoryId: null, qty: 1, unit: measure, notTracked: false });
+      ingredients.push({ name, inventoryId: null, qty: null, unit: measure, notTracked: false });
     }
 
     openNewRecipeForm({ name: meal.strMeal, image: meal.strMealThumb, instructions: meal.strInstructions, ingredients });
