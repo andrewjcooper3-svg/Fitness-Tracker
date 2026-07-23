@@ -1339,7 +1339,8 @@
       <input type="text" id="recipeName" class="config-input" placeholder="Recipe name" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
       <input type="text" id="recipeImage" class="config-input" placeholder="Image URL (optional)" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
       <textarea id="recipeInstructions" class="config-input" placeholder="Instructions" style="width:100%; box-sizing:border-box; min-height:70px; margin-bottom:10px; resize:vertical; font-family:var(--font);"></textarea>
-      <div class="sp-config-label" style="margin:0 0 6px;">Ingredients</div>
+      <div class="sp-config-label" style="margin:0 0 2px;">Ingredients</div>
+      <div class="ov-mini-empty" style="margin:0 0 8px;">Matched to your inventory by name automatically - the dropdown is only needed if a name doesn't match (e.g. recipe says "Pasta," inventory has "Fusilli").</div>
       <div id="ingredientEditorList"></div>
       <button class="kitchen-btn-sm" style="width:100%; margin-bottom:10px;" onclick="addIngredientRow()">+ Add Ingredient</button>
       <div style="display:flex; gap:8px;">
@@ -1957,7 +1958,7 @@ function renderIngredientEditor() {
       </div>
       <div class="ingredient-row-bottom">
         <select class="config-input" onchange="editingIngredients[${i}].inventoryId=this.value||null">
-          <option value="">Not linked</option>${options}
+          <option value="">Auto-match by name</option>${options}
         </select>
         <input type="number" class="config-input" value="${ing.qty != null && ing.qty !== '' ? ing.qty : ''}" step="0.1" min="0" placeholder="Qty" oninput="editingIngredients[${i}].qty=this.value===''?null:(parseFloat(this.value)||0)">
         <input type="text" class="config-input" value="${escapeHtml_(ing.unit || '')}" placeholder="Unit" oninput="editingIngredients[${i}].unit=this.value">
@@ -2055,18 +2056,37 @@ function neededQty_(ing) {
   return (ing.qty != null && ing.qty !== '') ? Number(ing.qty) : 0;
 }
 
+// Resolves an ingredient to a real inventory item without requiring it to
+// have ever been explicitly linked: an inventoryId (set by hand, or by
+// autoLinkIngredients_ below) is tried first since it survives an
+// inventory item later being renamed, but falls back to a live name match
+// (exact, then naive singular/plural) so an ingredient that was simply
+// typed - never linked at all - still resolves correctly every time this
+// runs. The dropdown in the ingredient editor is only needed to override
+// this when a name genuinely doesn't match (e.g. recipe says "Pasta",
+// inventory has "Fusilli"), not as a required step.
+function resolveIngredientInventoryItem_(ing, inventory) {
+  if (ing.inventoryId) {
+    const linked = inventory.find(it => it.id === ing.inventoryId);
+    if (linked) return linked;
+  }
+  const name = (ing.name || '').trim().toLowerCase();
+  if (!name) return null;
+  const norm = s => s.trim().toLowerCase().replace(/s$/, '');
+  return inventory.find(it => it.name.trim().toLowerCase() === name)
+    || inventory.find(it => norm(it.name) === norm(name))
+    || null;
+}
+
 function getRecipeStatus(recipe) {
-  const invById = {};
-  loadInventory().forEach(i => { invById[i.id] = i; });
+  const inventory = loadInventory();
   const missing = [];
-  let unlinkedCount = 0;
   recipe.ingredients.forEach(ing => {
     if (ing.notTracked) return;
-    if (!ing.inventoryId) { unlinkedCount++; return; }
-    const item = invById[ing.inventoryId];
+    const item = resolveIngredientInventoryItem_(ing, inventory);
     if (!item || item.qty <= 0 || item.qty < neededQty_(ing)) missing.push(ing.name);
   });
-  return { canMake: missing.length === 0, missing, unlinkedCount };
+  return { canMake: missing.length === 0, missing };
 }
 
 function renderRecipeList() {
@@ -2086,18 +2106,11 @@ function renderRecipeList() {
     const statusHtml = status.canMake
       ? '<span class="kitchen-badge kitchen-badge-green">Ready to make</span>'
       : `<span class="kitchen-badge kitchen-badge-amber">Missing: ${escapeHtml_(status.missing.join(', '))}</span>`;
-    // Called out explicitly rather than left silent - an unlinked ingredient
-    // is invisibly skipped from the shortage check above, so without this
-    // a recipe can sit at "Ready to make" indefinitely for reasons that
-    // have nothing to do with what's actually in stock.
-    const unlinkedHtml = status.unlinkedCount > 0
-      ? `<span class="kitchen-badge kitchen-badge-muted">${status.unlinkedCount} ingredient${status.unlinkedCount === 1 ? '' : 's'} not linked - Edit to link</span>`
-      : '';
     return `<div class="recipe-card">
       ${img}
       <div class="recipe-card-body">
         <div class="recipe-card-name">${escapeHtml_(r.name)}</div>
-        ${statusHtml}${unlinkedHtml}
+        ${statusHtml}
         <div class="recipe-card-actions">
           <button class="kitchen-btn-sm" onclick="openRecipeDetailModal('${r.id}')">View</button>
           <button class="kitchen-btn-sm" onclick="logMealMade('${r.id}')">Made This</button>
@@ -2119,15 +2132,12 @@ function logMealMade(recipeId) {
   if (!recipe) return;
 
   const status = getRecipeStatus(recipe);
-
   const inventory = loadInventory();
-  const invById = {};
-  inventory.forEach(i => { invById[i.id] = i; });
 
   const used = [];
   recipe.ingredients.forEach(ing => {
-    if (ing.notTracked || !ing.inventoryId) return;
-    const item = invById[ing.inventoryId];
+    if (ing.notTracked) return;
+    const item = resolveIngredientInventoryItem_(ing, inventory);
     if (item) {
       const usedQty = neededQty_(ing);
       item.qty = Math.max(0, item.qty - usedQty);
