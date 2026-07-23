@@ -1310,6 +1310,10 @@
         <input type="number" id="invItemCost" class="config-input" placeholder="Cost $ (optional)" step="0.01" min="0">
       </div>
       <input type="number" id="invItemParLevel" class="config-input" placeholder="Restock to (optional) - e.g. always keep 2 gallons" step="0.1" min="0" style="width:100%; box-sizing:border-box; margin-top:8px;">
+      <div class="weight-entry-row" style="margin-top:8px;">
+        <input type="number" id="invItemPackageSize" class="config-input" placeholder="Package size (optional, e.g. 400)" step="0.1" min="0">
+        <input type="text" id="invItemPackageLabel" class="config-input" placeholder="e.g. box, bag, dozen">
+      </div>
       <input type="date" id="invItemExpiration" class="config-input" style="width:100%; box-sizing:border-box; margin-top:8px;">
       <label class="kitchen-checkbox-label" style="margin-top:10px;">
         <input type="checkbox" id="invItemNotTracked"> Pantry staple (salt, oil, etc. - never flagged as missing/low)
@@ -1849,6 +1853,7 @@ function togglePlannedMeal(recipeId) {
 }
 
 function renderKitchenTab() {
+  migrateRecipeIngredientMeasures_();
   renderInventoryList();
   renderRecipeList();
   renderGroceryList();
@@ -1901,6 +1906,8 @@ function addInventoryItem() {
   const categoryEl = document.getElementById('invItemCategory');
   const costEl = document.getElementById('invItemCost');
   const parLevelEl = document.getElementById('invItemParLevel');
+  const packageSizeEl = document.getElementById('invItemPackageSize');
+  const packageLabelEl = document.getElementById('invItemPackageLabel');
   const expEl = document.getElementById('invItemExpiration');
   const notTrackedEl = document.getElementById('invItemNotTracked');
   const statusEl = document.getElementById('invAddStatus');
@@ -1922,6 +1929,8 @@ function addInventoryItem() {
     category: categoryEl.value.trim(),
     cost: costEl.value ? parseFloat(costEl.value) : null,
     parLevel: parLevelEl.value !== '' ? parseFloat(parLevelEl.value) : null,
+    packageSize: packageSizeEl.value !== '' ? parseFloat(packageSizeEl.value) : null,
+    packageLabel: packageLabelEl.value.trim(),
     expirationDate: expEl.value || null,
     notTracked: notTrackedEl.checked
   });
@@ -1929,7 +1938,8 @@ function addInventoryItem() {
 
   statusEl.classList.remove('warn');
   statusEl.textContent = 'Added.';
-  nameEl.value = ''; qtyEl.value = ''; unitEl.value = ''; categoryEl.value = ''; costEl.value = ''; parLevelEl.value = ''; expEl.value = '';
+  nameEl.value = ''; qtyEl.value = ''; unitEl.value = ''; categoryEl.value = ''; costEl.value = ''; parLevelEl.value = '';
+  packageSizeEl.value = ''; packageLabelEl.value = ''; expEl.value = '';
   notTrackedEl.checked = false;
 
   relinkAllRecipesToInventory_();
@@ -2088,6 +2098,21 @@ function neededQty_(ing) {
 // showing floating-point noise like 1.9999999999999998.
 function formatQty_(n) {
   return String(Math.round(n * 100) / 100);
+}
+
+// Converts a raw needed amount into a shopping-friendly line: "200g (1
+// box)" instead of just "200g", using an item's optional package size/
+// label (e.g. pasta comes in 400g boxes for you) - rounds UP to a whole
+// number of packages, since you can't buy a fraction of one at the store.
+// Falls back to the plain quantity when no package size is set on the
+// resolved item, or when there's no resolved item at all (an ingredient
+// that never matched anything in inventory).
+function formatBuyAmount_(amount, unit, item) {
+  const base = formatQty_(amount) + (unit ? ' ' + unit : '');
+  if (!item || !item.packageSize || item.packageSize <= 0) return base;
+  const packages = Math.ceil(amount / item.packageSize);
+  const label = item.packageLabel || 'pkg';
+  return `${base} (${packages} ${label})`;
 }
 
 // Resolves an ingredient to a real inventory item without requiring it to
@@ -2290,6 +2315,60 @@ async function searchMealDb() {
   }
 }
 
+// TheMealDB's measure field is one free-text string ("1 pound", "1 1/2
+// cups", "1/4 cup", "200g", "to taste") - splits off a leading whole
+// number, simple fraction, or mixed number as qty, leaving the rest as
+// unit, so a real amount is available instead of everything landing in
+// "unit" with no number to compute a grocery quantity from. A measure
+// with no parseable leading number (e.g. "to taste") is left as unit-only,
+// same as before.
+function parseMeasureToQtyUnit_(measure) {
+  const m = (measure || '').trim();
+  if (!m) return { qty: null, unit: '' };
+  const match = m.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*(.*)$/);
+  if (!match) return { qty: null, unit: m };
+
+  const numPart = match[1];
+  const rest = match[2].trim();
+  let qty;
+  if (numPart.includes('/')) {
+    if (numPart.includes(' ')) {
+      const [whole, frac] = numPart.split(' ');
+      const [n, d] = frac.split('/').map(Number);
+      qty = Number(whole) + n / d;
+    } else {
+      const [n, d] = numPart.split('/').map(Number);
+      qty = n / d;
+    }
+  } else {
+    qty = parseFloat(numPart);
+  }
+  return { qty: isNaN(qty) ? null : qty, unit: rest };
+}
+
+// Re-parses any already-saved ingredient that still has no qty (a MealDB
+// import from before parseMeasureToQtyUnit_ existed, or any ingredient
+// whose whole measure ended up in the unit field) so it picks up a real
+// number without needing to be re-imported or hand-edited. Idempotent -
+// once an ingredient has a qty, this leaves it alone.
+function migrateRecipeIngredientMeasures_() {
+  const recipes = loadRecipes();
+  let changed = false;
+  recipes.forEach(recipe => {
+    recipe.ingredients.forEach(ing => {
+      if ((ing.qty == null || ing.qty === '') && ing.unit) {
+        const parsed = parseMeasureToQtyUnit_(ing.unit);
+        if (parsed.qty != null) {
+          ing.qty = parsed.qty;
+          ing.unit = parsed.unit;
+          changed = true;
+        }
+      }
+    });
+  });
+  if (changed) saveRecipesList(recipes);
+}
+
 async function importMealDbRecipe(mealId) {
   try {
     const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${encodeURIComponent(mealId)}`);
@@ -2302,7 +2381,8 @@ async function importMealDbRecipe(mealId) {
       const name = (meal['strIngredient' + i] || '').trim();
       const measure = (meal['strMeasure' + i] || '').trim();
       if (!name) continue;
-      ingredients.push({ name, inventoryId: null, qty: null, unit: measure, notTracked: false });
+      const parsed = parseMeasureToQtyUnit_(measure);
+      ingredients.push({ name, inventoryId: null, qty: parsed.qty, unit: parsed.unit || measure, notTracked: false });
     }
 
     openNewRecipeForm({ name: meal.strMeal, image: meal.strMealThumb, instructions: meal.strInstructions, ingredients });
@@ -2346,7 +2426,7 @@ function computeAutoGroceryItems() {
     // par with plenty of shelf life left just needs the gap made up.
     const amount = hasPar ? ((outOfStock || expiringSoon) ? par : (par - it.qty)) : null;
     const reason = outOfStock ? 'Out of stock' : expiringSoon ? `Expiring in ${daysLeft}d` : 'Below target stock';
-    auto.push({ name: it.name, amount, unit: it.unit, reason });
+    auto.push({ name: it.name, amount, unit: it.unit, reason, item: it });
   });
   return auto;
 }
@@ -2377,9 +2457,9 @@ function computeMealPlanGroceryItems(recipes) {
     const haveQty = entry.item ? entry.item.qty : 0;
     if (entry.neededTotal > 0) {
       const shortfall = entry.neededTotal - haveQty;
-      if (shortfall > 0) results.push({ name: entry.name, amount: shortfall, unit: entry.unit });
+      if (shortfall > 0) results.push({ name: entry.name, amount: shortfall, unit: entry.unit, item: entry.item });
     } else if (entry.hasUnspecified && haveQty <= 0) {
-      results.push({ name: entry.name, amount: null, unit: null });
+      results.push({ name: entry.name, amount: null, unit: null, item: entry.item });
     }
   });
   return results;
@@ -2407,7 +2487,7 @@ function renderMealPlanGroceryList() {
   }
   listEl.innerHTML = items.map(it => `<div class="weight-history-row">
     <div class="weight-history-date">${escapeHtml_(it.name)}</div>
-    <div class="weight-history-value kitchen-badge kitchen-badge-amber">${it.amount != null ? 'Need ' + formatQty_(it.amount) + (it.unit ? ' ' + escapeHtml_(it.unit) : '') : 'Need some'}</div>
+    <div class="weight-history-value kitchen-badge kitchen-badge-amber">${it.amount != null ? 'Need ' + escapeHtml_(formatBuyAmount_(it.amount, it.unit, it.item)) : 'Need some'}</div>
   </div>`).join('');
 }
 
@@ -2433,7 +2513,7 @@ function renderGeneralGroceryList() {
       ? ` <span class="kitchen-badge kitchen-badge-muted">${escapeHtml_(item.reason)}</span>`
       : '';
     const valueBadge = item.amount != null
-      ? `Need ${formatQty_(item.amount)}${item.unit ? ' ' + escapeHtml_(item.unit) : ''}`
+      ? `Need ${escapeHtml_(formatBuyAmount_(item.amount, item.unit, item.item))}`
       : escapeHtml_(item.reason);
     html += `<div class="weight-history-row">
       <div class="weight-history-date">${escapeHtml_(item.name)}${reasonBadge}</div>
