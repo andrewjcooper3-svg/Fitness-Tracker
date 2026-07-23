@@ -2076,20 +2076,43 @@ function logMealMade(recipeId) {
 // whole measure string in the unit field rather than trying to split
 // "amount" from "unit" - cleaning that up is a manual step per ingredient
 // when you actually link one to an inventory item.
+// TheMealDB's plain search.php only matches the dish NAME - searching
+// "pasta" misses "Spaghetti Carbonara" or "Penne Arrabiata" since neither
+// literally contains the word "pasta". Also trying it as a category
+// (TheMealDB has a real "Pasta" category, among ~14 others) and as a main
+// ingredient filter catches those, merged and de-duplicated by id.
+const MEALDB_CATEGORIES = ['Beef', 'Breakfast', 'Chicken', 'Dessert', 'Goat', 'Lamb', 'Miscellaneous', 'Pasta', 'Pork', 'Seafood', 'Side', 'Starter', 'Vegan', 'Vegetarian'];
+
 async function searchMealDb() {
   const q = document.getElementById('mealdbSearchInput').value.trim();
   const resultsEl = document.getElementById('mealdbResults');
   if (!q) return;
   resultsEl.innerHTML = '<div class="ov-mini-empty">Searching…</div>';
+
+  const base = 'https://www.themealdb.com/api/json/v1/1/';
+  const requests = [fetch(base + `search.php?s=${encodeURIComponent(q)}`)];
+
+  const matchedCategory = MEALDB_CATEGORIES.find(c => c.toLowerCase() === q.toLowerCase());
+  if (matchedCategory) requests.push(fetch(base + `filter.php?c=${encodeURIComponent(matchedCategory)}`));
+  requests.push(fetch(base + `filter.php?i=${encodeURIComponent(q)}`));
+
   try {
-    const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    const meals = data.meals || [];
-    if (meals.length === 0) {
+    const responses = await Promise.all(requests.map(p => p.catch(() => null)));
+    const datas = await Promise.all(responses.map(r => (r && r.ok ? r.json().catch(() => null) : null)));
+
+    const seen = new Set();
+    const merged = [];
+    datas.forEach(d => {
+      (d && d.meals || []).forEach(m => {
+        if (!seen.has(m.idMeal)) { seen.add(m.idMeal); merged.push(m); }
+      });
+    });
+
+    if (merged.length === 0) {
       resultsEl.innerHTML = '<div class="ov-mini-empty">No matches.</div>';
       return;
     }
-    resultsEl.innerHTML = meals.map(m => `<div class="mealdb-result-row" onclick="importMealDbRecipe('${m.idMeal}')">
+    resultsEl.innerHTML = merged.map(m => `<div class="mealdb-result-row" onclick="importMealDbRecipe('${m.idMeal}')">
       <img class="recipe-card-img" src="${escapeHtml_(m.strMealThumb)}" alt="">
       <div class="recipe-card-name">${escapeHtml_(m.strMeal)}</div>
     </div>`).join('');
