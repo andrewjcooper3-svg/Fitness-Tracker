@@ -190,6 +190,80 @@ function getWeightLog_() {
   }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
 }
 
+const BODY_HEALTH_SHEET_NAME = 'Body Health Log';
+const BODY_HEALTH_HEADERS = ['Date', 'Sleep Hours', 'HRV (ms)', 'Resting HR (bpm)', 'Workout Minutes', 'Avg Workout HR', 'Source', 'Logged At'];
+
+/**
+ * Same one-row-per-day pattern as the Weight Log. An hourly Shortcut just
+ * re-sends the day's up-to-date totals each run (sleep/HRV/RHR are set
+ * once overnight and stay static; workout minutes/avg HR accumulate as
+ * the day goes on) - the upsert-by-date below overwrites with whatever's
+ * most current rather than piling up duplicate rows per hour.
+ */
+function getOrCreateBodyHealthSheet_() {
+  const ss = getOrCreateSpreadsheet_();
+  let sheet = ss.getSheetByName(BODY_HEALTH_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(BODY_HEALTH_SHEET_NAME);
+  sheet.appendRow(BODY_HEALTH_HEADERS);
+  const headerRange = sheet.getRange(1, 1, 1, BODY_HEALTH_HEADERS.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#1a1d24');
+  headerRange.setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function logBodyHealthEntry_(date, data, source) {
+  const sheet = getOrCreateBodyHealthSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  const now = new Date();
+  const row = [
+    date,
+    data.sleepHours != null ? data.sleepHours : '',
+    data.hrv != null ? data.hrv : '',
+    data.restingHR != null ? data.restingHR : '',
+    data.workoutMinutes != null ? data.workoutMinutes : '',
+    data.avgWorkoutHR != null ? data.avgWorkoutHR : '',
+    source || '',
+    now
+  ];
+
+  if (lastRow > 1) {
+    const dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < dates.length; i++) {
+      if (cellDateKey_(dates[i][0], timeZone) === date) {
+        const rowIndex = i + 2;
+        sheet.getRange(rowIndex, 1, 1, BODY_HEALTH_HEADERS.length).setValues([row]);
+        return;
+      }
+    }
+  }
+  sheet.appendRow(row);
+}
+
+function getBodyHealthLog_() {
+  const sheet = getOrCreateBodyHealthSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, BODY_HEALTH_HEADERS.length).getValues();
+  return rows.map(function (r) {
+    return {
+      date: cellDateKey_(r[0], timeZone),
+      sleepHours: r[1] === '' ? null : r[1],
+      hrv: r[2] === '' ? null : r[2],
+      restingHR: r[3] === '' ? null : r[3],
+      workoutMinutes: r[4] === '' ? null : r[4],
+      avgWorkoutHR: r[5] === '' ? null : r[5],
+      source: r[6] || ''
+    };
+  }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+}
+
 /**
  * Run this once manually from the Apps Script editor to create the
  * Sheet and this week's tab ahead of time, and print its URL to the
@@ -241,6 +315,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadBodyHealthLog') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', entries: getBodyHealthLog_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId() }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -272,6 +352,23 @@ function doPost(e) {
         throw new Error('logWeight requires a date and a numeric weight');
       }
       logWeightEntry_(data.date, weight, bodyFat != null && !isNaN(bodyFat) ? bodyFat : null, data.source || 'shortcut');
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'logBodyHealth') {
+      if (!data.date) {
+        throw new Error('logBodyHealth requires a date');
+      }
+      const toNumOrNull = v => (v != null && v !== '' && !isNaN(Number(v))) ? Number(v) : null;
+      logBodyHealthEntry_(data.date, {
+        sleepHours: toNumOrNull(data.sleepHours),
+        hrv: toNumOrNull(data.hrv),
+        restingHR: toNumOrNull(data.restingHR),
+        workoutMinutes: toNumOrNull(data.workoutMinutes),
+        avgWorkoutHR: toNumOrNull(data.avgWorkoutHR)
+      }, data.source || 'shortcut');
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);

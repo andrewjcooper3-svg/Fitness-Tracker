@@ -143,11 +143,12 @@
   #view-overview { order: 0; }
   #view-pushups { order: 1; }
   #view-tracker { order: 2; }
-  #view-calendar { order: 3; }
-  #view-kitchen { order: 4; }
-  #view-weight { order: 5; }
-  #view-stats { order: 6; }
-  #view-music { order: 7; }
+  #view-bodyhealth { order: 3; }
+  #view-calendar { order: 4; }
+  #view-kitchen { order: 5; }
+  #view-weight { order: 6; }
+  #view-stats { order: 7; }
+  #view-music { order: 8; }
 
   .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, #2e2519 100%); border-radius: 26px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
   .ov-hero-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -448,6 +449,11 @@
   .mealdb-result-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
   .mealdb-result-row:last-child { border-bottom: none; }
   .mealdb-result-row .recipe-card-name { font-size: 13px; font-weight: 600; }
+
+  .bh-tiles { display: flex; gap: 10px; margin-bottom: 12px; }
+  .bh-tile { flex: 1; background: var(--surface); border-radius: 16px; padding: 14px 10px; text-align: center; border: 1px solid rgba(245,230,210,0.06); cursor: pointer; }
+  .bh-tile-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px; }
+  .bh-tile-value { font-family: var(--font); font-size: 24px; font-weight: 800; }
 </style>
 </head>
 <body>
@@ -1235,6 +1241,39 @@
 
 </div>
 
+<div id="view-bodyhealth" class="app-view">
+  <div class="ov-page-head">
+    <div>
+      <div class="ov-page-week">Body Health</div>
+      <div class="ov-page-title">Health</div>
+    </div>
+  </div>
+
+  <div class="ov-hero" id="bhRecoveryHero" onclick="openBodyHealthDetailModal('recovery')">
+    <div class="ov-hero-label">Recovery</div>
+    <div class="ov-hero-number" id="bhRecoveryNumber">–</div>
+    <div class="ov-hero-sub" id="bhRecoverySub">No data yet</div>
+  </div>
+
+  <div class="bh-tiles">
+    <div class="bh-tile" onclick="openBodyHealthDetailModal('sleep')">
+      <div class="bh-tile-label">Sleep</div>
+      <div class="bh-tile-value" id="bhSleepNumber">–</div>
+    </div>
+    <div class="bh-tile" onclick="openBodyHealthDetailModal('strain')">
+      <div class="bh-tile-label">Strain</div>
+      <div class="bh-tile-value" id="bhStrainNumber">–</div>
+    </div>
+    <div class="bh-tile" onclick="openBodyHealthDetailModal('stress')">
+      <div class="bh-tile-label">Stress</div>
+      <div class="bh-tile-value" id="bhStressNumber">–</div>
+    </div>
+  </div>
+
+  <div class="ov-note" id="bhEmptyNote" style="display:none;">No Body Health data synced yet - once your Shortcut runs, sleep, HRV, resting heart rate, and workout data will start showing up here automatically. Nothing to enter manually.</div>
+  <div class="ov-note">Recovery and Sleep compare last night to your own rolling baseline, not a fixed scale. Strain blends real workout heart-rate data with your tracked training volume. Stress is HRV-trend based and will often track closely with Recovery.</div>
+</div>
+
 <div id="view-weight" class="app-view">
   <div class="ov-page-head">
     <div>
@@ -1440,6 +1479,15 @@
       <button class="ov-open-btn" onclick="saveSettings()" style="margin-top:12px;">Save</button>
       <div class="config-status" id="settingsStatus"></div>
     </div>
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:10px;">Body Health</div>
+      <div class="settings-field">
+        <div class="sp-config-label" style="margin:0 0 6px;">Max heart rate (bpm) - used to weight workout intensity for Strain</div>
+        <input type="number" id="settingsMaxHR" class="config-input" min="100" max="230" step="1">
+      </div>
+      <button class="ov-open-btn" onclick="saveBodyHealthSettings()" style="margin-top:12px;">Save</button>
+      <div class="config-status" id="bodyHealthSettingsStatus"></div>
+    </div>
     <div class="ov-note">Changes apply immediately across Overview, Pushups, and Stats.</div>
     <button class="event-modal-close" onclick="closeSettingsModal(event)">Close</button>
   </div>
@@ -1473,6 +1521,18 @@
   </div>
 </div>
 
+<div class="event-modal-overlay" id="bodyHealthDetailModalOverlay" onclick="closeBodyHealthDetailModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-title" id="bhDetailTitle" style="margin-bottom:6px;">Recovery</div>
+    <div class="event-modal-relative" id="bhDetailScoreLine" style="margin-bottom:14px;"></div>
+    <div id="bhDetailBody"></div>
+    <svg viewBox="0 0 320 140" class="stats-chart" id="bhDetailChart" preserveAspectRatio="none" style="margin-top:8px;"></svg>
+    <div class="stats-chart-labels" id="bhDetailChartLabels"></div>
+    <button class="event-modal-close" onclick="closeBodyHealthDetailModal(event)" style="margin-top:14px;">Close</button>
+  </div>
+</div>
+
 <div class="app-tabs" id="appTabs">
   <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">
     <div class="app-tab-label">Overview</div>
@@ -1482,6 +1542,9 @@
   </div>
   <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">
     <div class="app-tab-label">Trainer</div>
+  </div>
+  <div class="app-tab" data-view="bodyhealth" onclick="showAppView('bodyhealth')">
+    <div class="app-tab-label">Health</div>
   </div>
   <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">
     <div class="app-tab-label">Calendar</div>
@@ -1512,6 +1575,7 @@ const STORAGE_YEAR_CARRY_KEY = 'WORKOUT_YEAR_CARRY_FORWARD';
 const STORAGE_SETTINGS_KEY = 'WORKOUT_SETTINGS';
 let PUSHUP_DAILY_BASELINE = 165;
 let PUSHUP_YEAR_GOAL = 50000;
+let BODY_HEALTH_MAX_HR = 196; // 220 - 24, the standard age-based estimate; editable in Settings
 
 // Overridable from the Settings tab; falls back to the defaults above so
 // existing devices with no saved settings behave exactly as before.
@@ -1519,11 +1583,30 @@ function loadSettingsIntoState() {
   const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
   if (saved.dailyBaseline > 0) PUSHUP_DAILY_BASELINE = saved.dailyBaseline;
   if (saved.yearGoal > 0) PUSHUP_YEAR_GOAL = saved.yearGoal;
+  if (saved.maxHR > 0) BODY_HEALTH_MAX_HR = saved.maxHR;
 }
 
 function renderSettingsTab() {
   document.getElementById('settingsDailyBaseline').value = PUSHUP_DAILY_BASELINE;
   document.getElementById('settingsYearGoal').value = PUSHUP_YEAR_GOAL;
+  document.getElementById('settingsMaxHR').value = BODY_HEALTH_MAX_HR;
+}
+
+function saveBodyHealthSettings() {
+  const statusEl = document.getElementById('bodyHealthSettingsStatus');
+  const maxHR = parseFloat(document.getElementById('settingsMaxHR').value);
+  if (!(maxHR > 0)) {
+    statusEl.textContent = 'Enter a positive number.';
+    statusEl.classList.add('warn');
+    return;
+  }
+  const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+  saved.maxHR = maxHR;
+  localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
+  BODY_HEALTH_MAX_HR = maxHR;
+  statusEl.classList.remove('warn');
+  statusEl.textContent = 'Saved.';
+  renderBodyHealthTab();
 }
 
 function saveSettings() {
@@ -1535,7 +1618,10 @@ function saveSettings() {
     statusEl.classList.add('warn');
     return;
   }
-  localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify({ dailyBaseline, yearGoal }));
+  const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+  saved.dailyBaseline = dailyBaseline;
+  saved.yearGoal = yearGoal;
+  localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
   PUSHUP_DAILY_BASELINE = dailyBaseline;
   PUSHUP_YEAR_GOAL = yearGoal;
   statusEl.classList.remove('warn');
@@ -2570,6 +2656,324 @@ function removeGroceryManual(id) {
   renderGroceryList();
 }
 
+/* ---------- Body Health tab (Recovery, Sleep, Strain, Stress) ----------
+   Purely read-only, no manual entry anywhere - every field here arrives
+   via the logBodyHealth backend endpoint, meant to be fed by a Shortcut
+   reading sleep/HRV/resting-HR/workout data from Apple Health and POSTing
+   it in (hourly, per how it's meant to be set up). Scores are our own
+   approximation of the Oura/Whoop approach (personal rolling baselines,
+   not fixed universal thresholds) - not a copy of either's actual
+   algorithm, which isn't public. */
+
+const STORAGE_BODY_HEALTH_LOG_KEY = 'WORKOUT_BODY_HEALTH_LOG';
+
+function loadBodyHealthLog() { return JSON.parse(localStorage.getItem(STORAGE_BODY_HEALTH_LOG_KEY) || '[]'); }
+function saveBodyHealthLogEntries(entries) { localStorage.setItem(STORAGE_BODY_HEALTH_LOG_KEY, JSON.stringify(entries)); }
+
+async function loadRemoteBodyHealthLog() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadBodyHealthLog');
+    const data = await res.json();
+    if (data.status !== 'success' || !Array.isArray(data.entries)) return;
+    saveBodyHealthLogEntries(data.entries);
+    if (viewOrder[currentViewIndex] === 'bodyhealth') renderBodyHealthTab();
+    if (viewOrder[currentViewIndex] === 'overview') renderOverview();
+  } catch (e) {
+    // Offline/unreachable - whatever's already cached stands.
+  }
+}
+
+// Mean/stddev of a field across the log, excluding today by default so
+// "today vs. your baseline" never includes today in its own baseline.
+function computeRollingStats_(log, field, excludeDate) {
+  const values = log.filter(e => e[field] != null && e.date !== excludeDate).map(e => e[field]);
+  if (values.length === 0) return null;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((a, b) => a + (b - mean) * (b - mean), 0) / values.length;
+  return { mean, stddev: Math.sqrt(variance) || 1, count: values.length };
+}
+
+function bhBandFor_(score) {
+  if (score >= 67) return { label: 'Green', color: 'var(--green)' };
+  if (score >= 34) return { label: 'Yellow', color: 'var(--amber)' };
+  return { label: 'Red', color: 'var(--red)' };
+}
+
+function bhStrainBandFor_(score) {
+  if (score >= 85) return { label: 'Max', color: 'var(--red)' };
+  if (score >= 65) return { label: 'High', color: 'var(--amber)' };
+  if (score >= 35) return { label: 'Moderate', color: 'var(--green)' };
+  return { label: 'Low', color: 'var(--muted)' };
+}
+
+// Inverted from bhBandFor_ on purpose - for Stress, a HIGH score means
+// more stressed (bad), so it needs to band red at the top, not green.
+function bhStressBandFor_(score) {
+  if (score >= 67) return { label: 'High', color: 'var(--red)' };
+  if (score >= 34) return { label: 'Moderate', color: 'var(--amber)' };
+  return { label: 'Low', color: 'var(--green)' };
+}
+
+// HRV weighted more heavily than resting HR (70/30), mirroring Whoop's
+// stated approach of treating HRV as the dominant recovery signal with
+// resting HR as secondary context - both compared against a personal
+// rolling baseline (like Oura's "balance" concept) rather than a fixed
+// number, since a "good" HRV varies enormously person to person.
+function computeRecoveryScore() {
+  const log = loadBodyHealthLog();
+  const today = dateKey(new Date());
+  const todayEntry = log.find(e => e.date === today);
+  if (!todayEntry || (todayEntry.hrv == null && todayEntry.restingHR == null)) return null;
+
+  const hrvStats = computeRollingStats_(log, 'hrv', today);
+  const rhrStats = computeRollingStats_(log, 'restingHR', today);
+  if (!hrvStats && !rhrStats) return null;
+
+  let combinedZ = 0, weightSum = 0;
+  if (hrvStats && todayEntry.hrv != null) {
+    combinedZ += ((todayEntry.hrv - hrvStats.mean) / hrvStats.stddev) * 0.7;
+    weightSum += 0.7;
+  }
+  if (rhrStats && todayEntry.restingHR != null) {
+    combinedZ += ((rhrStats.mean - todayEntry.restingHR) / rhrStats.stddev) * 0.3;
+    weightSum += 0.3;
+  }
+  if (weightSum === 0) return null;
+  combinedZ /= weightSum;
+
+  const score = Math.max(0, Math.min(100, Math.round(50 + combinedZ * 20)));
+  const enoughHistory = (hrvStats && hrvStats.count >= 7) || (rhrStats && rhrStats.count >= 7);
+  return {
+    score, band: bhBandFor_(score), enoughHistory,
+    hrv: todayEntry.hrv, hrvBaseline: hrvStats ? hrvStats.mean : null,
+    restingHR: todayEntry.restingHR, rhrBaseline: rhrStats ? rhrStats.mean : null
+  };
+}
+
+// Simple v1: duration against a fixed 8-hour target. Oura's actual Sleep
+// Score also weighs efficiency/REM/deep/latency/timing, but that needs
+// sleep-stage data the Shortcut isn't set up to pull yet - worth revisiting
+// once/if that's flowing in.
+// A raw "% of 8 hours" score needs its own, stricter bands than Recovery's
+// z-score-based 67/34 thresholds - those percentages mean something
+// different here (67% of 8 hours is only 5.4 hours, not a "good" night),
+// so Green/Yellow/Red get set against real sleep-duration guidance instead.
+function bhSleepBandFor_(score) {
+  if (score >= 90) return { label: 'Green', color: 'var(--green)' };
+  if (score >= 70) return { label: 'Yellow', color: 'var(--amber)' };
+  return { label: 'Red', color: 'var(--red)' };
+}
+
+function computeSleepScore() {
+  const log = loadBodyHealthLog();
+  const today = dateKey(new Date());
+  const todayEntry = log.find(e => e.date === today);
+  if (!todayEntry || todayEntry.sleepHours == null) return null;
+  const score = Math.max(0, Math.min(100, Math.round((todayEntry.sleepHours / 8) * 100)));
+  return { score, band: bhSleepBandFor_(score), sleepHours: todayEntry.sleepHours };
+}
+
+// Mirrors Whoop's disproportionate zone weighting (time at 80-90%+ of max
+// HR counts far more than time at 50-60%) using each workout's average
+// heart rate as a stand-in for a full per-second zone breakdown, which
+// isn't practical to build inside the Shortcuts app itself.
+const BH_HR_ZONE_WEIGHTS = [
+  { max: 0.5, weight: 0.5 },
+  { max: 0.6, weight: 1 },
+  { max: 0.7, weight: 2 },
+  { max: 0.8, weight: 3 },
+  { max: 0.9, weight: 5 },
+  { max: Infinity, weight: 8 }
+];
+
+function bhIntensityWeight_(pctMax) {
+  for (const zone of BH_HR_ZONE_WEIGHTS) {
+    if (pctMax < zone.max) return zone.weight;
+  }
+  return BH_HR_ZONE_WEIGHTS[BH_HR_ZONE_WEIGHTS.length - 1].weight;
+}
+
+function computeCardioLoad_(entry) {
+  if (!entry || entry.workoutMinutes == null || entry.avgWorkoutHR == null || !BODY_HEALTH_MAX_HR) return 0;
+  return entry.workoutMinutes * bhIntensityWeight_(entry.avgWorkoutHR / BODY_HEALTH_MAX_HR);
+}
+
+// Reuses the pushup ledger already tracked elsewhere in this app - the
+// "muscular load" half of Strain needs no Health data at all.
+function computeDailyPushupVolume_(dateStr) {
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  return ledger[dateStr] || 0;
+}
+
+// Blends real workout heart-rate load with tracked training volume, each
+// expressed as a ratio against your own 30-day rolling average (a ratio
+// of 1.0 = a totally typical day for you) rather than an absolute scale -
+// same personal-baseline principle as Recovery/Sleep above.
+function computeStrainScore() {
+  const log = loadBodyHealthLog();
+  const now = new Date();
+  const today = dateKey(now);
+  const todayEntry = log.find(e => e.date === today);
+
+  const cardioToday = computeCardioLoad_(todayEntry);
+  const volumeToday = computeDailyPushupVolume_(today);
+
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() - 30);
+  const recentDates = [];
+  for (let d = new Date(cutoff); d <= now; d.setDate(d.getDate() + 1)) recentDates.push(dateKey(new Date(d)));
+
+  const cardioValues = recentDates.map(d => computeCardioLoad_(log.find(e => e.date === d)));
+  const volumeValues = recentDates.map(d => computeDailyPushupVolume_(d));
+  const cardioBaseline = cardioValues.reduce((a, b) => a + b, 0) / cardioValues.length;
+  const volumeBaseline = volumeValues.reduce((a, b) => a + b, 0) / volumeValues.length;
+
+  if (cardioToday === 0 && volumeToday === 0 && cardioBaseline === 0 && volumeBaseline === 0) return null;
+
+  const cardioRatio = cardioBaseline > 0 ? cardioToday / cardioBaseline : (cardioToday > 0 ? 2 : 1);
+  const volumeRatio = volumeBaseline > 0 ? volumeToday / volumeBaseline : (volumeToday > 0 ? 2 : 1);
+  const combinedRatio = (cardioRatio + volumeRatio) / 2;
+  const score = Math.max(0, Math.min(100, Math.round(combinedRatio * 50)));
+
+  return { score, band: bhStrainBandFor_(score), cardioToday, volumeToday, cardioBaseline, volumeBaseline };
+}
+
+// The honest limit discussed up front: a real, distinct Stress signal
+// needs continuous daytime HRV, not one overnight reading. This is a
+// trend-based approximation (recent 3-day HRV average vs. the prior 7)
+// rather than a copy of Recovery's point-in-time comparison, but it will
+// still often move together with Recovery given the shared input.
+function computeStressScore() {
+  const log = loadBodyHealthLog().filter(e => e.hrv != null).sort((a, b) => a.date.localeCompare(b.date));
+  if (log.length < 4) return null;
+
+  const recent = log.slice(-3);
+  const prior = log.slice(-10, -3);
+  if (prior.length === 0) return null;
+
+  const recentAvg = recent.reduce((a, e) => a + e.hrv, 0) / recent.length;
+  const priorAvg = prior.reduce((a, e) => a + e.hrv, 0) / prior.length;
+  const pctChange = (recentAvg - priorAvg) / priorAvg;
+
+  const score = Math.max(0, Math.min(100, Math.round(50 - pctChange * 200)));
+  return { score, band: bhStressBandFor_(score), recentAvg, priorAvg };
+}
+
+function setBodyHealthTile_(elId, result) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (result) {
+    el.textContent = result.score;
+    el.style.color = result.band.color;
+  } else {
+    el.textContent = '–';
+    el.style.color = '';
+  }
+}
+
+function renderBodyHealthTab() {
+  const log = loadBodyHealthLog();
+  document.getElementById('bhEmptyNote').style.display = log.length > 0 ? 'none' : 'block';
+
+  const recovery = computeRecoveryScore();
+  const numEl = document.getElementById('bhRecoveryNumber');
+  const subEl = document.getElementById('bhRecoverySub');
+  if (recovery) {
+    numEl.textContent = recovery.score;
+    numEl.style.color = recovery.band.color;
+    subEl.textContent = recovery.enoughHistory ? recovery.band.label + ' recovery' : `${recovery.band.label} - still building your baseline`;
+  } else {
+    numEl.textContent = '–';
+    numEl.style.color = '';
+    subEl.textContent = 'No data yet';
+  }
+
+  setBodyHealthTile_('bhSleepNumber', computeSleepScore());
+  setBodyHealthTile_('bhStrainNumber', computeStrainScore());
+  setBodyHealthTile_('bhStressNumber', computeStressScore());
+}
+
+// Generic line-chart renderer for Body Health trends - same visual
+// approach as renderWeightLineChart, generalized to any {date, value}
+// series instead of being hard-coded to the weight log's shape.
+function renderBodyHealthLineChart_(svgId, labelsId, points) {
+  const svg = document.getElementById(svgId);
+  const labelsEl = document.getElementById(labelsId);
+  if (!svg || !labelsEl) return;
+
+  if (points.length < 2) {
+    svg.innerHTML = '';
+    labelsEl.innerHTML = '<span class="ov-mini-empty">Not enough data yet.</span>';
+    return;
+  }
+
+  const values = points.map(p => p.value);
+  const minV = Math.min(...values), maxV = Math.max(...values);
+  const pad = Math.max(0.1, (maxV - minV) * 0.15);
+  const lo = minV - pad, hi = maxV + pad;
+  const chartW = 320, chartH = 132;
+  const stepX = chartW / (points.length - 1);
+  const yFor = v => chartH - ((v - lo) / (hi - lo)) * chartH;
+
+  const linePoints = points.map((p, i) => `${(i * stepX).toFixed(1)},${yFor(p.value).toFixed(1)}`).join(' ');
+  const dots = points.map((p, i) => `<circle cx="${(i * stepX).toFixed(1)}" cy="${yFor(p.value).toFixed(1)}" r="3.5" fill="var(--teal)"></circle>`).join('');
+  svg.innerHTML = `<polyline points="${linePoints}" fill="none" stroke="var(--teal)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>${dots}`;
+
+  const fmt = p => new Date(p.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) + ' · ' + p.value.toFixed(0);
+  labelsEl.innerHTML = `<span>${fmt(points[0])}</span><span>${fmt(points[points.length - 1])}</span>`;
+}
+
+function openBodyHealthDetailModal(type) {
+  const log = loadBodyHealthLog();
+  const titleEl = document.getElementById('bhDetailTitle');
+  const scoreLineEl = document.getElementById('bhDetailScoreLine');
+  const bodyEl = document.getElementById('bhDetailBody');
+  let points = [];
+
+  if (type === 'recovery') {
+    const r = computeRecoveryScore();
+    titleEl.textContent = 'Recovery';
+    scoreLineEl.textContent = r ? `${r.score} - ${r.band.label}` : 'No data yet';
+    bodyEl.innerHTML = r ? `
+      <div class="event-modal-row"><div class="event-modal-row-label">HRV</div><div class="event-modal-row-value">${r.hrv != null ? r.hrv.toFixed(0) + ' ms' : '–'}${r.hrvBaseline != null ? ' (avg ' + r.hrvBaseline.toFixed(0) + ' ms)' : ''}</div></div>
+      <div class="event-modal-row"><div class="event-modal-row-label">Resting Heart Rate</div><div class="event-modal-row-value">${r.restingHR != null ? r.restingHR.toFixed(0) + ' bpm' : '–'}${r.rhrBaseline != null ? ' (avg ' + r.rhrBaseline.toFixed(0) + ' bpm)' : ''}</div></div>
+    ` : '<div class="ov-mini-empty">No HRV/resting heart rate data synced yet.</div>';
+    points = log.filter(e => e.hrv != null).map(e => ({ date: e.date, value: e.hrv })).slice(-14);
+  } else if (type === 'sleep') {
+    const s = computeSleepScore();
+    titleEl.textContent = 'Sleep';
+    scoreLineEl.textContent = s ? `${s.score} - ${s.band.label}` : 'No data yet';
+    bodyEl.innerHTML = s ? `<div class="event-modal-row"><div class="event-modal-row-label">Last Night</div><div class="event-modal-row-value">${s.sleepHours.toFixed(1)} hours</div></div>` : '<div class="ov-mini-empty">No sleep data synced yet.</div>';
+    points = log.filter(e => e.sleepHours != null).map(e => ({ date: e.date, value: e.sleepHours })).slice(-14);
+  } else if (type === 'strain') {
+    const st = computeStrainScore();
+    titleEl.textContent = 'Strain';
+    scoreLineEl.textContent = st ? `${st.score} - ${st.band.label}` : 'No data yet';
+    bodyEl.innerHTML = st ? `
+      <div class="event-modal-row"><div class="event-modal-row-label">Cardio Load Today</div><div class="event-modal-row-value">${st.cardioToday.toFixed(0)} (avg ${st.cardioBaseline.toFixed(0)})</div></div>
+      <div class="event-modal-row"><div class="event-modal-row-label">Training Volume Today</div><div class="event-modal-row-value">${st.volumeToday} reps (avg ${st.volumeBaseline.toFixed(0)})</div></div>
+    ` : '<div class="ov-mini-empty">No workout or training data yet.</div>';
+  } else if (type === 'stress') {
+    const sr = computeStressScore();
+    titleEl.textContent = 'Stress';
+    scoreLineEl.textContent = sr ? `${sr.score} - ${sr.band.label}` : 'No data yet';
+    bodyEl.innerHTML = sr
+      ? `<div class="ov-mini-empty">Estimated from your recent HRV trend (3-day avg ${sr.recentAvg.toFixed(0)}ms vs. prior ${sr.priorAvg.toFixed(0)}ms) - not a fully distinct signal from Recovery, since that needs continuous daytime HRV rather than one overnight reading.</div>`
+      : '<div class="ov-mini-empty">Not enough HRV history yet.</div>';
+    points = log.filter(e => e.hrv != null).map(e => ({ date: e.date, value: e.hrv })).slice(-14);
+  }
+
+  renderBodyHealthLineChart_('bhDetailChart', 'bhDetailChartLabels', points);
+  document.getElementById('bodyHealthDetailModalOverlay').classList.add('open');
+}
+
+function closeBodyHealthDetailModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('bodyHealthDetailModalOverlay').classList.remove('open');
+}
+
 let isRestoringState = false;
 let calendarLoadedOnce = false;
 
@@ -2888,7 +3292,7 @@ function restoreState() {
 
 /* ---------- Weekly Overview tab ---------- */
 
-const viewOrder = ['overview', 'pushups', 'tracker', 'calendar', 'kitchen', 'weight', 'stats', 'music'];
+const viewOrder = ['overview', 'pushups', 'tracker', 'bodyhealth', 'calendar', 'kitchen', 'weight', 'stats', 'music'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -2900,6 +3304,7 @@ function renderActiveViewContent(view) {
   if (view === 'weight') { renderWeightTab(); loadRemoteWeightLog(); }
   if (view === 'stats') renderStatsTab();
   if (view === 'kitchen') renderKitchenTab();
+  if (view === 'bodyhealth') { renderBodyHealthTab(); loadRemoteBodyHealthLog(); }
 }
 
 // All 4 views live side-by-side in a flex track (CSS `order` maps them to
@@ -5090,6 +5495,10 @@ function refreshCurrentTab() {
     renderKitchenTab();
     return Promise.resolve();
   }
+  if (view === 'bodyhealth') {
+    renderBodyHealthTab();
+    return loadRemoteBodyHealthLog();
+  }
   return Promise.resolve();
 }
 
@@ -5236,6 +5645,7 @@ seedYearCarryForward();
 restoreState();
 fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
+loadRemoteBodyHealthLog();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
