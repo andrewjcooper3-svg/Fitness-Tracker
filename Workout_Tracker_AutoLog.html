@@ -141,13 +141,13 @@
   .app-views-track { display: flex; align-items: flex-start; will-change: transform; }
   .app-view { flex: 0 0 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
   #view-overview { order: 0; }
-  #view-tracker { order: 1; }
-  #view-pushups { order: 2; }
+  #view-pushups { order: 1; }
+  #view-tracker { order: 2; }
   #view-calendar { order: 3; }
-  #view-music { order: 4; }
+  #view-kitchen { order: 4; }
   #view-weight { order: 5; }
   #view-stats { order: 6; }
-  #view-kitchen { order: 7; }
+  #view-music { order: 7; }
 
   .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, #2e2519 100%); border-radius: 26px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
   .ov-hero-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -555,6 +555,20 @@
       </div>
       <div class="ov-widget-label">Weight</div>
       <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-widget-sizepicker">
+        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
+        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
+        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
+      </div>
+    </div>
+
+    <div class="ov-widget" data-widget="kitchen" data-size="wide" onclick="handleWidgetTap(event, 'kitchen')">
+      <div class="ov-widget-edit-bar">
+        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
+        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+      </div>
+      <div class="ov-widget-label">Kitchen</div>
+      <div id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
       <div class="ov-widget-sizepicker">
         <button onclick="setWidgetSize(event, this, 'small')">Small</button>
         <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
@@ -1463,17 +1477,17 @@
   <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">
     <div class="app-tab-label">Overview</div>
   </div>
-  <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">
-    <div class="app-tab-label">Trainer</div>
-  </div>
   <div class="app-tab" data-view="pushups" onclick="showAppView('pushups')">
     <div class="app-tab-label">Pushups</div>
+  </div>
+  <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">
+    <div class="app-tab-label">Trainer</div>
   </div>
   <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">
     <div class="app-tab-label">Calendar</div>
   </div>
-  <div class="app-tab" data-view="music" onclick="showAppView('music')">
-    <div class="app-tab-label">Music</div>
+  <div class="app-tab" data-view="kitchen" onclick="showAppView('kitchen')">
+    <div class="app-tab-label">Kitchen</div>
   </div>
   <div class="app-tab" data-view="weight" onclick="showAppView('weight')">
     <div class="app-tab-label">Weight</div>
@@ -1481,8 +1495,8 @@
   <div class="app-tab" data-view="stats" onclick="showAppView('stats')">
     <div class="app-tab-label">Stats</div>
   </div>
-  <div class="app-tab" data-view="kitchen" onclick="showAppView('kitchen')">
-    <div class="app-tab-label">Kitchen</div>
+  <div class="app-tab" data-view="music" onclick="showAppView('music')">
+    <div class="app-tab-label">Music</div>
   </div>
 </div>
 
@@ -2494,6 +2508,7 @@ function renderMealPlanGroceryList() {
 function renderGroceryList() {
   renderMealPlanGroceryList();
   renderGeneralGroceryList();
+  renderOverviewKitchenPreview();
 }
 
 function renderGeneralGroceryList() {
@@ -2873,7 +2888,7 @@ function restoreState() {
 
 /* ---------- Weekly Overview tab ---------- */
 
-const viewOrder = ['overview', 'tracker', 'pushups', 'calendar', 'music', 'weight', 'stats', 'kitchen'];
+const viewOrder = ['overview', 'pushups', 'tracker', 'calendar', 'kitchen', 'weight', 'stats', 'music'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -3091,6 +3106,7 @@ function renderOverview() {
   renderWeekWheel(days);
   renderOverviewPushupMini();
   renderOverviewWeightPreview();
+  renderOverviewKitchenPreview();
   ensureCalendarLoaded();
 }
 
@@ -3200,6 +3216,46 @@ function renderOverviewWeightPreview() {
   }
 
   el.innerHTML = headline;
+}
+
+// Combines everything the Kitchen tab would tell you to buy - the meal
+// plan's shortfall, the general restock list, and unchecked manual items -
+// into one glanceable count, same idea as the Upcoming widget summarizing
+// the Calendar tab.
+function renderOverviewKitchenPreview() {
+  const el = document.getElementById('ovKitchenPreview');
+  if (!el) return;
+  const widget = el.closest('.ov-widget');
+  const size = widget ? widget.dataset.size : 'wide';
+
+  const plannedIds = loadPlannedMeals();
+  const plannedRecipes = loadRecipes().filter(r => plannedIds.includes(r.id));
+  const mealPlanItems = computeMealPlanGroceryItems(plannedRecipes);
+  const generalItems = computeAutoGroceryItems();
+  const manualItems = loadGroceryManual().filter(i => !i.checked);
+
+  const combined = [
+    ...mealPlanItems.map(it => ({ name: it.name, badge: it.amount != null ? formatBuyAmount_(it.amount, it.unit, it.item) : 'Need some' })),
+    ...generalItems.map(it => ({ name: it.name, badge: it.amount != null ? formatBuyAmount_(it.amount, it.unit, it.item) : it.reason })),
+    ...manualItems.map(it => ({ name: it.name, badge: '' }))
+  ];
+
+  if (combined.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">Nothing needed right now</div>';
+    return;
+  }
+
+  if (size === 'small') {
+    el.innerHTML = `<div class="ov-mini-weight-value">${combined.length}</div><div class="ov-mini-weight-sub">item${combined.length === 1 ? '' : 's'} needed</div>`;
+    return;
+  }
+
+  const count = size === 'large' ? 5 : 3;
+  el.innerHTML = `<div class="ov-mini-weight-sub" style="margin-bottom:6px;">${combined.length} item${combined.length === 1 ? '' : 's'} needed</div>` +
+    combined.slice(0, count).map(it => `<div class="ov-mini-event"><div class="ov-mini-event-text">` +
+      `<span class="ov-mini-event-title">${escapeHtml_(it.name)}</span>` +
+      (it.badge ? `<span class="ov-mini-event-date">${escapeHtml_(it.badge)}</span>` : '') +
+      `</div></div>`).join('');
 }
 
 /* ---------- Pushups tab (week/month/year goals + running deficit) ---------- */
