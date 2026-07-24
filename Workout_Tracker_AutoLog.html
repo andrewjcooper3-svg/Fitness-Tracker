@@ -3598,6 +3598,28 @@ function initViewportHeightObserver() {
   });
 }
 
+// iOS Safari's well-known quirk: a position:fixed element is placed
+// relative to the layout viewport, which iOS can resize/shift independently
+// of the actual visible (visual) viewport - most commonly seen as a fixed
+// bottom bar drifting or changing apparent height depending on scroll
+// state or page content. Tracking window.visualViewport directly and
+// nudging the bar to match it is the standard fix: it pins the bar to
+// what's actually on screen instead of trusting fixed-position math alone.
+function initTabBarViewportPin() {
+  const bar = document.getElementById('appTabs');
+  if (!bar || !window.visualViewport) return;
+
+  function reposition() {
+    const vv = window.visualViewport;
+    const gap = window.innerHeight - (vv.height + vv.offsetTop);
+    bar.style.transform = gap > 0.5 ? `translateY(${-gap}px)` : '';
+  }
+
+  window.visualViewport.addEventListener('resize', reposition);
+  window.visualViewport.addEventListener('scroll', reposition);
+  reposition();
+}
+
 // Aggregates every day panel's current in-page state (all 7 days live in
 // the DOM at once, just hidden/shown via the day tabs) into weekly totals.
 function computeWeekStats() {
@@ -5886,6 +5908,7 @@ loadCalendarWorkerUrl();
 flushPendingLogs();
 renderTrainerStats();
 initViewportHeightObserver();
+initTabBarViewportPin();
 startPuAnimLoop();
 loadWidgetOrder();
 loadWidgetSizes();
