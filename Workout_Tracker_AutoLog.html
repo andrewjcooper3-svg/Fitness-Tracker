@@ -2116,13 +2116,29 @@ function openBarcodeScanModal() {
   statusEl.textContent = 'Point your camera at a barcode.';
   statusEl.classList.remove('warn');
   document.getElementById('barcodeScanModalOverlay').classList.add('open');
+  waitForZXingThenScan_(Date.now());
+}
 
+// The scanner library loads from a CDN <script> tag - on a real network that
+// can take a moment, so a single synchronous check right when the modal
+// opens can wrongly report "failed to load" if the script just hasn't
+// finished downloading yet. Poll for up to 8s before actually giving up.
+function waitForZXingThenScan_(startedAt) {
+  const statusEl = document.getElementById('barcodeScanStatus');
   if (typeof ZXingBrowser === 'undefined') {
-    statusEl.textContent = 'Barcode scanner failed to load - check your connection and try again.';
-    statusEl.classList.add('warn');
+    if (Date.now() - startedAt > 8000) {
+      statusEl.textContent = 'Barcode scanner failed to load - check your connection and try again.';
+      statusEl.classList.add('warn');
+      return;
+    }
+    statusEl.textContent = 'Loading scanner…';
+    setTimeout(() => waitForZXingThenScan_(startedAt), 200);
     return;
   }
 
+  if (!document.getElementById('barcodeScanModalOverlay').classList.contains('open')) return; // closed while we waited
+
+  statusEl.textContent = 'Point your camera at a barcode.';
   const videoEl = document.getElementById('barcodeScanVideo');
   const reader = new ZXingBrowser.BrowserMultiFormatReader();
   reader.decodeFromVideoDevice(undefined, videoEl, (result) => {
