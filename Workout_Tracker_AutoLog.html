@@ -454,6 +454,25 @@
   .bh-tile { flex: 1; background: var(--surface); border-radius: 16px; padding: 14px 10px; text-align: center; border: 1px solid rgba(245,230,210,0.06); cursor: pointer; }
   .bh-tile-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px; }
   .bh-tile-value { font-family: var(--font); font-size: 24px; font-weight: 800; }
+  .bh-tile-sub { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  .bh-ring { position: relative; margin: 0 auto; flex-shrink: 0; }
+  .bh-ring svg { display: block; }
+  .bh-ring-number { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font); font-weight: 800; }
+  .bh-hero-row { display: flex; align-items: center; gap: 18px; margin-top: 10px; }
+  .bh-hero-text { flex: 1; }
+  .bh-detail-ring-row { display: flex; align-items: center; gap: 18px; margin-bottom: 6px; }
+
+  .bh-tips { margin-top: 16px; }
+  .bh-tips-list { padding-left: 18px; font-family: var(--font); font-size: 13px; color: var(--text); line-height: 1.5; }
+  .bh-tips-list li { margin-bottom: 6px; }
+
+  .bh-week-table { margin-top: 18px; }
+  .bh-week-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(245,230,210,0.06); font-family: var(--font); font-size: 13px; }
+  .bh-week-row:last-child { border-bottom: none; }
+  .bh-week-day { color: var(--muted); }
+  .bh-week-score { font-weight: 700; }
+  .bh-week-dash { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -1251,22 +1270,29 @@
 
   <div class="ov-hero" id="bhRecoveryHero" onclick="openBodyHealthDetailModal('recovery')">
     <div class="ov-hero-label">Recovery</div>
-    <div class="ov-hero-number" id="bhRecoveryNumber">–</div>
-    <div class="ov-hero-sub" id="bhRecoverySub">No data yet</div>
+    <div class="bh-hero-row">
+      <div id="bhRecoveryRing"></div>
+      <div class="bh-hero-text">
+        <div class="ov-hero-sub" id="bhRecoverySub" style="margin-top:0;">No data yet</div>
+      </div>
+    </div>
   </div>
 
   <div class="bh-tiles">
     <div class="bh-tile" onclick="openBodyHealthDetailModal('sleep')">
       <div class="bh-tile-label">Sleep</div>
-      <div class="bh-tile-value" id="bhSleepNumber">–</div>
+      <div id="bhSleepRing"></div>
+      <div class="bh-tile-sub" id="bhSleepSub">–</div>
     </div>
     <div class="bh-tile" onclick="openBodyHealthDetailModal('strain')">
       <div class="bh-tile-label">Strain</div>
-      <div class="bh-tile-value" id="bhStrainNumber">–</div>
+      <div id="bhStrainRing"></div>
+      <div class="bh-tile-sub" id="bhStrainSub">–</div>
     </div>
     <div class="bh-tile" onclick="openBodyHealthDetailModal('stress')">
       <div class="bh-tile-label">Stress</div>
-      <div class="bh-tile-value" id="bhStressNumber">–</div>
+      <div id="bhStressRing"></div>
+      <div class="bh-tile-sub" id="bhStressSub">–</div>
     </div>
   </div>
 
@@ -1524,11 +1550,16 @@
 <div class="event-modal-overlay" id="bodyHealthDetailModalOverlay" onclick="closeBodyHealthDetailModal(event)">
   <div class="event-modal-sheet" onclick="event.stopPropagation()">
     <div class="event-modal-handle"></div>
-    <div class="ov-page-title" id="bhDetailTitle" style="margin-bottom:6px;">Recovery</div>
-    <div class="event-modal-relative" id="bhDetailScoreLine" style="margin-bottom:14px;"></div>
-    <div id="bhDetailBody"></div>
+    <div class="ov-page-title" id="bhDetailTitle" style="margin-bottom:10px;">Recovery</div>
+    <div class="bh-detail-ring-row">
+      <div id="bhDetailRing"></div>
+      <div class="event-modal-relative" id="bhDetailScoreLine" style="margin:0;"></div>
+    </div>
+    <div id="bhDetailBody" style="margin-top:16px;"></div>
+    <div id="bhDetailTips"></div>
     <svg viewBox="0 0 320 140" class="stats-chart" id="bhDetailChart" preserveAspectRatio="none" style="margin-top:8px;"></svg>
     <div class="stats-chart-labels" id="bhDetailChartLabels"></div>
+    <div id="bhDetailWeek"></div>
     <button class="event-modal-close" onclick="closeBodyHealthDetailModal(event)" style="margin-top:14px;">Close</button>
   </div>
 </div>
@@ -2685,10 +2716,12 @@ async function loadRemoteBodyHealthLog() {
   }
 }
 
-// Mean/stddev of a field across the log, excluding today by default so
-// "today vs. your baseline" never includes today in its own baseline.
-function computeRollingStats_(log, field, excludeDate) {
-  const values = log.filter(e => e[field] != null && e.date !== excludeDate).map(e => e[field]);
+// Mean/stddev of a field using only days strictly before beforeDate, so
+// "day X vs. baseline" never leaks same-day or future data into its own
+// baseline (matters once the 7-day table/chart compute past days, not
+// just today).
+function computeRollingStats_(log, field, beforeDate) {
+  const values = log.filter(e => e[field] != null && e.date < beforeDate).map(e => e[field]);
   if (values.length === 0) return null;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
   const variance = values.reduce((a, b) => a + (b - mean) * (b - mean), 0) / values.length;
@@ -2721,9 +2754,9 @@ function bhStressBandFor_(score) {
 // resting HR as secondary context - both compared against a personal
 // rolling baseline (like Oura's "balance" concept) rather than a fixed
 // number, since a "good" HRV varies enormously person to person.
-function computeRecoveryScore() {
+function computeRecoveryScore(forDate) {
   const log = loadBodyHealthLog();
-  const today = dateKey(new Date());
+  const today = forDate || dateKey(new Date());
   const todayEntry = log.find(e => e.date === today);
   if (!todayEntry || (todayEntry.hrv == null && todayEntry.restingHR == null)) return null;
 
@@ -2766,9 +2799,9 @@ function bhSleepBandFor_(score) {
   return { label: 'Red', color: 'var(--red)' };
 }
 
-function computeSleepScore() {
+function computeSleepScore(forDate) {
   const log = loadBodyHealthLog();
-  const today = dateKey(new Date());
+  const today = forDate || dateKey(new Date());
   const todayEntry = log.find(e => e.date === today);
   if (!todayEntry || todayEntry.sleepHours == null) return null;
   const score = Math.max(0, Math.min(100, Math.round((todayEntry.sleepHours / 8) * 100)));
@@ -2811,19 +2844,19 @@ function computeDailyPushupVolume_(dateStr) {
 // expressed as a ratio against your own 30-day rolling average (a ratio
 // of 1.0 = a totally typical day for you) rather than an absolute scale -
 // same personal-baseline principle as Recovery/Sleep above.
-function computeStrainScore() {
+function computeStrainScore(forDate) {
   const log = loadBodyHealthLog();
-  const now = new Date();
-  const today = dateKey(now);
+  const today = forDate || dateKey(new Date());
+  const anchor = new Date(today + 'T00:00:00');
   const todayEntry = log.find(e => e.date === today);
 
   const cardioToday = computeCardioLoad_(todayEntry);
   const volumeToday = computeDailyPushupVolume_(today);
 
-  const cutoff = new Date(now);
+  const cutoff = new Date(anchor);
   cutoff.setDate(cutoff.getDate() - 30);
   const recentDates = [];
-  for (let d = new Date(cutoff); d <= now; d.setDate(d.getDate() + 1)) recentDates.push(dateKey(new Date(d)));
+  for (let d = new Date(cutoff); d <= anchor; d.setDate(d.getDate() + 1)) recentDates.push(dateKey(new Date(d)));
 
   const cardioValues = recentDates.map(d => computeCardioLoad_(log.find(e => e.date === d)));
   const volumeValues = recentDates.map(d => computeDailyPushupVolume_(d));
@@ -2845,8 +2878,9 @@ function computeStrainScore() {
 // trend-based approximation (recent 3-day HRV average vs. the prior 7)
 // rather than a copy of Recovery's point-in-time comparison, but it will
 // still often move together with Recovery given the shared input.
-function computeStressScore() {
-  const log = loadBodyHealthLog().filter(e => e.hrv != null).sort((a, b) => a.date.localeCompare(b.date));
+function computeStressScore(forDate) {
+  const today = forDate || dateKey(new Date());
+  const log = loadBodyHealthLog().filter(e => e.hrv != null && e.date <= today).sort((a, b) => a.date.localeCompare(b.date));
   if (log.length < 4) return null;
 
   const recent = log.slice(-3);
@@ -2861,16 +2895,105 @@ function computeStressScore() {
   return { score, band: bhStressBandFor_(score), recentAvg, priorAvg };
 }
 
-function setBodyHealthTile_(elId, result) {
-  const el = document.getElementById(elId);
-  if (!el) return;
-  if (result) {
-    el.textContent = result.score;
-    el.style.color = result.band.color;
-  } else {
-    el.textContent = '–';
-    el.style.color = '';
+// Circular progress ring - a small SVG track+arc with the score centered
+// on top as plain HTML text (crisper and easier to align than text inside
+// the SVG itself). Score null renders an empty gray ring with a dash.
+function bhRingHTML_(score, color, size, stroke) {
+  size = size || 100;
+  stroke = stroke || 9;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const pct = score == null ? 0 : Math.max(0, Math.min(100, score)) / 100;
+  const offset = (c * (1 - pct)).toFixed(2);
+  const ringColor = color || 'var(--muted)';
+  const fontSize = Math.round(size * 0.30);
+  return `
+    <div class="bh-ring" style="width:${size}px;height:${size}px;">
+      <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="rgba(245,230,210,0.08)" stroke-width="${stroke}"></circle>
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${ringColor}" stroke-width="${stroke}"
+          stroke-linecap="round" stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${offset}"
+          transform="rotate(-90 ${size / 2} ${size / 2})"></circle>
+      </svg>
+      <div class="bh-ring-number" style="color:${ringColor};font-size:${fontSize}px;">${score != null ? score : '–'}</div>
+    </div>`;
+}
+
+// Static, rule-based guidance keyed by category + band label - no AI call,
+// no cost, just plain text tied to whichever band the score landed in.
+const BH_TIPS = {
+  recovery: {
+    Green: ['Recovery is strong - a good day to push training intensity.', 'Whatever you did yesterday (sleep, hydration, easier effort) is likely why - keep it up.'],
+    Yellow: ['Recovery is moderate - a normal-effort day rather than a max-effort one.', 'Prioritizing sleep tonight helps push this back toward Green.'],
+    Red: ['Recovery is low - consider an easier training day or full rest.', 'Focus on sleep, hydration, and lower stress today to help HRV and resting HR bounce back.']
+  },
+  sleep: {
+    Green: ['You hit your sleep target - keep this bedtime consistent.'],
+    Yellow: ['A bit short of target - try shifting bedtime 30-60 minutes earlier.'],
+    Red: ['Well under target - prioritize an earlier bedtime tonight and limit screens beforehand.']
+  },
+  strain: {
+    Low: ['Low training load today - there’s room to add volume or intensity if you’re feeling good.'],
+    Moderate: ['A balanced training load for today.'],
+    High: ['High strain today - make sure tonight’s sleep matches the effort you put in.'],
+    Max: ['Very high strain - prioritize recovery tonight, and consider an easier day next.']
+  },
+  stress: {
+    Low: ['HRV trend looks stable - stress appears low right now.'],
+    Moderate: ['Some early signs of rising stress - keep an eye on sleep and downtime.'],
+    High: ['HRV trend suggests elevated stress - lighter training and extra recovery over the next day or two can help.']
   }
+};
+
+function bhTipsHTML_(type, bandLabel) {
+  const tips = (BH_TIPS[type] && BH_TIPS[type][bandLabel]) || [];
+  if (!tips.length) return '';
+  return `<div class="bh-tips">
+    <div class="event-modal-row-label" style="margin-bottom:8px;">What This Means</div>
+    <ul class="bh-tips-list">${tips.map(t => `<li>${t}</li>`).join('')}</ul>
+  </div>`;
+}
+
+// Last 7 days as a compact table, computed via the date-parameterized
+// score functions above rather than stored separately anywhere.
+function bhWeekTableHTML_(type) {
+  const today = new Date();
+  const rows = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ds = dateKey(d);
+    let result = null;
+    if (type === 'recovery') result = computeRecoveryScore(ds);
+    else if (type === 'sleep') result = computeSleepScore(ds);
+    else if (type === 'strain') result = computeStrainScore(ds);
+    else if (type === 'stress') result = computeStressScore(ds);
+    rows.push({ label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }), result });
+  }
+  if (!rows.some(r => r.result)) return '';
+  const rowsHTML = rows.map(r => `
+    <div class="bh-week-row">
+      <div class="bh-week-day">${r.label}</div>
+      <div class="${r.result ? 'bh-week-score' : 'bh-week-dash'}" style="${r.result ? 'color:' + r.result.band.color : ''}">${r.result ? r.result.score : '–'}</div>
+    </div>`).join('');
+  return `<div class="bh-week-table"><div class="event-modal-row-label" style="margin-bottom:8px;">Last 7 Days</div>${rowsHTML}</div>`;
+}
+
+// Score history (not raw metric history) across every logged day, for the
+// detail-modal trend chart - reuses the same date-parameterized functions.
+function bhScoreHistoryPoints_(type) {
+  const log = loadBodyHealthLog();
+  const dates = Array.from(new Set(log.map(e => e.date))).sort();
+  const points = [];
+  for (const d of dates) {
+    let r = null;
+    if (type === 'recovery') r = computeRecoveryScore(d);
+    else if (type === 'sleep') r = computeSleepScore(d);
+    else if (type === 'strain') r = computeStrainScore(d);
+    else if (type === 'stress') r = computeStressScore(d);
+    if (r) points.push({ date: d, value: r.score });
+  }
+  return points.slice(-14);
 }
 
 function renderBodyHealthTab() {
@@ -2878,21 +3001,22 @@ function renderBodyHealthTab() {
   document.getElementById('bhEmptyNote').style.display = log.length > 0 ? 'none' : 'block';
 
   const recovery = computeRecoveryScore();
-  const numEl = document.getElementById('bhRecoveryNumber');
-  const subEl = document.getElementById('bhRecoverySub');
-  if (recovery) {
-    numEl.textContent = recovery.score;
-    numEl.style.color = recovery.band.color;
-    subEl.textContent = recovery.enoughHistory ? recovery.band.label + ' recovery' : `${recovery.band.label} - still building your baseline`;
-  } else {
-    numEl.textContent = '–';
-    numEl.style.color = '';
-    subEl.textContent = 'No data yet';
-  }
+  document.getElementById('bhRecoveryRing').innerHTML = bhRingHTML_(recovery ? recovery.score : null, recovery ? recovery.band.color : null, 96, 10);
+  document.getElementById('bhRecoverySub').textContent = recovery
+    ? (recovery.enoughHistory ? recovery.band.label + ' recovery' : `${recovery.band.label} - still building your baseline`)
+    : 'No data yet';
 
-  setBodyHealthTile_('bhSleepNumber', computeSleepScore());
-  setBodyHealthTile_('bhStrainNumber', computeStrainScore());
-  setBodyHealthTile_('bhStressNumber', computeStressScore());
+  const sleep = computeSleepScore();
+  document.getElementById('bhSleepRing').innerHTML = bhRingHTML_(sleep ? sleep.score : null, sleep ? sleep.band.color : null, 74, 8);
+  document.getElementById('bhSleepSub').textContent = sleep ? sleep.sleepHours.toFixed(1) + ' hrs' : 'No data';
+
+  const strain = computeStrainScore();
+  document.getElementById('bhStrainRing').innerHTML = bhRingHTML_(strain ? strain.score : null, strain ? strain.band.color : null, 74, 8);
+  document.getElementById('bhStrainSub').textContent = strain ? strain.band.label : 'No data';
+
+  const stress = computeStressScore();
+  document.getElementById('bhStressRing').innerHTML = bhRingHTML_(stress ? stress.score : null, stress ? stress.band.color : null, 74, 8);
+  document.getElementById('bhStressSub').textContent = stress ? stress.band.label : 'No data';
 }
 
 // Generic line-chart renderer for Body Health trends - same visual
@@ -2926,46 +3050,47 @@ function renderBodyHealthLineChart_(svgId, labelsId, points) {
 }
 
 function openBodyHealthDetailModal(type) {
-  const log = loadBodyHealthLog();
   const titleEl = document.getElementById('bhDetailTitle');
+  const ringEl = document.getElementById('bhDetailRing');
   const scoreLineEl = document.getElementById('bhDetailScoreLine');
   const bodyEl = document.getElementById('bhDetailBody');
-  let points = [];
+
+  let result = null, label = '', bodyHTML = '';
 
   if (type === 'recovery') {
-    const r = computeRecoveryScore();
-    titleEl.textContent = 'Recovery';
-    scoreLineEl.textContent = r ? `${r.score} - ${r.band.label}` : 'No data yet';
-    bodyEl.innerHTML = r ? `
-      <div class="event-modal-row"><div class="event-modal-row-label">HRV</div><div class="event-modal-row-value">${r.hrv != null ? r.hrv.toFixed(0) + ' ms' : '–'}${r.hrvBaseline != null ? ' (avg ' + r.hrvBaseline.toFixed(0) + ' ms)' : ''}</div></div>
-      <div class="event-modal-row"><div class="event-modal-row-label">Resting Heart Rate</div><div class="event-modal-row-value">${r.restingHR != null ? r.restingHR.toFixed(0) + ' bpm' : '–'}${r.rhrBaseline != null ? ' (avg ' + r.rhrBaseline.toFixed(0) + ' bpm)' : ''}</div></div>
+    result = computeRecoveryScore();
+    label = 'Recovery';
+    bodyHTML = result ? `
+      <div class="event-modal-row"><div class="event-modal-row-label">HRV</div><div class="event-modal-row-value">${result.hrv != null ? result.hrv.toFixed(0) + ' ms' : '–'}${result.hrvBaseline != null ? ' (avg ' + result.hrvBaseline.toFixed(0) + ' ms)' : ''}</div></div>
+      <div class="event-modal-row"><div class="event-modal-row-label">Resting Heart Rate</div><div class="event-modal-row-value">${result.restingHR != null ? result.restingHR.toFixed(0) + ' bpm' : '–'}${result.rhrBaseline != null ? ' (avg ' + result.rhrBaseline.toFixed(0) + ' bpm)' : ''}</div></div>
     ` : '<div class="ov-mini-empty">No HRV/resting heart rate data synced yet.</div>';
-    points = log.filter(e => e.hrv != null).map(e => ({ date: e.date, value: e.hrv })).slice(-14);
   } else if (type === 'sleep') {
-    const s = computeSleepScore();
-    titleEl.textContent = 'Sleep';
-    scoreLineEl.textContent = s ? `${s.score} - ${s.band.label}` : 'No data yet';
-    bodyEl.innerHTML = s ? `<div class="event-modal-row"><div class="event-modal-row-label">Last Night</div><div class="event-modal-row-value">${s.sleepHours.toFixed(1)} hours</div></div>` : '<div class="ov-mini-empty">No sleep data synced yet.</div>';
-    points = log.filter(e => e.sleepHours != null).map(e => ({ date: e.date, value: e.sleepHours })).slice(-14);
+    result = computeSleepScore();
+    label = 'Sleep';
+    bodyHTML = result ? `<div class="event-modal-row"><div class="event-modal-row-label">Last Night</div><div class="event-modal-row-value">${result.sleepHours.toFixed(1)} hours</div></div>` : '<div class="ov-mini-empty">No sleep data synced yet.</div>';
   } else if (type === 'strain') {
-    const st = computeStrainScore();
-    titleEl.textContent = 'Strain';
-    scoreLineEl.textContent = st ? `${st.score} - ${st.band.label}` : 'No data yet';
-    bodyEl.innerHTML = st ? `
-      <div class="event-modal-row"><div class="event-modal-row-label">Cardio Load Today</div><div class="event-modal-row-value">${st.cardioToday.toFixed(0)} (avg ${st.cardioBaseline.toFixed(0)})</div></div>
-      <div class="event-modal-row"><div class="event-modal-row-label">Training Volume Today</div><div class="event-modal-row-value">${st.volumeToday} reps (avg ${st.volumeBaseline.toFixed(0)})</div></div>
+    result = computeStrainScore();
+    label = 'Strain';
+    bodyHTML = result ? `
+      <div class="event-modal-row"><div class="event-modal-row-label">Cardio Load Today</div><div class="event-modal-row-value">${result.cardioToday.toFixed(0)} (avg ${result.cardioBaseline.toFixed(0)})</div></div>
+      <div class="event-modal-row"><div class="event-modal-row-label">Training Volume Today</div><div class="event-modal-row-value">${result.volumeToday} reps (avg ${result.volumeBaseline.toFixed(0)})</div></div>
     ` : '<div class="ov-mini-empty">No workout or training data yet.</div>';
   } else if (type === 'stress') {
-    const sr = computeStressScore();
-    titleEl.textContent = 'Stress';
-    scoreLineEl.textContent = sr ? `${sr.score} - ${sr.band.label}` : 'No data yet';
-    bodyEl.innerHTML = sr
-      ? `<div class="ov-mini-empty">Estimated from your recent HRV trend (3-day avg ${sr.recentAvg.toFixed(0)}ms vs. prior ${sr.priorAvg.toFixed(0)}ms) - not a fully distinct signal from Recovery, since that needs continuous daytime HRV rather than one overnight reading.</div>`
+    result = computeStressScore();
+    label = 'Stress';
+    bodyHTML = result
+      ? `<div class="event-modal-row"><div class="event-modal-row-label">HRV Trend</div><div class="event-modal-row-value">3-day avg ${result.recentAvg.toFixed(0)} ms vs. prior ${result.priorAvg.toFixed(0)} ms</div></div><div class="ov-mini-empty">Not a fully distinct signal from Recovery yet - a truly separate Stress reading needs continuous daytime HRV, not one overnight reading.</div>`
       : '<div class="ov-mini-empty">Not enough HRV history yet.</div>';
-    points = log.filter(e => e.hrv != null).map(e => ({ date: e.date, value: e.hrv })).slice(-14);
   }
 
-  renderBodyHealthLineChart_('bhDetailChart', 'bhDetailChartLabels', points);
+  titleEl.textContent = label;
+  ringEl.innerHTML = bhRingHTML_(result ? result.score : null, result ? result.band.color : null, 108, 11);
+  scoreLineEl.textContent = result ? result.band.label : 'No data yet';
+  bodyEl.innerHTML = bodyHTML;
+  document.getElementById('bhDetailTips').innerHTML = result ? bhTipsHTML_(type, result.band.label) : '';
+  document.getElementById('bhDetailWeek').innerHTML = bhWeekTableHTML_(type);
+
+  renderBodyHealthLineChart_('bhDetailChart', 'bhDetailChartLabels', bhScoreHistoryPoints_(type));
   document.getElementById('bodyHealthDetailModalOverlay').classList.add('open');
 }
 
