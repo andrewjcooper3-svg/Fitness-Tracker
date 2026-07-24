@@ -121,14 +121,14 @@
   .app-tabs {
     position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 480px;
     display: flex; align-items: center; gap: 2px; z-index: 50;
-    height: 56px; box-sizing: content-box;
+    height: 68px; box-sizing: content-box;
     background: rgba(23,20,15,0.82); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border);
     padding: 0 6px calc(env(safe-area-inset-bottom, 0px));
     overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
   }
   .app-tabs::-webkit-scrollbar { display: none; }
-  .app-tab { flex: 0 0 auto; width: 72px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 14px; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
+  .app-tab { flex: 0 0 auto; width: 72px; height: 52px; display: flex; align-items: center; justify-content: center; padding: 0 14px; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
   .app-tab-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); transition: color 0.15s; }
   .app-tab.active { background: var(--surface2); }
   .app-tab.active .app-tab-label { color: var(--accent); font-weight: 700; }
