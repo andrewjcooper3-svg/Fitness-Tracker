@@ -220,7 +220,32 @@ function logBodyHealthEntry_(date, data, source) {
   const timeZone = sheet.getParent().getSpreadsheetTimeZone();
   const lastRow = sheet.getLastRow();
   const now = new Date();
-  const row = [
+
+  if (lastRow > 1) {
+    const dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < dates.length; i++) {
+      if (cellDateKey_(dates[i][0], timeZone) === date) {
+        const rowIndex = i + 2;
+        // Merge onto the existing row so a shortcut that only sends one
+        // metric (e.g. just sleep) doesn't blank out what the others already saved today.
+        const existing = sheet.getRange(rowIndex, 1, 1, BODY_HEALTH_HEADERS.length).getValues()[0];
+        const row = [
+          date,
+          data.sleepHours != null ? data.sleepHours : existing[1],
+          data.hrv != null ? data.hrv : existing[2],
+          data.restingHR != null ? data.restingHR : existing[3],
+          data.workoutMinutes != null ? data.workoutMinutes : existing[4],
+          data.avgWorkoutHR != null ? data.avgWorkoutHR : existing[5],
+          source || existing[6],
+          now
+        ];
+        sheet.getRange(rowIndex, 1, 1, BODY_HEALTH_HEADERS.length).setValues([row]);
+        return;
+      }
+    }
+  }
+
+  sheet.appendRow([
     date,
     data.sleepHours != null ? data.sleepHours : '',
     data.hrv != null ? data.hrv : '',
@@ -229,19 +254,7 @@ function logBodyHealthEntry_(date, data, source) {
     data.avgWorkoutHR != null ? data.avgWorkoutHR : '',
     source || '',
     now
-  ];
-
-  if (lastRow > 1) {
-    const dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (let i = 0; i < dates.length; i++) {
-      if (cellDateKey_(dates[i][0], timeZone) === date) {
-        const rowIndex = i + 2;
-        sheet.getRange(rowIndex, 1, 1, BODY_HEALTH_HEADERS.length).setValues([row]);
-        return;
-      }
-    }
-  }
-  sheet.appendRow(row);
+  ]);
 }
 
 function getBodyHealthLog_() {
