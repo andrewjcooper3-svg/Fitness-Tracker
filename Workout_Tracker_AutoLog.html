@@ -473,6 +473,9 @@
   .bh-week-day { color: var(--muted); }
   .bh-week-score { font-weight: 700; }
   .bh-week-dash { color: var(--muted); }
+
+  .barcode-video-wrap { position: relative; width: 100%; aspect-ratio: 3 / 4; background: #000; border-radius: 16px; overflow: hidden; }
+  .barcode-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
 </style>
 </head>
 <body>
@@ -1379,6 +1382,7 @@
   <div class="kitchen-section" id="kitchenSectionInventory">
     <div class="config-box">
       <div class="config-title" style="margin-bottom:10px;">Add Item</div>
+      <button class="ov-open-btn" onclick="openBarcodeScanModal()" style="width:100%; margin-bottom:8px; background:var(--surface2);">Scan Barcode</button>
       <input type="text" id="invItemName" class="config-input" placeholder="Item name" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
       <div class="weight-entry-row">
         <input type="number" id="invItemQty" class="config-input" placeholder="Qty" step="0.1" min="0">
@@ -1564,6 +1568,18 @@
   </div>
 </div>
 
+<div class="event-modal-overlay" id="barcodeScanModalOverlay" onclick="closeBarcodeScanModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-title" style="margin-bottom:10px;">Scan Barcode</div>
+    <div class="barcode-video-wrap">
+      <video id="barcodeScanVideo" playsinline muted></video>
+    </div>
+    <div class="config-status" id="barcodeScanStatus" style="margin-top:10px;">Point your camera at a barcode.</div>
+    <button class="event-modal-close" onclick="closeBarcodeScanModal(event)" style="margin-top:14px;">Cancel</button>
+  </div>
+</div>
+
 <div class="app-tabs" id="appTabs">
   <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">
     <div class="app-tab-label">Overview</div>
@@ -1594,6 +1610,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
 <script>
 const dayKeys = ['mon','tue','wed','thu','fri','sat','sun'];
 const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday', sat:'Saturday', sun:'Sunday' };
@@ -2084,6 +2101,80 @@ function deleteInventoryItem(id) {
   renderInventoryList();
   renderGroceryList();
   renderRecipeList();
+}
+
+/* ---- Barcode scanning (free, no manual entry for packaged items) ----
+   Camera decoding via ZXing (CDN, free/open-source - Safari has no native
+   BarcodeDetector API). Product lookup via Open Food Facts, a free/keyless
+   public database - same "free public API" pattern as the MealDB recipe
+   search elsewhere in this tab. */
+
+let barcodeScanControls_ = null;
+
+function openBarcodeScanModal() {
+  const statusEl = document.getElementById('barcodeScanStatus');
+  statusEl.textContent = 'Point your camera at a barcode.';
+  statusEl.classList.remove('warn');
+  document.getElementById('barcodeScanModalOverlay').classList.add('open');
+
+  if (typeof ZXingBrowser === 'undefined') {
+    statusEl.textContent = 'Barcode scanner failed to load - check your connection and try again.';
+    statusEl.classList.add('warn');
+    return;
+  }
+
+  const videoEl = document.getElementById('barcodeScanVideo');
+  const reader = new ZXingBrowser.BrowserMultiFormatReader();
+  reader.decodeFromVideoDevice(undefined, videoEl, (result) => {
+    if (result) handleBarcodeDecoded(result.getText());
+    // A NotFoundException fires continuously while no barcode is in frame - expected, not an error.
+  }).then(controls => { barcodeScanControls_ = controls; }).catch(() => {
+    statusEl.textContent = 'Could not access the camera - check camera permission for this site.';
+    statusEl.classList.add('warn');
+  });
+}
+
+function closeBarcodeScanModal(event) {
+  if (event) event.stopPropagation();
+  if (barcodeScanControls_) { barcodeScanControls_.stop(); barcodeScanControls_ = null; }
+  document.getElementById('barcodeScanModalOverlay').classList.remove('open');
+}
+
+async function handleBarcodeDecoded(barcode) {
+  if (barcodeScanControls_) { barcodeScanControls_.stop(); barcodeScanControls_ = null; }
+  const invStatusEl = document.getElementById('invAddStatus');
+  try {
+    const res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(barcode) + '.json');
+    const data = await res.json();
+    closeBarcodeScanModal();
+    if (data && data.status === 1 && data.product) {
+      prefillInventoryFromProduct_(data.product, barcode);
+    } else {
+      invStatusEl.textContent = `Barcode ${barcode} not found - enter details manually.`;
+      invStatusEl.classList.add('warn');
+    }
+  } catch (e) {
+    closeBarcodeScanModal();
+    invStatusEl.textContent = 'Could not look up that barcode - enter details manually.';
+    invStatusEl.classList.add('warn');
+  }
+}
+
+function prefillInventoryFromProduct_(product, barcode) {
+  const name = product.product_name || product.generic_name || ('Item ' + barcode);
+  const parsedQty = parseMeasureToQtyUnit_(product.quantity || '');
+
+  document.getElementById('invItemName').value = name;
+  if (parsedQty.qty != null) document.getElementById('invItemQty').value = parsedQty.qty;
+  if (parsedQty.unit) document.getElementById('invItemUnit').value = parsedQty.unit;
+  if (product.categories_tags && product.categories_tags[0]) {
+    document.getElementById('invItemCategory').value = product.categories_tags[0].replace(/^[a-z]{2}:/, '').replace(/-/g, ' ');
+  }
+
+  const statusEl = document.getElementById('invAddStatus');
+  statusEl.classList.remove('warn');
+  statusEl.textContent = `Found "${name}" - check the quantity, then Add to Inventory.`;
+  document.getElementById('invItemQty').focus();
 }
 
 /* ---- Recipes ---- */
