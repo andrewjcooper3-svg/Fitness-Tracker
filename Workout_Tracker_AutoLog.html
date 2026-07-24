@@ -127,7 +127,7 @@
     overflow-x: auto; scrollbar-width: none;
   }
   .app-tabs::-webkit-scrollbar { display: none; }
-  .app-tab { flex: 0 0 auto; min-width: 72px; display: flex; align-items: center; justify-content: center; padding: 10px 14px; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
+  .app-tab { flex: 0 0 auto; min-width: 72px; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 13px 14px; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
   .app-tab-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); transition: color 0.15s; }
   .app-tab.active { background: var(--surface2); }
   .app-tab.active .app-tab-label { color: var(--accent); font-weight: 700; }
@@ -421,7 +421,7 @@
   .ov-mini-weight-sub { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; }
 
   .kitchen-subtabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); border-radius: 14px; padding: 4px; }
-  .kitchen-subtab { flex: 1; background: none; border: none; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 9px 0; border-radius: 11px; cursor: pointer; }
+  .kitchen-subtab { flex: 1; min-height: 44px; background: none; border: none; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 13px 0; border-radius: 11px; cursor: pointer; }
   .kitchen-subtab.active { background: var(--surface2); color: var(--accent); }
   .kitchen-badge { display: inline-block; font-family: var(--font); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px; vertical-align: middle; }
   .kitchen-badge-red { background: rgba(193,87,58,0.18); color: var(--red); }
