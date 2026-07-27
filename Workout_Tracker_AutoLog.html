@@ -274,12 +274,23 @@
   .pu-ring-label { font-family: var(--font); font-size: 12px; font-weight: 700; }
   .pu-ring-value { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-  .pu-anim-card { background: var(--surface); border-radius: 18px; padding: 10px 14px 4px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: center; border: 1px solid rgba(245,230,210,0.06); }
-  .pu-anim-svg { width: 150px; height: 105px; cursor: pointer; }
-  .pu-anim-ground { stroke: var(--border); stroke-width: 3; stroke-linecap: round; }
-  .pu-anim-body, .pu-anim-arm, .pu-anim-arm2 { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
-  .pu-anim-head { fill: var(--accent); }
-  .pu-anim-caption { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; padding-bottom: 8px; }
+  /* Small ambient cooking animation, top-right of the Kitchen tab - pure
+     CSS keyframes (no JS) since it's just a looping stir + rising steam,
+     unlike the pushup figure this doesn't need a tap-to-interrupt state. */
+  .cook-anim-svg { width: 60px; height: 60px; overflow: visible; }
+  .cook-anim-line { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+  .cook-anim-head { fill: var(--accent); }
+  .cook-anim-arm { transform-origin: 66px 40px; animation: cookStir 1s ease-in-out infinite alternate; }
+  .cook-anim-steam { fill: none; stroke: var(--muted); stroke-width: 4; stroke-linecap: round; opacity: 0; }
+  .cook-anim-steam1 { animation: cookSteam 2.2s ease-in infinite; }
+  .cook-anim-steam2 { animation: cookSteam 2.2s ease-in infinite; animation-delay: 0.7s; }
+  .cook-anim-steam3 { animation: cookSteam 2.2s ease-in infinite; animation-delay: 1.4s; }
+  @keyframes cookStir { 0% { transform: rotate(-16deg); } 100% { transform: rotate(16deg); } }
+  @keyframes cookSteam {
+    0% { transform: translateY(0); opacity: 0; }
+    25% { opacity: 0.9; }
+    100% { transform: translateY(-16px); opacity: 0; }
+  }
 
   .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
   .cal-title { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
@@ -647,21 +658,6 @@
     </div>
   </div>
 
-  <div class="pu-anim-card">
-    <div class="pu-anim-caption" id="puAnimCaption">Keep going · tap him 💪</div>
-    <!-- Animated entirely via JS (requestAnimationFrame in initPushupAnim()
-         below) rather than SMIL <animate> - Safari doesn't reliably support
-         the beginElement()/endElement() scripting calls a tap-to-interrupt
-         effect needs, so plain attribute-setting is used instead for both
-         the idle loop and the flex detour. -->
-    <svg viewBox="0 0 120 90" class="pu-anim-svg" id="puAnimSvg" onclick="triggerPushupFlex()" aria-hidden="true">
-      <line class="pu-anim-ground" x1="8" y1="80" x2="112" y2="80"></line>
-      <polyline class="pu-anim-body" points="18,76 52,44 86,30"></polyline>
-      <polyline class="pu-anim-arm" points="86,30 86,53 86,76"></polyline>
-      <polyline class="pu-anim-arm2" points="86,30 86,30 86,30" opacity="0"></polyline>
-      <circle class="pu-anim-head" cx="95" cy="22" r="7"></circle>
-    </svg>
-  </div>
 
   <div class="ov-note">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Year total starts from a 26,395 balance as of Jul 19, plus what's logged here since.</div>
 </div>
@@ -1325,6 +1321,22 @@
       <div class="ov-page-week">Kitchen</div>
       <div class="ov-page-title">Kitchen</div>
     </div>
+    <svg viewBox="0 0 100 100" class="cook-anim-svg" aria-hidden="true">
+      <path class="cook-anim-steam cook-anim-steam1" d="M 38,54 Q 34,46 38,40"></path>
+      <path class="cook-anim-steam cook-anim-steam2" d="M 50,54 Q 46,46 50,38"></path>
+      <path class="cook-anim-steam cook-anim-steam3" d="M 62,54 Q 58,46 62,40"></path>
+      <path class="cook-anim-line" d="M 28,62 L 72,62 L 64,90 L 36,90 Z" fill="var(--surface2)"></path>
+      <ellipse class="cook-anim-line" cx="50" cy="62" rx="22" ry="5" fill="none"></ellipse>
+      <line class="cook-anim-line" x1="28" y1="66" x2="18" y2="66"></line>
+      <line class="cook-anim-line" x1="72" y1="66" x2="82" y2="66"></line>
+      <circle class="cook-anim-head" cx="76" cy="26" r="6"></circle>
+      <polyline class="cook-anim-line" points="76,32 68,54"></polyline>
+      <polyline class="cook-anim-line" points="70,40 78,48"></polyline>
+      <g class="cook-anim-arm">
+        <polyline class="cook-anim-line" points="72,38 52,62"></polyline>
+        <line class="cook-anim-line" x1="52" y1="62" x2="46" y2="66"></line>
+      </g>
+    </svg>
   </div>
 
   <div class="kitchen-subtabs">
@@ -4243,7 +4255,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-ajc-icon';
+const APP_BUILD_VERSION = '2026-07-27-cook-anim';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -4535,116 +4547,6 @@ function renderPushupsTab() {
   badgeEl.classList.toggle('behind', !ahead);
   badgeEl.textContent = ahead ? 'On Pace' : 'Behind';
   subEl.textContent = ahead ? 'reps ahead of pace' : 'reps behind pace';
-}
-
-// Stick-figure animation, driven entirely by requestAnimationFrame + plain
-// attribute-setting rather than SMIL <animate> - Safari doesn't reliably
-// support the beginElement()/endElement() scripting calls a tap-to-interrupt
-// effect needs (a long-standing WebKit gap), so this avoids that dependency
-// altogether. One rAF loop plays either the idle pushup cycle or, when
-// triggered, a one-shot stand-up-and-flex detour before returning to it.
-const PU_LOOP_DUR = 1200;
-const PU_LOOP_KEYTIMES = [0, 0.5, 1];
-const PU_LOOP_BODY = ['18,76 52,44 86,30', '18,76 52,58 86,62', '18,76 52,44 86,30'];
-const PU_LOOP_ARM = ['86,30 86,53 86,76', '86,62 94,69 86,76', '86,30 86,53 86,76'];
-const PU_LOOP_HEAD_CY = [22, 54, 22];
-
-const PU_DETOUR_DUR = 2000;
-const PU_DETOUR_KEYTIMES = [0, 0.18, 0.36, 0.68, 0.84, 1];
-const PU_DETOUR_BODY = ['18,76 52,44 86,30', '60,76 60,52 60,28', '60,76 60,52 60,28', '60,76 60,52 60,28', '60,76 60,52 60,28', '18,76 52,44 86,30'];
-const PU_DETOUR_ARM = ['86,30 86,53 86,76', '60,28 66,42 62,54', '60,28 80,32 74,12', '60,28 80,32 74,12', '60,28 66,42 62,54', '86,30 86,53 86,76'];
-const PU_DETOUR_ARM2 = ['86,30 86,30 86,30', '60,28 54,42 58,54', '60,28 40,32 46,12', '60,28 40,32 46,12', '60,28 54,42 58,54', '86,30 86,30 86,30'];
-const PU_DETOUR_ARM2_OPACITY = [0, 1, 1, 1, 1, 0];
-const PU_DETOUR_HEAD_CX = [95, 60, 60, 60, 60, 95];
-const PU_DETOUR_HEAD_CY = [22, 16, 16, 16, 16, 22];
-
-function parsePuPoints(str) {
-  return str.trim().split(/\s+/).map(pair => pair.split(',').map(Number));
-}
-function lerpNum(a, b, t) { return a + (b - a) * t; }
-function lerpPuPoints(a, b, t) {
-  return a.map((pt, i) => lerpNum(pt[0], b[i][0], t).toFixed(2) + ',' + lerpNum(pt[1], b[i][1], t).toFixed(2)).join(' ');
-}
-// Finds which [keyTimes[i], keyTimes[i+1]] segment `t` (0-1) falls in, plus
-// how far through that segment it is (also 0-1).
-function samplePuSegment(keyTimes, t) {
-  for (let i = 0; i < keyTimes.length - 1; i++) {
-    if (t <= keyTimes[i + 1] || i === keyTimes.length - 2) {
-      const span = keyTimes[i + 1] - keyTimes[i];
-      return { i: i, localT: span > 0 ? Math.min(1, (t - keyTimes[i]) / span) : 1 };
-    }
-  }
-  return { i: 0, localT: 0 };
-}
-
-const PU_BODY_KF = { loop: PU_LOOP_BODY.map(parsePuPoints), detour: PU_DETOUR_BODY.map(parsePuPoints) };
-const PU_ARM_KF = { loop: PU_LOOP_ARM.map(parsePuPoints), detour: PU_DETOUR_ARM.map(parsePuPoints) };
-const PU_ARM2_KF = { detour: PU_DETOUR_ARM2.map(parsePuPoints) };
-
-let puAnimEls = null;
-function getPuAnimEls() {
-  if (!puAnimEls) {
-    puAnimEls = {
-      body: document.querySelector('.pu-anim-body'),
-      arm: document.querySelector('.pu-anim-arm'),
-      arm2: document.querySelector('.pu-anim-arm2'),
-      head: document.querySelector('.pu-anim-head')
-    };
-  }
-  return puAnimEls;
-}
-
-let pushupFlexing = false;
-let puAnimMode = 'loop';
-let puAnimModeStart = null;
-let puAnimFrameId = null;
-
-function puAnimTick(now) {
-  const els = getPuAnimEls();
-  if (!els.body) { puAnimFrameId = null; return; }
-  if (puAnimModeStart === null) puAnimModeStart = now;
-
-  if (puAnimMode === 'loop') {
-    const t = ((now - puAnimModeStart) % PU_LOOP_DUR) / PU_LOOP_DUR;
-    const { i, localT } = samplePuSegment(PU_LOOP_KEYTIMES, t);
-    els.body.setAttribute('points', lerpPuPoints(PU_BODY_KF.loop[i], PU_BODY_KF.loop[i + 1], localT));
-    els.arm.setAttribute('points', lerpPuPoints(PU_ARM_KF.loop[i], PU_ARM_KF.loop[i + 1], localT));
-    els.head.setAttribute('cy', lerpNum(PU_LOOP_HEAD_CY[i], PU_LOOP_HEAD_CY[i + 1], localT));
-  } else {
-    const t = Math.min(1, (now - puAnimModeStart) / PU_DETOUR_DUR);
-    const { i, localT } = samplePuSegment(PU_DETOUR_KEYTIMES, t);
-    els.body.setAttribute('points', lerpPuPoints(PU_BODY_KF.detour[i], PU_BODY_KF.detour[i + 1], localT));
-    els.arm.setAttribute('points', lerpPuPoints(PU_ARM_KF.detour[i], PU_ARM_KF.detour[i + 1], localT));
-    els.arm2.setAttribute('points', lerpPuPoints(PU_ARM2_KF.detour[i], PU_ARM2_KF.detour[i + 1], localT));
-    els.arm2.setAttribute('opacity', lerpNum(PU_DETOUR_ARM2_OPACITY[i], PU_DETOUR_ARM2_OPACITY[i + 1], localT));
-    els.head.setAttribute('cx', lerpNum(PU_DETOUR_HEAD_CX[i], PU_DETOUR_HEAD_CX[i + 1], localT));
-    els.head.setAttribute('cy', lerpNum(PU_DETOUR_HEAD_CY[i], PU_DETOUR_HEAD_CY[i + 1], localT));
-
-    if (t >= 1) {
-      const captionEl = document.getElementById('puAnimCaption');
-      if (captionEl) captionEl.textContent = 'Keep going · tap him 💪';
-      pushupFlexing = false;
-      puAnimMode = 'loop';
-      puAnimModeStart = now;
-    }
-  }
-
-  puAnimFrameId = requestAnimationFrame(puAnimTick);
-}
-
-function startPuAnimLoop() {
-  if (puAnimFrameId !== null) return;
-  puAnimModeStart = null;
-  puAnimFrameId = requestAnimationFrame(puAnimTick);
-}
-
-function triggerPushupFlex() {
-  if (pushupFlexing) return;
-  pushupFlexing = true;
-  puAnimMode = 'detour';
-  puAnimModeStart = performance.now();
-  const captionEl = document.getElementById('puAnimCaption');
-  if (captionEl) captionEl.textContent = '💪 Nice!';
 }
 
 /* ---------- Calendar tab (reads iCloud Calendar via the Apps Script backend) ---------- */
@@ -6673,7 +6575,6 @@ flushPendingLogs();
 renderTrainerStats();
 initViewportHeightObserver();
 initTabBarViewportPin();
-startPuAnimLoop();
 loadWidgetOrder();
 loadWidgetSizes();
 goToView('overview', false);
