@@ -15,7 +15,7 @@
     --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(12px + env(safe-area-inset-top, 0px)) 12px calc(88px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(12px + env(safe-area-inset-top, 0px)) 12px calc(28px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; }
   .header { padding: 16px 2px 14px; margin-bottom: 14px; }
   .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
   .header-title { font-family: var(--font); font-size: 30px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.05; }
@@ -119,8 +119,9 @@
   .header-week { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--accent); margin-top: 3px; }
 
   .app-tabs {
+    display: none; /* replaced by .nav-wheel for this experiment - see below */
     position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 480px;
-    display: flex; align-items: center; gap: 2px; z-index: 50;
+    align-items: center; gap: 2px; z-index: 50;
     height: 68px; box-sizing: content-box;
     background: rgba(23,20,15,0.82); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border);
@@ -132,6 +133,18 @@
   .app-tab-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); transition: color 0.15s; }
   .app-tab.active { background: var(--surface2); }
   .app-tab.active .app-tab-label { color: var(--accent); font-weight: 700; }
+
+  .nav-wheel {
+    position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 86px; height: 86px; border-radius: 50%; z-index: 60;
+    background: rgba(23,20,15,0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border); box-shadow: 0 8px 22px rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+  }
+  .nav-wheel-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .nav-wheel-dot { transition: r 0.15s, fill 0.15s; }
+  .nav-wheel-label { font-family: var(--font); font-size: 10.5px; font-weight: 700; color: var(--accent); text-align: center; line-height: 1.15; max-width: 46px; pointer-events: none; }
   .icon { width: 22px; height: 22px; display: block; flex-shrink: 0; }
   .ptr-bar { display: flex; align-items: center; justify-content: center; overflow: hidden; height: 0; }
   .ptr-spinner { width: 28px; height: 28px; border-radius: 50%; background: var(--surface); box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--accent); }
@@ -1612,6 +1625,16 @@
   <div class="app-tab" data-view="music" onclick="showAppView('music')">
     <div class="app-tab-label">Music</div>
   </div>
+</div>
+
+<!-- Experimental nav wheel - swipe/drag around the dial to rotate through
+     tabs instead of the horizontal bar above (hidden via CSS while this
+     is active). Reuses the same .app-tab elements/showAppView() as the
+     single source of truth for what's "active" - this is purely an
+     alternate front-end control, not a parallel nav system. -->
+<div class="nav-wheel" id="navWheel">
+  <svg viewBox="0 0 100 100" class="nav-wheel-ring" id="navWheelRing"></svg>
+  <div class="nav-wheel-label" id="navWheelLabel">Overview</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/zxing-browser.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js';document.head.appendChild(s);"></script>
@@ -3779,6 +3802,101 @@ function initTabBarViewportPin() {
   window.visualViewport.addEventListener('resize', reposition);
   window.visualViewport.addEventListener('scroll', reposition);
   reposition();
+}
+
+// Experimental alternate nav: a dial in the bottom-left you drag around
+// to rotate through tabs, instead of the horizontal bar (hidden via CSS
+// while this is active - see .app-tabs { display: none; }). Deliberately
+// reuses viewOrder/showAppView as the single source of truth for what's
+// "active" rather than tracking its own separate state, so this is a
+// pure alternate front-end control, easy to pull back out if it doesn't
+// feel right on a real device.
+function renderNavWheelDots_(highlightIndex) {
+  const ring = document.getElementById('navWheelRing');
+  if (!ring) return;
+  const n = viewOrder.length;
+  const R = 40;
+  let svg = '<circle cx="50" cy="50" r="44" fill="none" stroke="rgba(245,230,210,0.08)" stroke-width="1.5"></circle>';
+  for (let i = 0; i < n; i++) {
+    const angle = (i * 360 / n - 90) * Math.PI / 180;
+    const x = 50 + R * Math.cos(angle);
+    const y = 50 + R * Math.sin(angle);
+    const active = i === highlightIndex;
+    svg += `<circle class="nav-wheel-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${active ? 5 : 3}" fill="${active ? 'var(--accent)' : 'var(--muted)'}"></circle>`;
+  }
+  ring.innerHTML = svg;
+}
+
+function syncNavWheelToActiveView_() {
+  const label = document.getElementById('navWheelLabel');
+  const activeTab = document.querySelector('.app-tab.active .app-tab-label');
+  if (label) label.textContent = activeTab ? activeTab.textContent : viewOrder[currentViewIndex];
+  renderNavWheelDots_(currentViewIndex);
+}
+
+function initNavWheel() {
+  const wheel = document.getElementById('navWheel');
+  if (!wheel) return;
+  syncNavWheelToActiveView_();
+
+  let dragging = false, startAngle = 0, startIndex = 0, moved = false, previewIndex = currentViewIndex;
+
+  function angleFromEvent(e) {
+    const rect = wheel.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const t = e.touches && e.touches[0] ? e.touches[0] : e;
+    return Math.atan2(t.clientY - cy, t.clientX - cx) * 180 / Math.PI;
+  }
+
+  function start(e) {
+    dragging = true;
+    moved = false;
+    startAngle = angleFromEvent(e);
+    startIndex = currentViewIndex;
+    previewIndex = currentViewIndex;
+  }
+
+  function move(e) {
+    if (!dragging) return;
+    const angle = angleFromEvent(e);
+    let delta = angle - startAngle;
+    while (delta > 180) delta -= 360;
+    while (delta < -180) delta += 360;
+    if (Math.abs(delta) > 6) moved = true;
+    const step = 360 / viewOrder.length;
+    const stepsMoved = Math.round(delta / step);
+    let idx = (startIndex + stepsMoved) % viewOrder.length;
+    if (idx < 0) idx += viewOrder.length;
+    if (idx !== previewIndex) {
+      previewIndex = idx;
+      renderNavWheelDots_(idx);
+      const label = document.getElementById('navWheelLabel');
+      const tab = document.querySelector(`.app-tab[data-view="${viewOrder[idx]}"] .app-tab-label`);
+      if (label && tab) label.textContent = tab.textContent;
+    }
+    e.preventDefault();
+  }
+
+  function end() {
+    if (!dragging) return;
+    dragging = false;
+    if (moved) {
+      showAppView(viewOrder[previewIndex]);
+    } else {
+      // A plain tap (no real drag) advances to the next tab - a quick
+      // discoverable fallback alongside the rotate gesture.
+      showAppView(viewOrder[(currentViewIndex + 1) % viewOrder.length]);
+    }
+    syncNavWheelToActiveView_();
+  }
+
+  wheel.addEventListener('touchstart', start, { passive: true });
+  wheel.addEventListener('touchmove', move, { passive: false });
+  wheel.addEventListener('touchend', end);
+  wheel.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', e => { if (dragging) move(e); });
+  window.addEventListener('mouseup', end);
 }
 
 // Aggregates every day panel's current in-page state (all 7 days live in
@@ -6091,6 +6209,7 @@ flushPendingLogs();
 renderTrainerStats();
 initViewportHeightObserver();
 initTabBarViewportPin();
+initNavWheel();
 startPuAnimLoop();
 loadWidgetOrder();
 loadWidgetSizes();
