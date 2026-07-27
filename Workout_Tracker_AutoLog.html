@@ -412,6 +412,7 @@
   .weight-history-date { font-family: var(--font); font-size: 13px; color: var(--muted); flex: 1; min-width: 0; }
   .weight-history-value { font-family: var(--font); font-size: 14px; font-weight: 700; white-space: nowrap; }
   .weight-history-del { background: none; border: none; color: var(--muted); font-size: 19px; line-height: 1; cursor: pointer; padding: 4px 2px; flex-shrink: 0; }
+  .weight-history-edit { background: none; border: none; color: var(--accent); font-family: var(--font); font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 4px; flex-shrink: 0; }
 
   .stats-card { background: var(--surface); border-radius: 18px; padding: 16px; margin-bottom: 12px; border: 1px solid rgba(245,230,210,0.06); }
   .stats-card-title { font-family: var(--font); font-size: 13px; font-weight: 700; margin-bottom: 12px; }
@@ -1402,7 +1403,8 @@
       <label class="kitchen-checkbox-label" style="margin-top:10px;">
         <input type="checkbox" id="invItemNotTracked"> Pantry staple (salt, oil, etc. - never flagged as missing/low)
       </label>
-      <button class="ov-open-btn" onclick="addInventoryItem()" style="margin-top:10px;">Add to Inventory</button>
+      <button class="ov-open-btn" id="invAddBtn" onclick="addInventoryItem()" style="margin-top:10px;">Add to Inventory</button>
+      <button class="ov-open-btn" id="invCancelEditBtn" onclick="cancelEditInventoryItem()" style="margin-top:8px; display:none; background:transparent;">Cancel Edit</button>
       <div class="config-status" id="invAddStatus"></div>
     </div>
 
@@ -1506,6 +1508,10 @@
       <div class="settings-field">
         <div class="sp-config-label" style="margin:0 0 6px;">Yearly goal (total reps)</div>
         <input type="number" id="settingsYearGoal" class="config-input" min="0" step="1000">
+      </div>
+      <div class="settings-field">
+        <div class="sp-config-label" style="margin:0 0 6px;">Correct total reps this year (optional - only if the running total is off)</div>
+        <input type="number" id="settingsYearCorrection" class="config-input" min="0" step="1" placeholder="e.g. 37381">
       </div>
       <button class="ov-open-btn" onclick="saveSettings()" style="margin-top:12px;">Save</button>
       <div class="config-status" id="settingsStatus"></div>
@@ -1662,17 +1668,34 @@ function saveSettings() {
   const statusEl = document.getElementById('settingsStatus');
   const dailyBaseline = parseFloat(document.getElementById('settingsDailyBaseline').value);
   const yearGoal = parseFloat(document.getElementById('settingsYearGoal').value);
+  const yearCorrectionRaw = document.getElementById('settingsYearCorrection').value;
   if (!(dailyBaseline > 0) || !(yearGoal > 0)) {
     statusEl.textContent = 'Both fields need a positive number.';
     statusEl.classList.add('warn');
     return;
   }
+  if (yearCorrectionRaw !== '' && !(parseFloat(yearCorrectionRaw) >= 0)) {
+    statusEl.textContent = 'Year total correction needs a positive number.';
+    statusEl.classList.add('warn');
+    return;
+  }
+
   const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
   saved.dailyBaseline = dailyBaseline;
   saved.yearGoal = yearGoal;
   localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
   PUSHUP_DAILY_BASELINE = dailyBaseline;
   PUSHUP_YEAR_GOAL = yearGoal;
+
+  if (yearCorrectionRaw !== '') {
+    // Re-anchors the year-carry-forward balance to today, same mechanism as
+    // the original one-time seed - only the days logged strictly after
+    // today ever get added on top, so this can be corrected again later
+    // without double-counting anything already folded into the new total.
+    localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify({ asOf: dateKey(new Date()), total: parseFloat(yearCorrectionRaw) }));
+    document.getElementById('settingsYearCorrection').value = '';
+  }
+
   statusEl.classList.remove('warn');
   statusEl.textContent = 'Saved.';
   renderOverview();
@@ -2020,6 +2043,10 @@ function showKitchenSection(section) {
 
 /* ---- Inventory ---- */
 
+function formatExpirationDate_(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+}
+
 function renderInventoryList() {
   const el = document.getElementById('inventoryList');
   if (!el) return;
@@ -2031,22 +2058,38 @@ function renderInventoryList() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  el.innerHTML = items.slice().sort((a, b) => a.name.localeCompare(b.name)).map(it => {
+  // Soonest-expiring first (so this list actually functions as an
+  // expiration tracker, not just an alphabetical inventory) - items with
+  // no expiration date sort to the end, then alphabetically among ties.
+  const sorted = items.slice().sort((a, b) => {
+    if (a.expirationDate && b.expirationDate) {
+      if (a.expirationDate !== b.expirationDate) return a.expirationDate < b.expirationDate ? -1 : 1;
+    } else if (a.expirationDate || b.expirationDate) {
+      return a.expirationDate ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  el.innerHTML = sorted.map(it => {
     let expBadge = '';
     if (it.expirationDate) {
       const exp = new Date(it.expirationDate + 'T00:00:00');
       const daysLeft = Math.round((exp - today) / 86400000);
       if (daysLeft < 0) expBadge = '<span class="kitchen-badge kitchen-badge-red">Expired</span>';
       else if (daysLeft <= 3) expBadge = `<span class="kitchen-badge kitchen-badge-amber">${daysLeft}d left</span>`;
+      else expBadge = `<span class="kitchen-badge kitchen-badge-muted">${escapeHtml_(formatExpirationDate_(it.expirationDate))}</span>`;
     }
     const staple = it.notTracked ? '<span class="kitchen-badge kitchen-badge-muted">Staple</span>' : '';
     return `<div class="weight-history-row">
       <div class="weight-history-date">${escapeHtml_(it.name)}${staple}${expBadge}</div>
       <div class="weight-history-value">${it.qty}${it.unit ? ' ' + escapeHtml_(it.unit) : ''}</div>
+      <button class="weight-history-edit" onclick="openEditInventoryItem('${it.id}')">Edit</button>
       <button class="weight-history-del" onclick="deleteInventoryItem('${it.id}')">×</button>
     </div>`;
   }).join('');
 }
+
+let editingInventoryId = null;
 
 function addInventoryItem() {
   const nameEl = document.getElementById('invItemName');
@@ -2069,9 +2112,7 @@ function addInventoryItem() {
     return;
   }
 
-  const items = loadInventory();
-  items.push({
-    id: genId_(),
+  const fields = {
     name,
     qty,
     unit: unitEl.value.trim(),
@@ -2082,19 +2123,65 @@ function addInventoryItem() {
     packageLabel: packageLabelEl.value.trim(),
     expirationDate: expEl.value || null,
     notTracked: notTrackedEl.checked
-  });
+  };
+
+  const items = loadInventory();
+  if (editingInventoryId) {
+    const idx = items.findIndex(i => i.id === editingInventoryId);
+    if (idx !== -1) items[idx] = Object.assign({}, items[idx], fields);
+    editingInventoryId = null;
+  } else {
+    items.push(Object.assign({ id: genId_() }, fields));
+  }
   saveInventoryList(items);
 
   statusEl.classList.remove('warn');
-  statusEl.textContent = 'Added.';
-  nameEl.value = ''; qtyEl.value = ''; unitEl.value = ''; categoryEl.value = ''; costEl.value = ''; parLevelEl.value = '';
-  packageSizeEl.value = ''; packageLabelEl.value = ''; expEl.value = '';
-  notTrackedEl.checked = false;
+  statusEl.textContent = 'Saved.';
+  cancelEditInventoryItem();
 
   relinkAllRecipesToInventory_();
   renderInventoryList();
   renderGroceryList();
   renderRecipeList();
+}
+
+function openEditInventoryItem(id) {
+  const item = loadInventory().find(i => i.id === id);
+  if (!item) return;
+  editingInventoryId = id;
+
+  document.getElementById('invItemName').value = item.name;
+  document.getElementById('invItemQty').value = item.qty;
+  document.getElementById('invItemUnit').value = item.unit || '';
+  document.getElementById('invItemCategory').value = item.category || '';
+  document.getElementById('invItemCost').value = item.cost != null ? item.cost : '';
+  document.getElementById('invItemParLevel').value = item.parLevel != null ? item.parLevel : '';
+  document.getElementById('invItemPackageSize').value = item.packageSize != null ? item.packageSize : '';
+  document.getElementById('invItemPackageLabel').value = item.packageLabel || '';
+  document.getElementById('invItemExpiration').value = item.expirationDate || '';
+  document.getElementById('invItemNotTracked').checked = !!item.notTracked;
+
+  document.getElementById('invAddBtn').textContent = 'Update Item';
+  document.getElementById('invCancelEditBtn').style.display = 'block';
+  document.getElementById('invAddStatus').textContent = '';
+  document.getElementById('invAddStatus').classList.remove('warn');
+  updateViewportHeight('kitchen', true);
+}
+
+function cancelEditInventoryItem() {
+  editingInventoryId = null;
+  document.getElementById('invItemName').value = '';
+  document.getElementById('invItemQty').value = '';
+  document.getElementById('invItemUnit').value = '';
+  document.getElementById('invItemCategory').value = '';
+  document.getElementById('invItemCost').value = '';
+  document.getElementById('invItemParLevel').value = '';
+  document.getElementById('invItemPackageSize').value = '';
+  document.getElementById('invItemPackageLabel').value = '';
+  document.getElementById('invItemExpiration').value = '';
+  document.getElementById('invItemNotTracked').checked = false;
+  document.getElementById('invAddBtn').textContent = 'Add to Inventory';
+  document.getElementById('invCancelEditBtn').style.display = 'none';
 }
 
 function deleteInventoryItem(id) {
