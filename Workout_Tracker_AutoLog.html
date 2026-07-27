@@ -662,20 +662,6 @@
 </div>
 
 <div id="view-calendar" class="app-view">
-  <div class="config-box">
-    <div class="config-toggle" onclick="toggleCalendarConfig()">
-      <div class="config-title">⚙ Calendar Worker</div>
-      <div class="config-chevron" id="calendarConfigChevron">▸</div>
-    </div>
-    <div class="config-body" id="calendarConfigBody">
-      <div class="config-row">
-        <input type="text" id="calendarWorkerUrl" class="config-input" placeholder="Paste Cloudflare Worker URL">
-        <button class="config-save" onclick="saveCalendarWorkerUrl()">Save</button>
-      </div>
-      <div class="config-status" id="calendarConfigStatus">Not connected — paste your Worker URL above.</div>
-    </div>
-  </div>
-
   <div class="cal-header">
     <div class="cal-title">Upcoming</div>
     <button class="cal-refresh-btn" onclick="loadCalendarEvents()" title="Refresh">↻</button>
@@ -732,29 +718,7 @@
     <div class="dj-recent-row" id="djRecentRow"><div class="sp-playlists-empty">Connect Spotify first</div></div>
   </div>
 
-  <div class="config-box sp-config-box">
-    <div class="config-toggle" onclick="toggleSpotifyConfig()">
-      <div class="config-title">⚙ Spotify Settings</div>
-      <div class="config-chevron" id="spotifyConfigChevron">▸</div>
-    </div>
-    <div class="config-body" id="spotifyConfigBody">
-      <div class="config-row">
-        <input type="text" id="spotifyClientId" class="config-input" placeholder="Spotify Client ID">
-        <button class="config-save" onclick="saveSpotifyClientId()">Save</button>
-      </div>
-      <div class="config-status" id="spotifyConfigStatus">Not connected — paste your Client ID, save, then connect.</div>
-      <button class="ov-open-btn" id="spotifyConnectBtn" onclick="connectSpotify()" style="margin-top:8px;">Connect Spotify</button>
-
-      <div class="sp-config-label">Workout playlist (Trainer tab shuffle button)</div>
-      <div class="config-row">
-        <input type="text" id="spWorkoutPlaylistLink" class="config-input" placeholder="Playlist link">
-        <button class="config-save" onclick="saveSpotifyWorkoutPlaylist()">Save</button>
-      </div>
-      <div class="sp-config-hint">Pin playlists to Quick Access with the ☆ on any tile in Your Playlists, above.</div>
-    </div>
-  </div>
-
-  <div class="ov-note">Full playback control via Spotify's Web API - needs Premium and an active device (open Spotify somewhere first).</div>
+  <div class="ov-note">Full playback control via Spotify's Web API - needs Premium and an active device (open Spotify somewhere first). Connect Spotify and set your workout playlist in Settings (gear icon, Overview tab).</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -773,7 +737,7 @@
   <div class="sp-shuffle-icon">🔀</div>
   <div class="sp-shuffle-text">
     <div class="sp-shuffle-label">Shuffle Play</div>
-    <div class="sp-shuffle-playlist" id="spShufflePlaylistName">Not configured — set a playlist link in Spotify config</div>
+    <div class="sp-shuffle-playlist" id="spShufflePlaylistName">Not configured — set a playlist link in Settings</div>
   </div>
   <div class="sp-shuffle-status" id="spShuffleStatus"></div>
 </div>
@@ -790,20 +754,6 @@
   <div class="ov-tile">
     <div class="ov-tile-label">Days Active</div>
     <div class="ov-tile-value" id="ovDaysActive">0 / 7</div>
-  </div>
-</div>
-
-<div class="config-box">
-  <div class="config-toggle" onclick="toggleConfig()">
-    <div class="config-title">⚙ Google Sheet Sync</div>
-    <div class="config-chevron" id="configChevron">▸</div>
-  </div>
-  <div class="config-body" id="configBody">
-    <div class="config-row">
-      <input type="text" id="deploymentUrl" class="config-input" placeholder="Paste Apps Script deployment URL">
-      <button class="config-save" onclick="saveDeploymentUrl()">Save</button>
-    </div>
-    <div class="config-status" id="configStatus">Not connected — paste your Web App URL above.</div>
   </div>
 </div>
 
@@ -1419,18 +1369,6 @@
         <button class="config-save" onclick="searchRecipes()">Search</button>
       </div>
       <div id="mealdbResults"></div>
-
-      <div class="config-toggle" onclick="toggleSpoonacularConfig()" style="margin-top:10px;">
-        <div class="config-title">⚙ More Recipes (Spoonacular)</div>
-        <div class="config-chevron" id="spoonacularConfigChevron">▸</div>
-      </div>
-      <div class="config-body" id="spoonacularConfigBody">
-        <div class="config-row">
-          <input type="text" id="spoonacularApiKey" class="config-input" placeholder="Spoonacular API key">
-          <button class="config-save" onclick="saveSpoonacularApiKey()">Save</button>
-        </div>
-        <div class="config-status" id="spoonacularConfigStatus">Optional - TheMealDB alone is a small database. A free key at spoonacular.com/food-api adds thousands more results to every search.</div>
-      </div>
     </div>
 
     <button class="ov-open-btn" onclick="openNewRecipeForm()" style="margin-bottom:12px;">+ Add Recipe Manually</button>
@@ -1475,7 +1413,7 @@
     </div>
   </div>
 
-  <div class="ov-note">Inventory and recipes are saved on this device. Recipe search pulls from TheMealDB (free, no account) and, if you add a free API key, Spoonacular too - see "More Recipes" above the results.</div>
+  <div class="ov-note">Inventory and recipes are saved on this device. Recipe search always pulls from TheMealDB (free, no account) - add free Spoonacular/Edamam keys in Settings (gear icon, Overview tab) for many more results.</div>
 </div>
 
 </div>
@@ -1536,6 +1474,78 @@
       <div class="config-status" id="bodyHealthSettingsStatus"></div>
     </div>
     <div class="ov-note">Changes apply immediately across Overview, Pushups, and Stats.</div>
+
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:10px;">API Connections</div>
+
+      <div class="config-toggle" onclick="toggleConfig()">
+        <div class="config-title">⚙ Google Sheet Sync</div>
+        <div class="config-chevron" id="configChevron">▸</div>
+      </div>
+      <div class="config-body" id="configBody">
+        <div class="config-row">
+          <input type="text" id="deploymentUrl" class="config-input" placeholder="Paste Apps Script deployment URL">
+          <button class="config-save" onclick="saveDeploymentUrl()">Save</button>
+        </div>
+        <div class="config-status" id="configStatus">Not connected — paste your Web App URL above.</div>
+      </div>
+
+      <div class="config-toggle" onclick="toggleCalendarConfig()" style="margin-top:14px;">
+        <div class="config-title">⚙ Calendar Worker</div>
+        <div class="config-chevron" id="calendarConfigChevron">▸</div>
+      </div>
+      <div class="config-body" id="calendarConfigBody">
+        <div class="config-row">
+          <input type="text" id="calendarWorkerUrl" class="config-input" placeholder="Paste Cloudflare Worker URL">
+          <button class="config-save" onclick="saveCalendarWorkerUrl()">Save</button>
+        </div>
+        <div class="config-status" id="calendarConfigStatus">Not connected — paste your Worker URL above.</div>
+      </div>
+
+      <div class="config-toggle" onclick="toggleSpotifyConfig()" style="margin-top:14px;">
+        <div class="config-title">⚙ Spotify</div>
+        <div class="config-chevron" id="spotifyConfigChevron">▸</div>
+      </div>
+      <div class="config-body" id="spotifyConfigBody">
+        <div class="config-row">
+          <input type="text" id="spotifyClientId" class="config-input" placeholder="Spotify Client ID">
+          <button class="config-save" onclick="saveSpotifyClientId()">Save</button>
+        </div>
+        <div class="config-status" id="spotifyConfigStatus">Not connected — paste your Client ID, save, then connect.</div>
+        <button class="ov-open-btn" id="spotifyConnectBtn" onclick="connectSpotify()" style="margin-top:8px;">Connect Spotify</button>
+
+        <div class="sp-config-label">Workout playlist (Trainer tab shuffle button)</div>
+        <div class="config-row">
+          <input type="text" id="spWorkoutPlaylistLink" class="config-input" placeholder="Playlist link">
+          <button class="config-save" onclick="saveSpotifyWorkoutPlaylist()">Save</button>
+        </div>
+        <div class="sp-config-hint">Pin playlists to Quick Access with the ☆ on any tile in the Music tab's Your Playlists.</div>
+      </div>
+
+      <div class="config-toggle" onclick="toggleSpoonacularConfig()" style="margin-top:14px;">
+        <div class="config-title">⚙ Recipe Search Sources</div>
+        <div class="config-chevron" id="spoonacularConfigChevron">▸</div>
+      </div>
+      <div class="config-body" id="spoonacularConfigBody">
+        <div class="sp-config-label" style="margin-top:0;">Spoonacular</div>
+        <div class="config-row">
+          <input type="text" id="spoonacularApiKey" class="config-input" placeholder="Spoonacular API key">
+          <button class="config-save" onclick="saveSpoonacularApiKey()">Save</button>
+        </div>
+        <div class="config-status" id="spoonacularConfigStatus">Optional - TheMealDB alone is a small database. A free key at spoonacular.com/food-api adds thousands more results to every search.</div>
+
+        <div class="sp-config-label">Edamam</div>
+        <div class="config-row">
+          <input type="text" id="edamamAppId" class="config-input" placeholder="Edamam App ID">
+        </div>
+        <div class="config-row" style="margin-top:6px;">
+          <input type="text" id="edamamAppKey" class="config-input" placeholder="Edamam App Key">
+          <button class="config-save" onclick="saveEdamamKeys()">Save</button>
+        </div>
+        <div class="config-status" id="edamamConfigStatus">Optional - a free App ID + App Key at edamam.com/edamam-recipe-api adds another large database. Note: Edamam only gives ingredients + a link to the source page, not full instructions.</div>
+      </div>
+    </div>
+
     <button class="event-modal-close" onclick="closeSettingsModal(event)">Close</button>
   </div>
 </div>
@@ -1661,6 +1671,17 @@ function renderSettingsTab() {
   // to tell a save that silently failed apart from one that worked.
   const currentTotal = computePushupStats().year.actual;
   document.getElementById('settingsCurrentYearTotal').textContent = `Current total: ${currentTotal.toLocaleString()}`;
+
+  // API Connections - all now live here rather than scattered across
+  // tabs, so re-populate every field each time Settings opens (in case a
+  // remote sync landed while it was closed).
+  loadDeploymentUrl();
+  loadCalendarWorkerUrl();
+  loadSpotifyClientId();
+  loadSpotifyPlaylistInputs();
+  updateSpotifyConfigStatus();
+  loadSpoonacularApiKey();
+  loadEdamamKeys();
 }
 
 function saveBodyHealthSettings() {
@@ -2716,6 +2737,35 @@ async function searchSpoonacularResults_(q) {
   }
 }
 
+// Edamam (edamam.com/edamam-recipe-api) - a third, very large recipe
+// database (2M+ recipes) via a free App ID + App Key, no credit card.
+// Its search response already includes everything needed to import
+// (ingredients with structured quantity/measure) with no separate detail
+// fetch, unlike TheMealDB/Spoonacular - so results are cached here by a
+// short synthetic id and importEdamamRecipe() just reads back out of this
+// cache instead of spending another request. One real limitation: Edamam's
+// license only lets them return ingredient lines plus a link to the
+// original recipe's page, not full step-by-step instructions - so an
+// imported Edamam recipe's "instructions" is just that link.
+let edamamResultsCache_ = {};
+let edamamResultCounter_ = 0;
+async function searchEdamamResults_(q) {
+  const { appId, appKey } = getEdamamKeys();
+  if (!appId || !appKey) return [];
+  try {
+    const res = await fetch(`https://api.edamam.com/api/recipes/v2?type=public&q=${encodeURIComponent(q)}&app_id=${encodeURIComponent(appId)}&app_key=${encodeURIComponent(appKey)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.hits || []).map(h => h.recipe).filter(Boolean).map(r => {
+      const id = 'e' + (edamamResultCounter_++);
+      edamamResultsCache_[id] = r;
+      return { id, name: r.label, image: r.image, source: 'edamam' };
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
 async function searchRecipes() {
   const q = document.getElementById('mealdbSearchInput').value.trim();
   const resultsEl = document.getElementById('mealdbResults');
@@ -2723,11 +2773,12 @@ async function searchRecipes() {
   resultsEl.innerHTML = '<div class="ov-mini-empty">Searching…</div>';
 
   try {
-    const [mealDbResults, spoonacularResults] = await Promise.all([
+    const [mealDbResults, spoonacularResults, edamamResults] = await Promise.all([
       searchMealDbResults_(q).catch(() => []),
-      searchSpoonacularResults_(q).catch(() => [])
+      searchSpoonacularResults_(q).catch(() => []),
+      searchEdamamResults_(q).catch(() => [])
     ]);
-    const merged = mealDbResults.concat(spoonacularResults);
+    const merged = mealDbResults.concat(spoonacularResults, edamamResults);
 
     if (merged.length === 0) {
       resultsEl.innerHTML = '<div class="ov-mini-empty">No matches.</div>';
@@ -2798,7 +2849,27 @@ function migrateRecipeIngredientMeasures_() {
 
 function importRecipeResult(source, id) {
   if (source === 'spoonacular') return importSpoonacularRecipe(id);
+  if (source === 'edamam') return importEdamamRecipe(id);
   return importMealDbRecipe(id);
+}
+
+function importEdamamRecipe(id) {
+  const r = edamamResultsCache_[id];
+  if (!r) return;
+
+  const ingredients = (r.ingredients || []).map(ing => ({
+    name: ing.food || ing.text || '',
+    inventoryId: null,
+    qty: typeof ing.quantity === 'number' && ing.quantity > 0 ? ing.quantity : null,
+    unit: (ing.measure && ing.measure !== '<unit>') ? ing.measure : '',
+    notTracked: false
+  })).filter(ing => ing.name);
+
+  const instructions = 'Full instructions: ' + (r.url || r.shareAs || '(link unavailable)');
+
+  openNewRecipeForm({ name: r.label, image: r.image, instructions, ingredients });
+  document.getElementById('mealdbResults').innerHTML = '';
+  document.getElementById('mealdbSearchInput').value = '';
 }
 
 async function importMealDbRecipe(mealId) {
@@ -2868,6 +2939,7 @@ function saveSpoonacularApiKey() {
   document.getElementById('spoonacularConfigStatus').textContent = val
     ? '✓ Key saved - Spoonacular results included in every search.'
     : 'Optional - TheMealDB alone is a small database. A free key at spoonacular.com/food-api adds thousands more results to every search.';
+  syncApiKeysToRemote();
 }
 function loadSpoonacularApiKey() {
   const key = getSpoonacularApiKey();
@@ -2879,6 +2951,70 @@ function toggleSpoonacularConfig() {
   const chevron = document.getElementById('spoonacularConfigChevron');
   body.classList.toggle('expanded');
   chevron.textContent = body.classList.contains('expanded') ? '▾' : '▸';
+}
+
+const STORAGE_EDAMAM_APP_ID = 'WORKOUT_EDAMAM_APP_ID';
+const STORAGE_EDAMAM_APP_KEY = 'WORKOUT_EDAMAM_APP_KEY';
+function getEdamamKeys() {
+  return {
+    appId: localStorage.getItem(STORAGE_EDAMAM_APP_ID) || '',
+    appKey: localStorage.getItem(STORAGE_EDAMAM_APP_KEY) || ''
+  };
+}
+function saveEdamamKeys() {
+  const appId = document.getElementById('edamamAppId').value.trim();
+  const appKey = document.getElementById('edamamAppKey').value.trim();
+  localStorage.setItem(STORAGE_EDAMAM_APP_ID, appId);
+  localStorage.setItem(STORAGE_EDAMAM_APP_KEY, appKey);
+  document.getElementById('edamamConfigStatus').textContent = (appId && appKey)
+    ? '✓ Keys saved - Edamam results included in every search.'
+    : 'Optional - a free App ID + App Key at edamam.com/edamam-recipe-api adds another large database. Note: Edamam only gives ingredients + a link to the source page, not full instructions.';
+  syncApiKeysToRemote();
+}
+function loadEdamamKeys() {
+  const { appId, appKey } = getEdamamKeys();
+  document.getElementById('edamamAppId').value = appId;
+  document.getElementById('edamamAppKey').value = appKey;
+  if (appId && appKey) document.getElementById('edamamConfigStatus').textContent = '✓ Keys saved - Edamam results included in every search.';
+}
+
+// Whole-blob sync for the recipe-source API keys, same pattern as
+// Kitchen/Spotify - debounced push on any save, pulled and applied on
+// load so a key pasted on one device shows up on the others.
+let apiKeysSyncTimer_ = null;
+function syncApiKeysToRemote() {
+  clearTimeout(apiKeysSyncTimer_);
+  apiKeysSyncTimer_ = setTimeout(() => {
+    const url = getDeploymentUrl();
+    if (!url || !navigator.onLine) return;
+    const edamam = getEdamamKeys();
+    fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'saveApiKeysState',
+        spoonacularKey: getSpoonacularApiKey(),
+        edamamAppId: edamam.appId,
+        edamamAppKey: edamam.appKey
+      })
+    }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
+  }, 400);
+}
+
+async function loadRemoteApiKeysState() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadApiKeysState');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.state) return;
+    if (data.state.spoonacularKey) localStorage.setItem(STORAGE_SPOONACULAR_KEY, data.state.spoonacularKey);
+    if (data.state.edamamAppId) localStorage.setItem(STORAGE_EDAMAM_APP_ID, data.state.edamamAppId);
+    if (data.state.edamamAppKey) localStorage.setItem(STORAGE_EDAMAM_APP_KEY, data.state.edamamAppKey);
+    loadSpoonacularApiKey();
+    loadEdamamKeys();
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
 }
 
 /* ---- Grocery list ---- */
@@ -4094,7 +4230,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-recipes2';
+const APP_BUILD_VERSION = '2026-07-27-settings';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -4641,7 +4777,7 @@ async function loadCalendarEvents() {
 
   const url = getCalendarWorkerUrl();
   if (!url) {
-    statusEl.textContent = '⚠ No Calendar Worker URL configured — paste it above first.';
+    statusEl.textContent = '⚠ No Calendar Worker URL configured — set it in Settings (gear icon, Overview tab).';
     statusEl.className = 'cal-status error';
     renderOverviewCalendarPreview();
     return;
@@ -5225,7 +5361,7 @@ function renderShuffleBar() {
   const nameEl = document.getElementById('spShufflePlaylistName');
   if (!nameEl) return;
   const cfg = getSpotifyPlaylistConfig();
-  nameEl.textContent = (cfg.workout && (cfg.workout.name || cfg.workout.link)) || 'Not configured — set a playlist link in Spotify config';
+  nameEl.textContent = (cfg.workout && (cfg.workout.name || cfg.workout.link)) || 'Not configured — set a playlist link in Settings';
 }
 
 async function shufflePlayWorkoutPlaylist() {
@@ -5323,7 +5459,7 @@ function renderDjHero(state) {
 
   if (!isSpotifyConnected() || !state || !state.item) {
     titleEl.textContent = isSpotifyConnected() ? 'Nothing playing' : 'Not connected';
-    subEl.textContent = isSpotifyConnected() ? '' : 'Connect Spotify from the Overview tab';
+    subEl.textContent = isSpotifyConnected() ? '' : 'Connect Spotify in Settings (gear icon, Overview)';
     artEl.style.display = 'none';
     fallbackEl.style.display = 'flex';
     playBtn.textContent = '▶';
@@ -5468,7 +5604,7 @@ function renderDjQuickAccess() {
     artWrap.appendChild(art);
 
     // Only true pins are unpin-able from here - the workout playlist is
-    // a separate setting (edited in Spotify Settings), not a pin.
+    // a separate setting (edited in the Settings modal), not a pin.
     if (p.isPin) {
       const unpinBtn = document.createElement('div');
       unpinBtn.className = 'dj-pin-btn pinned';
@@ -6320,7 +6456,6 @@ loadRemotePushupLedger();
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
 loadCalendarWorkerUrl();
-loadSpoonacularApiKey();
 flushPendingLogs();
 renderTrainerStats();
 initViewportHeightObserver();
@@ -6329,6 +6464,12 @@ startPuAnimLoop();
 loadWidgetOrder();
 loadWidgetSizes();
 goToView('overview', false);
+
+(async function initApiKeys() {
+  await loadRemoteApiKeysState();
+  loadSpoonacularApiKey();
+  loadEdamamKeys();
+})();
 
 (async function initSpotify() {
   // Pull whatever's synced from another device first, THEN process a

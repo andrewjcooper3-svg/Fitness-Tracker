@@ -361,6 +361,27 @@ function loadSpotifyState_() {
   return raw ? JSON.parse(raw) : null;
 }
 
+// Third-party recipe search API keys (Spoonacular, Edamam) - same
+// whole-blob sync as Spotify/Kitchen above, so pasting a key on one
+// device carries over to the others instead of needing to be re-entered.
+const API_KEYS_STATE_KEY = 'API_KEYS_STATE';
+
+function saveApiKeysState_(spoonacularKey, edamamAppId, edamamAppKey) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(API_KEYS_STATE_KEY, JSON.stringify({
+    spoonacularKey: spoonacularKey || '',
+    edamamAppId: edamamAppId || '',
+    edamamAppKey: edamamAppKey || '',
+    savedAt: new Date().toISOString()
+  }));
+}
+
+function loadApiKeysState_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(API_KEYS_STATE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
 // Derives day-by-day pushup totals directly from the already-synced
 // per-set workout log (every week's own sheet, one row per set) instead
 // of trusting a separate local-only running tally - so a wiped/reset
@@ -449,6 +470,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadApiKeysState') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', state: loadApiKeysState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId() }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -494,6 +521,13 @@ function doPost(e) {
 
     if (data.action === 'saveSpotifyState') {
       saveSpotifyState_(data.clientId, data.tokens, data.playlists);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveApiKeysState') {
+      saveApiKeysState_(data.spoonacularKey, data.edamamAppId, data.edamamAppKey);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
