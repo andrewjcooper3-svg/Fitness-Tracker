@@ -4150,7 +4150,13 @@ function computePushupStats() {
   if (carry) {
     yearActual = carry.total;
     const carryDate = new Date(carry.asOf + 'T00:00:00');
-    for (let d = new Date(carryDate); d <= yearEnd; d.setDate(d.getDate() + 1)) {
+    // Bounded by today, not yearEnd - updatePushupLedger() writes an entry
+    // for every day of the CURRENT week (Monday-Sunday) regardless of
+    // whether that day has actually happened yet, so summing all the way
+    // to Dec 31 could pick up stale/leftover values sitting on this
+    // week's not-yet-reached days and inflate the total before they're
+    // real.
+    for (let d = new Date(carryDate); d <= today; d.setDate(d.getDate() + 1)) {
       if (d > carryDate) yearActual += ledger[dateKey(d)] || 0;
     }
   } else {
