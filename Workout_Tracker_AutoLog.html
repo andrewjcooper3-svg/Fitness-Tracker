@@ -68,13 +68,16 @@
   .badge-travel { background: rgba(91, 154, 148, 0.16); color: var(--teal); }
   .badge-rest { background: rgba(156, 107, 122, 0.16); color: var(--purple); }
   .section-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin: 14px 0 8px; }
-  .exercise-card { background: var(--surface); border-radius: 16px; overflow: hidden; margin-bottom: 10px; }
+  .exercise-card { background: var(--surface); border-radius: 16px; overflow: hidden; margin-bottom: 10px; position: relative; }
+  .exercise-card.exercise-dragging { box-shadow: 0 8px 20px rgba(0,0,0,0.4); opacity: 0.95; }
+  .exercise-card-inner { position: relative; z-index: 1; background: var(--surface); transition: transform 0.2s ease; touch-action: pan-y; }
+  .exercise-card-inner.swiping { transition: none; }
+  .exercise-swipe-delete-btn { position: absolute; top: 0; right: 0; bottom: 0; width: 84px; background: #c0392b; color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; }
   .exercise-header { display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; user-select: none; -webkit-user-select: none; border-bottom: 1px solid var(--border); }
+  .exercise-drag-handle { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--muted); cursor: grab; touch-action: none; flex-shrink: 0; }
   .exercise-toggle { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); flex-shrink: 0; }
   .exercise-name { font-family: var(--font); font-size: 15px; font-weight: 600; flex: 1; }
   .exercise-meta { font-family: var(--font); font-size: 13px; color: var(--muted); }
-  .exercise-delete-btn { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--muted); cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
-  .exercise-delete-btn:hover, .exercise-delete-btn:active { background: rgba(193, 87, 58, 0.16); color: var(--red); }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
   .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
@@ -3895,6 +3898,13 @@ function restoreDay(day, savedDay) {
     });
   }
 
+  // Cards can be reordered (drag handle) within a week, so the saved
+  // array's order is the actual intended display order, not just DOM
+  // insertion order - re-insert each matched card right before the day's
+  // "+ Add Exercise" anchor, in saved order, so a reload shows the last
+  // arrangement instead of resetting to the static template's order.
+  const addExerciseBtn = panel.querySelector(':scope > .add-exercise-btn');
+
   if (hasIds) {
     savedExercises.forEach(savedEx => {
       let card = Array.from(panel.querySelectorAll('.exercise-card')).find(c => c.dataset.exId === savedEx.id);
@@ -3907,6 +3917,7 @@ function restoreDay(day, savedDay) {
         const nameInput = card.querySelector('.exercise-name-input');
         if (nameInput) nameInput.value = savedEx.name;
       }
+      if (addExerciseBtn) panel.insertBefore(card, addExerciseBtn);
 
       let rows = card.querySelectorAll('.set-row');
       while (rows.length < savedEx.sets.length) {
@@ -4230,7 +4241,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-settings';
+const APP_BUILD_VERSION = '2026-07-27-reorder-swipe';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -5983,8 +5994,7 @@ function deleteSet(btn) {
   saveState();
 }
 
-function deleteExercise(btn) {
-  const card = btn.closest('.exercise-card');
+function deleteExercise(card) {
   if (!confirm('Delete this exercise?')) return;
   card.remove();
   saveState();
@@ -6023,17 +6033,218 @@ function initExerciseSets(card) {
   }
 
   const header = card.querySelector('.exercise-header');
-  if (!header.querySelector('.exercise-delete-btn')) {
-    const delBtn = document.createElement('div');
-    delBtn.className = 'exercise-delete-btn';
-    delBtn.textContent = '✕';
-    delBtn.onclick = (e) => { e.stopPropagation(); deleteExercise(delBtn); };
-    header.appendChild(delBtn);
+  if (!header.querySelector('.exercise-drag-handle')) {
+    const handle = document.createElement('div');
+    handle.className = 'exercise-drag-handle';
+    handle.textContent = '☰';
+    handle.addEventListener('pointerdown', startExerciseDrag);
+    header.insertBefore(handle, header.firstChild);
   }
 
+  initExerciseSwipe(card);
   card.querySelectorAll('.set-row').forEach(initSetDeleteBtn);
   updateExerciseTotal(card);
 }
+
+// Reorder handle ("☰", like Reminders/other iOS list apps) - press and
+// drag vertically to reorder exercises within a day, reflecting the order
+// you actually do them in. Uses Pointer Events (unifies mouse/touch) with
+// the classic drag-reorder trick: swap the DOM position with whichever
+// neighbor the dragged card's (transformed) midpoint has crossed, then
+// shift the drag's reference point by that neighbor's height so the
+// card's visual position under the finger doesn't jump at the moment of
+// the swap.
+let exerciseDragState = null;
+
+function startExerciseDrag(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const handle = e.currentTarget;
+  const card = handle.closest('.exercise-card');
+  const panel = card && card.closest('.day-panel');
+  if (!card || !panel) return;
+
+  handle.setPointerCapture(e.pointerId);
+  card.classList.add('exercise-dragging');
+  card.style.zIndex = '20';
+  exerciseDragState = { pointerId: e.pointerId, card, panel, startY: e.clientY, handle };
+  handle.addEventListener('pointermove', onExerciseDragMove);
+  handle.addEventListener('pointerup', endExerciseDrag);
+  handle.addEventListener('pointercancel', endExerciseDrag);
+}
+
+function onExerciseDragMove(e) {
+  const state = exerciseDragState;
+  if (!state || e.pointerId !== state.pointerId) return;
+  e.preventDefault();
+
+  const applyTransform = () => {
+    state.card.style.transform = `translateY(${e.clientY - state.startY}px)`;
+  };
+  applyTransform();
+
+  // A single move event can span more than one card's height (a fast
+  // flick, or coalesced pointermove events) - keep swapping past
+  // neighbors until the dragged card's position is stable, rather than
+  // checking only once, or a fast drag could skip past intermediate
+  // swaps entirely.
+  let swapped = true;
+  while (swapped) {
+    swapped = false;
+    const siblings = Array.from(state.panel.querySelectorAll(':scope > .exercise-card'));
+    const idx = siblings.indexOf(state.card);
+    const cardRect = state.card.getBoundingClientRect();
+    const cardMid = cardRect.top + cardRect.height / 2;
+
+    const next = siblings[idx + 1];
+    if (next) {
+      const nextRect = next.getBoundingClientRect();
+      if (cardMid > nextRect.top + nextRect.height / 2) {
+        state.panel.insertBefore(next, state.card);
+        state.startY += nextRect.height;
+        applyTransform();
+        swapped = true;
+        continue;
+      }
+    }
+    const prev = siblings[idx - 1];
+    if (prev) {
+      const prevRect = prev.getBoundingClientRect();
+      if (cardMid < prevRect.top + prevRect.height / 2) {
+        // Move prev (not state.card) - moving the actively-dragged,
+        // pointer-captured element via insertBefore counts as removing
+        // it from the DOM, which silently releases pointer capture and
+        // kills the rest of the drag. Moving the neighbor instead
+        // produces the same final order without ever touching state.card.
+        state.panel.insertBefore(prev, state.card.nextSibling);
+        state.startY -= prevRect.height;
+        applyTransform();
+        swapped = true;
+      }
+    }
+  }
+}
+
+function endExerciseDrag(e) {
+  const state = exerciseDragState;
+  if (!state || e.pointerId !== state.pointerId) return;
+  exerciseDragState = null;
+
+  state.card.style.transform = '';
+  state.card.style.zIndex = '';
+  state.card.classList.remove('exercise-dragging');
+  state.handle.removeEventListener('pointermove', onExerciseDragMove);
+  state.handle.removeEventListener('pointerup', endExerciseDrag);
+  state.handle.removeEventListener('pointercancel', endExerciseDrag);
+  saveState();
+}
+
+// Swipe-to-delete (left swipe reveals a Delete button on the right, same
+// gesture as Apple Mail/Gmail) - restructures each card's existing content
+// (header + sets) into an inner wrapper that slides horizontally, with the
+// delete button pinned underneath at the right edge, revealed as the inner
+// wrapper slides left. The card element itself never moves or gets
+// reparented, only its children - so every existing "direct child of
+// .day-panel" assumption elsewhere (tagging ids, reordering, deleting)
+// still holds.
+const EXERCISE_SWIPE_OPEN_PX = 84;
+let exerciseSwipeState = null;
+let exerciseOpenSwipeCard = null;
+
+function initExerciseSwipe(card) {
+  if (card.querySelector(':scope > .exercise-card-inner')) return;
+
+  const inner = document.createElement('div');
+  inner.className = 'exercise-card-inner';
+  while (card.firstChild) inner.appendChild(card.firstChild);
+
+  const delBtn = document.createElement('div');
+  delBtn.className = 'exercise-swipe-delete-btn';
+  delBtn.textContent = 'Delete';
+  delBtn.onclick = () => deleteExercise(card);
+
+  card.appendChild(delBtn);
+  card.appendChild(inner);
+
+  inner.addEventListener('pointerdown', onExerciseSwipeStart);
+  inner.addEventListener('pointermove', onExerciseSwipeMove);
+  inner.addEventListener('pointerup', onExerciseSwipeEnd);
+  inner.addEventListener('pointercancel', onExerciseSwipeEnd);
+}
+
+function onExerciseSwipeStart(e) {
+  if (e.target.closest('.exercise-drag-handle, input, textarea, .set-checkbox, .add-set-btn')) return;
+  const inner = e.currentTarget;
+  const card = inner.closest('.exercise-card');
+  exerciseSwipeState = {
+    pointerId: e.pointerId,
+    card, inner,
+    startX: e.clientX,
+    startY: e.clientY,
+    startTranslate: card.dataset.swipeOpen === '1' ? -EXERCISE_SWIPE_OPEN_PX : 0,
+    deciding: true,
+    isSwipe: false
+  };
+}
+
+function onExerciseSwipeMove(e) {
+  const state = exerciseSwipeState;
+  if (!state || e.pointerId !== state.pointerId) return;
+  const dx = e.clientX - state.startX;
+  const dy = e.clientY - state.startY;
+
+  if (state.deciding) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    state.deciding = false;
+    state.isSwipe = Math.abs(dx) > Math.abs(dy);
+    if (!state.isSwipe) { exerciseSwipeState = null; return; }
+    state.inner.classList.add('swiping');
+    state.inner.setPointerCapture(state.pointerId);
+  }
+  if (!state.isSwipe) return;
+
+  e.preventDefault();
+  const translate = Math.max(-EXERCISE_SWIPE_OPEN_PX, Math.min(0, state.startTranslate + dx));
+  state.inner.style.transform = `translateX(${translate}px)`;
+}
+
+function onExerciseSwipeEnd(e) {
+  const state = exerciseSwipeState;
+  if (!state || e.pointerId !== state.pointerId) return;
+  exerciseSwipeState = null;
+  if (!state.isSwipe) return;
+
+  state.inner.classList.remove('swiping');
+  const dx = e.clientX - state.startX;
+  const translate = state.startTranslate + dx;
+  setExerciseSwipeOpen(state.card, state.inner, translate < -EXERCISE_SWIPE_OPEN_PX / 2);
+}
+
+function setExerciseSwipeOpen(card, inner, open) {
+  if (open && exerciseOpenSwipeCard && exerciseOpenSwipeCard !== card) {
+    closeExerciseSwipe(exerciseOpenSwipeCard);
+  }
+  inner.style.transform = open ? `translateX(-${EXERCISE_SWIPE_OPEN_PX}px)` : '';
+  card.dataset.swipeOpen = open ? '1' : '0';
+  exerciseOpenSwipeCard = open ? card : (exerciseOpenSwipeCard === card ? null : exerciseOpenSwipeCard);
+}
+
+function closeExerciseSwipe(card) {
+  const inner = card.querySelector(':scope > .exercise-card-inner');
+  if (inner) inner.style.transform = '';
+  card.dataset.swipeOpen = '0';
+  if (exerciseOpenSwipeCard === card) exerciseOpenSwipeCard = null;
+}
+
+// Tapping anywhere outside the currently swiped-open row closes it, same
+// as Mail/Gmail - captures at the document level so it fires before the
+// tapped element's own click handling.
+document.addEventListener('pointerdown', (e) => {
+  if (!exerciseOpenSwipeCard) return;
+  if (e.target.closest('.exercise-card') !== exerciseOpenSwipeCard) {
+    closeExerciseSwipe(exerciseOpenSwipeCard);
+  }
+}, true);
 
 let nextCustomExId = 1;
 
