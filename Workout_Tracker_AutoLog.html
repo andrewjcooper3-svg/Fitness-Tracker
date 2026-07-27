@@ -3570,6 +3570,17 @@ function seedYearCarryForward() {
   localStorage.setItem(YEAR_CARRY_SEED_KEY, '1');
 }
 
+// One-time forced reset (distinct flag from the seed above, so it applies
+// regardless of whatever's currently stored - a fresh baseline of 27,381
+// as of the morning of Jul 27, confirmed correct, overriding whatever the
+// running total had drifted to before the year-total loop bound was fixed.
+const YEAR_CARRY_RESET_2026_07_27_KEY = 'WORKOUT_YEAR_CARRY_RESET_20260727';
+function forceYearCarryResetJul27() {
+  if (localStorage.getItem(YEAR_CARRY_RESET_2026_07_27_KEY)) return;
+  localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify({ asOf: '2026-07-27', total: 27381 }));
+  localStorage.setItem(YEAR_CARRY_RESET_2026_07_27_KEY, '1');
+}
+
 function restoreDay(day, savedDay) {
   if (!savedDay) return;
   const panel = document.getElementById('day-' + day);
@@ -6081,6 +6092,7 @@ tagExerciseIds();
 loadSettingsIntoState();
 seedHistoricalPushupLedger();
 seedYearCarryForward();
+forceYearCarryResetJul27();
 restoreState();
 fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
