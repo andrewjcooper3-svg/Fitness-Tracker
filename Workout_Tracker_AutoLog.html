@@ -277,11 +277,11 @@
   /* Small ambient cooking animation, top-right of the Kitchen tab - pure
      CSS keyframes (no JS) since it's just a looping stir + rising steam,
      unlike the pushup figure this doesn't need a tap-to-interrupt state. */
-  .cook-anim-svg { width: 60px; height: 60px; overflow: visible; }
-  .cook-anim-line { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+  .cook-anim-svg { width: 76px; height: 76px; overflow: visible; }
+  .cook-anim-line { fill: none; stroke: var(--accent); stroke-width: 6.5; stroke-linecap: round; stroke-linejoin: round; }
   .cook-anim-head { fill: var(--accent); }
-  .cook-anim-arm { transform-origin: 66px 40px; animation: cookStir 1s ease-in-out infinite alternate; }
-  .cook-anim-steam { fill: none; stroke: var(--muted); stroke-width: 4; stroke-linecap: round; opacity: 0; }
+  .cook-anim-arm { transform-origin: 72px 34px; animation: cookStir 1s ease-in-out infinite alternate; }
+  .cook-anim-steam { fill: none; stroke: var(--muted); stroke-width: 4.5; stroke-linecap: round; opacity: 0; }
   .cook-anim-steam1 { animation: cookSteam 2.2s ease-in infinite; }
   .cook-anim-steam2 { animation: cookSteam 2.2s ease-in infinite; animation-delay: 0.7s; }
   .cook-anim-steam3 { animation: cookSteam 2.2s ease-in infinite; animation-delay: 1.4s; }
@@ -1322,19 +1322,18 @@
       <div class="ov-page-title">Kitchen</div>
     </div>
     <svg viewBox="0 0 100 100" class="cook-anim-svg" aria-hidden="true">
-      <path class="cook-anim-steam cook-anim-steam1" d="M 38,54 Q 34,46 38,40"></path>
-      <path class="cook-anim-steam cook-anim-steam2" d="M 50,54 Q 46,46 50,38"></path>
-      <path class="cook-anim-steam cook-anim-steam3" d="M 62,54 Q 58,46 62,40"></path>
-      <path class="cook-anim-line" d="M 28,62 L 72,62 L 64,90 L 36,90 Z" fill="var(--surface2)"></path>
-      <ellipse class="cook-anim-line" cx="50" cy="62" rx="22" ry="5" fill="none"></ellipse>
-      <line class="cook-anim-line" x1="28" y1="66" x2="18" y2="66"></line>
-      <line class="cook-anim-line" x1="72" y1="66" x2="82" y2="66"></line>
-      <circle class="cook-anim-head" cx="76" cy="26" r="6"></circle>
-      <polyline class="cook-anim-line" points="76,32 68,54"></polyline>
-      <polyline class="cook-anim-line" points="70,40 78,48"></polyline>
+      <path class="cook-anim-steam cook-anim-steam1" d="M 36,52 Q 32,44 36,38"></path>
+      <path class="cook-anim-steam cook-anim-steam2" d="M 50,52 Q 46,44 50,36"></path>
+      <path class="cook-anim-steam cook-anim-steam3" d="M 64,52 Q 60,44 64,38"></path>
+      <path class="cook-anim-line" d="M 26,60 L 74,60 L 65,90 L 35,90 Z" fill="var(--surface2)"></path>
+      <ellipse class="cook-anim-line" cx="50" cy="60" rx="24" ry="5" fill="none"></ellipse>
+      <line class="cook-anim-line" x1="26" y1="64" x2="15" y2="64"></line>
+      <line class="cook-anim-line" x1="74" y1="64" x2="85" y2="64"></line>
+      <circle class="cook-anim-head" cx="78" cy="20" r="9"></circle>
+      <polyline class="cook-anim-line" points="77,29 75,58"></polyline>
       <g class="cook-anim-arm">
-        <polyline class="cook-anim-line" points="72,38 52,62"></polyline>
-        <line class="cook-anim-line" x1="52" y1="62" x2="46" y2="66"></line>
+        <polyline class="cook-anim-line" points="72,34 50,60"></polyline>
+        <line class="cook-anim-line" x1="50" y1="60" x2="44" y2="64"></line>
       </g>
     </svg>
   </div>
@@ -4255,7 +4254,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-cook-anim';
+const APP_BUILD_VERSION = '2026-07-27-cook-anim2';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
