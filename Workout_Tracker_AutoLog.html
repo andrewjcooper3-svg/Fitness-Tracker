@@ -808,8 +808,8 @@
 </div>
 
 <div class="day-tabs">
-  <div class="day-tab home active" onclick="showDay('mon')"><div class="tab-lbl">Mon</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
-  <div class="day-tab gym" onclick="showDay('tue')"><div class="tab-lbl">Tue</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
+  <div class="day-tab gym active" onclick="showDay('mon')"><div class="tab-lbl">Mon</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
+  <div class="day-tab home" onclick="showDay('tue')"><div class="tab-lbl">Tue</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
   <div class="day-tab gym" onclick="showDay('wed')"><div class="tab-lbl">Wed</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
   <div class="day-tab home" onclick="showDay('thu')"><div class="tab-lbl">Thu</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
   <div class="day-tab gym" onclick="showDay('fri')"><div class="tab-lbl">Fri</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
@@ -3487,6 +3487,8 @@ async function fetchAndApplyRemoteDraft() {
     const data = await res.json();
     if (data.status !== 'success' || !data.draft || data.draft.week !== getWeekLabel()) return;
 
+    if (needsDayTemplateMigration20260727) stripStaleDayTemplateExercises_(data.draft.days);
+
     isRestoringState = true;
     dayKeys.forEach(day => restoreDay(day, data.draft.days[day]));
     isRestoringState = false;
@@ -3495,6 +3497,42 @@ async function fetchAndApplyRemoteDraft() {
     if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
   } catch (e) {
     // Offline/unreachable - the local-only restore already in place stands.
+  }
+}
+
+// One-time migration for the Jul 27 Mon/Wed/Fri schedule change (the
+// Monday<->Tuesday content swap, plus Wednesday's new "Walk" exercise).
+// tagExerciseIds() assigns ex0/ex1/... purely by current DOM position, so
+// any exercise list saved (locally or in the cloud draft) before this edit
+// carries ids that line up with the OLD template, not the new one.
+// restoreDay's id-based pruning removes every card whose id isn't in the
+// saved set - so old Monday's single "Pushups" card (ex0) would make the
+// new Monday's "Leg Press" (also ex0, purely by position) survive while
+// the other 11 new exercises get deleted as "not in savedIds", and
+// Wednesday's new Walk card (ex11) would get deleted the same way. This
+// strips just the exercises arrays for the three edited days so the new
+// template renders untouched instead of getting pruned down to whatever
+// the old template's card count happened to be; checklist state and the
+// unedited days are unaffected. Guarded by a real flag (not just a
+// localStorage check at each restore site) so the local restore and the
+// async cloud-draft fetch - which can land moments apart - both act on the
+// same one-time decision instead of racing each other.
+const DAY_TEMPLATE_MIGRATION_20260727_KEY = 'WORKOUT_DAY_TEMPLATE_MIGRATED_20260727';
+let needsDayTemplateMigration20260727 = false;
+function stripStaleDayTemplateExercises_(days) {
+  if (!days) return;
+  ['mon', 'tue', 'wed'].forEach(day => {
+    if (days[day]) days[day].exercises = [];
+  });
+}
+function migrateStaleDayTemplates20260727() {
+  if (localStorage.getItem(DAY_TEMPLATE_MIGRATION_20260727_KEY)) return;
+  needsDayTemplateMigration20260727 = true;
+  localStorage.setItem(DAY_TEMPLATE_MIGRATION_20260727_KEY, '1');
+  const state = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null');
+  if (state && state.days) {
+    stripStaleDayTemplateExercises_(state.days);
+    localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
   }
 }
 
@@ -3956,7 +3994,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-mwf';
+const APP_BUILD_VERSION = '2026-07-27-mwf2';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6117,6 +6155,7 @@ loadSettingsIntoState();
 seedHistoricalPushupLedger();
 seedYearCarryForward();
 forceYearCarryResetJul27();
+migrateStaleDayTemplates20260727();
 restoreState();
 fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
