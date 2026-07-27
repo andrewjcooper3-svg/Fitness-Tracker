@@ -1509,6 +1509,7 @@
       <div class="settings-field">
         <div class="sp-config-label" style="margin:0 0 6px;">Correct total reps this year (optional - only if the running total is off)</div>
         <input type="number" id="settingsYearCorrection" class="config-input" min="0" step="1" placeholder="e.g. 37381">
+        <div class="config-status" id="settingsCurrentYearTotal" style="margin-top:6px; color: var(--muted);"></div>
       </div>
       <button class="ov-open-btn" onclick="saveSettings()" style="margin-top:12px;">Save</button>
       <div class="config-status" id="settingsStatus"></div>
@@ -1624,7 +1625,6 @@ const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 const STORAGE_STATE_KEY = 'WORKOUT_TRACKER_STATE';
 const STORAGE_PUSHUP_LEDGER_KEY = 'WORKOUT_PUSHUP_LEDGER';
 const STORAGE_YEAR_CARRY_KEY = 'WORKOUT_YEAR_CARRY_FORWARD';
-const STORAGE_DEFICIT_ANCHOR_KEY = 'WORKOUT_DEFICIT_ANCHOR_DATE';
 const STORAGE_SETTINGS_KEY = 'WORKOUT_SETTINGS';
 let PUSHUP_DAILY_BASELINE = 165;
 let PUSHUP_YEAR_GOAL = 50000;
@@ -1643,6 +1643,12 @@ function renderSettingsTab() {
   document.getElementById('settingsDailyBaseline').value = PUSHUP_DAILY_BASELINE;
   document.getElementById('settingsYearGoal').value = PUSHUP_YEAR_GOAL;
   document.getElementById('settingsMaxHR').value = BODY_HEALTH_MAX_HR;
+
+  // The correction field itself is write-only (always blank) so a save
+  // actually taking effect can be confirmed - otherwise there's no way
+  // to tell a save that silently failed apart from one that worked.
+  const currentTotal = computePushupStats().year.actual;
+  document.getElementById('settingsCurrentYearTotal').textContent = `Current total: ${currentTotal.toLocaleString()}`;
 }
 
 function saveBodyHealthSettings() {
@@ -1692,19 +1698,13 @@ function saveSettings() {
     // without double-counting anything already folded into the new total.
     localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify({ asOf: dateKey(new Date()), total: parseFloat(yearCorrectionRaw) }));
     document.getElementById('settingsYearCorrection').value = '';
-
-    // The Deficit stat normally sums every logged day since the very
-    // first one ever recorded - correcting the year total is a "start
-    // fresh from here" moment, so the deficit clock resets to count
-    // from today too rather than staying anchored to old history that's
-    // now folded into the corrected total above.
-    localStorage.setItem(STORAGE_DEFICIT_ANCHOR_KEY, dateKey(new Date()));
   }
 
   statusEl.classList.remove('warn');
   statusEl.textContent = 'Saved.';
   renderOverview();
   renderPushupsTab();
+  renderSettingsTab();
 }
 
 // Weight log - purely local (same pattern as the pushup ledger). Fitdays'
@@ -4160,33 +4160,27 @@ function computePushupStats() {
     }
   }
 
-  // Running deficit: actual vs. the 165/day baseline pace, from the first
-  // day this device has any logged data - which now includes the seeded
-  // Week-of-Jul-13 totals, so the clock starts from when the plan really
-  // began rather than from whenever this tab shipped.
-  // A "correct total" save resets this anchor to today (see saveSettings),
-  // since that's a deliberate start-fresh moment - otherwise it defaults
-  // to the very first day this device ever logged anything.
-  const deficitAnchor = localStorage.getItem(STORAGE_DEFICIT_ANCHOR_KEY);
-  const loggedDates = Object.keys(ledger).sort();
-  let deficit = null, deficitSinceLabel = null;
-  if (deficitAnchor || loggedDates.length > 0) {
-    const startDate = deficitAnchor ? new Date(deficitAnchor + 'T00:00:00') : new Date(loggedDates[0] + 'T00:00:00');
-    let expected = 0, actual = 0;
-    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
-      if (d.getDay() !== 0) expected += PUSHUP_DAILY_BASELINE;
-      actual += ledger[dateKey(d)] || 0;
-    }
-    deficit = actual - expected;
-    deficitSinceLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
+  // Deficit = how far off pace the year total is, expressed in reps:
+  // compare what % of the year has elapsed against what % of the year's
+  // goal is actually done, then convert that percentage-point gap back
+  // into a rep count against the goal. Pure function of yearActual/
+  // PUSHUP_YEAR_GOAL/today's date - no separate day-by-day ledger
+  // summation to keep in sync, so correcting the year total (Settings)
+  // is the only thing that ever needs to happen for this to stay right.
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  const daysInYear = Math.round((yearEnd - yearStart) / 86400000) + 1;
+  const dayOfYear = Math.round((today - yearStart) / 86400000) + 1;
+  const pctYearElapsed = dayOfYear / daysInYear;
+  const pctGoalComplete = PUSHUP_YEAR_GOAL > 0 ? yearActual / PUSHUP_YEAR_GOAL : 0;
+  const deficit = Math.round((pctGoalComplete - pctYearElapsed) * PUSHUP_YEAR_GOAL);
 
   return {
     week: { actual: weekTotals.pushupTotal, target: weekTotals.pushupTarget },
     month: { actual: monthActual, target: monthTarget },
     year: { actual: yearActual, target: PUSHUP_YEAR_GOAL },
     deficit: deficit,
-    deficitSinceLabel: deficitSinceLabel
+    pctYearElapsed: pctYearElapsed,
+    pctGoalComplete: pctGoalComplete
   };
 }
 
@@ -4202,27 +4196,17 @@ function renderPushupsTab() {
   const numEl = document.getElementById('puDeficitNumber');
   const subEl = document.getElementById('puDeficitSub');
 
-  if (stats.deficit === null) {
-    sinceEl.textContent = 'No pushups logged yet';
-    numEl.textContent = '0';
-    numEl.classList.remove('ahead', 'behind');
-    heroEl.classList.remove('ahead', 'behind');
-    badgeEl.classList.remove('ahead', 'behind');
-    badgeEl.textContent = 'No Data';
-    subEl.textContent = 'Log a set to start tracking';
-  } else {
-    const ahead = stats.deficit >= 0;
-    sinceEl.textContent = `Since ${stats.deficitSinceLabel}, vs. ${PUSHUP_DAILY_BASELINE}/day pace`;
-    numEl.textContent = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
-    numEl.classList.toggle('ahead', ahead);
-    numEl.classList.toggle('behind', !ahead);
-    heroEl.classList.toggle('ahead', ahead);
-    heroEl.classList.toggle('behind', !ahead);
-    badgeEl.classList.toggle('ahead', ahead);
-    badgeEl.classList.toggle('behind', !ahead);
-    badgeEl.textContent = ahead ? 'On Pace' : 'Behind';
-    subEl.textContent = ahead ? 'reps ahead of pace' : 'reps behind pace';
-  }
+  const ahead = stats.deficit >= 0;
+  sinceEl.textContent = `${Math.round(stats.pctGoalComplete * 100)}% of goal vs. ${Math.round(stats.pctYearElapsed * 100)}% of year done`;
+  numEl.textContent = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
+  numEl.classList.toggle('ahead', ahead);
+  numEl.classList.toggle('behind', !ahead);
+  heroEl.classList.toggle('ahead', ahead);
+  heroEl.classList.toggle('behind', !ahead);
+  badgeEl.classList.toggle('ahead', ahead);
+  badgeEl.classList.toggle('behind', !ahead);
+  badgeEl.textContent = ahead ? 'On Pace' : 'Behind';
+  subEl.textContent = ahead ? 'reps ahead of pace' : 'reps behind pace';
 }
 
 // Stick-figure animation, driven entirely by requestAnimationFrame + plain
