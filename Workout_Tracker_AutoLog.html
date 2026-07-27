@@ -165,6 +165,7 @@
   .ov-page-head-actions { display: flex; align-items: center; gap: 10px; }
   .ov-gear-btn { font-size: 20px; line-height: 1; color: var(--muted); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
   .ov-gear-btn:active { color: var(--accent); }
+  .ov-build-stamp { font-family: var(--font); font-size: 10px; color: var(--muted); opacity: 0.5; text-align: right; margin: -8px 2px 8px; }
 
   /* Big activity-ring hero (Apple Fitness style) - sits directly on the
      page background, no card box, so it reads as clearly primary versus
@@ -494,10 +495,12 @@
       <div class="ov-page-title">Overview</div>
     </div>
     <div class="ov-page-head-actions">
+      <button class="ov-gear-btn" onclick="forceFullRefresh()" aria-label="Refresh" title="Force a fresh reload">↻</button>
       <button class="ov-gear-btn" onclick="openSettingsModal()" aria-label="Settings">⚙</button>
       <button class="ov-edit-btn" id="ovEditBtn" onclick="toggleOverviewEdit()">Edit</button>
     </div>
   </div>
+  <div class="ov-build-stamp" id="ovBuildStamp"></div>
 
   <div class="ov-ring-hero" id="ovPushupHero" onclick="showAppView('pushups')">
     <div class="ov-ring" id="ovRingBig">
@@ -816,29 +819,8 @@
 
 <!-- MONDAY -->
 <div id="day-mon" class="day-panel active" data-pushup-target="165">
-  <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="alert amber">💪 <span>Gym fixed to Tue/Wed/Fri this week. Pushups back to 165/day baseline.</span></div>
 
-  <div class="section-label">Workouts</div>
-
-  <div class="exercise-card">
-    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
-    <div class="exercise-sets">
-      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-    </div>
-  </div>
-
-  <button class="summary-btn" onclick="generateSummary('mon')">📋 Generate Session Summary</button>
-  <div class="summary-output" id="mon-summary"></div>
-  <button class="copy-btn" id="mon-copy" onclick="copySummary('mon')">📎 Copy to Clipboard</button>
-  <div class="log-status" id="mon-log-status"></div>
-</div>
-
-<!-- TUESDAY -->
-<div id="day-tue" class="day-panel" data-pushup-target="165">
-  <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-gym">🏋 GYM</div></div>
+  <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-gym">🏋 GYM</div></div>
   <div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Arms + Core.</span></div>
 
   <div class="section-label">Workouts</div>
@@ -941,6 +923,29 @@
       <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Time</div><input class="set-input" type="text" placeholder="70s"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
     </div>
   </div>
+
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="BW"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="55"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
+  </div>
+
+  <button class="summary-btn" onclick="generateSummary('mon')">📋 Generate Session Summary</button>
+  <div class="summary-output" id="mon-summary"></div>
+  <button class="copy-btn" id="mon-copy" onclick="copySummary('mon')">📎 Copy to Clipboard</button>
+  <div class="log-status" id="mon-log-status"></div>
+</div>
+
+<!-- TUESDAY -->
+<div id="day-tue" class="day-panel" data-pushup-target="165">
+
+  <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
+  <div class="alert amber">💪 <span>Gym fixed to Mon/Wed/Fri this week. Pushups back to 165/day baseline.</span></div>
+
+  <div class="section-label">Workouts</div>
 
   <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
@@ -1082,7 +1087,7 @@
 <!-- THURSDAY -->
 <div id="day-thu" class="day-panel" data-pushup-target="165">
   <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="alert amber">💪 <span>Gym fixed to Tue/Wed/Fri this week. Pushups back to 165/day baseline.</span></div>
+  <div class="alert amber">💪 <span>Gym fixed to Mon/Wed/Fri this week. Pushups back to 165/day baseline.</span></div>
 
   <div class="section-label">Workouts</div>
 
@@ -1992,13 +1997,61 @@ function genId_() {
 }
 
 function loadInventory() { return JSON.parse(localStorage.getItem(STORAGE_INVENTORY_KEY) || '[]'); }
-function saveInventoryList(items) { localStorage.setItem(STORAGE_INVENTORY_KEY, JSON.stringify(items)); }
+function saveInventoryList(items) { localStorage.setItem(STORAGE_INVENTORY_KEY, JSON.stringify(items)); syncKitchenToRemote(); }
 function loadRecipes() { return JSON.parse(localStorage.getItem(STORAGE_RECIPES_KEY) || '[]'); }
-function saveRecipesList(items) { localStorage.setItem(STORAGE_RECIPES_KEY, JSON.stringify(items)); }
+function saveRecipesList(items) { localStorage.setItem(STORAGE_RECIPES_KEY, JSON.stringify(items)); syncKitchenToRemote(); }
 function loadMealLog() { return JSON.parse(localStorage.getItem(STORAGE_MEAL_LOG_KEY) || '[]'); }
 function saveMealLog(items) { localStorage.setItem(STORAGE_MEAL_LOG_KEY, JSON.stringify(items)); }
 function loadGroceryManual() { return JSON.parse(localStorage.getItem(STORAGE_GROCERY_MANUAL_KEY) || '[]'); }
-function saveGroceryManual(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_KEY, JSON.stringify(items)); }
+function saveGroceryManual(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_KEY, JSON.stringify(items)); syncKitchenToRemote(); }
+
+// Kitchen (Inventory/Recipes/manual Grocery items) used to be local-only,
+// one device with no sync. Whole-state push on every save, whole-state
+// pull on load - simplest correct approach for one person's own devices,
+// not concurrent multi-user editing. Debounced slightly so a burst of
+// edits (e.g. typing into several fields) doesn't fire a request per
+// keystroke-triggered save.
+let kitchenSyncTimer_ = null;
+function syncKitchenToRemote() {
+  clearTimeout(kitchenSyncTimer_);
+  kitchenSyncTimer_ = setTimeout(() => {
+    const url = getDeploymentUrl();
+    if (!url || !navigator.onLine) return;
+    fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'saveKitchenState',
+        inventory: loadInventory(),
+        recipes: loadRecipes(),
+        groceryManual: loadGroceryManual()
+      })
+    }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
+  }, 400);
+}
+
+async function loadRemoteKitchenState() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadKitchenState');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.state) return;
+    saveInventoryListLocal_(data.state.inventory || []);
+    saveRecipesListLocal_(data.state.recipes || []);
+    saveGroceryManualLocal_(data.state.groceryManual || []);
+    if (viewOrder[currentViewIndex] === 'kitchen') renderKitchenTab();
+    if (viewOrder[currentViewIndex] === 'overview') renderOverview();
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
+}
+
+// Local-only writes (no remote echo) - used specifically when applying a
+// just-pulled remote state, so the pull itself doesn't immediately
+// re-trigger another push right back out.
+function saveInventoryListLocal_(items) { localStorage.setItem(STORAGE_INVENTORY_KEY, JSON.stringify(items)); }
+function saveRecipesListLocal_(items) { localStorage.setItem(STORAGE_RECIPES_KEY, JSON.stringify(items)); }
+function saveGroceryManualLocal_(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_KEY, JSON.stringify(items)); }
 
 // Recipes checked as "making this week" - purely manual (you check/uncheck
 // as you plan), no automatic weekly reset. Kept separate from the recipe
@@ -3443,6 +3496,35 @@ function updatePushupLedger() {
   localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(ledger));
 }
 
+// The ledger above only ever lived in this one browser's localStorage -
+// wiped by a cache clear, a new device, or Safari evicting storage, and
+// history for past weeks was gone for good even though the actual sets
+// were safely logged to the Sheet all along (one row per set, via the
+// existing Session Summary log). This recovers it from that same
+// authoritative source: the backend re-derives day totals directly from
+// every week-sheet's Pushups rows. Merged in via max-per-date (never
+// min) since a same-day value only ever grows as more sets get checked
+// off - so a partial local session never gets overwritten by a smaller
+// number, but a wiped/empty local ledger fully recovers from the sheet.
+async function loadRemotePushupLedger() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadPushupLedger');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.ledger) return;
+    const local = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+    Object.keys(data.ledger).forEach(date => {
+      local[date] = Math.max(local[date] || 0, data.ledger[date]);
+    });
+    localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(local));
+    if (viewOrder[currentViewIndex] === 'pushups') renderPushupsTab();
+    if (viewOrder[currentViewIndex] === 'overview') renderOverview();
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
+}
+
 // One-time seed of the Week-of-Jul-13 reps actually reviewed from the
 // user's Sheet/PDF log, from before this ledger existed to track them
 // automatically - without this the deficit clock would start from
@@ -3610,12 +3692,12 @@ let currentViewIndex = 0;
 function renderActiveViewContent(view) {
   if (view === 'overview') renderOverview();
   if (view === 'tracker') renderTrainerStats();
-  if (view === 'pushups') renderPushupsTab();
+  if (view === 'pushups') { renderPushupsTab(); loadRemotePushupLedger(); }
   if (view === 'calendar') ensureCalendarLoaded();
   if (view === 'music') renderMusicTab();
   if (view === 'weight') { renderWeightTab(); loadRemoteWeightLog(); }
   if (view === 'stats') renderStatsTab();
-  if (view === 'kitchen') renderKitchenTab();
+  if (view === 'kitchen') { renderKitchenTab(); loadRemoteKitchenState(); }
   if (view === 'bodyhealth') { renderBodyHealthTab(); loadRemoteBodyHealthLog(); }
 }
 
@@ -3832,10 +3914,29 @@ function renderWeekWheel(days) {
   if (labelEl) labelEl.textContent = `${activeCount}/7`;
 }
 
+// Bumped on every meaningful change to this file - shown on Overview so
+// you can visually confirm a reload actually picked up new content
+// rather than just re-serving a cached copy (the stamp not changing
+// after a refresh means the STALE copy is coming from somewhere upstream
+// of this page - a hosting/CDN cache or the wrong URL - not just a
+// simple browser cache needing a clear).
+const APP_BUILD_VERSION = '2026-07-27e';
+
+// Forces a genuinely fresh network fetch of this page, bypassing any
+// browser/PWA cache - a plain reload can still be served from cache,
+// but a different URL (via the cache-busting query param) can't be.
+function forceFullRefresh() {
+  const url = new URL(location.href);
+  url.searchParams.set('_refresh', Date.now());
+  location.href = url.toString();
+}
+
 function renderOverview() {
   const { days, totals } = computeWeekStats();
 
   document.getElementById('ovWeekLabel').textContent = getWeekLabel();
+  const stampEl = document.getElementById('ovBuildStamp');
+  if (stampEl) stampEl.textContent = 'Build ' + APP_BUILD_VERSION;
 
   const pushupPct = totals.pushupTarget ? Math.min(100, Math.round(totals.pushupTotal / totals.pushupTarget * 100)) : 0;
   document.getElementById('ovHeroNumber').textContent = totals.pushupTotal;
@@ -5809,7 +5910,7 @@ function refreshCurrentTab() {
   }
   if (view === 'pushups') {
     renderPushupsTab();
-    return Promise.resolve();
+    return loadRemotePushupLedger();
   }
   if (view === 'calendar') {
     return Promise.resolve(loadCalendarEvents());
@@ -5827,7 +5928,7 @@ function refreshCurrentTab() {
   }
   if (view === 'kitchen') {
     renderKitchenTab();
-    return Promise.resolve();
+    return loadRemoteKitchenState();
   }
   if (view === 'bodyhealth') {
     renderBodyHealthTab();
@@ -5980,6 +6081,8 @@ restoreState();
 fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
 loadRemoteBodyHealthLog();
+loadRemoteKitchenState();
+loadRemotePushupLedger();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();

@@ -313,6 +313,79 @@ function loadDraftState_() {
   return raw ? JSON.parse(raw) : null;
 }
 
+// Kitchen (Inventory/Recipes/manual Grocery items) was local-storage-only
+// (one device, no sync) - stored the same simple way as the draft state
+// above: one JSON blob in Script Properties, whole-state overwrite on
+// every save, whole-state pull on load. No per-item merge/conflict
+// logic - appropriate for a single person using their own devices, not
+// concurrent multi-user editing.
+const KITCHEN_STATE_KEY = 'KITCHEN_STATE';
+
+function saveKitchenState_(inventory, recipes, groceryManual) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(KITCHEN_STATE_KEY, JSON.stringify({
+    inventory: inventory || [],
+    recipes: recipes || [],
+    groceryManual: groceryManual || [],
+    savedAt: new Date().toISOString()
+  }));
+}
+
+function loadKitchenState_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(KITCHEN_STATE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+// Derives day-by-day pushup totals directly from the already-synced
+// per-set workout log (every week's own sheet, one row per set) instead
+// of trusting a separate local-only running tally - so a wiped/reset
+// device (cache clear, new phone, etc.) can recover real history from
+// the same sheet a Session Summary already writes to, rather than that
+// history only ever existing in one browser's localStorage. Keyed the
+// same way the client's local ledger is: each week-sheet's own Monday
+// plus the row's Day column position (Monday=0 ... Sunday=6), not the
+// literal log timestamp - a session logged late at night for "Tuesday"
+// still counts against the Tuesday slot even if it was typed in past
+// midnight or backfilled the same day as another tab.
+const PUSHUP_LEDGER_DAY_INDEX = { 'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4, 'Saturday': 5, 'Sunday': 6 };
+
+function getPushupLedgerFromSheets_() {
+  const ss = getOrCreateSpreadsheet_();
+  const timeZone = ss.getSpreadsheetTimeZone();
+  const ledger = {};
+
+  ss.getSheets().forEach(function (sheet) {
+    const name = sheet.getSheetName();
+    const m = name.match(/^Week of ([A-Za-z]+ \d+) - [A-Za-z]+ \d+, (\d{4})$/);
+    if (!m) return; // Not a weekly workout-log sheet (Weight Log, Body Health Log, etc.)
+
+    const monday = new Date(m[1] + ', ' + m[2]);
+    if (isNaN(monday.getTime())) return;
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+
+    const rows = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
+    rows.forEach(function (row) {
+      const day = row[1];
+      const exercise = row[2];
+      if (exercise !== 'Pushups') return;
+      const dayIdx = PUSHUP_LEDGER_DAY_INDEX[day];
+      if (dayIdx == null) return;
+      const reps = Number(row[7]);
+      if (isNaN(reps)) return;
+
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + dayIdx);
+      const key = Utilities.formatDate(date, timeZone, 'yyyy-MM-dd');
+      ledger[key] = (ledger[key] || 0) + reps;
+    });
+  });
+
+  return ledger;
+}
+
 function doGet(e) {
   const action = e && e.parameter ? e.parameter.action : null;
 
@@ -331,6 +404,18 @@ function doGet(e) {
   if (action === 'loadBodyHealthLog') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', entries: getBodyHealthLog_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'loadKitchenState') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', state: loadKitchenState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'loadPushupLedger') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', ledger: getPushupLedgerFromSheets_() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -365,6 +450,13 @@ function doPost(e) {
         throw new Error('logWeight requires a date and a numeric weight');
       }
       logWeightEntry_(data.date, weight, bodyFat != null && !isNaN(bodyFat) ? bodyFat : null, data.source || 'shortcut');
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveKitchenState') {
+      saveKitchenState_(data.inventory, data.recipes, data.groceryManual);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
