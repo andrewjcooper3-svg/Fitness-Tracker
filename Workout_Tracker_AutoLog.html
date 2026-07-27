@@ -1416,9 +1416,21 @@
       <div class="config-title" style="margin-bottom:10px;">Find a Recipe</div>
       <div class="weight-entry-row">
         <input type="text" id="mealdbSearchInput" class="config-input" placeholder="Search recipes (e.g. pasta)">
-        <button class="config-save" onclick="searchMealDb()">Search</button>
+        <button class="config-save" onclick="searchRecipes()">Search</button>
       </div>
       <div id="mealdbResults"></div>
+
+      <div class="config-toggle" onclick="toggleSpoonacularConfig()" style="margin-top:10px;">
+        <div class="config-title">⚙ More Recipes (Spoonacular)</div>
+        <div class="config-chevron" id="spoonacularConfigChevron">▸</div>
+      </div>
+      <div class="config-body" id="spoonacularConfigBody">
+        <div class="config-row">
+          <input type="text" id="spoonacularApiKey" class="config-input" placeholder="Spoonacular API key">
+          <button class="config-save" onclick="saveSpoonacularApiKey()">Save</button>
+        </div>
+        <div class="config-status" id="spoonacularConfigStatus">Optional - TheMealDB alone is a small database. A free key at spoonacular.com/food-api adds thousands more results to every search.</div>
+      </div>
     </div>
 
     <button class="ov-open-btn" onclick="openNewRecipeForm()" style="margin-bottom:12px;">+ Add Recipe Manually</button>
@@ -1463,7 +1475,7 @@
     </div>
   </div>
 
-  <div class="ov-note">Inventory and recipes are saved on this device. Recipe search pulls from TheMealDB, a free public recipe database - no account or cost required.</div>
+  <div class="ov-note">Inventory and recipes are saved on this device. Recipe search pulls from TheMealDB (free, no account) and, if you add a free API key, Spoonacular too - see "More Recipes" above the results.</div>
 </div>
 
 </div>
@@ -2665,12 +2677,7 @@ function logMealMadeFromModal() {
 // ingredient filter catches those, merged and de-duplicated by id.
 const MEALDB_CATEGORIES = ['Beef', 'Breakfast', 'Chicken', 'Dessert', 'Goat', 'Lamb', 'Miscellaneous', 'Pasta', 'Pork', 'Seafood', 'Side', 'Starter', 'Vegan', 'Vegetarian'];
 
-async function searchMealDb() {
-  const q = document.getElementById('mealdbSearchInput').value.trim();
-  const resultsEl = document.getElementById('mealdbResults');
-  if (!q) return;
-  resultsEl.innerHTML = '<div class="ov-mini-empty">Searching…</div>';
-
+async function searchMealDbResults_(q) {
   const base = 'https://www.themealdb.com/api/json/v1/1/';
   const requests = [fetch(base + `search.php?s=${encodeURIComponent(q)}`)];
 
@@ -2678,25 +2685,57 @@ async function searchMealDb() {
   if (matchedCategory) requests.push(fetch(base + `filter.php?c=${encodeURIComponent(matchedCategory)}`));
   requests.push(fetch(base + `filter.php?i=${encodeURIComponent(q)}`));
 
-  try {
-    const responses = await Promise.all(requests.map(p => p.catch(() => null)));
-    const datas = await Promise.all(responses.map(r => (r && r.ok ? r.json().catch(() => null) : null)));
+  const responses = await Promise.all(requests.map(p => p.catch(() => null)));
+  const datas = await Promise.all(responses.map(r => (r && r.ok ? r.json().catch(() => null) : null)));
 
-    const seen = new Set();
-    const merged = [];
-    datas.forEach(d => {
-      (d && d.meals || []).forEach(m => {
-        if (!seen.has(m.idMeal)) { seen.add(m.idMeal); merged.push(m); }
-      });
+  const seen = new Set();
+  const merged = [];
+  datas.forEach(d => {
+    (d && d.meals || []).forEach(m => {
+      if (!seen.has(m.idMeal)) { seen.add(m.idMeal); merged.push({ id: m.idMeal, name: m.strMeal, image: m.strMealThumb, source: 'mealdb' }); }
     });
+  });
+  return merged;
+}
+
+// Spoonacular (spoonacular.com/food-api) - a much larger recipe database
+// (thousands of dishes vs. TheMealDB's few hundred) via its free
+// developer tier (150 requests/day, no credit card). Optional: search
+// still works with TheMealDB alone if no key is saved, this just widens
+// the results when one is.
+async function searchSpoonacularResults_(q) {
+  const key = getSpoonacularApiKey();
+  if (!key) return [];
+  try {
+    const res = await fetch(`https://api.spoonacular.com/recipes/complexSearch?apiKey=${encodeURIComponent(key)}&query=${encodeURIComponent(q)}&number=15`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.results || []).map(r => ({ id: r.id, name: r.title, image: r.image, source: 'spoonacular' }));
+  } catch (e) {
+    return [];
+  }
+}
+
+async function searchRecipes() {
+  const q = document.getElementById('mealdbSearchInput').value.trim();
+  const resultsEl = document.getElementById('mealdbResults');
+  if (!q) return;
+  resultsEl.innerHTML = '<div class="ov-mini-empty">Searching…</div>';
+
+  try {
+    const [mealDbResults, spoonacularResults] = await Promise.all([
+      searchMealDbResults_(q).catch(() => []),
+      searchSpoonacularResults_(q).catch(() => [])
+    ]);
+    const merged = mealDbResults.concat(spoonacularResults);
 
     if (merged.length === 0) {
       resultsEl.innerHTML = '<div class="ov-mini-empty">No matches.</div>';
       return;
     }
-    resultsEl.innerHTML = merged.map(m => `<div class="mealdb-result-row" onclick="importMealDbRecipe('${m.idMeal}')">
-      <img class="recipe-card-img" src="${escapeHtml_(m.strMealThumb)}" alt="">
-      <div class="recipe-card-name">${escapeHtml_(m.strMeal)}</div>
+    resultsEl.innerHTML = merged.map(m => `<div class="mealdb-result-row" onclick="importRecipeResult('${m.source}', '${m.id}')">
+      <img class="recipe-card-img" src="${escapeHtml_(m.image)}" alt="">
+      <div class="recipe-card-name">${escapeHtml_(m.name)}</div>
     </div>`).join('');
   } catch (e) {
     resultsEl.innerHTML = '<div class="ov-mini-empty">Search failed - check your connection.</div>';
@@ -2757,6 +2796,11 @@ function migrateRecipeIngredientMeasures_() {
   if (changed) saveRecipesList(recipes);
 }
 
+function importRecipeResult(source, id) {
+  if (source === 'spoonacular') return importSpoonacularRecipe(id);
+  return importMealDbRecipe(id);
+}
+
 async function importMealDbRecipe(mealId) {
   try {
     const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${encodeURIComponent(mealId)}`);
@@ -2779,6 +2823,62 @@ async function importMealDbRecipe(mealId) {
   } catch (e) {
     // Leave the search results as-is so the user can just try again.
   }
+}
+
+// Spoonacular's ingredients already come as structured {amount, unit,
+// name} rather than TheMealDB's one free-text measure string, so no
+// parsing step is needed here.
+async function importSpoonacularRecipe(id) {
+  const key = getSpoonacularApiKey();
+  if (!key) return;
+  try {
+    const res = await fetch(`https://api.spoonacular.com/recipes/${encodeURIComponent(id)}/information?apiKey=${encodeURIComponent(key)}&includeNutrition=false`);
+    const meal = await res.json();
+    if (!meal || !meal.title) return;
+
+    const ingredients = (meal.extendedIngredients || []).map(ing => ({
+      name: ing.name || ing.originalName || '',
+      inventoryId: null,
+      qty: typeof ing.amount === 'number' ? ing.amount : null,
+      unit: ing.unit || '',
+      notTracked: false
+    })).filter(ing => ing.name);
+
+    const instructions = meal.instructions
+      ? meal.instructions.replace(/<li[^>]*>/gi, '').replace(/<\/(li|p)>/gi, '\n').replace(/<[^>]+>/g, '').trim()
+      : (meal.analyzedInstructions && meal.analyzedInstructions[0]
+          ? meal.analyzedInstructions[0].steps.map(s => s.number + '. ' + s.step).join('\n')
+          : '');
+
+    openNewRecipeForm({ name: meal.title, image: meal.image, instructions, ingredients });
+    document.getElementById('mealdbResults').innerHTML = '';
+    document.getElementById('mealdbSearchInput').value = '';
+  } catch (e) {
+    // Leave the search results as-is so the user can just try again.
+  }
+}
+
+const STORAGE_SPOONACULAR_KEY = 'WORKOUT_SPOONACULAR_API_KEY';
+function getSpoonacularApiKey() {
+  return localStorage.getItem(STORAGE_SPOONACULAR_KEY) || '';
+}
+function saveSpoonacularApiKey() {
+  const val = document.getElementById('spoonacularApiKey').value.trim();
+  localStorage.setItem(STORAGE_SPOONACULAR_KEY, val);
+  document.getElementById('spoonacularConfigStatus').textContent = val
+    ? '✓ Key saved - Spoonacular results included in every search.'
+    : 'Optional - TheMealDB alone is a small database. A free key at spoonacular.com/food-api adds thousands more results to every search.';
+}
+function loadSpoonacularApiKey() {
+  const key = getSpoonacularApiKey();
+  document.getElementById('spoonacularApiKey').value = key;
+  if (key) document.getElementById('spoonacularConfigStatus').textContent = '✓ Key saved - Spoonacular results included in every search.';
+}
+function toggleSpoonacularConfig() {
+  const body = document.getElementById('spoonacularConfigBody');
+  const chevron = document.getElementById('spoonacularConfigChevron');
+  body.classList.toggle('expanded');
+  chevron.textContent = body.classList.contains('expanded') ? '▾' : '▸';
 }
 
 /* ---- Grocery list ---- */
@@ -3994,7 +4094,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-spotifysync';
+const APP_BUILD_VERSION = '2026-07-27-recipes2';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6220,6 +6320,7 @@ loadRemotePushupLedger();
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
 loadCalendarWorkerUrl();
+loadSpoonacularApiKey();
 flushPendingLogs();
 renderTrainerStats();
 initViewportHeightObserver();
