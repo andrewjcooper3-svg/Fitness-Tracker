@@ -15,7 +15,7 @@
     --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   .header { padding: 16px 2px 14px; margin-bottom: 14px; }
   .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
   .header-title { font-family: var(--font); font-size: 30px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.05; }
@@ -1324,7 +1324,7 @@
 
   <div class="config-box">
     <div class="config-title" style="margin-bottom:10px;">Log a Weigh-In</div>
-    <input type="date" id="weightEntryDate" class="config-input settings-field" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+    <input type="date" id="weightEntryDate" class="config-input settings-field" style="width:100%; max-width:100%; min-width:0; box-sizing:border-box; margin-bottom:8px;">
     <div class="weight-entry-row">
       <input type="number" id="weightEntryLbs" class="config-input" placeholder="Weight (lbs)" step="0.1" min="0">
       <input type="number" id="weightEntryBodyFat" class="config-input" placeholder="Body fat % (optional)" step="0.1" min="0" max="100">
@@ -1396,7 +1396,7 @@
         <input type="number" id="invItemPackageSize" class="config-input" placeholder="Package size (optional, e.g. 400)" step="0.1" min="0">
         <input type="text" id="invItemPackageLabel" class="config-input" placeholder="e.g. box, bag, dozen">
       </div>
-      <input type="date" id="invItemExpiration" class="config-input" style="width:100%; box-sizing:border-box; margin-top:8px;">
+      <input type="date" id="invItemExpiration" class="config-input" style="width:100%; max-width:100%; min-width:0; box-sizing:border-box; margin-top:8px;">
       <label class="kitchen-checkbox-label" style="margin-top:10px;">
         <input type="checkbox" id="invItemNotTracked"> Pantry staple (salt, oil, etc. - never flagged as missing/low)
       </label>
