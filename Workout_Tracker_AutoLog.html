@@ -1696,7 +1696,16 @@ function saveSettings() {
     // the original one-time seed - only the days logged strictly after
     // today ever get added on top, so this can be corrected again later
     // without double-counting anything already folded into the new total.
-    localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify({ asOf: dateKey(new Date()), total: parseFloat(yearCorrectionRaw) }));
+    // todaySnapshot captures whatever's already logged today at save-time,
+    // so anything added to today AFTER saving still counts as a delta
+    // above this rather than being silently excluded forever.
+    updatePushupLedger();
+    const todayLedger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+    localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify({
+      asOf: dateKey(new Date()),
+      total: parseFloat(yearCorrectionRaw),
+      todaySnapshot: todayLedger[dateKey(new Date())] || 0
+    }));
     document.getElementById('settingsYearCorrection').value = '';
   }
 
@@ -3577,7 +3586,13 @@ function seedYearCarryForward() {
 const YEAR_CARRY_RESET_2026_07_27_KEY = 'WORKOUT_YEAR_CARRY_RESET_20260727';
 function forceYearCarryResetJul27() {
   if (localStorage.getItem(YEAR_CARRY_RESET_2026_07_27_KEY)) return;
-  localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify({ asOf: '2026-07-27', total: 27381 }));
+  updatePushupLedger();
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify({
+    asOf: '2026-07-27',
+    total: 27381,
+    todaySnapshot: ledger['2026-07-27'] || 0
+  }));
   localStorage.setItem(YEAR_CARRY_RESET_2026_07_27_KEY, '1');
 }
 
@@ -4170,6 +4185,15 @@ function computePushupStats() {
     for (let d = new Date(carryDate); d <= today; d.setDate(d.getDate() + 1)) {
       if (d > carryDate) yearActual += ledger[dateKey(d)] || 0;
     }
+    // The loop above always excludes the exact carry date itself (today,
+    // usually) since the entered total is meant to already include
+    // whatever was logged up to the moment it was saved - but anything
+    // ADDED to that same day afterward (a new set checked off, a new
+    // custom "Pushups" exercise logged later) needs to still count, not
+    // get silently dropped forever. Tracked as a delta above whatever
+    // was already in the ledger for that day at save-time.
+    const carryDateKey = dateKey(carryDate);
+    yearActual += Math.max(0, (ledger[carryDateKey] || 0) - (carry.todaySnapshot || 0));
   } else {
     const yearStart = new Date(today.getFullYear(), 0, 1);
     for (let d = new Date(yearStart); d <= yearEnd; d.setDate(d.getDate() + 1)) {
