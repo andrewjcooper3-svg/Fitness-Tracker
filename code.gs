@@ -337,6 +337,30 @@ function loadKitchenState_() {
   return raw ? JSON.parse(raw) : null;
 }
 
+// Spotify connection (Client ID, OAuth tokens, pinned/workout playlists)
+// was local-storage-only, so "Connect Spotify" - pasting a Client ID and
+// completing the OAuth consent screen - had to be repeated on every new
+// device. Same whole-blob-overwrite pattern as Kitchen above: one JSON
+// blob in Script Properties, no per-field merge logic, appropriate for a
+// single person's own devices.
+const SPOTIFY_STATE_KEY = 'SPOTIFY_STATE';
+
+function saveSpotifyState_(clientId, tokens, playlists) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(SPOTIFY_STATE_KEY, JSON.stringify({
+    clientId: clientId || '',
+    tokens: tokens || null,
+    playlists: playlists || null,
+    savedAt: new Date().toISOString()
+  }));
+}
+
+function loadSpotifyState_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(SPOTIFY_STATE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
 // Derives day-by-day pushup totals directly from the already-synced
 // per-set workout log (every week's own sheet, one row per set) instead
 // of trusting a separate local-only running tally - so a wiped/reset
@@ -419,6 +443,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadSpotifyState') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', state: loadSpotifyState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId() }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -457,6 +487,13 @@ function doPost(e) {
 
     if (data.action === 'saveKitchenState') {
       saveKitchenState_(data.inventory, data.recipes, data.groceryManual);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveSpotifyState') {
+      saveSpotifyState_(data.clientId, data.tokens, data.playlists);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);

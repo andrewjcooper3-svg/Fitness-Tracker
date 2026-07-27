@@ -3994,7 +3994,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-mwf2';
+const APP_BUILD_VERSION = '2026-07-27-spotifysync';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -4699,6 +4699,54 @@ async function generateSpotifyCodeChallenge(verifier) {
   return spotifyBase64UrlEncode(new Uint8Array(digest));
 }
 
+// Client ID, OAuth tokens, and pinned/workout playlists used to be
+// local-storage-only, so "Connect Spotify" (pasting a Client ID, then
+// completing Spotify's OAuth consent screen) had to be repeated on every
+// new device. Same whole-blob push/pull as Kitchen: debounced push on any
+// change, pulled and applied via local-only setters on load so the pull
+// itself doesn't re-trigger another push.
+let spotifySyncTimer_ = null;
+function syncSpotifyToRemote() {
+  clearTimeout(spotifySyncTimer_);
+  spotifySyncTimer_ = setTimeout(() => {
+    const url = getDeploymentUrl();
+    if (!url || !navigator.onLine) return;
+    fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'saveSpotifyState',
+        clientId: getSpotifyClientId(),
+        tokens: getSpotifyTokens(),
+        playlists: getSpotifyPlaylistConfig()
+      })
+    }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
+  }, 400);
+}
+
+async function loadRemoteSpotifyState() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadSpotifyState');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.state) return;
+    if (data.state.clientId) localStorage.setItem(STORAGE_SPOTIFY_CLIENT_ID, data.state.clientId);
+    if (data.state.tokens) localStorage.setItem(STORAGE_SPOTIFY_TOKENS, JSON.stringify(data.state.tokens));
+    if (data.state.playlists) localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify(data.state.playlists));
+    loadSpotifyClientId();
+    loadSpotifyPlaylistInputs();
+    updateSpotifyConfigStatus();
+    renderPinnedPlaylists();
+    renderShuffleBar();
+    if (isSpotifyConnected()) {
+      startSpotifyPolling();
+      refreshSpotifyPlaylistMetadata();
+    }
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
+}
+
 function getSpotifyClientId() {
   return localStorage.getItem(STORAGE_SPOTIFY_CLIENT_ID) || '';
 }
@@ -4707,6 +4755,7 @@ function saveSpotifyClientId() {
   const val = document.getElementById('spotifyClientId').value.trim();
   localStorage.setItem(STORAGE_SPOTIFY_CLIENT_ID, val);
   updateSpotifyConfigStatus();
+  syncSpotifyToRemote();
 }
 
 function loadSpotifyClientId() {
@@ -4742,6 +4791,7 @@ function disconnectSpotify() {
   stopSpotifyPolling();
   stopDjPolling();
   updateSpotifyConfigStatus();
+  syncSpotifyToRemote();
   renderNowPlaying(null);
   renderDjHero(null);
   djPlaylistsLoaded = false;
@@ -4763,6 +4813,7 @@ function storeSpotifyTokens(data) {
     refresh_token: data.refresh_token || existing.refresh_token,
     expires_at: Date.now() + (data.expires_in * 1000)
   }));
+  syncSpotifyToRemote();
 }
 
 // If the page just got redirected back from Spotify's consent screen,
@@ -4886,6 +4937,7 @@ function saveSpotifyWorkoutPlaylist() {
 
   localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify({ pins: existing.pins || [null, null, null], workout: workout }));
   renderShuffleBar();
+  syncSpotifyToRemote();
   refreshSpotifyPlaylistMetadata();
 }
 
@@ -4931,6 +4983,7 @@ function togglePinPlaylist(playlist) {
   renderPinnedPlaylists();
   renderDjQuickAccess();
   renderDjPlaylistGrid();
+  syncSpotifyToRemote();
 }
 
 async function fetchSpotifyPlaylistMeta(id) {
@@ -4964,6 +5017,7 @@ async function refreshSpotifyPlaylistMetadata() {
     localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify(cfg));
     renderPinnedPlaylists();
     renderShuffleBar();
+    syncSpotifyToRemote();
   }
 }
 
@@ -6176,6 +6230,11 @@ loadWidgetSizes();
 goToView('overview', false);
 
 (async function initSpotify() {
+  // Pull whatever's synced from another device first, THEN process a
+  // fresh OAuth redirect on this device (if any) - so a just-completed
+  // Connect always wins over an older remote blob, regardless of which
+  // network request happens to land first.
+  await loadRemoteSpotifyState();
   await handleSpotifyRedirect();
   loadSpotifyClientId();
   loadSpotifyPlaylistInputs();
