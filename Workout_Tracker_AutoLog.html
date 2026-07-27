@@ -15,7 +15,7 @@
     --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(12px + env(safe-area-inset-top, 0px)) 12px calc(88px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; }
   .header { padding: 16px 2px 14px; margin-bottom: 14px; }
   .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
   .header-title { font-family: var(--font); font-size: 30px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.05; }
@@ -119,16 +119,16 @@
   .header-week { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--accent); margin-top: 3px; }
 
   .app-tabs {
-    position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; max-width: 480px;
+    position: fixed; left: 0; right: 0; top: 0; margin: 0 auto; max-width: 480px;
     display: flex; align-items: center; gap: 2px; z-index: 50;
-    height: 68px; box-sizing: content-box;
+    height: 44px; box-sizing: content-box;
     background: rgba(23,20,15,0.82); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border);
-    padding: 0 6px calc(env(safe-area-inset-bottom, 0px));
+    border-bottom: 1px solid var(--border);
+    padding: calc(env(safe-area-inset-top, 0px)) 6px 0;
     overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
   }
   .app-tabs::-webkit-scrollbar { display: none; }
-  .app-tab { flex: 0 0 auto; width: 72px; height: 52px; display: flex; align-items: center; justify-content: center; padding: 0 14px; border-radius: 14px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
+  .app-tab { flex: 0 0 auto; width: 64px; height: 36px; display: flex; align-items: center; justify-content: center; padding: 0 10px; border-radius: 12px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
   .app-tab-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); transition: color 0.15s; }
   .app-tab.active { background: var(--surface2); }
   .app-tab.active .app-tab-label { color: var(--accent); font-weight: 700; }
@@ -3778,10 +3778,12 @@ function initTabBarViewportPin() {
   const bar = document.getElementById('appTabs');
   if (!bar || !window.visualViewport) return;
 
+  // Now top-anchored, not bottom - the drift direction is the opposite of
+  // before: a top-fixed element needs to follow the visual viewport's own
+  // top edge (vv.offsetTop) downward, not compensate for a bottom gap.
   function reposition() {
     const vv = window.visualViewport;
-    const gap = window.innerHeight - (vv.height + vv.offsetTop);
-    bar.style.transform = gap > 0.5 ? `translateY(${-gap}px)` : '';
+    bar.style.transform = vv.offsetTop > 0.5 ? `translateY(${vv.offsetTop}px)` : '';
   }
 
   window.visualViewport.addEventListener('resize', reposition);
