@@ -490,6 +490,207 @@ function getExerciseHistory_() {
   return history;
 }
 
+// Removes any existing rows for a given Day label within a single
+// week-sheet before a fresh write - makes logging a day idempotent, so
+// tapping "Generate Summary" mid-workout and again after finishing (or a
+// manual tap followed later by the 4am auto-log, in either order) always
+// leaves exactly one set of rows for that day, never a duplicate. Scans
+// bottom-to-top so deleting a row doesn't shift the index of ones still
+// to be checked.
+function deleteRowsForDay_(sheet, day) {
+  if (!day) return;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const dayColumn = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+  for (let i = dayColumn.length - 1; i >= 0; i--) {
+    if (dayColumn[i][0] === day) sheet.deleteRow(i + 2);
+  }
+}
+
+// Shared by the manual "Generate Summary" POST handler and the 4am
+// auto-log trigger - one row per set (same shape either way), replacing
+// whatever was already logged for that day rather than appending
+// alongside it.
+function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
+  const sheet = getOrCreateWeekSheet_(weekLabel);
+  deleteRowsForDay_(sheet, day);
+
+  const color = DAY_COLORS[day];
+  const priorLastRow = sheet.getLastRow();
+  const priorDay = priorLastRow > 1 ? sheet.getRange(priorLastRow, 2).getValue() : null;
+  let isFirstRowOfBatch = true;
+
+  function appendRow(row) {
+    sheet.appendRow(row);
+    const rowIndex = sheet.getLastRow();
+    const range = sheet.getRange(rowIndex, 1, 1, HEADERS.length);
+
+    if (color) range.setBackground(color);
+    if (isFirstRowOfBatch && day !== priorDay) {
+      range.setBorder(true, null, null, null, null, null, '#4a4a4a', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+    }
+    isFirstRowOfBatch = false;
+
+    sheet.getRange(rowIndex, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+  }
+
+  let rowsAdded = 0;
+
+  if (exercises.length > 0) {
+    exercises.forEach(function (ex) {
+      const sets = Array.isArray(ex.sets) ? ex.sets : [];
+      if (sets.length > 0) {
+        sets.forEach(function (s) {
+          appendRow([
+            timestamp,
+            day,
+            ex.name || '',
+            s.setNum != null ? s.setNum : '',
+            s.targetWeight != null ? s.targetWeight : '',
+            s.actualWeight != null ? s.actualWeight : '',
+            s.targetReps != null ? s.targetReps : '',
+            s.actualReps != null ? s.actualReps : '',
+            s.completed ? 'Yes' : 'No',
+            s.notes || ''
+          ]);
+          rowsAdded++;
+        });
+      } else {
+        // An exercise with no set data - log a bare placeholder row for it.
+        appendRow([timestamp, day, ex.name || '', '', '', '', '', '', '', '']);
+        rowsAdded++;
+      }
+    });
+  } else {
+    // No exercises for the day (e.g. a rest/cardio-only day) - log a single placeholder row.
+    appendRow([timestamp, day, '', '', '', '', '', '', '', notes || '']);
+    rowsAdded = 1;
+  }
+
+  return rowsAdded;
+}
+
+// ---------- 4am auto-log from the synced draft ----------
+//
+// The draft blob (DRAFT_STATE_KEY, see saveDraftState_/loadDraftState_
+// above) is already kept in sync with whatever's checked/typed in the
+// app, continuously, well before "Generate Summary" is ever tapped - so
+// a day's workout doesn't actually need that manual tap to exist
+// server-side. This lets a time-based trigger (see
+// createDailyAutoLogTrigger_(), run once from the Apps Script editor to
+// install it) log the previous day's session automatically overnight,
+// so a forgotten "Generate Summary" doesn't mean losing that day's data.
+//
+// The draft's per-set fields (from the client's serializeDay()) are the
+// raw typed values, not the resolved target/actual split a manual
+// Generate Summary produces - targetWeight/targetReps were added
+// alongside them specifically so this function can resolve "actual"
+// the same way actualOrTarget() does client-side: typed value if there
+// is one, otherwise assume the prescribed target was followed.
+const DAY_KEY_TO_NAME_ = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+const DAY_KEY_ORDER_ = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+function getWeekLabelForDate_(date) {
+  const dow = date.getDay();
+  const diffToMonday = (dow === 0 ? -6 : 1) - dow;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return formatWeekLabel_(monday, sunday);
+}
+
+function getDayKeyForDate_(date) {
+  const dow = date.getDay(); // 0=Sunday..6=Saturday
+  return DAY_KEY_ORDER_[dow === 0 ? 6 : dow - 1];
+}
+
+function actualOrTarget_(typed, target) {
+  const t = (typed || '').toString().trim();
+  return t ? t : (target || '');
+}
+
+// True if there's actually something worth logging for this day - avoids
+// writing an all-blank placeholder row for a day the app was simply never
+// opened on.
+function draftDayHasActivity_(dayData) {
+  if (!dayData) return false;
+  const exercises = Array.isArray(dayData.exercises) ? dayData.exercises : [];
+  const hasSetActivity = exercises.some(function (ex) {
+    return (ex.sets || []).some(function (s) {
+      return s.checked || (s.weight || '').toString().trim() || (s.reps || '').toString().trim() || (s.notes || '').toString().trim();
+    });
+  });
+  if (hasSetActivity) return true;
+  const checkItems = Array.isArray(dayData.checkItems) ? dayData.checkItems : [];
+  return checkItems.some(function (c) { return c.checked; });
+}
+
+function logDayFromDraftIfNeeded_(date) {
+  const draft = loadDraftState_();
+  if (!draft || !draft.days) return { logged: false, reason: 'no draft' };
+
+  const weekLabel = getWeekLabelForDate_(date);
+  if (draft.week !== weekLabel) return { logged: false, reason: 'draft is for a different week' };
+
+  const dayKey = getDayKeyForDate_(date);
+  const dayData = draft.days[dayKey];
+  if (!draftDayHasActivity_(dayData)) return { logged: false, reason: 'no activity logged for that day' };
+
+  const dayName = DAY_KEY_TO_NAME_[dayKey];
+  const exercises = (dayData.exercises || []).map(function (ex) {
+    return {
+      name: ex.name || '',
+      sets: (ex.sets || []).map(function (s, i) {
+        return {
+          setNum: i + 1,
+          targetWeight: s.targetWeight || '',
+          actualWeight: actualOrTarget_(s.weight, s.targetWeight),
+          targetReps: s.targetReps || '',
+          actualReps: actualOrTarget_(s.reps, s.targetReps),
+          completed: !!s.checked,
+          notes: s.notes || ''
+        };
+      })
+    };
+  });
+
+  const timestamp = draft.savedAt ? new Date(draft.savedAt) : date;
+  const rowsAdded = writeSessionRows_(weekLabel, dayName, exercises, '', timestamp);
+  return { logged: true, day: dayName, week: weekLabel, rowsAdded: rowsAdded };
+}
+
+// The function the daily trigger actually calls - always targets
+// "yesterday" (relative to whenever the trigger fires, early morning),
+// since a day's workout is done by then and won't change further.
+function autoLogYesterday() {
+  const ss = getOrCreateSpreadsheet_();
+  const timeZone = ss.getSpreadsheetTimeZone();
+  const now = new Date();
+  const yesterday = new Date(Utilities.formatDate(now, timeZone, "yyyy-MM-dd'T'00:00:00"));
+  yesterday.setDate(yesterday.getDate() - 1);
+  const result = logDayFromDraftIfNeeded_(yesterday);
+  Logger.log('autoLogYesterday: ' + JSON.stringify(result));
+  return result;
+}
+
+// Run this ONCE from the Apps Script editor (select it in the function
+// dropdown, then Run) to install the daily trigger - it persists on its
+// own after that, independent of deployments, and does not need to be
+// run again unless you want to change the schedule. Guarded so running
+// it more than once doesn't stack up duplicate triggers.
+function createDailyAutoLogTrigger_() {
+  const already = ScriptApp.getProjectTriggers().some(function (t) {
+    return t.getHandlerFunction() === 'autoLogYesterday';
+  });
+  if (already) {
+    Logger.log('Trigger already exists - not creating another one.');
+    return;
+  }
+  ScriptApp.newTrigger('autoLogYesterday').timeBased().everyDays(1).atHour(4).create();
+  Logger.log('Daily auto-log trigger created - will fire once between 4-5am each day.');
+}
+
 function doGet(e) {
   const action = e && e.parameter ? e.parameter.action : null;
 
@@ -616,63 +817,10 @@ function doPost(e) {
     }
 
     const weekLabel = data.week || getCurrentWeekLabel_();
-    const sheet = getOrCreateWeekSheet_(weekLabel);
-
     const day = data.day || '';
     const timestamp = data.timestamp ? new Date(data.timestamp) : new Date();
     const exercises = Array.isArray(data.exercises) ? data.exercises : [];
-    const color = DAY_COLORS[day];
-
-    const priorLastRow = sheet.getLastRow();
-    const priorDay = priorLastRow > 1 ? sheet.getRange(priorLastRow, 2).getValue() : null;
-    let isFirstRowOfBatch = true;
-
-    function appendRow(row) {
-      sheet.appendRow(row);
-      const rowIndex = sheet.getLastRow();
-      const range = sheet.getRange(rowIndex, 1, 1, HEADERS.length);
-
-      if (color) range.setBackground(color);
-      if (isFirstRowOfBatch && day !== priorDay) {
-        range.setBorder(true, null, null, null, null, null, '#4a4a4a', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
-      }
-      isFirstRowOfBatch = false;
-
-      sheet.getRange(rowIndex, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss');
-    }
-
-    let rowsAdded = 0;
-
-    if (exercises.length > 0) {
-      exercises.forEach(function (ex) {
-        const sets = Array.isArray(ex.sets) ? ex.sets : [];
-        if (sets.length > 0) {
-          sets.forEach(function (s) {
-            appendRow([
-              timestamp,
-              day,
-              ex.name || '',
-              s.setNum != null ? s.setNum : '',
-              s.targetWeight != null ? s.targetWeight : '',
-              s.actualWeight != null ? s.actualWeight : '',
-              s.targetReps != null ? s.targetReps : '',
-              s.actualReps != null ? s.actualReps : '',
-              s.completed ? 'Yes' : 'No',
-              s.notes || ''
-            ]);
-            rowsAdded++;
-          });
-        } else {
-          // An exercise with no set data - log a bare placeholder row for it.
-          appendRow([timestamp, day, ex.name || '', '', '', '', '', '', '', '']);
-          rowsAdded++;
-        }
-      });
-    } else {
-      // No exercises for the day (e.g. a rest/cardio-only day) - log a single placeholder row.
-      appendRow([timestamp, day, '', '', '', '', '', '', '', data.notes || '']);
-      rowsAdded = 1;
-    }
+    const rowsAdded = writeSessionRows_(weekLabel, day, exercises, data.notes || '', timestamp);
 
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', rowsAdded: rowsAdded, sheet: weekLabel }))
