@@ -507,10 +507,10 @@ function deleteRowsForDay_(sheet, day) {
   }
 }
 
-// Shared by the manual "Generate Summary" POST handler and the 4am
-// auto-log trigger - one row per set (same shape either way), replacing
-// whatever was already logged for that day rather than appending
-// alongside it.
+// One row per set, replacing whatever was already logged for that day
+// rather than appending alongside it (see deleteRowsForDay_ above) - so
+// tapping "Generate Summary" more than once for the same day never
+// leaves duplicate rows behind.
 function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
   const sheet = getOrCreateWeekSheet_(weekLabel);
   deleteRowsForDay_(sheet, day);
@@ -568,127 +568,6 @@ function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
   }
 
   return rowsAdded;
-}
-
-// ---------- 4am auto-log from the synced draft ----------
-//
-// The draft blob (DRAFT_STATE_KEY, see saveDraftState_/loadDraftState_
-// above) is already kept in sync with whatever's checked/typed in the
-// app, continuously, well before "Generate Summary" is ever tapped - so
-// a day's workout doesn't actually need that manual tap to exist
-// server-side. This lets a time-based trigger (see
-// createDailyAutoLogTrigger_(), run once from the Apps Script editor to
-// install it) log the previous day's session automatically overnight,
-// so a forgotten "Generate Summary" doesn't mean losing that day's data.
-//
-// The draft's per-set fields (from the client's serializeDay()) are the
-// raw typed values, not the resolved target/actual split a manual
-// Generate Summary produces - targetWeight/targetReps were added
-// alongside them specifically so this function can resolve "actual"
-// the same way actualOrTarget() does client-side: typed value if there
-// is one, otherwise assume the prescribed target was followed.
-const DAY_KEY_TO_NAME_ = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
-const DAY_KEY_ORDER_ = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-function getWeekLabelForDate_(date) {
-  const dow = date.getDay();
-  const diffToMonday = (dow === 0 ? -6 : 1) - dow;
-  const monday = new Date(date);
-  monday.setDate(date.getDate() + diffToMonday);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return formatWeekLabel_(monday, sunday);
-}
-
-function getDayKeyForDate_(date) {
-  const dow = date.getDay(); // 0=Sunday..6=Saturday
-  return DAY_KEY_ORDER_[dow === 0 ? 6 : dow - 1];
-}
-
-function actualOrTarget_(typed, target) {
-  const t = (typed || '').toString().trim();
-  return t ? t : (target || '');
-}
-
-// True if there's actually something worth logging for this day - avoids
-// writing an all-blank placeholder row for a day the app was simply never
-// opened on.
-function draftDayHasActivity_(dayData) {
-  if (!dayData) return false;
-  const exercises = Array.isArray(dayData.exercises) ? dayData.exercises : [];
-  const hasSetActivity = exercises.some(function (ex) {
-    return (ex.sets || []).some(function (s) {
-      return s.checked || (s.weight || '').toString().trim() || (s.reps || '').toString().trim() || (s.notes || '').toString().trim();
-    });
-  });
-  if (hasSetActivity) return true;
-  const checkItems = Array.isArray(dayData.checkItems) ? dayData.checkItems : [];
-  return checkItems.some(function (c) { return c.checked; });
-}
-
-function logDayFromDraftIfNeeded_(date) {
-  const draft = loadDraftState_();
-  if (!draft || !draft.days) return { logged: false, reason: 'no draft' };
-
-  const weekLabel = getWeekLabelForDate_(date);
-  if (draft.week !== weekLabel) return { logged: false, reason: 'draft is for a different week' };
-
-  const dayKey = getDayKeyForDate_(date);
-  const dayData = draft.days[dayKey];
-  if (!draftDayHasActivity_(dayData)) return { logged: false, reason: 'no activity logged for that day' };
-
-  const dayName = DAY_KEY_TO_NAME_[dayKey];
-  const exercises = (dayData.exercises || []).map(function (ex) {
-    return {
-      name: ex.name || '',
-      sets: (ex.sets || []).map(function (s, i) {
-        return {
-          setNum: i + 1,
-          targetWeight: s.targetWeight || '',
-          actualWeight: actualOrTarget_(s.weight, s.targetWeight),
-          targetReps: s.targetReps || '',
-          actualReps: actualOrTarget_(s.reps, s.targetReps),
-          completed: !!s.checked,
-          notes: s.notes || ''
-        };
-      })
-    };
-  });
-
-  const timestamp = draft.savedAt ? new Date(draft.savedAt) : date;
-  const rowsAdded = writeSessionRows_(weekLabel, dayName, exercises, '', timestamp);
-  return { logged: true, day: dayName, week: weekLabel, rowsAdded: rowsAdded };
-}
-
-// The function the daily trigger actually calls - always targets
-// "yesterday" (relative to whenever the trigger fires, early morning),
-// since a day's workout is done by then and won't change further.
-function autoLogYesterday() {
-  const ss = getOrCreateSpreadsheet_();
-  const timeZone = ss.getSpreadsheetTimeZone();
-  const now = new Date();
-  const yesterday = new Date(Utilities.formatDate(now, timeZone, "yyyy-MM-dd'T'00:00:00"));
-  yesterday.setDate(yesterday.getDate() - 1);
-  const result = logDayFromDraftIfNeeded_(yesterday);
-  Logger.log('autoLogYesterday: ' + JSON.stringify(result));
-  return result;
-}
-
-// Run this ONCE from the Apps Script editor (select it in the function
-// dropdown, then Run) to install the daily trigger - it persists on its
-// own after that, independent of deployments, and does not need to be
-// run again unless you want to change the schedule. Guarded so running
-// it more than once doesn't stack up duplicate triggers.
-function createDailyAutoLogTrigger_() {
-  const already = ScriptApp.getProjectTriggers().some(function (t) {
-    return t.getHandlerFunction() === 'autoLogYesterday';
-  });
-  if (already) {
-    Logger.log('Trigger already exists - not creating another one.');
-    return;
-  }
-  ScriptApp.newTrigger('autoLogYesterday').timeBased().everyDays(1).atHour(4).create();
-  Logger.log('Daily auto-log trigger created - will fire once between 4-5am each day.');
 }
 
 function doGet(e) {

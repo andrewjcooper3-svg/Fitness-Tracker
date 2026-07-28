@@ -3662,13 +3662,7 @@ function serializeDay(day) {
         weight: inputs[0] ? inputs[0].value : '',
         reps: inputs[1] ? inputs[1].value : '',
         notes: inputs[2] ? inputs[2].value : '',
-        checked: row.querySelector('.set-checkbox').classList.contains('checked'),
-        // Only used server-side (auto-log, see submitWorkout/autoLogYesterday
-        // in code.gs) to resolve an "actual" value the same way
-        // actualOrTarget() does client-side - restoreDay() never reads
-        // these, so they don't affect what shows up on restore.
-        targetWeight: inputs[0] ? inputs[0].placeholder : '',
-        targetReps: inputs[1] ? inputs[1].placeholder : ''
+        checked: row.querySelector('.set-checkbox').classList.contains('checked')
       };
     });
     return { id: card.dataset.exId, custom: !!nameInput, name: nameInput ? nameInput.value : '', sets: sets };
@@ -4264,7 +4258,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-28-autolog-dedup';
+const APP_BUILD_VERSION = '2026-07-28-dedup-only';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
