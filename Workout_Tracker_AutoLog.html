@@ -83,6 +83,7 @@
   .exercise-history-note { font-family: var(--font); font-size: 11px; color: var(--muted); padding: 0 14px 9px; margin-top: -3px; }
   .exercise-history-up { color: var(--green); font-weight: 600; }
   .exercise-history-down { color: var(--red); font-weight: 600; }
+  .exercise-history-neutral { color: var(--muted); font-weight: 600; }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
   .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
@@ -4257,7 +4258,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-exercise-history';
+const APP_BUILD_VERSION = '2026-07-27-history-compact';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -5819,6 +5820,14 @@ function getExerciseTargetForHistory_(card) {
   };
 }
 
+// Up/down/neutral arrow plus the actual delta number - no "Last: X lb"
+// sentence, just a compact always-shown indicator per stat.
+function formatHistoryDelta_(delta, unit) {
+  if (delta > 0) return `<span class="exercise-history-up">▲${delta}${unit}</span>`;
+  if (delta < 0) return `<span class="exercise-history-down">▼${Math.abs(delta)}${unit}</span>`;
+  return `<span class="exercise-history-neutral">→0${unit}</span>`;
+}
+
 function updateExerciseHistoryNote(card) {
   if (!card) return;
   const name = getExerciseName(card).trim().toLowerCase();
@@ -5826,23 +5835,18 @@ function updateExerciseHistoryNote(card) {
   const entry = name ? historyMap[name] : null;
   let noteEl = card.querySelector('.exercise-history-note');
 
-  if (!entry) {
+  const target = entry ? getExerciseTargetForHistory_(card) : null;
+  const parts = [];
+  if (entry && typeof target.weight === 'number' && typeof entry.weight === 'number') {
+    parts.push(formatHistoryDelta_(Math.round((target.weight - entry.weight) * 100) / 100, ' lb'));
+  }
+  if (entry && typeof target.reps === 'number' && typeof entry.reps === 'number') {
+    parts.push(formatHistoryDelta_(target.reps - entry.reps, ' reps'));
+  }
+
+  if (parts.length === 0) {
     if (noteEl) noteEl.remove();
     return;
-  }
-
-  const target = getExerciseTargetForHistory_(card);
-  const parts = [`Last: ${entry.weight} lb × ${entry.reps}`];
-
-  if (typeof target.weight === 'number' && typeof entry.weight === 'number') {
-    const dw = Math.round((target.weight - entry.weight) * 100) / 100;
-    if (dw > 0) parts.push(`<span class="exercise-history-up">▲ ${dw} lb</span>`);
-    else if (dw < 0) parts.push(`<span class="exercise-history-down">▼ ${Math.abs(dw)} lb</span>`);
-  }
-  if (typeof target.reps === 'number' && typeof entry.reps === 'number') {
-    const dr = target.reps - entry.reps;
-    if (dr > 0) parts.push(`<span class="exercise-history-up">▲ ${dr} reps</span>`);
-    else if (dr < 0) parts.push(`<span class="exercise-history-down">▼ ${Math.abs(dr)} reps</span>`);
   }
 
   if (!noteEl) {
@@ -5850,7 +5854,7 @@ function updateExerciseHistoryNote(card) {
     noteEl.className = 'exercise-history-note';
     card.querySelector('.exercise-header').insertAdjacentElement('afterend', noteEl);
   }
-  noteEl.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+  noteEl.innerHTML = parts.join(' &nbsp;&nbsp; ');
 }
 
 function renderExerciseHistoryNotes() {
