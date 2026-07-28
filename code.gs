@@ -431,6 +431,65 @@ function getPushupLedgerFromSheets_() {
   return ledger;
 }
 
+// For each exercise name, finds the most recent session it was actually
+// logged in (any day, any week - not necessarily "last week", since the
+// same lift can fall on different days across a schedule change) and
+// records that session's top set: the highest actual weight logged, and
+// the actual reps alongside it. Lets the client show "last time you did
+// this, you did X lb x Y reps" plus whether this week's target is up or
+// down from that, regardless of which day of the week it happened on.
+// Sheets are processed oldest-to-newest so a later week's entry for the
+// same exercise naturally overwrites an earlier one.
+function getExerciseHistory_() {
+  const ss = getOrCreateSpreadsheet_();
+  const history = {};
+
+  const weekSheets = [];
+  ss.getSheets().forEach(function (sheet) {
+    const name = sheet.getSheetName();
+    const m = name.match(/^Week of ([A-Za-z]+ \d+) - [A-Za-z]+ \d+, (\d{4})$/);
+    if (!m) return;
+    const monday = new Date(m[1] + ', ' + m[2]);
+    if (isNaN(monday.getTime())) return;
+    weekSheets.push({ sheet: sheet, monday: monday });
+  });
+  weekSheets.sort(function (a, b) { return a.monday - b.monday; });
+
+  weekSheets.forEach(function (entry) {
+    const sheet = entry.sheet;
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+
+    const rows = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
+    const sessions = {};
+    rows.forEach(function (row) {
+      const day = row[1], exercise = row[2];
+      if (!exercise) return;
+      const actualWeight = Number(row[5]);
+      if (isNaN(actualWeight) || actualWeight <= 0) return;
+      const actualReps = Number(row[7]);
+
+      const key = day + '||' + exercise;
+      const best = sessions[key];
+      if (!best || actualWeight > best.weight || (actualWeight === best.weight && !isNaN(actualReps) && actualReps > best.reps)) {
+        sessions[key] = { exercise: exercise, weight: actualWeight, reps: isNaN(actualReps) ? row[7] : actualReps };
+      }
+    });
+
+    Object.keys(sessions).forEach(function (key) {
+      const s = sessions[key];
+      const nameKey = String(s.exercise).trim().toLowerCase();
+      history[nameKey] = {
+        weight: s.weight,
+        reps: s.reps,
+        asOf: Utilities.formatDate(entry.monday, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd')
+      };
+    });
+  });
+
+  return history;
+}
+
 function doGet(e) {
   const action = e && e.parameter ? e.parameter.action : null;
 
@@ -461,6 +520,12 @@ function doGet(e) {
   if (action === 'loadPushupLedger') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', ledger: getPushupLedgerFromSheets_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'getExerciseHistory') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', history: getExerciseHistory_() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 

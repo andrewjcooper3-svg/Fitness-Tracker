@@ -80,6 +80,9 @@
   .exercise-toggle { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); flex-shrink: 0; }
   .exercise-name { font-family: var(--font); font-size: 15px; font-weight: 600; flex: 1; }
   .exercise-meta { font-family: var(--font); font-size: 13px; color: var(--muted); }
+  .exercise-history-note { font-family: var(--font); font-size: 11px; color: var(--muted); padding: 0 14px 9px; margin-top: -3px; }
+  .exercise-history-up { color: var(--green); font-weight: 600; }
+  .exercise-history-down { color: var(--red); font-weight: 600; }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
   .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
@@ -4254,7 +4257,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-27-cook-anim2';
+const APP_BUILD_VERSION = '2026-07-27-exercise-history';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -5672,7 +5675,11 @@ function showDay(day) {
 }
 
 function toggleExercise(header) {
-  const sets = header.nextElementSibling;
+  // Looked up by class rather than assumed to be the very next sibling -
+  // the history note above now sits between the header and the sets
+  // container, which would otherwise get toggled instead of the real
+  // sets element.
+  const sets = header.parentElement.querySelector(':scope > .exercise-sets');
   sets.classList.toggle('expanded');
   const toggle = header.querySelector('.exercise-toggle');
   toggle.textContent = sets.classList.contains('expanded') ? '▾' : '▸';
@@ -5792,6 +5799,76 @@ function actualOrTarget(input) {
 function asNumberOrString(v) {
   const n = parseFloat(v);
   return isNaN(n) ? v : n;
+}
+
+// Small "last time you did this" subtitle under each exercise's header -
+// shows the most recent actually-logged weight/reps for that exercise
+// name (from getExerciseHistory_() on the backend, which scans every
+// week's sheet regardless of which day it fell on) plus an up/down
+// indicator when this week's target differs from it. Kept visible
+// whether the card is expanded or not, since the point is to notice a
+// change while just scanning the list.
+const STORAGE_EXERCISE_HISTORY_KEY = 'WORKOUT_EXERCISE_HISTORY';
+
+function getExerciseTargetForHistory_(card) {
+  const rows = card.querySelectorAll('.set-row');
+  const firstInputs = rows[0] ? rows[0].querySelectorAll('.set-input') : [];
+  return {
+    weight: asNumberOrString(targetOrTyped(firstInputs[0])),
+    reps: asNumberOrString(targetOrTyped(firstInputs[1]))
+  };
+}
+
+function updateExerciseHistoryNote(card) {
+  if (!card) return;
+  const name = getExerciseName(card).trim().toLowerCase();
+  const historyMap = JSON.parse(localStorage.getItem(STORAGE_EXERCISE_HISTORY_KEY) || '{}');
+  const entry = name ? historyMap[name] : null;
+  let noteEl = card.querySelector('.exercise-history-note');
+
+  if (!entry) {
+    if (noteEl) noteEl.remove();
+    return;
+  }
+
+  const target = getExerciseTargetForHistory_(card);
+  const parts = [`Last: ${entry.weight} lb × ${entry.reps}`];
+
+  if (typeof target.weight === 'number' && typeof entry.weight === 'number') {
+    const dw = Math.round((target.weight - entry.weight) * 100) / 100;
+    if (dw > 0) parts.push(`<span class="exercise-history-up">▲ ${dw} lb</span>`);
+    else if (dw < 0) parts.push(`<span class="exercise-history-down">▼ ${Math.abs(dw)} lb</span>`);
+  }
+  if (typeof target.reps === 'number' && typeof entry.reps === 'number') {
+    const dr = target.reps - entry.reps;
+    if (dr > 0) parts.push(`<span class="exercise-history-up">▲ ${dr} reps</span>`);
+    else if (dr < 0) parts.push(`<span class="exercise-history-down">▼ ${Math.abs(dr)} reps</span>`);
+  }
+
+  if (!noteEl) {
+    noteEl = document.createElement('div');
+    noteEl.className = 'exercise-history-note';
+    card.querySelector('.exercise-header').insertAdjacentElement('afterend', noteEl);
+  }
+  noteEl.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+}
+
+function renderExerciseHistoryNotes() {
+  document.querySelectorAll('.exercise-card').forEach(updateExerciseHistoryNote);
+}
+
+async function loadRemoteExerciseHistory() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=getExerciseHistory');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.history) return;
+    localStorage.setItem(STORAGE_EXERCISE_HISTORY_KEY, JSON.stringify(data.history));
+    renderExerciseHistoryNotes();
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
 }
 
 // Counts a set's reps toward the total if a number was typed in; if the
@@ -5947,6 +6024,7 @@ function initExerciseSets(card) {
   initExerciseSwipe(card);
   card.querySelectorAll('.set-row').forEach(initSetDeleteBtn);
   updateExerciseTotal(card);
+  updateExerciseHistoryNote(card);
 }
 
 // Reorder handle ("☰", like Reminders/other iOS list apps) - press and
@@ -6155,7 +6233,7 @@ function addExercise(panel, skipFocus) {
   const card = document.createElement('div');
   card.className = 'exercise-card';
   card.dataset.exId = 'custom-' + Date.now() + '-' + (nextCustomExId++);
-  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><input class="exercise-name-input" type="text" placeholder="Exercise name" onclick="event.stopPropagation()"></div><div class="exercise-meta">Custom</div></div>` +
+  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><input class="exercise-name-input" type="text" placeholder="Exercise name" onclick="event.stopPropagation()" oninput="updateExerciseHistoryNote(this.closest('.exercise-card'))"></div><div class="exercise-meta">Custom</div></div>` +
     `<div class="exercise-sets expanded"><div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div></div>`;
 
   const addBtn = panel.querySelector(':scope > .add-exercise-btn');
@@ -6566,6 +6644,7 @@ loadRemoteWeightLog();
 loadRemoteBodyHealthLog();
 loadRemoteKitchenState();
 loadRemotePushupLedger();
+loadRemoteExerciseHistory();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
