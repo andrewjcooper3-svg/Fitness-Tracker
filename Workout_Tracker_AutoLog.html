@@ -111,7 +111,8 @@
   .check-item.checked { opacity: 0.42; }
   .check-item.checked .item-name { text-decoration: line-through; }
   .check-item.checked .checkbox { background: var(--green); border-color: var(--green); }
-  .checkbox { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: white; transition: all 0.15s; margin-top: 1px; }
+  .checkbox { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: white; transition: all 0.15s; margin-top: 1px; cursor: pointer; }
+  .checkbox.checked { background: var(--green); border-color: var(--green); }
   .item-body { flex: 1; min-width: 0; }
   .item-name { font-family: var(--font); font-size: 14px; font-weight: 600; }
   .item-meta { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 1px; }
@@ -1346,6 +1347,7 @@
     <button class="kitchen-subtab active" data-section="inventory" onclick="showKitchenSection('inventory')">Inventory</button>
     <button class="kitchen-subtab" data-section="recipes" onclick="showKitchenSection('recipes')">Recipes</button>
     <button class="kitchen-subtab" data-section="grocery" onclick="showKitchenSection('grocery')">Grocery</button>
+    <button class="kitchen-subtab" data-section="shopping" onclick="showKitchenSection('shopping')">Shopping</button>
   </div>
 
   <div class="kitchen-section" id="kitchenSectionInventory">
@@ -1430,6 +1432,20 @@
     <div class="config-box">
       <div class="config-title" style="margin-bottom:6px;">General List</div>
       <div id="groceryList"></div>
+    </div>
+  </div>
+
+  <div class="kitchen-section" id="kitchenSectionShopping" style="display:none;">
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:10px;">Add Item</div>
+      <div class="weight-entry-row">
+        <input type="text" id="shoppingItemInput" class="config-input" placeholder="Item to buy (e.g. deodorant)">
+        <button class="config-save" onclick="addShoppingItem()">Add</button>
+      </div>
+    </div>
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:6px;">Shopping List</div>
+      <div id="shoppingList"></div>
     </div>
   </div>
 
@@ -2061,6 +2077,7 @@ const STORAGE_RECIPES_KEY = 'WORKOUT_KITCHEN_RECIPES';
 const STORAGE_MEAL_LOG_KEY = 'WORKOUT_KITCHEN_MEAL_LOG';
 const STORAGE_GROCERY_MANUAL_KEY = 'WORKOUT_KITCHEN_GROCERY_MANUAL';
 const STORAGE_PLANNED_MEALS_KEY = 'WORKOUT_KITCHEN_PLANNED_MEALS';
+const STORAGE_SHOPPING_LIST_KEY = 'WORKOUT_KITCHEN_SHOPPING_LIST';
 
 function genId_() {
   return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -2074,6 +2091,8 @@ function loadMealLog() { return JSON.parse(localStorage.getItem(STORAGE_MEAL_LOG
 function saveMealLog(items) { localStorage.setItem(STORAGE_MEAL_LOG_KEY, JSON.stringify(items)); }
 function loadGroceryManual() { return JSON.parse(localStorage.getItem(STORAGE_GROCERY_MANUAL_KEY) || '[]'); }
 function saveGroceryManual(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_KEY, JSON.stringify(items)); syncKitchenToRemote(); }
+function loadShoppingList() { return JSON.parse(localStorage.getItem(STORAGE_SHOPPING_LIST_KEY) || '[]'); }
+function saveShoppingList(items) { localStorage.setItem(STORAGE_SHOPPING_LIST_KEY, JSON.stringify(items)); syncKitchenToRemote(); }
 
 // Kitchen (Inventory/Recipes/manual Grocery items) used to be local-only,
 // one device with no sync. Whole-state push on every save, whole-state
@@ -2093,7 +2112,8 @@ function syncKitchenToRemote() {
         action: 'saveKitchenState',
         inventory: loadInventory(),
         recipes: loadRecipes(),
-        groceryManual: loadGroceryManual()
+        groceryManual: loadGroceryManual(),
+        shoppingList: loadShoppingList()
       })
     }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
   }, 400);
@@ -2109,6 +2129,7 @@ async function loadRemoteKitchenState() {
     saveInventoryListLocal_(data.state.inventory || []);
     saveRecipesListLocal_(data.state.recipes || []);
     saveGroceryManualLocal_(data.state.groceryManual || []);
+    saveShoppingListLocal_(data.state.shoppingList || []);
     if (viewOrder[currentViewIndex] === 'kitchen') renderKitchenTab();
     if (viewOrder[currentViewIndex] === 'overview') renderOverview();
   } catch (e) {
@@ -2122,6 +2143,7 @@ async function loadRemoteKitchenState() {
 function saveInventoryListLocal_(items) { localStorage.setItem(STORAGE_INVENTORY_KEY, JSON.stringify(items)); }
 function saveRecipesListLocal_(items) { localStorage.setItem(STORAGE_RECIPES_KEY, JSON.stringify(items)); }
 function saveGroceryManualLocal_(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_KEY, JSON.stringify(items)); }
+function saveShoppingListLocal_(items) { localStorage.setItem(STORAGE_SHOPPING_LIST_KEY, JSON.stringify(items)); }
 
 // Recipes checked as "making this week" - purely manual (you check/uncheck
 // as you plan), no automatic weekly reset. Kept separate from the recipe
@@ -2144,10 +2166,11 @@ function renderKitchenTab() {
   renderInventoryList();
   renderRecipeList();
   renderGroceryList();
+  renderShoppingList();
 }
 
 function showKitchenSection(section) {
-  ['inventory', 'recipes', 'grocery'].forEach(s => {
+  ['inventory', 'recipes', 'grocery', 'shopping'].forEach(s => {
     const el = document.getElementById('kitchenSection' + s.charAt(0).toUpperCase() + s.slice(1));
     if (el) el.style.display = s === section ? 'block' : 'none';
     const tab = document.querySelector(`.kitchen-subtab[data-section="${s}"]`);
@@ -3037,6 +3060,83 @@ async function loadRemoteApiKeysState() {
   }
 }
 
+/* ---- Category grouping for the grocery and shopping lists ----
+   Ordered the way a typical grocery store is laid out (produce/perimeter
+   first, center-store dry goods after) so working down the list roughly
+   matches the walk through the store. Most items never get a category
+   typed in manually (it's an optional inventory field), so a keyword
+   guess from the item name is the common path - the inventory Category
+   field is only consulted first as a hint when it matches something
+   recognized. */
+const GROCERY_CATEGORY_ORDER = [
+  'Produce', 'Meat & Seafood', 'Dairy & Eggs', 'Bakery', 'Frozen',
+  'Pantry & Dry Goods', 'Canned & Jarred', 'Condiments & Sauces',
+  'Snacks', 'Beverages', 'Other'
+];
+const GROCERY_CATEGORY_KEYWORDS = {
+  'Produce': ['apple', 'banana', 'orange', 'lettuce', 'spinach', 'kale', 'tomato', 'onion', 'garlic', 'potato', 'carrot', 'broccoli', 'cucumber', 'pepper', 'avocado', 'lemon', 'lime', 'grape', 'berry', 'strawberr', 'blueberr', 'raspberr', 'mushroom', 'celery', 'cabbage', 'corn', 'squash', 'zucchini', 'cilantro', 'parsley', 'basil', 'melon', 'peach', 'pear', 'plum', 'mango', 'pineapple'],
+  'Meat & Seafood': ['chicken', 'beef', 'pork', 'turkey', 'bacon', 'sausage', 'steak', 'ground beef', 'fish', 'salmon', 'shrimp', 'tilapia', 'tuna', 'seafood', 'ham', 'ribs'],
+  'Dairy & Eggs': ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'egg', 'half and half', 'sour cream'],
+  'Bakery': ['bread', 'bagel', 'tortilla', 'roll', 'bun', 'muffin', 'croissant', 'cake', 'dough', 'pita'],
+  'Frozen': ['frozen', 'ice cream', 'popsicle'],
+  'Pantry & Dry Goods': ['rice', 'pasta', 'flour', 'sugar', 'cereal', 'oats', 'oatmeal', 'bean', 'lentil', 'quinoa', 'breadcrumb', 'baking soda', 'baking powder', 'noodle'],
+  'Canned & Jarred': ['canned', 'can of', 'jar', 'soup', 'tomato sauce', 'tomato paste', 'broth', 'stock'],
+  'Condiments & Sauces': ['ketchup', 'mustard', 'mayo', 'oil', 'vinegar', 'dressing', 'syrup', 'honey', 'jam', 'jelly', 'peanut butter', 'salsa', 'hot sauce', 'soy sauce', 'bbq sauce'],
+  'Snacks': ['chip', 'cracker', 'cookie', 'popcorn', 'pretzel', 'candy', 'nuts', 'granola', 'chocolate'],
+  'Beverages': ['water', 'soda', 'juice', 'coffee', 'tea', 'beer', 'wine', 'sparkling', 'gatorade']
+};
+const GROCERY_CATEGORY_ALIASES = {
+  'produce': 'Produce', 'fruit': 'Produce', 'fruits': 'Produce', 'vegetable': 'Produce', 'vegetables': 'Produce', 'veggies': 'Produce',
+  'meat': 'Meat & Seafood', 'seafood': 'Meat & Seafood', 'fish': 'Meat & Seafood',
+  'dairy': 'Dairy & Eggs', 'eggs': 'Dairy & Eggs',
+  'bakery': 'Bakery', 'bread': 'Bakery',
+  'frozen': 'Frozen',
+  'pantry': 'Pantry & Dry Goods', 'dry goods': 'Pantry & Dry Goods', 'grains': 'Pantry & Dry Goods',
+  'canned': 'Canned & Jarred', 'canned goods': 'Canned & Jarred',
+  'condiments': 'Condiments & Sauces', 'sauces': 'Condiments & Sauces', 'oils': 'Condiments & Sauces',
+  'snacks': 'Snacks',
+  'beverages': 'Beverages', 'drinks': 'Beverages'
+};
+
+const HOUSEHOLD_CATEGORY_ORDER = ['Paper & Cleaning', 'Laundry', 'Personal Care', 'Health & Pharmacy', 'Home & Other'];
+const HOUSEHOLD_CATEGORY_KEYWORDS = {
+  'Paper & Cleaning': ['paper towel', 'toilet paper', 'tissue', 'napkin', 'cleaner', 'cleaning', 'dish soap', 'dish detergent', 'sponge', 'trash bag', 'garbage bag', 'disinfectant', 'bleach', 'all purpose'],
+  'Laundry': ['laundry', 'fabric softener', 'dryer sheet', 'stain remover'],
+  'Personal Care': ['deodorant', 'shampoo', 'conditioner', 'soap', 'toothpaste', 'toothbrush', 'razor', 'lotion', 'sunscreen', 'floss', 'body wash'],
+  'Health & Pharmacy': ['vitamin', 'medicine', 'ibuprofen', 'tylenol', 'advil', 'bandage', 'first aid', 'allerg']
+};
+
+function guessCategory_(name, keywordMap, fallback) {
+  const n = name.toLowerCase();
+  for (const cat in keywordMap) {
+    if (keywordMap[cat].some(kw => n.includes(kw))) return cat;
+  }
+  return fallback;
+}
+
+function resolveGroceryCategory_(name, explicitCategory) {
+  const hint = (explicitCategory || '').trim().toLowerCase();
+  if (hint && GROCERY_CATEGORY_ALIASES[hint]) return GROCERY_CATEGORY_ALIASES[hint];
+  return guessCategory_(name, GROCERY_CATEGORY_KEYWORDS, 'Other');
+}
+
+function resolveHouseholdCategory_(name) {
+  return guessCategory_(name, HOUSEHOLD_CATEGORY_KEYWORDS, 'Home & Other');
+}
+
+// Buckets already-categorized items ({category, ...}) into the given
+// canonical order, dropping empty buckets and preserving each bucket's
+// original item order.
+function groupByCategory_(taggedItems, order) {
+  const groups = {};
+  taggedItems.forEach(it => { (groups[it.category] = groups[it.category] || []).push(it); });
+  return order.filter(cat => groups[cat] && groups[cat].length > 0).map(cat => ({ category: cat, items: groups[cat] }));
+}
+
+function renderCategoryHeader_(category, isFirst) {
+  return `<div class="sp-config-label"${isFirst ? ' style="margin-top:0;"' : ''}>${escapeHtml_(category)}</div>`;
+}
+
 /* ---- Grocery list ---- */
 
 // Only produces an actual amount-to-buy when a "restock to" par level is
@@ -3129,10 +3229,20 @@ function renderMealPlanGroceryList() {
     listEl.innerHTML = '<div class="ov-mini-empty">You have everything for these meals.</div>';
     return;
   }
-  listEl.innerHTML = items.map(it => `<div class="weight-history-row">
-    <div class="weight-history-date">${escapeHtml_(it.name)}</div>
-    <div class="weight-history-value kitchen-badge kitchen-badge-amber">${it.amount != null ? 'Need ' + escapeHtml_(formatBuyAmount_(it.amount, it.unit, it.item)) : 'Need some'}</div>
-  </div>`).join('');
+  const tagged = items.map(it => Object.assign({ category: resolveGroceryCategory_(it.name, it.item && it.item.category) }, it));
+  const groups = groupByCategory_(tagged, GROCERY_CATEGORY_ORDER);
+
+  let html = '';
+  groups.forEach((group, gi) => {
+    html += renderCategoryHeader_(group.category, gi === 0);
+    group.items.forEach(it => {
+      html += `<div class="weight-history-row">
+        <div class="weight-history-date">${escapeHtml_(it.name)}</div>
+        <div class="weight-history-value kitchen-badge kitchen-badge-amber">${it.amount != null ? 'Need ' + escapeHtml_(formatBuyAmount_(it.amount, it.unit, it.item)) : 'Need some'}</div>
+      </div>`;
+    });
+  });
+  listEl.innerHTML = html;
 }
 
 function renderGroceryList() {
@@ -3152,26 +3262,41 @@ function renderGeneralGroceryList() {
     return;
   }
 
-  let html = '';
+  const tagged = [];
   auto.forEach(item => {
-    const reasonBadge = item.amount != null
-      ? ` <span class="kitchen-badge kitchen-badge-muted">${escapeHtml_(item.reason)}</span>`
-      : '';
-    const valueBadge = item.amount != null
-      ? `Need ${escapeHtml_(formatBuyAmount_(item.amount, item.unit, item.item))}`
-      : escapeHtml_(item.reason);
-    html += `<div class="weight-history-row">
-      <div class="weight-history-date">${escapeHtml_(item.name)}${reasonBadge}</div>
-      <div class="weight-history-value kitchen-badge kitchen-badge-amber">${valueBadge}</div>
-    </div>`;
+    tagged.push({ kind: 'auto', data: item, category: resolveGroceryCategory_(item.name, item.item && item.item.category) });
   });
   manual.forEach(item => {
-    const style = item.checked ? 'text-decoration:line-through; opacity:0.5;' : '';
-    html += `<div class="weight-history-row">
-      <div class="weight-history-date" style="${style}">${escapeHtml_(item.name)}</div>
-      <button class="weight-history-del" onclick="toggleGroceryChecked('${item.id}')">${item.checked ? '↺' : '✓'}</button>
-      <button class="weight-history-del" onclick="removeGroceryManual('${item.id}')">×</button>
-    </div>`;
+    tagged.push({ kind: 'manual', data: item, category: resolveGroceryCategory_(item.name, item.category) });
+  });
+  const groups = groupByCategory_(tagged, GROCERY_CATEGORY_ORDER);
+
+  let html = '';
+  groups.forEach((group, gi) => {
+    html += renderCategoryHeader_(group.category, gi === 0);
+    group.items.forEach(entry => {
+      if (entry.kind === 'auto') {
+        const item = entry.data;
+        const reasonBadge = item.amount != null
+          ? ` <span class="kitchen-badge kitchen-badge-muted">${escapeHtml_(item.reason)}</span>`
+          : '';
+        const valueBadge = item.amount != null
+          ? `Need ${escapeHtml_(formatBuyAmount_(item.amount, item.unit, item.item))}`
+          : escapeHtml_(item.reason);
+        html += `<div class="weight-history-row">
+          <div class="weight-history-date">${escapeHtml_(item.name)}${reasonBadge}</div>
+          <div class="weight-history-value kitchen-badge kitchen-badge-amber">${valueBadge}</div>
+        </div>`;
+      } else {
+        const item = entry.data;
+        const style = item.checked ? 'text-decoration:line-through; opacity:0.5;' : '';
+        html += `<div class="weight-history-row">
+          <div class="weight-history-date" style="${style}">${escapeHtml_(item.name)}</div>
+          <button class="weight-history-del" onclick="toggleGroceryChecked('${item.id}')">${item.checked ? '↺' : '✓'}</button>
+          <button class="weight-history-del" onclick="removeGroceryManual('${item.id}')">×</button>
+        </div>`;
+      }
+    });
   });
   el.innerHTML = html;
 }
@@ -3198,6 +3323,59 @@ function toggleGroceryChecked(id) {
 function removeGroceryManual(id) {
   saveGroceryManual(loadGroceryManual().filter(i => i.id !== id));
   renderGroceryList();
+}
+
+/* ---- Shopping list (household items - deodorant, cleaner, etc.) ---- */
+
+function renderShoppingList() {
+  const el = document.getElementById('shoppingList');
+  if (!el) return;
+  const items = loadShoppingList();
+  if (items.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">Nothing on your shopping list.</div>';
+    return;
+  }
+
+  const tagged = items.map(it => Object.assign({ category: resolveHouseholdCategory_(it.name) }, it));
+  const groups = groupByCategory_(tagged, HOUSEHOLD_CATEGORY_ORDER);
+
+  let html = '';
+  groups.forEach((group, gi) => {
+    html += renderCategoryHeader_(group.category, gi === 0);
+    group.items.forEach(it => {
+      const style = it.checked ? 'text-decoration:line-through; opacity:0.5;' : '';
+      html += `<div class="weight-history-row">
+        <div class="checkbox${it.checked ? ' checked' : ''}" onclick="toggleShoppingChecked('${it.id}')">${it.checked ? '✓' : ''}</div>
+        <div class="weight-history-date" style="${style}">${escapeHtml_(it.name)}</div>
+        <button class="weight-history-del" onclick="removeShoppingItem('${it.id}')">×</button>
+      </div>`;
+    });
+  });
+  el.innerHTML = html;
+}
+
+function addShoppingItem() {
+  const inputEl = document.getElementById('shoppingItemInput');
+  const name = inputEl.value.trim();
+  if (!name) return;
+  const list = loadShoppingList();
+  list.push({ id: genId_(), name, checked: false });
+  saveShoppingList(list);
+  inputEl.value = '';
+  renderShoppingList();
+}
+
+function toggleShoppingChecked(id) {
+  const list = loadShoppingList();
+  const item = list.find(i => i.id === id);
+  if (item) item.checked = !item.checked;
+  saveShoppingList(list);
+  renderShoppingList();
+}
+
+function removeShoppingItem(id) {
+  saveShoppingList(loadShoppingList().filter(i => i.id !== id));
+  renderShoppingList();
 }
 
 /* ---------- Body Health tab (Recovery, Sleep, Strain, Stress) ----------
@@ -4258,7 +4436,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-28-new-icon';
+const APP_BUILD_VERSION = '2026-07-28-shopping-list';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

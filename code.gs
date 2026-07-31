@@ -321,12 +321,13 @@ function loadDraftState_() {
 // concurrent multi-user editing.
 const KITCHEN_STATE_KEY = 'KITCHEN_STATE';
 
-function saveKitchenState_(inventory, recipes, groceryManual) {
+function saveKitchenState_(inventory, recipes, groceryManual, shoppingList) {
   const props = PropertiesService.getScriptProperties();
   props.setProperty(KITCHEN_STATE_KEY, JSON.stringify({
     inventory: inventory || [],
     recipes: recipes || [],
     groceryManual: groceryManual || [],
+    shoppingList: shoppingList || [],
     savedAt: new Date().toISOString()
   }));
 }
@@ -658,7 +659,7 @@ function doPost(e) {
     }
 
     if (data.action === 'saveKitchenState') {
-      saveKitchenState_(data.inventory, data.recipes, data.groceryManual);
+      saveKitchenState_(data.inventory, data.recipes, data.groceryManual, data.shoppingList);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
