@@ -629,6 +629,20 @@
         <button onclick="setWidgetSize(event, this, 'large')">Large</button>
       </div>
     </div>
+
+    <div class="ov-widget" data-widget="shopping" data-size="wide" onclick="handleShoppingWidgetTap(event)">
+      <div class="ov-widget-edit-bar">
+        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
+        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+      </div>
+      <div class="ov-widget-label">Shopping</div>
+      <div id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-widget-sizepicker">
+        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
+        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
+        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
+      </div>
+    </div>
   </div>
 
   <div class="ov-note">Reflects what's checked off this week, saved on this device.<br>Automatically resets once a new week begins.</div>
@@ -3137,6 +3151,22 @@ function renderCategoryHeader_(category, isFirst) {
   return `<div class="sp-config-label"${isFirst ? ' style="margin-top:0;"' : ''}>${escapeHtml_(category)}</div>`;
 }
 
+// Auto (low-stock) and meal-plan grocery items are recomputed fresh from
+// inventory/recipes on every render, not persisted objects like manual
+// items - so they don't have a "checked" field to toggle. This keyed set
+// lets you tick them off during a shopping trip anyway. Kept local-only
+// (not part of the kitchen sync) since it's a short-lived shopping-trip
+// convenience, not data worth round-tripping to the backend.
+const STORAGE_GROCERY_CHECKED_KEYS = 'WORKOUT_KITCHEN_GROCERY_CHECKED_KEYS';
+function loadGroceryCheckedKeys_() { return new Set(JSON.parse(localStorage.getItem(STORAGE_GROCERY_CHECKED_KEYS) || '[]')); }
+function saveGroceryCheckedKeys_(set) { localStorage.setItem(STORAGE_GROCERY_CHECKED_KEYS, JSON.stringify(Array.from(set))); }
+function toggleGroceryCheckedKey_(key) {
+  const set = loadGroceryCheckedKeys_();
+  if (set.has(key)) set.delete(key); else set.add(key);
+  saveGroceryCheckedKeys_(set);
+  renderGroceryList();
+}
+
 /* ---- Grocery list ---- */
 
 // Only produces an actual amount-to-buy when a "restock to" par level is
@@ -3231,13 +3261,17 @@ function renderMealPlanGroceryList() {
   }
   const tagged = items.map(it => Object.assign({ category: resolveGroceryCategory_(it.name, it.item && it.item.category) }, it));
   const groups = groupByCategory_(tagged, GROCERY_CATEGORY_ORDER);
+  const checkedKeys = loadGroceryCheckedKeys_();
 
   let html = '';
   groups.forEach((group, gi) => {
     html += renderCategoryHeader_(group.category, gi === 0);
     group.items.forEach(it => {
+      const key = 'mealplan:' + (it.item ? it.item.id : it.name.toLowerCase());
+      const checked = checkedKeys.has(key);
       html += `<div class="weight-history-row">
-        <div class="weight-history-date">${escapeHtml_(it.name)}</div>
+        <div class="checkbox${checked ? ' checked' : ''}" onclick="toggleGroceryCheckedKey_('${escapeJsAttr_(key)}')">${checked ? '✓' : ''}</div>
+        <div class="weight-history-date" style="${checked ? 'text-decoration:line-through; opacity:0.5;' : ''}">${escapeHtml_(it.name)}</div>
         <div class="weight-history-value kitchen-badge kitchen-badge-amber">${it.amount != null ? 'Need ' + escapeHtml_(formatBuyAmount_(it.amount, it.unit, it.item)) : 'Need some'}</div>
       </div>`;
     });
@@ -3270,6 +3304,7 @@ function renderGeneralGroceryList() {
     tagged.push({ kind: 'manual', data: item, category: resolveGroceryCategory_(item.name, item.category) });
   });
   const groups = groupByCategory_(tagged, GROCERY_CATEGORY_ORDER);
+  const checkedKeys = loadGroceryCheckedKeys_();
 
   let html = '';
   groups.forEach((group, gi) => {
@@ -3277,6 +3312,8 @@ function renderGeneralGroceryList() {
     group.items.forEach(entry => {
       if (entry.kind === 'auto') {
         const item = entry.data;
+        const key = 'auto:' + (item.item ? item.item.id : item.name.toLowerCase());
+        const checked = checkedKeys.has(key);
         const reasonBadge = item.amount != null
           ? ` <span class="kitchen-badge kitchen-badge-muted">${escapeHtml_(item.reason)}</span>`
           : '';
@@ -3284,15 +3321,16 @@ function renderGeneralGroceryList() {
           ? `Need ${escapeHtml_(formatBuyAmount_(item.amount, item.unit, item.item))}`
           : escapeHtml_(item.reason);
         html += `<div class="weight-history-row">
-          <div class="weight-history-date">${escapeHtml_(item.name)}${reasonBadge}</div>
+          <div class="checkbox${checked ? ' checked' : ''}" onclick="toggleGroceryCheckedKey_('${escapeJsAttr_(key)}')">${checked ? '✓' : ''}</div>
+          <div class="weight-history-date" style="${checked ? 'text-decoration:line-through; opacity:0.5;' : ''}">${escapeHtml_(item.name)}${reasonBadge}</div>
           <div class="weight-history-value kitchen-badge kitchen-badge-amber">${valueBadge}</div>
         </div>`;
       } else {
         const item = entry.data;
         const style = item.checked ? 'text-decoration:line-through; opacity:0.5;' : '';
         html += `<div class="weight-history-row">
+          <div class="checkbox${item.checked ? ' checked' : ''}" onclick="toggleGroceryChecked('${item.id}')">${item.checked ? '✓' : ''}</div>
           <div class="weight-history-date" style="${style}">${escapeHtml_(item.name)}</div>
-          <button class="weight-history-del" onclick="toggleGroceryChecked('${item.id}')">${item.checked ? '↺' : '✓'}</button>
           <button class="weight-history-del" onclick="removeGroceryManual('${item.id}')">×</button>
         </div>`;
       }
@@ -3328,6 +3366,7 @@ function removeGroceryManual(id) {
 /* ---- Shopping list (household items - deodorant, cleaner, etc.) ---- */
 
 function renderShoppingList() {
+  renderOverviewShoppingPreview();
   const el = document.getElementById('shoppingList');
   if (!el) return;
   const items = loadShoppingList();
@@ -4351,6 +4390,15 @@ function handleWidgetTap(event, view) {
   showAppView(view);
 }
 
+// Shopping isn't its own top-level tab - it's a Kitchen subtab - so this
+// widget needs to both switch views and select that subtab, rather than
+// just showAppView() like the other widgets.
+function handleShoppingWidgetTap(event) {
+  if (overviewEditing) return;
+  showAppView('kitchen');
+  showKitchenSection('shopping');
+}
+
 function setWidgetSize(event, btn, size) {
   event.stopPropagation();
   const widget = btn.closest('.ov-widget');
@@ -4436,7 +4484,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-28-shopping-list';
+const APP_BUILD_VERSION = '2026-07-28-shopping-widget-checkboxes';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -4463,6 +4511,7 @@ function renderOverview() {
   renderOverviewPushupMini();
   renderOverviewWeightPreview();
   renderOverviewKitchenPreview();
+  renderOverviewShoppingPreview();
   ensureCalendarLoaded();
 }
 
@@ -4614,6 +4663,33 @@ function renderOverviewKitchenPreview() {
       `</div></div>`).join('');
 }
 
+// Same idea as the Kitchen widget above, but for unchecked household
+// shopping-list items instead of grocery/inventory shortfalls.
+function renderOverviewShoppingPreview() {
+  const el = document.getElementById('ovShoppingPreview');
+  if (!el) return;
+  const widget = el.closest('.ov-widget');
+  const size = widget ? widget.dataset.size : 'wide';
+
+  const unchecked = loadShoppingList().filter(i => !i.checked);
+
+  if (unchecked.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">Nothing needed right now</div>';
+    return;
+  }
+
+  if (size === 'small') {
+    el.innerHTML = `<div class="ov-mini-weight-value">${unchecked.length}</div><div class="ov-mini-weight-sub">item${unchecked.length === 1 ? '' : 's'} needed</div>`;
+    return;
+  }
+
+  const count = size === 'large' ? 5 : 3;
+  el.innerHTML = `<div class="ov-mini-weight-sub" style="margin-bottom:6px;">${unchecked.length} item${unchecked.length === 1 ? '' : 's'} needed</div>` +
+    unchecked.slice(0, count).map(it => `<div class="ov-mini-event"><div class="ov-mini-event-text">` +
+      `<span class="ov-mini-event-title">${escapeHtml_(it.name)}</span>` +
+      `</div></div>`).join('');
+}
+
 /* ---------- Pushups tab (week/month/year goals + running deficit) ---------- */
 
 function setGoalRing(ringId, pctId, valueId, actual, target) {
@@ -4736,6 +4812,14 @@ function escapeHtml_(str) {
   const div = document.createElement('div');
   div.textContent = str == null ? '' : str;
   return div.innerHTML;
+}
+
+// For interpolating a value into a single-quoted onclick="...('...')"
+// attribute - escapeHtml_ alone isn't enough since a name with an
+// apostrophe (e.g. "Trader Joe's") would otherwise break out of the
+// quoted JS string argument, not just the HTML attribute.
+function escapeJsAttr_(str) {
+  return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 // "Today" / "Tomorrow" / "In N days" (or "N days ago" for a past date,
