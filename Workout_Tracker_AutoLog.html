@@ -3876,6 +3876,25 @@ function getWeekLabel() {
   return `Week of ${fmt(monday)} - ${fmt(sunday)}, ${sunday.getFullYear()}`;
 }
 
+// restoreState() only ever checks for a week rollover once, at page load -
+// if the app/PWA is left open (foregrounded or just backgrounded, never
+// force-quit or reloaded) across the Sunday-to-Monday boundary, the day
+// panels keep showing the PREVIOUS week's typed values indefinitely,
+// since nothing else re-runs that check. getWeekMonday()/getWeekLabel()
+// use a live `new Date()` though, so they silently flip to the new week
+// the moment the clock ticks over - meaning computeWeekStats() (and
+// anything built on it, the pushup ledger update in particular) then
+// misattributes last week's still-on-screen numbers onto THIS week's
+// dates the next time stats get computed, inflating the running pushup
+// total by roughly a stale week's worth every time this happens.
+// Reloading on rollover is the simplest fix that's guaranteed correct -
+// every other subsystem (kitchen, spotify, calendar, etc.) also assumes
+// "the page just loaded" freshness, not just the workout day panels.
+let weekLabelAtLoad_ = null;
+function checkForWeekRollover_() {
+  if (weekLabelAtLoad_ !== null && getWeekLabel() !== weekLabelAtLoad_) location.reload();
+}
+
 function dateKey(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -4500,7 +4519,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-03-schedule-and-progression';
+const APP_BUILD_VERSION = '2026-08-03-week-rollover-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6921,6 +6940,11 @@ seedYearCarryForward();
 forceYearCarryResetJul27();
 migrateStaleDayTemplates20260727();
 restoreState();
+weekLabelAtLoad_ = getWeekLabel();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForWeekRollover_();
+});
+setInterval(checkForWeekRollover_, 5 * 60 * 1000);
 fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
 loadRemoteBodyHealthLog();
