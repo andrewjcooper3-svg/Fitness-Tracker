@@ -313,19 +313,23 @@ function loadDraftState_() {
   return raw ? JSON.parse(raw) : null;
 }
 
-// Kitchen (Inventory/Recipes/manual Grocery items) was local-storage-only
-// (one device, no sync) - stored the same simple way as the draft state
-// above: one JSON blob in Script Properties, whole-state overwrite on
-// every save, whole-state pull on load. No per-item merge/conflict
+// Kitchen (Inventory/manual Grocery items/Shopping list) is local-storage-
+// only (one device, no sync) - stored the same simple way as the draft
+// state above: one JSON blob in Script Properties, whole-state overwrite
+// on every save, whole-state pull on load. No per-item merge/conflict
 // logic - appropriate for a single person using their own devices, not
 // concurrent multi-user editing.
+//
+// Recipes are NOT part of this blob - see "Recipe Database" below, a
+// separate spreadsheet (one tab per recipe) that's the real source of
+// truth, so recipes are readable/editable directly in Sheets rather than
+// buried in a JSON property.
 const KITCHEN_STATE_KEY = 'KITCHEN_STATE';
 
-function saveKitchenState_(inventory, recipes, groceryManual, shoppingList) {
+function saveKitchenState_(inventory, groceryManual, shoppingList) {
   const props = PropertiesService.getScriptProperties();
   props.setProperty(KITCHEN_STATE_KEY, JSON.stringify({
     inventory: inventory || [],
-    recipes: recipes || [],
     groceryManual: groceryManual || [],
     shoppingList: shoppingList || [],
     savedAt: new Date().toISOString()
@@ -336,6 +340,169 @@ function loadKitchenState_() {
   const props = PropertiesService.getScriptProperties();
   const raw = props.getProperty(KITCHEN_STATE_KEY);
   return raw ? JSON.parse(raw) : null;
+}
+
+// ---------- Recipe Database (its own spreadsheet, one tab per recipe) ----------
+//
+// Deliberately a separate spreadsheet from the workout log (a separate
+// RECIPES_SHEET_ID property, same pattern as getOrCreateSpreadsheet_
+// above) - the workout Sheet stays strictly workout weeks, nothing else
+// gets mixed into it.
+//
+// Each recipe's tab layout:
+//   A1: "Recipe ID"   B1: <id>            (stable key - lets a rename
+//                                           update the same tab instead
+//                                           of creating a duplicate)
+//   A2: "Name"        B2: <name>
+//   A3: "Image URL"   B3: <image>
+//   A4: "Instructions" B4: <instructions>
+//   Row 6: header row - Ingredient | Qty | Unit | Staple
+//   Row 7+: one row per ingredient
+//
+// inventoryId (the app's own link from an ingredient to a specific
+// inventory item) is intentionally NOT stored here - it's a local
+// convenience the app already re-derives by name match on load
+// (autoLinkIngredients_), so persisting it would just be a stale id
+// once it's read back on a different device.
+const RECIPE_SHEET_INGREDIENT_HEADER_ROW = 6;
+
+function getOrCreateRecipesSpreadsheet_() {
+  const props = PropertiesService.getScriptProperties();
+  let sheetId = props.getProperty('RECIPES_SHEET_ID');
+  let ss;
+
+  if (sheetId) {
+    try {
+      ss = SpreadsheetApp.openById(sheetId);
+    } catch (e) {
+      ss = null;
+    }
+  }
+
+  if (!ss) {
+    ss = SpreadsheetApp.create('Recipe Database');
+    props.setProperty('RECIPES_SHEET_ID', ss.getId());
+  }
+
+  return ss;
+}
+
+// Sheet tab names can't contain : \ / ? * [ ] and max out at 100 chars -
+// sanitize and leave headroom for the " (2)" de-dup suffix below.
+function sanitizeRecipeSheetName_(name) {
+  let clean = (name || '').replace(/[:\\\/\?\*\[\]]/g, '-').trim();
+  if (!clean) clean = 'Untitled Recipe';
+  return clean.slice(0, 90);
+}
+
+function findRecipeSheetById_(ss, id) {
+  const sheets = ss.getSheets();
+  for (let i = 0; i < sheets.length; i++) {
+    if (sheets[i].getLastRow() < 1) continue;
+    if (String(sheets[i].getRange(1, 2).getValue()) === String(id)) return sheets[i];
+  }
+  return null;
+}
+
+// Picks a tab name that won't collide with a different recipe's tab -
+// "Chili", "Chili (2)", "Chili (3)"... The recipe's own existing sheet
+// (if renaming in place) doesn't count as a collision with itself.
+function uniqueRecipeSheetName_(ss, name, keepSheet) {
+  const base = sanitizeRecipeSheetName_(name);
+  let candidate = base;
+  let n = 2;
+  while (true) {
+    const found = ss.getSheetByName(candidate);
+    if (!found || (keepSheet && found.getName() === keepSheet.getName())) return candidate;
+    candidate = (base + ' (' + n + ')').slice(0, 95);
+    n++;
+  }
+}
+
+function saveRecipeToSheet_(recipe) {
+  if (!recipe || !recipe.id) return;
+  const ss = getOrCreateRecipesSpreadsheet_();
+  let sheet = findRecipeSheetById_(ss, recipe.id);
+  const desiredName = uniqueRecipeSheetName_(ss, recipe.name, sheet);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(desiredName);
+  } else if (sheet.getName() !== desiredName) {
+    sheet.setName(desiredName);
+  }
+
+  sheet.clear();
+  sheet.getRange(1, 1, 4, 2).setValues([
+    ['Recipe ID', recipe.id],
+    ['Name', recipe.name || ''],
+    ['Image URL', recipe.image || ''],
+    ['Instructions', recipe.instructions || '']
+  ]);
+  sheet.getRange(1, 1, 4, 1).setFontWeight('bold');
+
+  const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+  sheet.getRange(RECIPE_SHEET_INGREDIENT_HEADER_ROW, 1, 1, 4).setValues([['Ingredient', 'Qty', 'Unit', 'Staple']]);
+  sheet.getRange(RECIPE_SHEET_INGREDIENT_HEADER_ROW, 1, 1, 4).setFontWeight('bold');
+
+  if (ingredients.length > 0) {
+    const rows = ingredients.map(function (ing) {
+      return [ing.name || '', ing.qty != null ? ing.qty : '', ing.unit || '', ing.notTracked ? 'Yes' : ''];
+    });
+    sheet.getRange(RECIPE_SHEET_INGREDIENT_HEADER_ROW + 1, 1, rows.length, 4).setValues(rows);
+  }
+
+  sheet.autoResizeColumns(1, 4);
+}
+
+// Sheets requires at least one tab - if the recipe being deleted is the
+// only tab left, clear it instead of deleting it (leaves an empty
+// "Untitled Recipe" placeholder rather than erroring).
+function deleteRecipeSheet_(id) {
+  const ss = getOrCreateRecipesSpreadsheet_();
+  const sheet = findRecipeSheetById_(ss, id);
+  if (!sheet) return;
+  if (ss.getSheets().length > 1) ss.deleteSheet(sheet);
+  else sheet.clear();
+}
+
+function loadRecipesFromSheets_() {
+  const ss = getOrCreateRecipesSpreadsheet_();
+  const recipes = [];
+
+  ss.getSheets().forEach(function (sheet) {
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 4) return;
+
+    const meta = sheet.getRange(1, 1, 4, 2).getValues();
+    const id = meta[0][1];
+    const name = meta[1][1];
+    if (!id || !name) return;
+
+    const ingredients = [];
+    if (lastRow > RECIPE_SHEET_INGREDIENT_HEADER_ROW) {
+      const ingRows = sheet.getRange(RECIPE_SHEET_INGREDIENT_HEADER_ROW + 1, 1, lastRow - RECIPE_SHEET_INGREDIENT_HEADER_ROW, 4).getValues();
+      ingRows.forEach(function (r) {
+        if (!r[0]) return;
+        ingredients.push({
+          name: String(r[0]),
+          inventoryId: null,
+          qty: r[1] !== '' ? Number(r[1]) : null,
+          unit: r[2] ? String(r[2]) : '',
+          notTracked: r[3] === 'Yes'
+        });
+      });
+    }
+
+    recipes.push({
+      id: String(id),
+      name: String(name),
+      image: meta[2][1] ? String(meta[2][1]) : '',
+      instructions: meta[3][1] ? String(meta[3][1]) : '',
+      ingredients: ingredients
+    });
+  });
+
+  return recipes;
 }
 
 // Spotify connection (Client ID, OAuth tokens, pinned/workout playlists)
@@ -598,6 +765,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadRecipesFromSheets') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', recipes: loadRecipesFromSheets_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadPushupLedger') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', ledger: getPushupLedgerFromSheets_() }))
@@ -659,7 +832,21 @@ function doPost(e) {
     }
 
     if (data.action === 'saveKitchenState') {
-      saveKitchenState_(data.inventory, data.recipes, data.groceryManual, data.shoppingList);
+      saveKitchenState_(data.inventory, data.groceryManual, data.shoppingList);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveRecipeToSheet') {
+      saveRecipeToSheet_(data.recipe);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'deleteRecipeSheet') {
+      deleteRecipeSheet_(data.id);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);

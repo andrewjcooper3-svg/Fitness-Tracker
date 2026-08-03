@@ -2068,8 +2068,11 @@ function genId_() {
 
 function loadInventory() { return JSON.parse(localStorage.getItem(STORAGE_INVENTORY_KEY) || '[]'); }
 function saveInventoryList(items) { localStorage.setItem(STORAGE_INVENTORY_KEY, JSON.stringify(items)); syncKitchenToRemote(); }
+// Recipes sync individually to their own sheet (see syncRecipeToSheet_/
+// loadRemoteRecipes below) rather than through the whole-blob
+// syncKitchenToRemote - this is just the local cache read/write.
 function loadRecipes() { return JSON.parse(localStorage.getItem(STORAGE_RECIPES_KEY) || '[]'); }
-function saveRecipesList(items) { localStorage.setItem(STORAGE_RECIPES_KEY, JSON.stringify(items)); syncKitchenToRemote(); }
+function saveRecipesList(items) { localStorage.setItem(STORAGE_RECIPES_KEY, JSON.stringify(items)); }
 function loadMealLog() { return JSON.parse(localStorage.getItem(STORAGE_MEAL_LOG_KEY) || '[]'); }
 function saveMealLog(items) { localStorage.setItem(STORAGE_MEAL_LOG_KEY, JSON.stringify(items)); }
 function loadGroceryManual() { return JSON.parse(localStorage.getItem(STORAGE_GROCERY_MANUAL_KEY) || '[]'); }
@@ -2094,7 +2097,6 @@ function syncKitchenToRemote() {
       body: JSON.stringify({
         action: 'saveKitchenState',
         inventory: loadInventory(),
-        recipes: loadRecipes(),
         groceryManual: loadGroceryManual(),
         shoppingList: loadShoppingList()
       })
@@ -2110,10 +2112,50 @@ async function loadRemoteKitchenState() {
     const data = await res.json();
     if (data.status !== 'success' || !data.state) return;
     saveInventoryListLocal_(data.state.inventory || []);
-    saveRecipesListLocal_(data.state.recipes || []);
     saveGroceryManualLocal_(data.state.groceryManual || []);
     saveShoppingListLocal_(data.state.shoppingList || []);
     if (viewOrder[currentViewIndex] === 'kitchen') renderKitchenTab();
+    if (viewOrder[currentViewIndex] === 'overview') renderOverview();
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
+}
+
+// Recipe Database - a separate spreadsheet (one tab per recipe), not part
+// of the kitchen-state blob above, so recipes are readable/editable
+// directly in Sheets. Each save/delete pushes just that one recipe
+// immediately (not debounced - these are deliberate taps, not keystrokes)
+// rather than a whole-list push, since Sheets writes are naturally
+// per-tab. The local cache (STORAGE_RECIPES_KEY) is refreshed from the
+// sheets on load, same offline-friendly pattern as everything else here.
+function syncRecipeToSheet_(recipe) {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine || !recipe) return;
+  fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'saveRecipeToSheet', recipe })
+  }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
+}
+
+function deleteRecipeSheetRemote_(id) {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine || !id) return;
+  fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'deleteRecipeSheet', id })
+  }).catch(() => { /* offline/unreachable - sheet just won't be cleaned up until next attempt */ });
+}
+
+async function loadRemoteRecipes() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadRecipesFromSheets');
+    const data = await res.json();
+    if (data.status !== 'success' || !Array.isArray(data.recipes)) return;
+    saveRecipesList(data.recipes);
+    relinkAllRecipesToInventory_();
+    if (viewOrder[currentViewIndex] === 'kitchen') { renderRecipeList(); renderGroceryList(); }
     if (viewOrder[currentViewIndex] === 'overview') renderOverview();
   } catch (e) {
     // Offline/unreachable - whatever's cached locally stands.
@@ -2124,7 +2166,6 @@ async function loadRemoteKitchenState() {
 // just-pulled remote state, so the pull itself doesn't immediately
 // re-trigger another push right back out.
 function saveInventoryListLocal_(items) { localStorage.setItem(STORAGE_INVENTORY_KEY, JSON.stringify(items)); }
-function saveRecipesListLocal_(items) { localStorage.setItem(STORAGE_RECIPES_KEY, JSON.stringify(items)); }
 function saveGroceryManualLocal_(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_KEY, JSON.stringify(items)); }
 function saveShoppingListLocal_(items) { localStorage.setItem(STORAGE_SHOPPING_LIST_KEY, JSON.stringify(items)); }
 
@@ -2509,13 +2550,19 @@ function saveRecipe() {
   autoLinkIngredients_(cleanIngredients, loadInventory());
 
   const recipes = loadRecipes();
+  let savedRecipe;
   if (editingRecipeId) {
     const idx = recipes.findIndex(r => r.id === editingRecipeId);
-    if (idx !== -1) recipes[idx] = Object.assign({}, recipes[idx], { name, image, instructions, ingredients: cleanIngredients });
+    if (idx !== -1) {
+      recipes[idx] = Object.assign({}, recipes[idx], { name, image, instructions, ingredients: cleanIngredients });
+      savedRecipe = recipes[idx];
+    }
   } else {
-    recipes.push({ id: genId_(), name, image, instructions, ingredients: cleanIngredients });
+    savedRecipe = { id: genId_(), name, image, instructions, ingredients: cleanIngredients };
+    recipes.push(savedRecipe);
   }
   saveRecipesList(recipes);
+  syncRecipeToSheet_(savedRecipe);
   closeRecipeEditor();
   renderRecipeList();
 }
@@ -2527,6 +2574,7 @@ function editRecipe(id) {
 
 function deleteRecipe(id) {
   saveRecipesList(loadRecipes().filter(r => r.id !== id));
+  deleteRecipeSheetRemote_(id);
   renderRecipeList();
 }
 
@@ -4219,7 +4267,7 @@ function renderActiveViewContent(view) {
   if (view === 'music') renderMusicTab();
   if (view === 'weight') { renderWeightTab(); loadRemoteWeightLog(); }
   if (view === 'stats') renderStatsTab();
-  if (view === 'kitchen') { renderKitchenTab(); loadRemoteKitchenState(); }
+  if (view === 'kitchen') { renderKitchenTab(); loadRemoteKitchenState(); loadRemoteRecipes(); }
   if (view === 'bodyhealth') { renderBodyHealthTab(); loadRemoteBodyHealthLog(); }
 }
 
@@ -4453,7 +4501,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-07-28-friday-c-day';
+const APP_BUILD_VERSION = '2026-07-28-recipe-database';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6722,7 +6770,7 @@ function refreshCurrentTab() {
   }
   if (view === 'kitchen') {
     renderKitchenTab();
-    return loadRemoteKitchenState();
+    return Promise.all([loadRemoteKitchenState(), loadRemoteRecipes()]);
   }
   if (view === 'bodyhealth') {
     renderBodyHealthTab();
@@ -6878,6 +6926,7 @@ fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
 loadRemoteBodyHealthLog();
 loadRemoteKitchenState();
+loadRemoteRecipes();
 loadRemotePushupLedger();
 loadRemoteExerciseHistory();
 
