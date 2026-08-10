@@ -1675,6 +1675,7 @@ function saveBodyHealthSettings() {
   statusEl.classList.remove('warn');
   statusEl.textContent = 'Saved.';
   renderBodyHealthTab();
+  syncSettingsToRemote();
 }
 
 function saveSettings() {
@@ -1723,6 +1724,57 @@ function saveSettings() {
   renderOverview();
   renderPushupsTab();
   renderSettingsTab();
+  syncSettingsToRemote();
+}
+
+// Whole-blob sync for Pushup Goals / Body Health settings (daily
+// baseline, year goal, max HR) and the year-total correction - same
+// debounced-push-on-save / pull-and-apply-on-load pattern as
+// Kitchen/Spotify/API keys above, so a correction typed into one
+// device's "Correct total reps this year" field (or a changed goal)
+// actually shows up on the others instead of staying stuck locally.
+let settingsSyncTimer_ = null;
+function syncSettingsToRemote() {
+  clearTimeout(settingsSyncTimer_);
+  settingsSyncTimer_ = setTimeout(() => {
+    const url = getDeploymentUrl();
+    if (!url || !navigator.onLine) return;
+    const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+    const yearCarry = JSON.parse(localStorage.getItem(STORAGE_YEAR_CARRY_KEY) || 'null');
+    fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'saveSettingsState',
+        dailyBaseline: saved.dailyBaseline || null,
+        yearGoal: saved.yearGoal || null,
+        maxHR: saved.maxHR || null,
+        yearCarry: yearCarry
+      })
+    }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
+  }, 400);
+}
+
+async function loadRemoteSettingsState() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadSettingsState');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.state) return;
+    const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+    if (data.state.dailyBaseline > 0) saved.dailyBaseline = data.state.dailyBaseline;
+    if (data.state.yearGoal > 0) saved.yearGoal = data.state.yearGoal;
+    if (data.state.maxHR > 0) saved.maxHR = data.state.maxHR;
+    localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
+    if (data.state.yearCarry) localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify(data.state.yearCarry));
+    loadSettingsIntoState();
+    renderOverview();
+    renderPushupsTab();
+    renderBodyHealthTab();
+    if (document.getElementById('settingsModalOverlay').classList.contains('open')) renderSettingsTab();
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
 }
 
 // Weight log - purely local (same pattern as the pushup ledger). Fitdays'
@@ -1954,6 +2006,7 @@ function closeWeekDetailModal(event) {
 function openSettingsModal() {
   renderSettingsTab();
   document.getElementById('settingsModalOverlay').classList.add('open');
+  loadRemoteSettingsState();
 }
 
 function closeSettingsModal(event) {
@@ -4421,6 +4474,7 @@ function saveWidgetSizes() {
   const sizes = {};
   document.querySelectorAll('.ov-widget').forEach(w => { sizes[w.dataset.widget] = w.dataset.size; });
   localStorage.setItem(STORAGE_OVERVIEW_WIDGET_SIZES, JSON.stringify(sizes));
+  syncOverviewLayoutToRemote();
 }
 
 function loadWidgetSizes() {
@@ -4433,6 +4487,7 @@ function loadWidgetSizes() {
 function saveWidgetOrder() {
   const order = Array.from(document.querySelectorAll('.ov-widget')).map(w => w.dataset.widget);
   localStorage.setItem(STORAGE_OVERVIEW_WIDGET_ORDER, JSON.stringify(order));
+  syncOverviewLayoutToRemote();
 }
 
 function loadWidgetOrder() {
@@ -4444,6 +4499,41 @@ function loadWidgetOrder() {
     const w = board.querySelector(`.ov-widget[data-widget="${key}"]`);
     if (w) board.appendChild(w);
   });
+}
+
+// Whole-blob sync for the Overview widget board layout (sizes + order) -
+// same debounced-push / pull-and-apply pattern as Settings/Kitchen/
+// Spotify above, so rearranging or resizing widgets on one device
+// carries over to the others instead of staying stuck per-device.
+let overviewLayoutSyncTimer_ = null;
+function syncOverviewLayoutToRemote() {
+  clearTimeout(overviewLayoutSyncTimer_);
+  overviewLayoutSyncTimer_ = setTimeout(() => {
+    const url = getDeploymentUrl();
+    if (!url || !navigator.onLine) return;
+    const sizes = JSON.parse(localStorage.getItem(STORAGE_OVERVIEW_WIDGET_SIZES) || '{}');
+    const order = JSON.parse(localStorage.getItem(STORAGE_OVERVIEW_WIDGET_ORDER) || 'null');
+    fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'saveOverviewLayoutState', sizes: sizes, order: order })
+    }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
+  }, 400);
+}
+
+async function loadRemoteOverviewLayoutState() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const res = await fetch(url + '?action=loadOverviewLayoutState');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.state) return;
+    if (data.state.sizes) localStorage.setItem(STORAGE_OVERVIEW_WIDGET_SIZES, JSON.stringify(data.state.sizes));
+    if (data.state.order) localStorage.setItem(STORAGE_OVERVIEW_WIDGET_ORDER, JSON.stringify(data.state.order));
+    loadWidgetOrder();
+    loadWidgetSizes();
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
 }
 
 // Small 7-segment ring (Apple "Screen Time" style) replacing the old
@@ -6910,6 +7000,8 @@ loadRemoteKitchenState();
 loadRemoteRecipes();
 loadRemotePushupLedger();
 loadRemoteExerciseHistory();
+loadRemoteSettingsState();
+loadRemoteOverviewLayoutState();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();

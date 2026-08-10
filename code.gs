@@ -550,6 +550,50 @@ function loadApiKeysState_() {
   return raw ? JSON.parse(raw) : null;
 }
 
+// Pushup Goals / Body Health settings (daily baseline, year goal, max
+// HR) plus the manual year-total correction - same whole-blob sync as
+// Spotify/API keys above, so a correction typed into one device's
+// "Correct total reps this year" field actually carries over to the
+// others instead of staying stuck locally.
+const SETTINGS_STATE_KEY = 'APP_SETTINGS_STATE';
+
+function saveSettingsState_(dailyBaseline, yearGoal, maxHR, yearCarry) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(SETTINGS_STATE_KEY, JSON.stringify({
+    dailyBaseline: dailyBaseline || null,
+    yearGoal: yearGoal || null,
+    maxHR: maxHR || null,
+    yearCarry: yearCarry || null,
+    savedAt: new Date().toISOString()
+  }));
+}
+
+function loadSettingsState_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(SETTINGS_STATE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+// Overview widget board layout (sizes + order) - same whole-blob sync,
+// so rearranging or resizing widgets on one device carries over to the
+// others instead of staying stuck per-device.
+const OVERVIEW_LAYOUT_STATE_KEY = 'OVERVIEW_LAYOUT_STATE';
+
+function saveOverviewLayoutState_(sizes, order) {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(OVERVIEW_LAYOUT_STATE_KEY, JSON.stringify({
+    sizes: sizes || null,
+    order: order || null,
+    savedAt: new Date().toISOString()
+  }));
+}
+
+function loadOverviewLayoutState_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(OVERVIEW_LAYOUT_STATE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
 // Derives day-by-day pushup totals directly from the already-synced
 // per-set workout log (every week's own sheet, one row per set) instead
 // of trusting a separate local-only running tally - so a wiped/reset
@@ -777,6 +821,18 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadSettingsState') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', state: loadSettingsState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'loadOverviewLayoutState') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', state: loadOverviewLayoutState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'getExerciseHistory') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', history: getExerciseHistory_() }))
@@ -861,6 +917,20 @@ function doPost(e) {
 
     if (data.action === 'saveApiKeysState') {
       saveApiKeysState_(data.spoonacularKey, data.edamamAppId, data.edamamAppKey);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveSettingsState') {
+      saveSettingsState_(data.dailyBaseline, data.yearGoal, data.maxHR, data.yearCarry);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveOverviewLayoutState') {
+      saveOverviewLayoutState_(data.sizes, data.order);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
