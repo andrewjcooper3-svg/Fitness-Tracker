@@ -1716,15 +1716,14 @@ const STORAGE_WATER_LOG_KEY = 'WORKOUT_WATER_LEDGER';
 const STORAGE_WATER_ENTRIES_KEY = 'WORKOUT_WATER_ENTRIES';
 
 // Each button logs its real volume, but only an estimated net hydration
-// value counts toward the daily total/ring - coffee and tea's mild
-// diuretic effect means they don't hydrate 1:1 with their volume the
-// way plain water does. Defaults below are a starting guess; both
-// numbers are editable per-drink in Settings (rawOz/hydrationOz get
-// overwritten in place by loadSettingsIntoState, label never does).
+// value counts toward the daily total/ring. Coffee counts at 95% (a
+// mild diuretic discount); tea counts fully 1:1, same as water. Both
+// numbers are still editable via the +/- steppers on the widget, which
+// get overwritten in place by loadSettingsIntoState (label never does).
 const WATER_DRINK_TYPES = {
   water:  { label: 'Water',  rawOz: 32, hydrationOz: 32 },
-  coffee: { label: 'Coffee', rawOz: 11, hydrationOz: 8 },
-  tea:    { label: 'Tea',    rawOz: 9,  hydrationOz: 7 }
+  coffee: { label: 'Coffee', rawOz: 11, hydrationOz: 10 },
+  tea:    { label: 'Tea',    rawOz: 9,  hydrationOz: 9 }
 };
 let PUSHUP_DAILY_BASELINE = 165;
 let PUSHUP_YEAR_GOAL = 50000;
@@ -4705,7 +4704,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-water-inline-steppers';
+const APP_BUILD_VERSION = '2026-08-11-water-hydration-defaults';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
