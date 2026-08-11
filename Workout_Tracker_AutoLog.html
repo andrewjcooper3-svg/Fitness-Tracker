@@ -316,16 +316,18 @@
   .cook-anim-svg { width: 76px; height: 76px; overflow: visible; }
   .cook-anim-line { fill: none; stroke: var(--accent); stroke-width: 6.5; stroke-linecap: round; stroke-linejoin: round; }
   .cook-anim-head { fill: var(--accent); }
-  .cook-anim-arm { transform-origin: 72px 34px; animation: cookStir 1s ease-in-out infinite alternate; }
-  .cook-anim-steam { fill: none; stroke: var(--muted); stroke-width: 4.5; stroke-linecap: round; opacity: 0; }
-  .cook-anim-steam1 { animation: cookSteam 2.2s ease-in infinite; }
-  .cook-anim-steam2 { animation: cookSteam 2.2s ease-in infinite; animation-delay: 0.7s; }
-  .cook-anim-steam3 { animation: cookSteam 2.2s ease-in infinite; animation-delay: 1.4s; }
-  @keyframes cookStir { 0% { transform: rotate(-16deg); } 100% { transform: rotate(16deg); } }
-  @keyframes cookSteam {
-    0% { transform: translateY(0); opacity: 0; }
-    25% { opacity: 0.9; }
-    100% { transform: translateY(-16px); opacity: 0; }
+  .cook-anim-panarm { transform-origin: 33px 33px; animation: panToss 1.4s ease-in-out infinite; }
+  .cook-anim-pan { fill: var(--surface2); stroke: var(--accent); stroke-width: 3.5; }
+  .cook-anim-pancake { fill: var(--muted); stroke: none; transform-origin: 76px 40px; animation: pancakeFlip 1.4s ease-in-out infinite; }
+  @keyframes panToss {
+    0% { transform: rotate(6deg); }
+    50% { transform: rotate(-10deg); }
+    100% { transform: rotate(6deg); }
+  }
+  @keyframes pancakeFlip {
+    0% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-26px) rotate(180deg); }
+    100% { transform: translateY(0) rotate(360deg); }
   }
 
   .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
@@ -1344,19 +1346,16 @@
       <div class="ov-page-title">Kitchen</div>
     </div>
     <svg viewBox="0 0 100 100" class="cook-anim-svg" aria-hidden="true">
-      <path class="cook-anim-steam cook-anim-steam1" d="M 36,52 Q 32,44 36,38"></path>
-      <path class="cook-anim-steam cook-anim-steam2" d="M 50,52 Q 46,44 50,36"></path>
-      <path class="cook-anim-steam cook-anim-steam3" d="M 64,52 Q 60,44 64,38"></path>
-      <path class="cook-anim-line" d="M 26,60 L 74,60 L 65,90 L 35,90 Z" fill="var(--surface2)"></path>
-      <ellipse class="cook-anim-line" cx="50" cy="60" rx="24" ry="5" fill="none"></ellipse>
-      <line class="cook-anim-line" x1="26" y1="64" x2="15" y2="64"></line>
-      <line class="cook-anim-line" x1="74" y1="64" x2="85" y2="64"></line>
-      <circle class="cook-anim-head" cx="78" cy="20" r="9"></circle>
-      <polyline class="cook-anim-line" points="77,29 75,58"></polyline>
-      <g class="cook-anim-arm">
-        <polyline class="cook-anim-line" points="72,34 50,60"></polyline>
-        <line class="cook-anim-line" x1="50" y1="60" x2="44" y2="64"></line>
+      <ellipse class="cook-anim-pancake" cx="76" cy="40" rx="8" ry="3"></ellipse>
+      <g class="cook-anim-panarm">
+        <polyline class="cook-anim-line" points="33,33 48,44"></polyline>
+        <line class="cook-anim-line" x1="48" y1="44" x2="65" y2="47"></line>
+        <ellipse class="cook-anim-pan" cx="79" cy="47" rx="14" ry="4"></ellipse>
       </g>
+      <circle class="cook-anim-head" cx="30" cy="20" r="9"></circle>
+      <polyline class="cook-anim-line" points="32,29 36,56"></polyline>
+      <line class="cook-anim-line" x1="36" y1="56" x2="24" y2="90"></line>
+      <line class="cook-anim-line" x1="36" y1="56" x2="46" y2="88"></line>
     </svg>
   </div>
 
@@ -4786,7 +4785,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-fondue-instructions-v3';
+const APP_BUILD_VERSION = '2026-08-11-pancake-flip-anim';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
