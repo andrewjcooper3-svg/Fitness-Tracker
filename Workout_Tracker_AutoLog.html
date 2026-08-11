@@ -248,11 +248,10 @@
   .wt-chart { width: 100%; height: 64px; display: block; overflow: visible; }
   .wt-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 10px; color: var(--muted); margin-top: 4px; }
   .wt-chart-detail { font-family: var(--font); font-size: 11.5px; color: var(--text); margin-top: 7px; min-height: 15px; }
-  .wt-settings-grid { display: flex; flex-direction: column; gap: 8px; }
-  .wt-settings-row { display: grid; grid-template-columns: 48px 1fr 16px 1fr; align-items: center; gap: 6px; }
-  .wt-settings-label { font-family: var(--font); font-size: 12px; color: var(--muted); }
-  .wt-settings-arrow { font-family: var(--font); font-size: 12px; color: var(--muted); text-align: center; }
-  .wt-settings-row .config-input { padding: 8px 10px; font-size: 12.5px; }
+  .wt-btn-row { display: flex; align-items: stretch; gap: 6px; }
+  .wt-btn-row .wt-add-btn { flex: 1; }
+  .wt-stepper { flex-shrink: 0; width: 30px; font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--muted); background: var(--surface2); border: none; border-radius: 9px; cursor: pointer; }
+  .wt-stepper:active { color: var(--teal); }
   .ov-widget[data-size="small"] .wt-body { flex-direction: column; gap: 10px; }
   .ov-widget[data-size="small"] .wt-ring { width: 64px; height: 64px; }
   .ov-widget[data-size="small"] .wt-ring-num { font-size: 15px; }
@@ -665,9 +664,21 @@
           </div>
         </div>
         <div class="wt-info">
-          <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
-          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
-          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
+          <div class="wt-btn-row">
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', -1)">−</button>
+            <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', 1)">+</button>
+          </div>
+          <div class="wt-btn-row">
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', -1)">−</button>
+            <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', 1)">+</button>
+          </div>
+          <div class="wt-btn-row">
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', -1)">−</button>
+            <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', 1)">+</button>
+          </div>
         </div>
       </div>
       <div class="wt-chart-wrap">
@@ -1522,14 +1533,7 @@
         <div class="sp-config-label" style="margin:0 0 6px;">Daily goal (oz)</div>
         <input type="number" id="settingsWaterGoal" class="config-input" min="0" step="1">
       </div>
-      <div class="settings-field">
-        <div class="sp-config-label" style="margin:0 0 8px;">Button amounts (oz logged → oz counted toward goal)</div>
-        <div class="wt-settings-grid">
-          <div class="wt-settings-row"><span class="wt-settings-label">Water</span><input type="number" id="settingsDrinkWaterRaw" class="config-input" min="0" step="1"><span class="wt-settings-arrow">→</span><input type="number" id="settingsDrinkWaterNet" class="config-input" min="0" step="1"></div>
-          <div class="wt-settings-row"><span class="wt-settings-label">Coffee</span><input type="number" id="settingsDrinkCoffeeRaw" class="config-input" min="0" step="1"><span class="wt-settings-arrow">→</span><input type="number" id="settingsDrinkCoffeeNet" class="config-input" min="0" step="1"></div>
-          <div class="wt-settings-row"><span class="wt-settings-label">Tea</span><input type="number" id="settingsDrinkTeaRaw" class="config-input" min="0" step="1"><span class="wt-settings-arrow">→</span><input type="number" id="settingsDrinkTeaNet" class="config-input" min="0" step="1"></div>
-        </div>
-      </div>
+      <div class="ov-note" style="margin:0 0 4px; text-align:left;">Per-drink amounts have their own +/- right on the Water widget now.</div>
       <button class="ov-open-btn" onclick="saveWaterGoalSetting()" style="margin-top:12px;">Save</button>
       <div class="config-status" id="waterSettingsStatus"></div>
     </div>
@@ -1751,12 +1755,6 @@ function renderSettingsTab() {
   document.getElementById('settingsYearGoal').value = PUSHUP_YEAR_GOAL;
   document.getElementById('settingsMaxHR').value = BODY_HEALTH_MAX_HR;
   document.getElementById('settingsWaterGoal').value = WATER_DAILY_GOAL;
-  document.getElementById('settingsDrinkWaterRaw').value = WATER_DRINK_TYPES.water.rawOz;
-  document.getElementById('settingsDrinkWaterNet').value = WATER_DRINK_TYPES.water.hydrationOz;
-  document.getElementById('settingsDrinkCoffeeRaw').value = WATER_DRINK_TYPES.coffee.rawOz;
-  document.getElementById('settingsDrinkCoffeeNet').value = WATER_DRINK_TYPES.coffee.hydrationOz;
-  document.getElementById('settingsDrinkTeaRaw').value = WATER_DRINK_TYPES.tea.rawOz;
-  document.getElementById('settingsDrinkTeaNet').value = WATER_DRINK_TYPES.tea.hydrationOz;
 
   // The correction field itself is write-only (always blank) so a save
   // actually taking effect can be confirmed - otherwise there's no way
@@ -1797,28 +1795,16 @@ function saveBodyHealthSettings() {
 function saveWaterGoalSetting() {
   const statusEl = document.getElementById('waterSettingsStatus');
   const waterGoal = parseFloat(document.getElementById('settingsWaterGoal').value);
-  const drinkInputs = {
-    water:  { raw: parseFloat(document.getElementById('settingsDrinkWaterRaw').value),  net: parseFloat(document.getElementById('settingsDrinkWaterNet').value) },
-    coffee: { raw: parseFloat(document.getElementById('settingsDrinkCoffeeRaw').value), net: parseFloat(document.getElementById('settingsDrinkCoffeeNet').value) },
-    tea:    { raw: parseFloat(document.getElementById('settingsDrinkTeaRaw').value),    net: parseFloat(document.getElementById('settingsDrinkTeaNet').value) }
-  };
-  const drinkTypesValid = Object.values(drinkInputs).every(d => d.raw > 0 && d.net >= 0);
-  if (!(waterGoal > 0) || !drinkTypesValid) {
-    statusEl.textContent = 'Goal and drink amounts need a positive number (net can be 0).';
+  if (!(waterGoal > 0)) {
+    statusEl.textContent = 'Enter a positive number.';
     statusEl.classList.add('warn');
     return;
   }
 
   const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
   saved.waterGoal = waterGoal;
-  saved.drinkAmounts = {
-    water:  { rawOz: drinkInputs.water.raw,  hydrationOz: drinkInputs.water.net },
-    coffee: { rawOz: drinkInputs.coffee.raw, hydrationOz: drinkInputs.coffee.net },
-    tea:    { rawOz: drinkInputs.tea.raw,    hydrationOz: drinkInputs.tea.net }
-  };
   localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
   WATER_DAILY_GOAL = waterGoal;
-  loadSettingsIntoState();
 
   statusEl.classList.remove('warn');
   statusEl.textContent = 'Saved.';
@@ -4719,7 +4705,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-water-editable-amounts';
+const APP_BUILD_VERSION = '2026-08-11-water-inline-steppers';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -4779,9 +4765,9 @@ function saveTodayWaterEntries_(state) {
 }
 
 // Button text is generated from WATER_DRINK_TYPES rather than hardcoded,
-// since both numbers are now editable in Settings - the "(N net)"
-// qualifier only shows up when it'd actually tell you something (i.e.
-// the drink doesn't count 1:1 toward the goal).
+// since both numbers are now editable right on the widget - the "(N
+// net)" qualifier only shows up when it'd actually tell you something
+// (i.e. the drink doesn't count 1:1 toward the goal).
 function renderWaterButtons() {
   ['water', 'coffee', 'tea'].forEach(type => {
     const btn = document.getElementById('wtBtn' + type.charAt(0).toUpperCase() + type.slice(1));
@@ -4789,6 +4775,33 @@ function renderWaterButtons() {
     const d = WATER_DRINK_TYPES[type];
     btn.innerHTML = `+${d.rawOz} oz ${d.label}` + (d.hydrationOz !== d.rawOz ? ` <span class="wt-btn-net">(${d.hydrationOz} net)</span>` : '');
   });
+}
+
+// The small +/- next to each button - adjusts that drink's logged (raw)
+// amount by 1oz, keeping its net-hydration value scaled to the same
+// ratio it had before (so nudging Coffee from 11oz to 12oz keeps its
+// ~73% net rate rather than freezing the net value at 8). Persisted and
+// synced through the same settings blob/endpoint the old Settings-page
+// version used - only the input surface changed, not the storage.
+function adjustDrinkAmount(event, type, direction) {
+  event.stopPropagation();
+  if (overviewEditing) return;
+  const d = WATER_DRINK_TYPES[type];
+  if (!d) return;
+
+  const ratio = d.rawOz > 0 ? d.hydrationOz / d.rawOz : 1;
+  const newRaw = Math.max(1, d.rawOz + direction);
+  const newHydration = Math.max(0, Math.round(newRaw * ratio));
+  d.rawOz = newRaw;
+  d.hydrationOz = newHydration;
+
+  const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+  saved.drinkAmounts = saved.drinkAmounts || {};
+  saved.drinkAmounts[type] = { rawOz: newRaw, hydrationOz: newHydration };
+  localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
+
+  renderWaterButtons();
+  syncSettingsToRemote();
 }
 
 function renderOverviewWaterWidget() {
