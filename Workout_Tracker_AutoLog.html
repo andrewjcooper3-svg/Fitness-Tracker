@@ -247,6 +247,7 @@
   .wt-chart-wrap { margin-top: 14px; }
   .wt-chart { width: 100%; height: 64px; display: block; overflow: visible; }
   .wt-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .wt-chart-detail { font-family: var(--font); font-size: 11.5px; color: var(--text); margin-top: 7px; min-height: 15px; }
   .ov-widget[data-size="small"] .wt-body { flex-direction: column; gap: 10px; }
   .ov-widget[data-size="small"] .wt-ring { width: 64px; height: 64px; }
   .ov-widget[data-size="small"] .wt-ring-num { font-size: 15px; }
@@ -667,6 +668,7 @@
       <div class="wt-chart-wrap">
         <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
         <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+        <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
       </div>
       <div class="ov-widget-sizepicker">
         <button onclick="setWidgetSize(event, this, 'small')">Small</button>
@@ -4671,7 +4673,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-water-chart-drinks-undo';
+const APP_BUILD_VERSION = '2026-08-11-water-hour-detail';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -4749,18 +4751,33 @@ function renderOverviewWaterWidget() {
   renderWaterHourlyChart(state.entries);
 }
 
+// Which entries landed in each hour, rebuilt on every chart render -
+// showWaterHourDetail below reads straight from this rather than
+// re-deriving it from scratch on every tap/hover.
+let waterChartHourEntries_ = new Array(24).fill(null).map(() => []);
+
+function formatHour12_(h) {
+  const period = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + ' ' + period;
+}
+
 // 24 fixed hourly slots (not just the hours with data) so the chart
 // reads as "today's timeline" rather than a bar-per-drink list - an
 // early-morning coffee and a late-night glass of water should land far
-// apart on the axis rather than sitting side by side.
+// apart on the axis rather than sitting side by side. Each bar carries
+// a second, invisible full-height rect on top purely as a hit target -
+// otherwise an empty hour's real bar is a sliver only ~3px tall, far
+// too small to reliably tap or hover.
 function renderWaterHourlyChart(entries) {
   const svg = document.getElementById('wtHourlyChart');
   if (!svg) return;
-  const hourTotals = new Array(24).fill(0);
+  waterChartHourEntries_ = new Array(24).fill(null).map(() => []);
   entries.forEach(e => {
     const hour = new Date(e.loggedAt).getHours();
-    if (hour >= 0 && hour < 24) hourTotals[hour] += e.hydrationOz;
+    if (hour >= 0 && hour < 24) waterChartHourEntries_[hour].push(e);
   });
+  const hourTotals = waterChartHourEntries_.map(list => list.reduce((sum, e) => sum + e.hydrationOz, 0));
 
   const chartW = 320, chartH = 60, barGap = 2;
   const barW = (chartW - barGap * 23) / 24;
@@ -4773,8 +4790,43 @@ function renderWaterHourlyChart(entries) {
     const y = chartH - hgt;
     const color = oz > 0 ? 'var(--teal)' : 'var(--surface2)';
     bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hgt.toFixed(1)}" rx="1.5" fill="${color}"></rect>`;
+    bars += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${chartH}" fill="transparent" style="cursor:pointer;" onclick="showWaterHourDetail(${h})" onmouseenter="showWaterHourDetail(${h})"></rect>`;
   });
   svg.innerHTML = bars;
+
+  const detailEl = document.getElementById('wtChartDetail');
+  if (detailEl) detailEl.textContent = "Tap or hover a bar for that hour's breakdown";
+}
+
+// Groups an hour's entries by drink type (a busy hour might have two
+// waters and a coffee) so the preview reads as "Water 64oz, Coffee 8oz
+// net" rather than one line per individual tap.
+function showWaterHourDetail(hour) {
+  const detailEl = document.getElementById('wtChartDetail');
+  if (!detailEl) return;
+  const entries = waterChartHourEntries_[hour] || [];
+  const label = formatHour12_(hour);
+
+  if (!entries.length) {
+    detailEl.textContent = label + ' — no intake logged';
+    return;
+  }
+
+  const byType = {};
+  entries.forEach(e => {
+    if (!byType[e.type]) byType[e.type] = { hydrationOz: 0, rawOz: 0 };
+    byType[e.type].hydrationOz += e.hydrationOz;
+    byType[e.type].rawOz += e.rawOz;
+  });
+  const parts = Object.keys(byType).map(type => {
+    const t = byType[type];
+    const drinkLabel = (WATER_DRINK_TYPES[type] || WATER_DRINK_TYPES.water).label;
+    return t.rawOz !== t.hydrationOz
+      ? `${drinkLabel} ${t.hydrationOz}oz net (${t.rawOz}oz raw)`
+      : `${drinkLabel} ${t.hydrationOz}oz`;
+  });
+  const total = entries.reduce((sum, e) => sum + e.hydrationOz, 0);
+  detailEl.textContent = `${label} — ${total}oz: ${parts.join(', ')}`;
 }
 
 function logWaterIntake(event, type) {
