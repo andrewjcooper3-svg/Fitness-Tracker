@@ -23,6 +23,13 @@
  * requires.
  */
 
+// Bumped on every deploy-affecting change - the client fetches the bare
+// deployment URL (no action param) and compares this against its own
+// expected value, so a stale deployment (redeploy skipped or missed)
+// shows up as a clear warning in Settings instead of silently breaking
+// whichever feature changed since the last real deploy.
+const BACKEND_BUILD_VERSION = '2026-08-11-settings-sheet';
+
 const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Set', 'Target Weight', 'Actual Weight', 'Target Reps', 'Actual Reps', 'Completed', 'Notes'];
 const COLUMN_WIDTHS = [140, 90, 190, 50, 100, 100, 90, 90, 90, 240];
 
@@ -1055,7 +1062,7 @@ function doGet(e) {
   }
 
   return ContentService
-    .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId() }))
+    .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId(), backendVersion: BACKEND_BUILD_VERSION }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 

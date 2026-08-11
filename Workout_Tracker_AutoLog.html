@@ -1552,6 +1552,7 @@
           <button class="config-save" onclick="saveDeploymentUrl()">Save</button>
         </div>
         <div class="config-status" id="configStatus">Not connected — paste your Web App URL above.</div>
+        <div class="config-status" id="backendVersionStatus"></div>
       </div>
 
       <div class="config-toggle" onclick="toggleCalendarConfig()" style="margin-top:14px;">
@@ -4704,7 +4705,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-water-hydration-defaults';
+const APP_BUILD_VERSION = '2026-08-11-backend-version-check';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6467,6 +6468,38 @@ function updateConfigStatus(url) {
     status.textContent = 'Not connected — paste your Web App URL above.';
     status.className = 'config-status warn';
   }
+  checkBackendVersion(url);
+}
+
+// Bumped alongside code.gs's BACKEND_BUILD_VERSION whenever a change
+// there matters to the client. Fetching the bare deployment URL (no
+// action param) and comparing the two catches the single most common
+// cause of "it worked on one device but not the other" reports: a
+// code.gs edit that was pushed here but never actually redeployed as a
+// new Apps Script Web App version, so the two ends silently disagree
+// about what a request/response is supposed to look like.
+const EXPECTED_BACKEND_VERSION = '2026-08-11-settings-sheet';
+
+async function checkBackendVersion(url) {
+  const el = document.getElementById('backendVersionStatus');
+  if (!el) return;
+  if (!url || !navigator.onLine) { el.textContent = ''; return; }
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.backendVersion === EXPECTED_BACKEND_VERSION) {
+      el.textContent = '✓ Backend up to date (' + data.backendVersion + ')';
+      el.className = 'config-status ok';
+    } else if (data.backendVersion) {
+      el.textContent = '⚠ Backend out of date (running ' + data.backendVersion + ', expected ' + EXPECTED_BACKEND_VERSION + ') — redeploy code.gs as a new Web App version.';
+      el.className = 'config-status warn';
+    } else {
+      el.textContent = '⚠ Backend predates version tracking — redeploy code.gs to get the latest fixes.';
+      el.className = 'config-status warn';
+    }
+  } catch (e) {
+    el.textContent = '';
+  }
 }
 
 function getDeploymentUrl() {
@@ -7385,6 +7418,17 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkForWeekRollover_();
 });
 setInterval(checkForWeekRollover_, 5 * 60 * 1000);
+
+// The Water widget only pulled from the Sheet once, at page load - fine
+// for a page you just opened, but a phone tab left open all day (e.g. a
+// home-screen bookmark) would never notice water logged on another
+// device afterward without a manual full reload. Re-pulling whenever
+// the tab/app comes back into view (foregrounded, app-switched back to)
+// closes that gap the same way the week-rollover check above already
+// does, without needing a constant background poll.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') loadRemoteWaterLedger();
+});
 fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
 loadRemoteBodyHealthLog();
