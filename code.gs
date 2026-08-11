@@ -190,6 +190,56 @@ function getWeightLog_() {
   }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
 }
 
+const WATER_SHEET_NAME = 'Water Log';
+const WATER_HEADERS = ['Date', 'Ounces', 'Logged At'];
+
+/**
+ * Unlike the weight log (one upserted row per day, since only the latest
+ * reading matters), water intake is additive - every tap of the +32oz
+ * button is its own row here, and the daily total is the sum of that
+ * day's rows. Appending instead of upserting means two devices tapping
+ * the button around the same time can never stomp on each other (no
+ * read-modify-write race), and getWaterLedgerFromSheets_ below always
+ * recomputes the true total straight from these rows rather than
+ * trusting a client's locally-remembered running count.
+ */
+function getOrCreateWaterSheet_() {
+  const ss = getOrCreateSpreadsheet_();
+  let sheet = ss.getSheetByName(WATER_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(WATER_SHEET_NAME);
+  sheet.appendRow(WATER_HEADERS);
+  const headerRange = sheet.getRange(1, 1, 1, WATER_HEADERS.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#1a1d24');
+  headerRange.setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function logWaterEntry_(date, ounces) {
+  const sheet = getOrCreateWaterSheet_();
+  sheet.appendRow([date, ounces, new Date()]);
+}
+
+function getWaterLedgerFromSheets_() {
+  const sheet = getOrCreateWaterSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  const ledger = {};
+  if (lastRow < 2) return ledger;
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, WATER_HEADERS.length).getValues();
+  rows.forEach(function (row) {
+    const key = cellDateKey_(row[0], timeZone);
+    const ounces = Number(row[1]);
+    if (isNaN(ounces)) return;
+    ledger[key] = (ledger[key] || 0) + ounces;
+  });
+  return ledger;
+}
+
 const BODY_HEALTH_SHEET_NAME = 'Body Health Log';
 const BODY_HEALTH_HEADERS = ['Date', 'Sleep Hours', 'HRV (ms)', 'Resting HR (bpm)', 'Workout Minutes', 'Avg Workout HR', 'Source', 'Logged At'];
 
@@ -557,13 +607,14 @@ function loadApiKeysState_() {
 // others instead of staying stuck locally.
 const SETTINGS_STATE_KEY = 'APP_SETTINGS_STATE';
 
-function saveSettingsState_(dailyBaseline, yearGoal, maxHR, yearCarry) {
+function saveSettingsState_(dailyBaseline, yearGoal, maxHR, yearCarry, waterGoal) {
   const props = PropertiesService.getScriptProperties();
   props.setProperty(SETTINGS_STATE_KEY, JSON.stringify({
     dailyBaseline: dailyBaseline || null,
     yearGoal: yearGoal || null,
     maxHR: maxHR || null,
     yearCarry: yearCarry || null,
+    waterGoal: waterGoal || null,
     savedAt: new Date().toISOString()
   }));
 }
@@ -821,6 +872,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadWaterLedger') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', ledger: getWaterLedgerFromSheets_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadSettingsState') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', state: loadSettingsState_() }))
@@ -866,6 +923,17 @@ function doPost(e) {
 
     if (data.action === 'saveDraft') {
       saveDraftState_(data.week || getCurrentWeekLabel_(), data.days || {});
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'logWater') {
+      const ounces = Number(data.ounces);
+      if (!data.date || isNaN(ounces)) {
+        throw new Error('logWater requires a date and a numeric ounces');
+      }
+      logWaterEntry_(data.date, ounces);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
@@ -923,7 +991,7 @@ function doPost(e) {
     }
 
     if (data.action === 'saveSettingsState') {
-      saveSettingsState_(data.dailyBaseline, data.yearGoal, data.maxHR, data.yearCarry);
+      saveSettingsState_(data.dailyBaseline, data.yearGoal, data.maxHR, data.yearCarry, data.waterGoal);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
