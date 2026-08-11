@@ -248,6 +248,11 @@
   .wt-chart { width: 100%; height: 64px; display: block; overflow: visible; }
   .wt-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 10px; color: var(--muted); margin-top: 4px; }
   .wt-chart-detail { font-family: var(--font); font-size: 11.5px; color: var(--text); margin-top: 7px; min-height: 15px; }
+  .wt-settings-grid { display: flex; flex-direction: column; gap: 8px; }
+  .wt-settings-row { display: grid; grid-template-columns: 48px 1fr 16px 1fr; align-items: center; gap: 6px; }
+  .wt-settings-label { font-family: var(--font); font-size: 12px; color: var(--muted); }
+  .wt-settings-arrow { font-family: var(--font); font-size: 12px; color: var(--muted); text-align: center; }
+  .wt-settings-row .config-input { padding: 8px 10px; font-size: 12.5px; }
   .ov-widget[data-size="small"] .wt-body { flex-direction: column; gap: 10px; }
   .ov-widget[data-size="small"] .wt-ring { width: 64px; height: 64px; }
   .ov-widget[data-size="small"] .wt-ring-num { font-size: 15px; }
@@ -660,9 +665,9 @@
           </div>
         </div>
         <div class="wt-info">
-          <button class="wt-add-btn" onclick="logWaterIntake(event, 'water')">+32 oz Water</button>
-          <button class="wt-add-btn wt-add-btn-secondary" onclick="logWaterIntake(event, 'coffee')">+11 oz Coffee <span class="wt-btn-net">(8 net)</span></button>
-          <button class="wt-add-btn wt-add-btn-secondary" onclick="logWaterIntake(event, 'tea')">+9 oz Tea <span class="wt-btn-net">(7 net)</span></button>
+          <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
+          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
+          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
         </div>
       </div>
       <div class="wt-chart-wrap">
@@ -1517,6 +1522,14 @@
         <div class="sp-config-label" style="margin:0 0 6px;">Daily goal (oz)</div>
         <input type="number" id="settingsWaterGoal" class="config-input" min="0" step="1">
       </div>
+      <div class="settings-field">
+        <div class="sp-config-label" style="margin:0 0 8px;">Button amounts (oz logged → oz counted toward goal)</div>
+        <div class="wt-settings-grid">
+          <div class="wt-settings-row"><span class="wt-settings-label">Water</span><input type="number" id="settingsDrinkWaterRaw" class="config-input" min="0" step="1"><span class="wt-settings-arrow">→</span><input type="number" id="settingsDrinkWaterNet" class="config-input" min="0" step="1"></div>
+          <div class="wt-settings-row"><span class="wt-settings-label">Coffee</span><input type="number" id="settingsDrinkCoffeeRaw" class="config-input" min="0" step="1"><span class="wt-settings-arrow">→</span><input type="number" id="settingsDrinkCoffeeNet" class="config-input" min="0" step="1"></div>
+          <div class="wt-settings-row"><span class="wt-settings-label">Tea</span><input type="number" id="settingsDrinkTeaRaw" class="config-input" min="0" step="1"><span class="wt-settings-arrow">→</span><input type="number" id="settingsDrinkTeaNet" class="config-input" min="0" step="1"></div>
+        </div>
+      </div>
       <button class="ov-open-btn" onclick="saveWaterGoalSetting()" style="margin-top:12px;">Save</button>
       <div class="config-status" id="waterSettingsStatus"></div>
     </div>
@@ -1701,7 +1714,9 @@ const STORAGE_WATER_ENTRIES_KEY = 'WORKOUT_WATER_ENTRIES';
 // Each button logs its real volume, but only an estimated net hydration
 // value counts toward the daily total/ring - coffee and tea's mild
 // diuretic effect means they don't hydrate 1:1 with their volume the
-// way plain water does.
+// way plain water does. Defaults below are a starting guess; both
+// numbers are editable per-drink in Settings (rawOz/hydrationOz get
+// overwritten in place by loadSettingsIntoState, label never does).
 const WATER_DRINK_TYPES = {
   water:  { label: 'Water',  rawOz: 32, hydrationOz: 32 },
   coffee: { label: 'Coffee', rawOz: 11, hydrationOz: 8 },
@@ -1720,6 +1735,15 @@ function loadSettingsIntoState() {
   if (saved.yearGoal > 0) PUSHUP_YEAR_GOAL = saved.yearGoal;
   if (saved.maxHR > 0) BODY_HEALTH_MAX_HR = saved.maxHR;
   if (saved.waterGoal > 0) WATER_DAILY_GOAL = saved.waterGoal;
+  if (saved.drinkAmounts) {
+    Object.keys(WATER_DRINK_TYPES).forEach(type => {
+      const override = saved.drinkAmounts[type];
+      if (override && override.rawOz > 0 && override.hydrationOz >= 0) {
+        WATER_DRINK_TYPES[type].rawOz = override.rawOz;
+        WATER_DRINK_TYPES[type].hydrationOz = override.hydrationOz;
+      }
+    });
+  }
 }
 
 function renderSettingsTab() {
@@ -1727,6 +1751,12 @@ function renderSettingsTab() {
   document.getElementById('settingsYearGoal').value = PUSHUP_YEAR_GOAL;
   document.getElementById('settingsMaxHR').value = BODY_HEALTH_MAX_HR;
   document.getElementById('settingsWaterGoal').value = WATER_DAILY_GOAL;
+  document.getElementById('settingsDrinkWaterRaw').value = WATER_DRINK_TYPES.water.rawOz;
+  document.getElementById('settingsDrinkWaterNet').value = WATER_DRINK_TYPES.water.hydrationOz;
+  document.getElementById('settingsDrinkCoffeeRaw').value = WATER_DRINK_TYPES.coffee.rawOz;
+  document.getElementById('settingsDrinkCoffeeNet').value = WATER_DRINK_TYPES.coffee.hydrationOz;
+  document.getElementById('settingsDrinkTeaRaw').value = WATER_DRINK_TYPES.tea.rawOz;
+  document.getElementById('settingsDrinkTeaNet').value = WATER_DRINK_TYPES.tea.hydrationOz;
 
   // The correction field itself is write-only (always blank) so a save
   // actually taking effect can be confirmed - otherwise there's no way
@@ -1767,15 +1797,29 @@ function saveBodyHealthSettings() {
 function saveWaterGoalSetting() {
   const statusEl = document.getElementById('waterSettingsStatus');
   const waterGoal = parseFloat(document.getElementById('settingsWaterGoal').value);
-  if (!(waterGoal > 0)) {
-    statusEl.textContent = 'Enter a positive number.';
+  const drinkInputs = {
+    water:  { raw: parseFloat(document.getElementById('settingsDrinkWaterRaw').value),  net: parseFloat(document.getElementById('settingsDrinkWaterNet').value) },
+    coffee: { raw: parseFloat(document.getElementById('settingsDrinkCoffeeRaw').value), net: parseFloat(document.getElementById('settingsDrinkCoffeeNet').value) },
+    tea:    { raw: parseFloat(document.getElementById('settingsDrinkTeaRaw').value),    net: parseFloat(document.getElementById('settingsDrinkTeaNet').value) }
+  };
+  const drinkTypesValid = Object.values(drinkInputs).every(d => d.raw > 0 && d.net >= 0);
+  if (!(waterGoal > 0) || !drinkTypesValid) {
+    statusEl.textContent = 'Goal and drink amounts need a positive number (net can be 0).';
     statusEl.classList.add('warn');
     return;
   }
+
   const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
   saved.waterGoal = waterGoal;
+  saved.drinkAmounts = {
+    water:  { rawOz: drinkInputs.water.raw,  hydrationOz: drinkInputs.water.net },
+    coffee: { rawOz: drinkInputs.coffee.raw, hydrationOz: drinkInputs.coffee.net },
+    tea:    { rawOz: drinkInputs.tea.raw,    hydrationOz: drinkInputs.tea.net }
+  };
   localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
   WATER_DAILY_GOAL = waterGoal;
+  loadSettingsIntoState();
+
   statusEl.classList.remove('warn');
   statusEl.textContent = 'Saved.';
   renderOverviewWaterWidget();
@@ -1853,7 +1897,8 @@ function syncSettingsToRemote() {
         yearGoal: saved.yearGoal || null,
         maxHR: saved.maxHR || null,
         yearCarry: yearCarry,
-        waterGoal: saved.waterGoal || null
+        waterGoal: saved.waterGoal || null,
+        drinkAmounts: saved.drinkAmounts || null
       })
     }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
   }, 400);
@@ -1871,6 +1916,7 @@ async function loadRemoteSettingsState() {
     if (data.state.yearGoal > 0) saved.yearGoal = data.state.yearGoal;
     if (data.state.maxHR > 0) saved.maxHR = data.state.maxHR;
     if (data.state.waterGoal > 0) saved.waterGoal = data.state.waterGoal;
+    if (data.state.drinkAmounts) saved.drinkAmounts = data.state.drinkAmounts;
     localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
     if (data.state.yearCarry) localStorage.setItem(STORAGE_YEAR_CARRY_KEY, JSON.stringify(data.state.yearCarry));
     loadSettingsIntoState();
@@ -4673,7 +4719,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-water-hour-detail';
+const APP_BUILD_VERSION = '2026-08-11-water-editable-amounts';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -4732,6 +4778,19 @@ function saveTodayWaterEntries_(state) {
   localStorage.setItem(STORAGE_WATER_ENTRIES_KEY, JSON.stringify(state));
 }
 
+// Button text is generated from WATER_DRINK_TYPES rather than hardcoded,
+// since both numbers are now editable in Settings - the "(N net)"
+// qualifier only shows up when it'd actually tell you something (i.e.
+// the drink doesn't count 1:1 toward the goal).
+function renderWaterButtons() {
+  ['water', 'coffee', 'tea'].forEach(type => {
+    const btn = document.getElementById('wtBtn' + type.charAt(0).toUpperCase() + type.slice(1));
+    if (!btn) return;
+    const d = WATER_DRINK_TYPES[type];
+    btn.innerHTML = `+${d.rawOz} oz ${d.label}` + (d.hydrationOz !== d.rawOz ? ` <span class="wt-btn-net">(${d.hydrationOz} net)</span>` : '');
+  });
+}
+
 function renderOverviewWaterWidget() {
   const ringEl = document.getElementById('wtRing');
   if (!ringEl) return;
@@ -4743,6 +4802,8 @@ function renderOverviewWaterWidget() {
   ringEl.style.setProperty('--pct', pct);
   document.getElementById('wtRingNum').textContent = todayOz;
   document.getElementById('wtRingTarget').textContent = 'of ' + WATER_DAILY_GOAL + ' oz';
+
+  renderWaterButtons();
 
   const state = getTodayWaterEntries_();
   const undoBtn = document.getElementById('wtUndoBtn');

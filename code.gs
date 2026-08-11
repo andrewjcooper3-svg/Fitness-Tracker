@@ -650,7 +650,7 @@ function loadApiKeysState_() {
 // others instead of staying stuck locally.
 const SETTINGS_STATE_KEY = 'APP_SETTINGS_STATE';
 
-function saveSettingsState_(dailyBaseline, yearGoal, maxHR, yearCarry, waterGoal) {
+function saveSettingsState_(dailyBaseline, yearGoal, maxHR, yearCarry, waterGoal, drinkAmounts) {
   const props = PropertiesService.getScriptProperties();
   props.setProperty(SETTINGS_STATE_KEY, JSON.stringify({
     dailyBaseline: dailyBaseline || null,
@@ -658,6 +658,7 @@ function saveSettingsState_(dailyBaseline, yearGoal, maxHR, yearCarry, waterGoal
     maxHR: maxHR || null,
     yearCarry: yearCarry || null,
     waterGoal: waterGoal || null,
+    drinkAmounts: drinkAmounts || null,
     savedAt: new Date().toISOString()
   }));
 }
@@ -1048,7 +1049,7 @@ function doPost(e) {
     }
 
     if (data.action === 'saveSettingsState') {
-      saveSettingsState_(data.dailyBaseline, data.yearGoal, data.maxHR, data.yearCarry, data.waterGoal);
+      saveSettingsState_(data.dailyBaseline, data.yearGoal, data.maxHR, data.yearCarry, data.waterGoal, data.drinkAmounts);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
