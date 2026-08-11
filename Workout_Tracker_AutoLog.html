@@ -228,21 +228,30 @@
   .ov-widget[data-size="large"] .ov-widget-sizepicker button:nth-child(3) { color: var(--accent); border-color: var(--accent); }
 
   /* Water widget - same ring-on-the-left layout as the Pushups hero,
-     scaled down to widget size, with a tap-to-log button standing in
-     for the hero's stat column. */
+     scaled down to widget size, with tap-to-log buttons standing in
+     for the hero's stat column, plus an hourly bar chart below. */
+  .wt-undo-btn { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); background: none; border: none; cursor: pointer; padding: 4px 2px; }
+  .wt-undo-btn:active { color: var(--text); }
   .wt-body { display: flex; align-items: center; gap: 14px; }
   .wt-ring { flex-shrink: 0; width: 86px; height: 86px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; background: conic-gradient(var(--teal) calc(var(--pct, 0) * 3.6deg), var(--surface2) 0deg); transition: background 0.6s ease; }
   .wt-ring::after { content: ''; position: absolute; inset: 8px; background: var(--surface); border-radius: 50%; }
   .wt-ring-center { position: relative; z-index: 1; text-align: center; }
   .wt-ring-num { font-family: var(--font); font-size: 19px; font-weight: 800; letter-spacing: -0.3px; line-height: 1; }
   .wt-ring-target { font-family: var(--font); font-size: 10px; color: var(--muted); margin-top: 3px; }
-  .wt-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  .wt-add-btn { font-family: var(--font); font-size: 14px; font-weight: 700; color: white; background: var(--teal); border: none; border-radius: 12px; padding: 11px 0; cursor: pointer; width: 100%; }
+  .wt-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+  .wt-add-btn { font-family: var(--font); font-size: 14px; font-weight: 700; color: white; background: var(--teal); border: none; border-radius: 12px; padding: 10px 0; cursor: pointer; width: 100%; }
   .wt-add-btn:active { opacity: 0.8; }
+  .wt-add-btn-secondary { font-size: 12.5px; font-weight: 600; color: var(--teal); background: rgba(91,154,148,0.14); padding: 8px 0; }
+  .wt-btn-net { font-weight: 500; opacity: 0.75; }
   .wt-note { font-family: var(--font); font-size: 11px; color: var(--muted); text-align: center; }
+  .wt-chart-wrap { margin-top: 14px; }
+  .wt-chart { width: 100%; height: 64px; display: block; overflow: visible; }
+  .wt-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 10px; color: var(--muted); margin-top: 4px; }
   .ov-widget[data-size="small"] .wt-body { flex-direction: column; gap: 10px; }
   .ov-widget[data-size="small"] .wt-ring { width: 64px; height: 64px; }
   .ov-widget[data-size="small"] .wt-ring-num { font-size: 15px; }
+  .ov-widget[data-size="small"] .wt-add-btn-secondary,
+  .ov-widget[data-size="small"] .wt-chart-wrap { display: none; }
 
   /* One grouped card with three internal columns (dividers, not separate
      shadowed boxes) - the Apple Health "summary row" pattern instead of
@@ -638,7 +647,10 @@
         <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
         <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
       </div>
-      <div class="ov-widget-label">Water</div>
+      <div class="ov-widget-head">
+        <div class="ov-widget-label">Water</div>
+        <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
+      </div>
       <div class="wt-body">
         <div class="wt-ring" id="wtRing">
           <div class="wt-ring-center">
@@ -647,9 +659,14 @@
           </div>
         </div>
         <div class="wt-info">
-          <button class="wt-add-btn" onclick="logWaterIntake(event)">+32 oz</button>
-          <div class="wt-note" id="wtNote"></div>
+          <button class="wt-add-btn" onclick="logWaterIntake(event, 'water')">+32 oz Water</button>
+          <button class="wt-add-btn wt-add-btn-secondary" onclick="logWaterIntake(event, 'coffee')">+11 oz Coffee <span class="wt-btn-net">(8 net)</span></button>
+          <button class="wt-add-btn wt-add-btn-secondary" onclick="logWaterIntake(event, 'tea')">+9 oz Tea <span class="wt-btn-net">(7 net)</span></button>
         </div>
+      </div>
+      <div class="wt-chart-wrap">
+        <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
+        <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
       </div>
       <div class="ov-widget-sizepicker">
         <button onclick="setWidgetSize(event, this, 'small')">Small</button>
@@ -1677,6 +1694,17 @@ const STORAGE_PUSHUP_LEDGER_KEY = 'WORKOUT_PUSHUP_LEDGER';
 const STORAGE_YEAR_CARRY_KEY = 'WORKOUT_YEAR_CARRY_FORWARD';
 const STORAGE_SETTINGS_KEY = 'WORKOUT_SETTINGS';
 const STORAGE_WATER_LOG_KEY = 'WORKOUT_WATER_LEDGER';
+const STORAGE_WATER_ENTRIES_KEY = 'WORKOUT_WATER_ENTRIES';
+
+// Each button logs its real volume, but only an estimated net hydration
+// value counts toward the daily total/ring - coffee and tea's mild
+// diuretic effect means they don't hydrate 1:1 with their volume the
+// way plain water does.
+const WATER_DRINK_TYPES = {
+  water:  { label: 'Water',  rawOz: 32, hydrationOz: 32 },
+  coffee: { label: 'Coffee', rawOz: 11, hydrationOz: 8 },
+  tea:    { label: 'Tea',    rawOz: 9,  hydrationOz: 7 }
+};
 let PUSHUP_DAILY_BASELINE = 165;
 let PUSHUP_YEAR_GOAL = 50000;
 let BODY_HEALTH_MAX_HR = 196; // 220 - 24, the standard age-based estimate; editable in Settings
@@ -4643,7 +4671,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-water-widget';
+const APP_BUILD_VERSION = '2026-08-11-water-chart-drinks-undo';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -4675,62 +4703,166 @@ function renderOverview() {
   ensureCalendarLoaded();
 }
 
-// Water widget - same ring-plus-goal shape as the Pushups hero, but
-// its own ledger since intake isn't logged as a "set" like an exercise.
+// Water widget - same ring-plus-goal shape as the Pushups hero, but its
+// own ledger since intake isn't logged as a "set" like an exercise.
 // Ounces are additive per day, so - same reasoning as the pushup ledger
 // - each tap posts its own row to the Sheet rather than a client-computed
-// running total, and loadRemoteWaterLedger merges in by taking the max
-// per date, never the min, so a partial local tally never gets
-// overwritten by a smaller number but a wiped/reset device still
-// recovers the real total.
+// running total, and loadRemoteWaterLedger merges the day-total ledger
+// in by taking the max per date, never the min, so a partial local
+// tally never gets overwritten by a smaller number but a wiped/reset
+// device still recovers the real total.
+//
+// Alongside that day-total ledger, today's individual entries (type,
+// volume, and timestamp) are kept separately so the hourly chart and
+// Undo have something to work with - the day-total ledger alone only
+// knows "how much today," not "when" or "what was the last thing
+// logged." getTodayWaterEntries_ resets that list itself once the
+// calendar date moves on, the same way the day-total ledger implicitly
+// does by keying off dateKey().
+function getTodayWaterEntries_() {
+  const todayKey = dateKey(new Date());
+  const stored = JSON.parse(localStorage.getItem(STORAGE_WATER_ENTRIES_KEY) || 'null');
+  if (!stored || stored.date !== todayKey) return { date: todayKey, entries: [] };
+  return stored;
+}
+
+function saveTodayWaterEntries_(state) {
+  localStorage.setItem(STORAGE_WATER_ENTRIES_KEY, JSON.stringify(state));
+}
+
 function renderOverviewWaterWidget() {
   const ringEl = document.getElementById('wtRing');
   if (!ringEl) return;
   const todayKey = dateKey(new Date());
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
-  const todayOz = ledger[todayKey] || 0;
+  const todayOz = Math.max(0, ledger[todayKey] || 0);
   const pct = WATER_DAILY_GOAL ? Math.min(100, Math.round(todayOz / WATER_DAILY_GOAL * 100)) : 0;
 
   ringEl.style.setProperty('--pct', pct);
   document.getElementById('wtRingNum').textContent = todayOz;
   document.getElementById('wtRingTarget').textContent = 'of ' + WATER_DAILY_GOAL + ' oz';
-  const noteEl = document.getElementById('wtNote');
-  if (noteEl) noteEl.textContent = todayOz >= WATER_DAILY_GOAL ? 'Goal hit 💧' : '';
+
+  const state = getTodayWaterEntries_();
+  const undoBtn = document.getElementById('wtUndoBtn');
+  if (undoBtn) undoBtn.style.display = state.entries.length ? '' : 'none';
+
+  renderWaterHourlyChart(state.entries);
 }
 
-function logWaterIntake(event) {
+// 24 fixed hourly slots (not just the hours with data) so the chart
+// reads as "today's timeline" rather than a bar-per-drink list - an
+// early-morning coffee and a late-night glass of water should land far
+// apart on the axis rather than sitting side by side.
+function renderWaterHourlyChart(entries) {
+  const svg = document.getElementById('wtHourlyChart');
+  if (!svg) return;
+  const hourTotals = new Array(24).fill(0);
+  entries.forEach(e => {
+    const hour = new Date(e.loggedAt).getHours();
+    if (hour >= 0 && hour < 24) hourTotals[hour] += e.hydrationOz;
+  });
+
+  const chartW = 320, chartH = 60, barGap = 2;
+  const barW = (chartW - barGap * 23) / 24;
+  const maxVal = Math.max(...hourTotals, 8);
+
+  let bars = '';
+  hourTotals.forEach((oz, h) => {
+    const hgt = oz > 0 ? Math.max(3, (oz / maxVal) * chartH) : 1;
+    const x = h * (barW + barGap);
+    const y = chartH - hgt;
+    const color = oz > 0 ? 'var(--teal)' : 'var(--surface2)';
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hgt.toFixed(1)}" rx="1.5" fill="${color}"></rect>`;
+  });
+  svg.innerHTML = bars;
+}
+
+function logWaterIntake(event, type) {
   event.stopPropagation();
   if (overviewEditing) return;
+  const drink = WATER_DRINK_TYPES[type] || WATER_DRINK_TYPES.water;
   const todayKey = dateKey(new Date());
+  const loggedAt = new Date().toISOString();
+
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
-  ledger[todayKey] = (ledger[todayKey] || 0) + 32;
+  ledger[todayKey] = (ledger[todayKey] || 0) + drink.hydrationOz;
   localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
+
+  const state = getTodayWaterEntries_();
+  state.entries.push({ type: type, rawOz: drink.rawOz, hydrationOz: drink.hydrationOz, loggedAt: loggedAt });
+  saveTodayWaterEntries_(state);
+
   renderOverviewWaterWidget();
 
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
   fetch(url, {
     method: 'POST',
-    body: JSON.stringify({ action: 'logWater', date: todayKey, ounces: 32 })
+    body: JSON.stringify({ action: 'logWater', date: todayKey, type: type, rawOz: drink.rawOz, hydrationOz: drink.hydrationOz })
   }).catch(() => { /* offline/unreachable - local tally stands, reconciles from the Sheet on next load */ });
+}
+
+// Undoes the most recent entry - locally that's unambiguous (today's own
+// entries list), and on the backend it's simply the Water Log sheet's
+// last row, since rows are appended in the order they were logged. Good
+// enough for the common case this is meant for (fix a mis-tap right
+// after it happens); it doesn't try to reconcile against a different
+// device tapping at the same moment.
+function undoLastWaterEntry(event) {
+  event.stopPropagation();
+  const state = getTodayWaterEntries_();
+  if (!state.entries.length) return;
+  const removed = state.entries.pop();
+  saveTodayWaterEntries_(state);
+
+  const todayKey = dateKey(new Date());
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
+  ledger[todayKey] = Math.max(0, (ledger[todayKey] || 0) - removed.hydrationOz);
+  localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
+
+  renderOverviewWaterWidget();
+
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'undoLastWater' }) })
+    .catch(() => { /* offline/unreachable - local tally stands */ });
 }
 
 async function loadRemoteWaterLedger() {
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
+  const todayKey = dateKey(new Date());
+
   try {
     const res = await fetch(url + '?action=loadWaterLedger');
     const data = await res.json();
-    if (data.status !== 'success' || !data.ledger) return;
-    const local = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
-    Object.keys(data.ledger).forEach(date => {
-      local[date] = Math.max(local[date] || 0, data.ledger[date]);
-    });
-    localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(local));
-    renderOverviewWaterWidget();
+    if (data.status === 'success' && data.ledger) {
+      const local = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
+      Object.keys(data.ledger).forEach(date => {
+        local[date] = Math.max(local[date] || 0, data.ledger[date]);
+      });
+      localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(local));
+    }
   } catch (e) {
     // Offline/unreachable - whatever's cached locally stands.
   }
+
+  // Today's individual entries (for the hourly chart) are pulled
+  // separately and taken wholesale from the server rather than merged,
+  // since the server is the authoritative record of every device's taps
+  // for today - any taps made on THIS device later in the same session
+  // just append on top locally afterward.
+  try {
+    const res2 = await fetch(url + '?action=loadWaterEntries&date=' + encodeURIComponent(todayKey));
+    const data2 = await res2.json();
+    if (data2.status === 'success' && Array.isArray(data2.entries)) {
+      saveTodayWaterEntries_({ date: todayKey, entries: data2.entries });
+    }
+  } catch (e) {
+    // Offline/unreachable - whatever's cached locally stands.
+  }
+
+  renderOverviewWaterWidget();
 }
 
 // Sets/Total Reps/Days Active now live on the Trainer tab (moved off

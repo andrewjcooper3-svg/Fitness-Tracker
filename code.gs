@@ -191,22 +191,34 @@ function getWeightLog_() {
 }
 
 const WATER_SHEET_NAME = 'Water Log';
-const WATER_HEADERS = ['Date', 'Ounces', 'Logged At'];
+const WATER_HEADERS = ['Date', 'Type', 'Raw Ounces', 'Hydration Ounces', 'Logged At'];
 
 /**
  * Unlike the weight log (one upserted row per day, since only the latest
- * reading matters), water intake is additive - every tap of the +32oz
+ * reading matters), water intake is additive - every tap of a drink
  * button is its own row here, and the daily total is the sum of that
- * day's rows. Appending instead of upserting means two devices tapping
- * the button around the same time can never stomp on each other (no
- * read-modify-write race), and getWaterLedgerFromSheets_ below always
- * recomputes the true total straight from these rows rather than
- * trusting a client's locally-remembered running count.
+ * day's Hydration Ounces. Appending instead of upserting means two
+ * devices tapping around the same time can never stomp on each other
+ * (no read-modify-write race), and getWaterLedgerFromSheets_ below
+ * always recomputes the true total straight from these rows rather than
+ * trusting a client's locally-remembered running count. Raw Ounces is
+ * kept alongside Hydration Ounces purely for a readable log (e.g. "11oz
+ * Coffee" rather than just "8"); only Hydration Ounces feeds the ledger.
  */
 function getOrCreateWaterSheet_() {
   const ss = getOrCreateSpreadsheet_();
   let sheet = ss.getSheetByName(WATER_SHEET_NAME);
-  if (sheet) return sheet;
+  if (sheet) {
+    // Re-stamp the header row if an earlier version of this sheet was
+    // created with the old 3-column layout (Date, Ounces, Logged At) -
+    // keeps new reads/writes self-consistent going forward without a
+    // full data migration for what's still a brand new, likely-empty log.
+    const existingHeaders = sheet.getRange(1, 1, 1, WATER_HEADERS.length).getValues()[0];
+    if (existingHeaders.join('|') !== WATER_HEADERS.join('|')) {
+      sheet.getRange(1, 1, 1, WATER_HEADERS.length).setValues([WATER_HEADERS]);
+    }
+    return sheet;
+  }
 
   sheet = ss.insertSheet(WATER_SHEET_NAME);
   sheet.appendRow(WATER_HEADERS);
@@ -218,9 +230,15 @@ function getOrCreateWaterSheet_() {
   return sheet;
 }
 
-function logWaterEntry_(date, ounces) {
+function logWaterEntry_(date, type, rawOz, hydrationOz) {
   const sheet = getOrCreateWaterSheet_();
-  sheet.appendRow([date, ounces, new Date()]);
+  sheet.appendRow([date, type || 'water', rawOz, hydrationOz, new Date()]);
+}
+
+function deleteLastWaterEntry_() {
+  const sheet = getOrCreateWaterSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.deleteRow(lastRow);
 }
 
 function getWaterLedgerFromSheets_() {
@@ -233,11 +251,36 @@ function getWaterLedgerFromSheets_() {
   const rows = sheet.getRange(2, 1, lastRow - 1, WATER_HEADERS.length).getValues();
   rows.forEach(function (row) {
     const key = cellDateKey_(row[0], timeZone);
-    const ounces = Number(row[1]);
-    if (isNaN(ounces)) return;
-    ledger[key] = (ledger[key] || 0) + ounces;
+    const hydrationOz = Number(row[3]);
+    if (isNaN(hydrationOz)) return;
+    ledger[key] = (ledger[key] || 0) + hydrationOz;
   });
   return ledger;
+}
+
+// Per-entry detail (type, volume, and time of day) for one calendar day -
+// the day-total ledger above only knows "how much," not "when" or "what
+// kind," which the client needs for the hourly intake chart.
+function getWaterEntriesForDate_(date) {
+  const sheet = getOrCreateWaterSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, WATER_HEADERS.length).getValues();
+  const entries = [];
+  rows.forEach(function (row) {
+    if (cellDateKey_(row[0], timeZone) !== date) return;
+    const hydrationOz = Number(row[3]);
+    if (isNaN(hydrationOz) || !(row[4] instanceof Date)) return;
+    entries.push({
+      type: row[1] || 'water',
+      rawOz: Number(row[2]) || hydrationOz,
+      hydrationOz: hydrationOz,
+      loggedAt: Utilities.formatDate(row[4], timeZone, "yyyy-MM-dd'T'HH:mm:ss")
+    });
+  });
+  return entries;
 }
 
 const BODY_HEALTH_SHEET_NAME = 'Body Health Log';
@@ -878,6 +921,13 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadWaterEntries') {
+    const date = e.parameter.date || Utilities.formatDate(new Date(), getOrCreateSpreadsheet_().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', entries: getWaterEntriesForDate_(date) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadSettingsState') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', state: loadSettingsState_() }))
@@ -929,11 +979,18 @@ function doPost(e) {
     }
 
     if (data.action === 'logWater') {
-      const ounces = Number(data.ounces);
-      if (!data.date || isNaN(ounces)) {
-        throw new Error('logWater requires a date and a numeric ounces');
+      const hydrationOz = Number(data.hydrationOz);
+      if (!data.date || isNaN(hydrationOz)) {
+        throw new Error('logWater requires a date and a numeric hydrationOz');
       }
-      logWaterEntry_(data.date, ounces);
+      logWaterEntry_(data.date, data.type, Number(data.rawOz) || hydrationOz, hydrationOz);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'undoLastWater') {
+      deleteLastWaterEntry_();
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
