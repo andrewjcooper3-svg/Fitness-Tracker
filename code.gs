@@ -644,29 +644,124 @@ function loadApiKeysState_() {
 }
 
 // Pushup Goals / Body Health settings (daily baseline, year goal, max
-// HR) plus the manual year-total correction - same whole-blob sync as
-// Spotify/API keys above, so a correction typed into one device's
-// "Correct total reps this year" field actually carries over to the
-// others instead of staying stuck locally.
-const SETTINGS_STATE_KEY = 'APP_SETTINGS_STATE';
+// HR), the manual year-total correction, and the Water widget's goal +
+// per-drink oz amounts - same cross-device reach as everything else in
+// this file, but as a real "Settings" sheet (Key/Value, one row per
+// setting) rather than an opaque PropertiesService blob, so a value can
+// be eyeballed or hand-corrected directly in the spreadsheet the same
+// way Weight/Water/Body Health already can. yearCarry is the one
+// exception kept as a JSON string in its own cell, since it's an
+// internal bookkeeping object rather than something meant to be
+// hand-edited.
+const SETTINGS_STATE_KEY = 'APP_SETTINGS_STATE'; // legacy PropertiesService key, read once below to migrate
+const SETTINGS_SHEET_NAME = 'Settings';
+const SETTINGS_HEADERS = ['Key', 'Value'];
+const SETTINGS_DRINK_TYPES = ['water', 'coffee', 'tea'];
+
+function getOrCreateSettingsSheet_() {
+  const ss = getOrCreateSpreadsheet_();
+  let sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(SETTINGS_SHEET_NAME);
+  sheet.appendRow(SETTINGS_HEADERS);
+  const headerRange = sheet.getRange(1, 1, 1, SETTINGS_HEADERS.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#1a1d24');
+  headerRange.setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  sheet.setColumnWidth(1, 220);
+  sheet.setColumnWidth(2, 280);
+
+  // One-time carry-forward from the PropertiesService blob this
+  // replaces, so switching to a visible sheet doesn't silently drop a
+  // goal or correction saved before this migration.
+  const legacyRaw = PropertiesService.getScriptProperties().getProperty(SETTINGS_STATE_KEY);
+  if (legacyRaw) {
+    try {
+      const legacy = JSON.parse(legacyRaw);
+      if (legacy.dailyBaseline) sheet.appendRow(['dailyBaseline', legacy.dailyBaseline]);
+      if (legacy.yearGoal) sheet.appendRow(['yearGoal', legacy.yearGoal]);
+      if (legacy.maxHR) sheet.appendRow(['maxHR', legacy.maxHR]);
+      if (legacy.waterGoal) sheet.appendRow(['waterGoal', legacy.waterGoal]);
+      if (legacy.yearCarry) sheet.appendRow(['yearCarry', JSON.stringify(legacy.yearCarry)]);
+      if (legacy.drinkAmounts) {
+        SETTINGS_DRINK_TYPES.forEach(function (type) {
+          const d = legacy.drinkAmounts[type];
+          if (d) {
+            sheet.appendRow(['drink.' + type + '.rawOz', d.rawOz]);
+            sheet.appendRow(['drink.' + type + '.hydrationOz', d.hydrationOz]);
+          }
+        });
+      }
+    } catch (e) {
+      // Malformed legacy blob - nothing to carry forward, sheet just starts empty.
+    }
+  }
+
+  return sheet;
+}
+
+function setSettingsValue_(sheet, key, value) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    const keys = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i][0] === key) {
+        sheet.getRange(i + 2, 2).setValue(value);
+        return;
+      }
+    }
+  }
+  sheet.appendRow([key, value]);
+}
 
 function saveSettingsState_(dailyBaseline, yearGoal, maxHR, yearCarry, waterGoal, drinkAmounts) {
-  const props = PropertiesService.getScriptProperties();
-  props.setProperty(SETTINGS_STATE_KEY, JSON.stringify({
-    dailyBaseline: dailyBaseline || null,
-    yearGoal: yearGoal || null,
-    maxHR: maxHR || null,
-    yearCarry: yearCarry || null,
-    waterGoal: waterGoal || null,
-    drinkAmounts: drinkAmounts || null,
-    savedAt: new Date().toISOString()
-  }));
+  const sheet = getOrCreateSettingsSheet_();
+  if (dailyBaseline) setSettingsValue_(sheet, 'dailyBaseline', dailyBaseline);
+  if (yearGoal) setSettingsValue_(sheet, 'yearGoal', yearGoal);
+  if (maxHR) setSettingsValue_(sheet, 'maxHR', maxHR);
+  if (waterGoal) setSettingsValue_(sheet, 'waterGoal', waterGoal);
+  if (yearCarry) setSettingsValue_(sheet, 'yearCarry', JSON.stringify(yearCarry));
+  if (drinkAmounts) {
+    SETTINGS_DRINK_TYPES.forEach(function (type) {
+      const d = drinkAmounts[type];
+      if (!d) return;
+      if (d.rawOz != null) setSettingsValue_(sheet, 'drink.' + type + '.rawOz', d.rawOz);
+      if (d.hydrationOz != null) setSettingsValue_(sheet, 'drink.' + type + '.hydrationOz', d.hydrationOz);
+    });
+  }
+  setSettingsValue_(sheet, 'savedAt', new Date().toISOString());
 }
 
 function loadSettingsState_() {
-  const props = PropertiesService.getScriptProperties();
-  const raw = props.getProperty(SETTINGS_STATE_KEY);
-  return raw ? JSON.parse(raw) : null;
+  const sheet = getOrCreateSettingsSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  const map = {};
+  rows.forEach(function (r) { map[r[0]] = r[1]; });
+
+  const drinkAmounts = {};
+  let hasDrinkData = false;
+  SETTINGS_DRINK_TYPES.forEach(function (type) {
+    const rawVal = map['drink.' + type + '.rawOz'];
+    const netVal = map['drink.' + type + '.hydrationOz'];
+    if (rawVal != null && netVal != null) {
+      drinkAmounts[type] = { rawOz: Number(rawVal), hydrationOz: Number(netVal) };
+      hasDrinkData = true;
+    }
+  });
+
+  return {
+    dailyBaseline: map.dailyBaseline || null,
+    yearGoal: map.yearGoal || null,
+    maxHR: map.maxHR || null,
+    waterGoal: map.waterGoal || null,
+    yearCarry: map.yearCarry ? JSON.parse(map.yearCarry) : null,
+    drinkAmounts: hasDrinkData ? drinkAmounts : null
+  };
 }
 
 // Overview widget board layout (sizes + order) - same whole-blob sync,
