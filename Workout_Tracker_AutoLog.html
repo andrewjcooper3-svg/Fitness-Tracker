@@ -2310,27 +2310,35 @@ async function loadRemoteRecipes() {
   }
 }
 
-// Recipe seed queue - lets a recipe get added to this list (in code,
-// via a normal commit) and land in the real Recipes sheet without
-// anyone re-typing it through the UI. Exists because Claude's sandbox
-// has no route to script.google.com, so pushing straight to the Sheet
-// from there isn't possible - but the app running in your actual
-// browser already has a working connection, so it can do the push
-// itself the next time it loads. Runs after loadRemoteRecipes (so a
-// fresh pull from the Sheet doesn't get seen as "not there yet" and
+// Recipe seed queue - lets a recipe get added (or edited) in this list
+// (in code, via a normal commit) and land in the real Recipes sheet
+// without anyone re-typing it through the UI. Exists because Claude's
+// sandbox has no route to script.google.com, so pushing straight to
+// the Sheet from there isn't possible - but the app running in your
+// actual browser already has a working connection, so it can do the
+// push itself the next time it loads. Runs after loadRemoteRecipes (so
+// a fresh pull from the Sheet doesn't get seen as "not there yet" and
 // re-added) and pushes through the exact same syncRecipeToSheet_ path
-// a manual "Save Recipe" tap uses. Each seed has a fixed id, so
-// applying it on a second device just re-saves the same sheet tab
-// instead of creating a duplicate. The "applied" flag is only set once
-// the push has actually been attempted while online, so an offline
-// load retries on the next one rather than silently giving up.
+// a manual "Save Recipe" tap uses.
+//
+// Each seed carries a version number - bumping it (e.g. to fix the
+// instructions) makes this re-apply and re-push that seed's id even
+// though it already exists, overwriting the same sheet tab in place
+// rather than creating a duplicate (saveRecipeToSheet_ upserts by id).
+// Versions already applied are tracked per-id, so a device that's
+// already current for a given version does nothing, and re-running on
+// a second device is always safe either way. The version is only
+// recorded as applied once the push has actually been attempted while
+// online, so an offline load retries on the next one instead of
+// silently giving up.
 const STORAGE_RECIPE_SEEDS_APPLIED_KEY = 'WORKOUT_RECIPE_SEEDS_APPLIED';
 const PENDING_RECIPE_SEEDS = [
   {
     id: 'seed-swiss-fondue-20260811',
+    version: 2,
     name: 'Swiss-Style Fondue',
     image: '',
-    instructions: 'Rub the inside of the fondue pot with a halved garlic clove.\n\nToss the grated Gruyère, Fontina, and Kaltbach with 1½ tsp cornstarch.\n\nHeat the Chablis in the pot, then melt in the cheese mixture, stirring until smooth.\n\nStir in 1 tbsp kirsch.\n\nSeason with ~¼ tsp black pepper and ~⅛ tsp nutmeg (1-2 light scrapes). No added salt.\n\nIf needed, thicken with an additional ½-1 tsp cornstarch mixed into a slurry.\n\nServe with cubed bread, boiled skin-on potatoes (1½-2" pieces), cornichons, and peppers.\n\nNote: this is a substitute blend approximating a traditional Swiss moitié-moitié fondue (normally Gruyère + Vacherin Fribourgeois) - Fontina + Kaltbach stood in for the Vacherin Fribourgeois we couldn\'t find, not an identical recipe.',
+    instructions: 'Grate or cube the Gruyère, Fontina, and Kaltbach, then toss with 1½ tsp cornstarch until evenly coated - this keeps the fondue smooth instead of clumping or breaking later.\n\nRub the inside of the fondue pot (caquelon) with the cut side of a halved garlic clove, then discard the garlic.\n\nAdd the Chablis to the pot and warm over medium heat until gently simmering - don\'t let it boil.\n\nLower the heat. Add the cheese a handful at a time, stirring constantly in a figure-8 with a wooden spoon or fork. Let each addition fully melt before adding the next - this is what keeps the emulsion smooth rather than stringy or separated.\n\nOnce all the cheese is melted and smooth, stir in the kirsch.\n\nSeason with about ¼ tsp black pepper and ⅛ tsp nutmeg (1-2 light scrapes). No salt needed - the cheese already carries plenty.\n\nIf it\'s still too thin, whisk the remaining ½-1 tsp cornstarch with a splash of kirsch or wine into a smooth slurry, stir it in, and simmer gently for another minute or two until it thickens.\n\nMove the pot to the fondue burner set low, just enough to keep a bare simmer, and stir occasionally while serving to keep it from separating.\n\nServe with cubed bread, boiled skin-on potatoes (1½-2" pieces), cornichons, and peppers for dipping.\n\nNote: this is a substitute blend approximating a traditional Swiss moitié-moitié fondue (normally Gruyère + Vacherin Fribourgeois) - Fontina + Kaltbach stood in for the Vacherin Fribourgeois we couldn\'t find, not an identical recipe.',
     ingredients: [
       { name: 'Gruyère', qty: 10, unit: 'oz' },
       { name: 'Fontina Val d\'Aosta DOP', qty: 5, unit: 'oz' },
@@ -2354,22 +2362,25 @@ function applyPendingRecipeSeeds_() {
   if (!PENDING_RECIPE_SEEDS.length) return;
   const url = getDeploymentUrl();
   const online = !!url && navigator.onLine;
-  const applied = new Set(JSON.parse(localStorage.getItem(STORAGE_RECIPE_SEEDS_APPLIED_KEY) || '[]'));
+  const appliedVersions = JSON.parse(localStorage.getItem(STORAGE_RECIPE_SEEDS_APPLIED_KEY) || '{}');
   const recipes = loadRecipes();
   let changedLocal = false;
 
   PENDING_RECIPE_SEEDS.forEach(seed => {
-    let recipe = recipes.find(r => r.id === seed.id);
-    if (!recipe) {
-      const ingredients = (seed.ingredients || []).map(ing => Object.assign({ inventoryId: null, notTracked: false }, ing));
-      autoLinkIngredients_(ingredients, loadInventory());
-      recipe = { id: seed.id, name: seed.name, image: seed.image || '', instructions: seed.instructions || '', ingredients };
-      recipes.push(recipe);
-      changedLocal = true;
-    }
-    if (!applied.has(seed.id) && online) {
+    const version = seed.version || 1;
+    if ((appliedVersions[seed.id] || 0) >= version) return;
+
+    const ingredients = (seed.ingredients || []).map(ing => Object.assign({ inventoryId: null, notTracked: false }, ing));
+    autoLinkIngredients_(ingredients, loadInventory());
+    const recipe = { id: seed.id, name: seed.name, image: seed.image || '', instructions: seed.instructions || '', ingredients };
+
+    const idx = recipes.findIndex(r => r.id === seed.id);
+    if (idx === -1) recipes.push(recipe); else recipes[idx] = recipe;
+    changedLocal = true;
+
+    if (online) {
       syncRecipeToSheet_(recipe);
-      applied.add(seed.id);
+      appliedVersions[seed.id] = version;
     }
   });
 
@@ -2377,7 +2388,7 @@ function applyPendingRecipeSeeds_() {
     saveRecipesList(recipes);
     if (viewOrder[currentViewIndex] === 'kitchen') { renderRecipeList(); renderGroceryList(); }
   }
-  localStorage.setItem(STORAGE_RECIPE_SEEDS_APPLIED_KEY, JSON.stringify(Array.from(applied)));
+  localStorage.setItem(STORAGE_RECIPE_SEEDS_APPLIED_KEY, JSON.stringify(appliedVersions));
 }
 
 // Local-only writes (no remote echo) - used specifically when applying a
@@ -4775,7 +4786,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-recipe-seed-queue';
+const APP_BUILD_VERSION = '2026-08-11-fondue-instructions-v2';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
