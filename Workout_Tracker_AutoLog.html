@@ -2381,7 +2381,7 @@ const STORAGE_RECIPE_SEEDS_APPLIED_KEY = 'WORKOUT_RECIPE_SEEDS_APPLIED';
 const PENDING_RECIPE_SEEDS = [
   {
     id: 'seed-swiss-fondue-20260811',
-    version: 3,
+    version: 4,
     name: 'Swiss-Style Fondue',
     image: '',
     instructions: '1. Grate or cube the 10 oz Gruyère, 5 oz Fontina, and 5 oz Kaltbach. Toss with 1½ tsp cornstarch until evenly coated - this keeps the fondue smooth instead of clumping or breaking later.\n\n2. Rub the inside of the fondue pot (caquelon) with the cut side of a halved garlic clove, then discard the garlic.\n\n3. Add 1¼ cups Chablis to the pot and warm over medium heat until gently simmering - don\'t let it boil.\n\n4. Lower the heat. Add the cornstarch-coated cheese a handful at a time, stirring constantly in a figure-8 with a wooden spoon or fork. Let each addition fully melt before adding the next - this is what keeps the emulsion smooth rather than stringy or separated.\n\n5. Once all the cheese is melted and smooth, stir in 1 tbsp kirsch.\n\n6. Season with about ¼ tsp black pepper and ⅛ tsp nutmeg (1-2 light scrapes). No salt needed - the cheese already carries plenty.\n\n7. If it\'s still too thin, whisk the remaining ½-1 tsp cornstarch with a splash of kirsch or wine into a smooth slurry, stir it in, and simmer gently for another minute or two until it thickens.\n\n8. Move the pot to the fondue burner set low, just enough to keep a bare simmer, and stir occasionally while serving to keep it from separating.\n\n9. Serve with cubed bread, boiled skin-on potatoes (1½-2" pieces), cornichons, and peppers for dipping.\n\nNote: this is a substitute blend approximating a traditional Swiss moitié-moitié fondue (normally Gruyère + Vacherin Fribourgeois) - Fontina + Kaltbach stood in for the Vacherin Fribourgeois we couldn\'t find, not an identical recipe.',
@@ -2389,15 +2389,14 @@ const PENDING_RECIPE_SEEDS = [
       { name: 'Gruyère', qty: 10, unit: 'oz' },
       { name: 'Fontina Val d\'Aosta DOP', qty: 5, unit: 'oz' },
       { name: 'Emmi Kaltbach Le Crémeux', qty: 5, unit: 'oz' },
-      { name: 'Cornstarch (tossed with cheese)', qty: 1.5, unit: 'tsp' },
-      { name: 'Cornstarch (slurry, to thicken)', qty: 0.75, unit: 'tsp' },
+      { name: 'Cornstarch', qty: 2.25, unit: 'tsp' },
       { name: 'Chablis', qty: 1.25, unit: 'cup' },
       { name: 'Kirsch', qty: 1, unit: 'tbsp' },
       { name: 'Garlic clove', qty: 1, unit: 'clove' },
       { name: 'Black pepper', qty: 0.25, unit: 'tsp' },
       { name: 'Nutmeg', qty: 0.125, unit: 'tsp' },
-      { name: 'Bread, cubed', qty: null, unit: 'for dipping' },
-      { name: 'Potatoes, skin-on, 1½-2" pieces', qty: null, unit: 'for dipping' },
+      { name: 'Bread', qty: null, unit: 'for dipping' },
+      { name: 'Baby Potatoes', qty: null, unit: 'for dipping' },
       { name: 'Cornichons', qty: null, unit: 'for dipping' },
       { name: 'Peppers', qty: null, unit: 'for dipping' }
     ]
@@ -5237,7 +5236,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-conservative-rounding';
+const APP_BUILD_VERSION = '2026-08-12-fondue-ingredient-names';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
