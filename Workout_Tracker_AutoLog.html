@@ -234,6 +234,30 @@
   .ov-widget[data-size="wide"] .ov-widget-sizepicker button:nth-child(2),
   .ov-widget[data-size="large"] .ov-widget-sizepicker button:nth-child(3) { color: var(--accent); border-color: var(--accent); }
 
+  /* Water card - its own full-width card, since it has real interactive
+     content (ring, log buttons, hourly chart) that doesn't reduce to a
+     single line the way everything below it does. */
+  .ov-water-card { background: var(--surface); border-radius: 22px; padding: 16px 18px; margin-bottom: 14px; }
+
+  /* Everything else lives in ONE grouped card as hairline-divided rows,
+     not a separate box per item - the iOS-Settings / Copilot-list
+     pattern, so it reads as a single continuous surface rather than a
+     stack of tiles. Every id inside a row is unchanged from the old
+     per-widget cards, so the existing render functions (which look up
+     an element by id, or read data-size off the closest .ov-widget)
+     keep working without any JS changes. */
+  .ov-list-card { background: var(--surface); border-radius: 22px; overflow: hidden; margin-bottom: 16px; }
+  .ov-list-row { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+  .ov-list-row:last-child { border-bottom: none; }
+  .ov-list-row:active { background: var(--surface2); }
+  .ov-list-row-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .ov-list-row-body { flex: 1; min-width: 0; }
+  .ov-list-row-label { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.8; margin-bottom: 3px; }
+  .ov-list-row-chevron { color: var(--muted); opacity: 0.4; font-size: 17px; flex-shrink: 0; }
+  .ov-list-row .sp-np-title { font-size: 13px; }
+  .ov-list-row .sp-playlists, .ov-list-row .sp-np-artist { display: none; }
+  .ov-list-row .sp-status-dot { flex-shrink: 0; }
+
   /* Water widget - same ring-on-the-left layout as the Pushups hero,
      scaled down to widget size, with tap-to-log buttons standing in
      for the hero's stat column, plus an hourly bar chart below. */
@@ -558,7 +582,6 @@
     <div class="ov-page-head-actions">
       <button class="ov-gear-btn" onclick="forceFullRefresh()" aria-label="Refresh" title="Force a fresh reload">↻</button>
       <button class="ov-gear-btn" onclick="openSettingsModal()" aria-label="Settings">⚙</button>
-      <button class="ov-edit-btn" id="ovEditBtn" onclick="toggleOverviewEdit()">Edit</button>
     </div>
   </div>
   <div class="ov-build-stamp" id="ovBuildStamp"></div>
@@ -596,138 +619,100 @@
     </div>
   </div>
 
-  <div class="ov-board" id="ovBoard">
-    <div class="ov-widget" data-widget="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
-      <div class="ov-widget-edit-bar">
-        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
-        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
-      </div>
-      <div class="ov-widget-head">
-        <div class="ov-widget-label">Spotify</div>
-        <div class="sp-status-dot" id="spStatusDot"></div>
-      </div>
-      <div class="sp-body">
-        <div class="sp-now-playing" id="spNowPlaying">
-          <div class="sp-np-art-wrap">
-            <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
-            <div class="sp-np-art-fallback" id="spNpArtFallback">🎵</div>
-          </div>
-          <div class="sp-np-body">
-            <div class="sp-np-title" id="spNpTitle">Not connected</div>
-            <div class="sp-np-artist" id="spNpArtist"></div>
-          </div>
+  <div class="ov-water-card">
+    <div class="ov-widget-head">
+      <div class="ov-widget-label">Water</div>
+      <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
+    </div>
+    <div class="wt-body">
+      <div class="wt-ring" id="wtRing">
+        <div class="wt-ring-center">
+          <div class="wt-ring-num" id="wtRingNum">0</div>
+          <div class="wt-ring-target" id="wtRingTarget">of 100 oz</div>
         </div>
+      </div>
+      <div class="wt-info">
+        <div class="wt-btn-row">
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', -1)">−</button>
+          <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', 1)">+</button>
+        </div>
+        <div class="wt-btn-row">
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', -1)">−</button>
+          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', 1)">+</button>
+        </div>
+        <div class="wt-btn-row">
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', -1)">−</button>
+          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', 1)">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="wt-chart-wrap">
+      <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
+      <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+      <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
+    </div>
+  </div>
+
+  <!-- One grouped card, hairline-divided rows - no per-row box, so this
+       reads as a single continuous surface (iOS-settings / Copilot-list
+       style) instead of a stack of separate tiles. Every inner id below
+       is unchanged from the old per-widget cards, so all existing
+       render/update functions keep working with zero JS changes. -->
+  <div class="ov-list-card" id="ovBoard">
+    <div class="ov-list-row ov-widget" data-widget="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
+      <div class="sp-np-art-wrap ov-list-row-icon">
+        <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
+        <div class="sp-np-art-fallback" id="spNpArtFallback">🎵</div>
+      </div>
+      <div class="ov-list-row-body">
+        <div class="ov-list-row-label">Spotify</div>
+        <div class="sp-np-title" id="spNpTitle">Not connected</div>
+        <div class="sp-np-artist" id="spNpArtist"></div>
         <div class="sp-playlists" id="spPlaylistTiles">
           <div class="sp-playlists-empty">Pin playlists in the Music tab</div>
         </div>
       </div>
-      <div class="ov-widget-sizepicker">
-        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
-        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
-        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
-      </div>
+      <div class="sp-status-dot" id="spStatusDot"></div>
+      <div class="ov-list-row-chevron">›</div>
     </div>
 
-    <div class="ov-widget" data-widget="weight" data-size="small" onclick="handleWidgetTap(event, 'weight')">
-      <div class="ov-widget-edit-bar">
-        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
-        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+    <div class="ov-list-row ov-widget" data-widget="upcoming" data-size="small" onclick="handleWidgetTap(event, 'calendar')">
+      <div class="ov-list-row-icon">📅</div>
+      <div class="ov-list-row-body">
+        <div class="ov-list-row-label">Upcoming</div>
+        <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
       </div>
-      <div class="ov-widget-label">Weight</div>
-      <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
-      <div class="ov-widget-sizepicker">
-        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
-        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
-        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
-      </div>
+      <div class="ov-list-row-chevron">›</div>
     </div>
 
-    <div class="ov-widget" data-widget="upcoming" data-size="wide" onclick="handleWidgetTap(event, 'calendar')">
-      <div class="ov-widget-edit-bar">
-        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
-        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+    <div class="ov-list-row ov-widget" data-widget="weight" data-size="small" onclick="handleWidgetTap(event, 'weight')">
+      <div class="ov-list-row-icon">⚖️</div>
+      <div class="ov-list-row-body">
+        <div class="ov-list-row-label">Weight</div>
+        <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
       </div>
-      <div class="ov-widget-label">Upcoming</div>
-      <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
-      <div class="ov-widget-sizepicker">
-        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
-        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
-        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
-      </div>
+      <div class="ov-list-row-chevron">›</div>
     </div>
 
-    <div class="ov-widget" data-widget="water" data-size="wide">
-      <div class="ov-widget-edit-bar">
-        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
-        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+    <div class="ov-list-row ov-widget" data-widget="kitchen" data-size="small" onclick="handleWidgetTap(event, 'kitchen')">
+      <div class="ov-list-row-icon">🍳</div>
+      <div class="ov-list-row-body">
+        <div class="ov-list-row-label">Kitchen</div>
+        <div id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
       </div>
-      <div class="ov-widget-head">
-        <div class="ov-widget-label">Water</div>
-        <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
-      </div>
-      <div class="wt-body">
-        <div class="wt-ring" id="wtRing">
-          <div class="wt-ring-center">
-            <div class="wt-ring-num" id="wtRingNum">0</div>
-            <div class="wt-ring-target" id="wtRingTarget">of 100 oz</div>
-          </div>
-        </div>
-        <div class="wt-info">
-          <div class="wt-btn-row">
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', -1)">−</button>
-            <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', 1)">+</button>
-          </div>
-          <div class="wt-btn-row">
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', -1)">−</button>
-            <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', 1)">+</button>
-          </div>
-          <div class="wt-btn-row">
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', -1)">−</button>
-            <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', 1)">+</button>
-          </div>
-        </div>
-      </div>
-      <div class="wt-chart-wrap">
-        <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
-        <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
-        <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
-      </div>
-      <div class="ov-widget-sizepicker">
-        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
-        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
-        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
-      </div>
+      <div class="ov-list-row-chevron">›</div>
     </div>
 
-    <div class="ov-widget" data-widget="kitchen" data-size="small" onclick="handleWidgetTap(event, 'kitchen')">
-      <div class="ov-widget-edit-bar">
-        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
-        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
+    <div class="ov-list-row ov-widget" data-widget="shopping" data-size="small" onclick="handleShoppingWidgetTap(event)">
+      <div class="ov-list-row-icon">🛒</div>
+      <div class="ov-list-row-body">
+        <div class="ov-list-row-label">Shopping</div>
+        <div id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
       </div>
-      <div class="ov-widget-label">Kitchen</div>
-      <div id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
-      <div class="ov-widget-sizepicker">
-        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
-        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
-        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
-      </div>
-    </div>
-
-    <div class="ov-widget" data-widget="shopping" data-size="small" onclick="handleShoppingWidgetTap(event)">
-      <div class="ov-widget-edit-bar">
-        <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
-        <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
-      </div>
-      <div class="ov-widget-label">Shopping</div>
-      <div id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
-      <div class="ov-widget-sizepicker">
-        <button onclick="setWidgetSize(event, this, 'small')">Small</button>
-        <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
-        <button onclick="setWidgetSize(event, this, 'large')">Large</button>
-      </div>
+      <div class="ov-list-row-chevron">›</div>
     </div>
   </div>
 
@@ -5571,7 +5556,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-overview-redesign';
+const APP_BUILD_VERSION = '2026-08-12-overview-list-redesign';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
