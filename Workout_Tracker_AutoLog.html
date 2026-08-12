@@ -292,25 +292,37 @@
   /* Colorful icon-tile grid for everything else - each category gets
      its own tinted icon chip so the page reads at a glance, bento-style,
      instead of a flat monochrome list. */
-  .ov-tile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
-  .ov-tile { background: var(--surface); border-radius: 16px; padding: 9px 11px; cursor: pointer; transition: background 0.15s; position: relative; }
-  .ov-tile:active { background: var(--surface2); }
-  .ov-tile-wide { grid-column: span 2; }
-  .ov-tile-icon { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; line-height: 1; margin-bottom: 5px; }
-  .ov-tile-icon.c-weight { background: rgba(183,148,246,0.24); }
-  .ov-tile-icon.c-kitchen { background: rgba(245,185,66,0.24); }
-  .ov-tile-icon.c-shopping { background: rgba(107,207,127,0.24); }
-  .ov-tile-icon.c-upcoming { background: rgba(244,114,182,0.24); }
-  .ov-tile-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.8; margin-bottom: 2px; }
-  .ov-tile .sp-np-artist, .ov-tile .sp-playlists { display: none; }
-  .ov-tile .sp-np-art-wrap { width: 26px; height: 26px; border-radius: 8px; margin-bottom: 5px; }
-  .ov-tile .sp-np-title { font-size: 12.5px; }
-  .ov-tile .ov-mini-empty { font-size: 12px; padding: 0; line-height: 1.3; }
-  .ov-tile .ov-mini-weight-value { font-size: 19px; }
+  /* Namespaced "ov-glance-*" rather than "ov-tile*" - that name was
+     already claimed by the unrelated Sets/Reps/Days summary row on the
+     Trainer tab, and colliding with it let that rule's padding/border-
+     left win the cascade, collapsing this grid's tile padding to
+     almost nothing (content sat flush against the rounded corners). */
+  .ov-glance-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+  /* grid-column explicitly set (not left to default) because these
+     tiles also carry the shared .ov-widget class (needed so the
+     existing render functions' closest('.ov-widget') lookup still
+     works) - .ov-widget's own grid-column:span 2 would otherwise win
+     and force every tile to full width. */
+  .ov-glance-tile { background: var(--surface); border-radius: 18px; padding: 13px 15px; cursor: pointer; transition: background 0.15s; position: relative; grid-column: span 1; }
+  .ov-glance-tile:active { background: var(--surface2); }
+  .ov-glance-tile-wide { grid-column: span 2; }
+  .ov-glance-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; margin-bottom: 7px; flex-shrink: 0; }
+  .ov-glance-icon svg { display: block; }
+  .ov-glance-icon.c-weight { background: rgba(183,148,246,0.22); color: #b794f6; }
+  .ov-glance-icon.c-kitchen { background: rgba(245,185,66,0.22); color: #f5b942; }
+  .ov-glance-icon.c-shopping { background: rgba(107,207,127,0.22); color: #6bcf7f; }
+  .ov-glance-icon.c-upcoming { background: rgba(244,114,182,0.22); color: #f472b6; }
+  .ov-glance-icon.c-spotify { background: rgba(29,185,84,0.18); color: #1ed760; }
+  .ov-glance-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.8; margin-bottom: 3px; }
+  .ov-glance-tile .sp-np-artist, .ov-glance-tile .sp-playlists { display: none; }
+  .ov-glance-tile .sp-np-art-wrap { width: 28px; height: 28px; border-radius: 9px; margin-bottom: 7px; }
+  .ov-glance-tile .sp-np-title { font-size: 12.5px; }
+  .ov-glance-tile .ov-mini-empty { font-size: 12px; padding: 0; line-height: 1.3; }
+  .ov-glance-tile .ov-mini-weight-value { font-size: 19px; }
   /* Status dot moves to a small corner badge instead of sitting inline
      next to the label - inline made the Spotify label sit visually
      heavier/offset compared to every other tile's plain one-word label. */
-  .ov-tile .sp-status-dot { position: absolute; top: 13px; right: 13px; }
+  .ov-glance-tile .sp-status-dot { position: absolute; top: 14px; right: 14px; }
 
   /* Water widget - same ring-on-the-left layout as the Pushups hero,
      scaled down to widget size, with tap-to-log buttons standing in
@@ -329,7 +341,8 @@
   .wt-add-btn-secondary { font-size: 11.5px; font-weight: 600; color: var(--teal); background: rgba(91,154,148,0.14); padding: 6px 0; }
   .wt-btn-net { font-weight: 500; opacity: 0.75; }
   .wt-note { font-family: var(--font); font-size: 11px; color: var(--muted); text-align: center; }
-  .wt-chart-wrap { margin-top: 6px; }
+  .wt-chart-wrap { display: none; margin-top: 6px; }
+  .wt-chart-wrap.expanded { display: block; }
   .wt-chart { width: 100%; height: 26px; display: block; overflow: visible; }
   .wt-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 9.5px; color: var(--muted); margin-top: 2px; }
   .wt-chart-detail { font-family: var(--font); font-size: 10.5px; color: var(--text); margin-top: 4px; min-height: 13px; }
@@ -658,8 +671,8 @@
   </div>
 
   <div class="ov-hero-card ov-hero-water" id="ovBoard">
-    <div class="ov-widget-head">
-      <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water</div>
+    <div class="ov-widget-head" onclick="toggleWaterChart_()" style="cursor:pointer;">
+      <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water <span id="wtChartChevron" style="opacity:0.65; font-weight:400;">▸</span></div>
       <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
     </div>
     <div class="wt-body">
@@ -687,47 +700,52 @@
         </div>
       </div>
     </div>
-    <div class="wt-chart-wrap">
+    <div class="wt-chart-wrap" id="wtChartWrap">
       <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
       <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
       <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
     </div>
   </div>
 
-  <div class="ov-tile-grid">
-    <div class="ov-tile" data-widget="weight" onclick="handleWidgetTap(event, 'weight')">
-      <div class="ov-tile-icon c-weight">⚖️</div>
-      <div class="ov-tile-label">Weight</div>
+  <!-- Matching set of simple line icons (same stroke width/size) instead
+       of raw platform emoji - emoji glyphs vary wildly in visual style/
+       weight/optical size from each other (some flat, some filled,
+       some multi-color), which read as "not lined up" even when every
+       box is genuinely pixel-aligned. -->
+  <div class="ov-glance-grid">
+    <div class="ov-glance-tile ov-widget" data-widget="weight" data-size="small" onclick="handleWidgetTap(event, 'weight')">
+      <div class="ov-glance-icon c-weight"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="4" height="6" rx="1"></rect><rect x="17" y="9" width="4" height="6" rx="1"></rect><line x1="7" y1="12" x2="17" y2="12"></line></svg></div>
+      <div class="ov-glance-label">Weight</div>
       <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-tile" data-widget="spotify" onclick="handleWidgetTap(event, 'music')">
+    <div class="ov-glance-tile ov-widget" data-widget="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
       <span class="sp-status-dot" id="spStatusDot"></span>
-      <div class="sp-np-art-wrap ov-tile-icon">
+      <div class="sp-np-art-wrap ov-glance-icon c-spotify">
         <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
-        <div class="sp-np-art-fallback" id="spNpArtFallback">🎵</div>
+        <div class="sp-np-art-fallback" id="spNpArtFallback"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.4 14.4a.6.6 0 0 1-.83.2c-2.3-1.4-5.2-1.7-8.6-.9a.6.6 0 1 1-.27-1.17c3.7-.85 6.9-.48 9.5 1.1a.6.6 0 0 1 .2.77zm1.2-2.7a.75.75 0 0 1-1.03.25c-2.6-1.6-6.6-2.06-9.7-1.13a.75.75 0 0 1-.43-1.44c3.5-1.06 7.9-.55 10.9 1.3a.75.75 0 0 1 .26 1.02zm.1-2.8C14.8 9.1 9.6 8.9 6.6 9.8a.9.9 0 1 1-.52-1.72c3.5-1.06 9.2-.83 12.8 1.28a.9.9 0 0 1-.9 1.56z"></path></svg></div>
       </div>
-      <div class="ov-tile-label">Spotify</div>
+      <div class="ov-glance-label">Spotify</div>
       <div class="sp-np-title" id="spNpTitle">Not connected</div>
       <div class="sp-np-artist" id="spNpArtist"></div>
       <div class="sp-playlists" id="spPlaylistTiles"><div class="sp-playlists-empty">Pin playlists in the Music tab</div></div>
     </div>
 
-    <div class="ov-tile" data-widget="kitchen" onclick="handleWidgetTap(event, 'kitchen')">
-      <div class="ov-tile-icon c-kitchen">🍳</div>
-      <div class="ov-tile-label">Kitchen</div>
+    <div class="ov-glance-tile ov-widget" data-widget="kitchen" data-size="small" onclick="handleWidgetTap(event, 'kitchen')">
+      <div class="ov-glance-icon c-kitchen"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="13" r="7"></circle><line x1="17" y1="13" x2="22" y2="13"></line></svg></div>
+      <div class="ov-glance-label">Kitchen</div>
       <div id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-tile" data-widget="shopping" onclick="handleShoppingWidgetTap(event)">
-      <div class="ov-tile-icon c-shopping">🛒</div>
-      <div class="ov-tile-label">Shopping</div>
+    <div class="ov-glance-tile ov-widget" data-widget="shopping" data-size="small" onclick="handleShoppingWidgetTap(event)">
+      <div class="ov-glance-icon c-shopping"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"></path></svg></div>
+      <div class="ov-glance-label">Shopping</div>
       <div id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-tile ov-tile-wide" data-widget="upcoming" onclick="handleWidgetTap(event, 'calendar')">
-      <div class="ov-tile-icon c-upcoming">📅</div>
-      <div class="ov-tile-label">Upcoming</div>
+    <div class="ov-glance-tile ov-glance-tile-wide ov-widget" data-widget="upcoming" data-size="small" onclick="handleWidgetTap(event, 'calendar')">
+      <div class="ov-glance-icon c-upcoming"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><line x1="16" y1="3" x2="16" y2="7"></line><line x1="8" y1="3" x2="8" y2="7"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+      <div class="ov-glance-label">Upcoming</div>
       <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
   </div>
@@ -5569,7 +5587,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-overview-v3-compact-fit';
+const APP_BUILD_VERSION = '2026-08-12-overview-fix-tile-padding-collision';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -5658,6 +5676,19 @@ function adjustDrinkAmount(event, type, direction) {
 
   renderWaterButtons();
   syncSettingsToRemote();
+}
+
+// The hourly chart is collapsed by default (not everyone wants to see
+// it every time) - tapping the "Water" header expands/collapses it in
+// place rather than navigating anywhere, matching the rest of the
+// water card's tap-to-log behavior instead of opening a separate view.
+function toggleWaterChart_() {
+  const wrap = document.getElementById('wtChartWrap');
+  const chevron = document.getElementById('wtChartChevron');
+  if (!wrap) return;
+  const expanded = wrap.classList.toggle('expanded');
+  if (chevron) chevron.textContent = expanded ? '▾' : '▸';
+  updateViewportHeight('overview', true);
 }
 
 function renderOverviewWaterWidget() {
