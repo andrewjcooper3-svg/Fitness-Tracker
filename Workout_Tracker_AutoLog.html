@@ -154,12 +154,15 @@
   #view-overview { order: 0; }
   #view-pushups { order: 1; }
   #view-tracker { order: 2; }
-  #view-bodyhealth { order: 3; }
+  #view-kitchen { order: 3; }
   #view-calendar { order: 4; }
-  #view-kitchen { order: 5; }
-  #view-weight { order: 6; }
-  #view-stats { order: 7; }
-  #view-music { order: 8; }
+  #view-weight { order: 5; }
+  #view-stats { order: 6; }
+  #view-music { order: 7; }
+  /* Hidden for now - see the app-tab comment above. Still in the DOM
+     with the rest of its markup/logic untouched, just taken out of the
+     swipe flow entirely (order no longer matters while it's display:none). */
+  #view-bodyhealth { display: none; }
 
   .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, #2e2519 100%); border-radius: 26px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid rgba(245,230,210,0.05); }
   .ov-hero-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -1368,30 +1371,35 @@
 
   <div class="kitchen-section" id="kitchenSectionInventory">
     <div class="config-box">
-      <div class="config-title" style="margin-bottom:10px;">Add Item</div>
-      <button class="ov-open-btn" onclick="openBarcodeScanModal('inventory')" style="width:100%; margin-bottom:8px; background:var(--surface2);">Scan Barcode</button>
-      <input type="text" id="invItemName" class="config-input" placeholder="Item name" style="width:100%; box-sizing:border-box; margin-bottom:8px;" onblur="maybePrefillExpiration_('invItemName','invItemExpiration')">
-      <div class="weight-entry-row">
-        <input type="number" id="invItemQty" class="config-input" placeholder="Qty" step="0.1" min="0">
-        <select id="invItemUnit" class="config-input"></select>
+      <div class="config-toggle" onclick="toggleKitchenCollapse_('invAddBody','invAddChevron')">
+        <div class="config-title">Add Item</div>
+        <div class="config-chevron" id="invAddChevron">▸</div>
       </div>
-      <select id="invItemCategory" class="config-input" style="width:100%; box-sizing:border-box; margin-top:8px;"></select>
-      <div class="weight-entry-row" style="margin-top:8px;">
-        <input type="number" id="invItemCost" class="config-input" placeholder="Cost $ (optional)" step="0.01" min="0">
-        <input type="number" id="invItemCostPerPound" class="config-input" placeholder="Cost per lb (optional)" step="0.01" min="0">
+      <div class="config-body" id="invAddBody">
+        <button class="ov-open-btn" onclick="openBarcodeScanModal('inventory')" style="width:100%; margin-bottom:8px; background:var(--surface2);">Scan Barcode</button>
+        <input type="text" id="invItemName" class="config-input" placeholder="Item name" style="width:100%; box-sizing:border-box; margin-bottom:8px;" onblur="maybePrefillExpiration_('invItemName','invItemExpiration')">
+        <div class="weight-entry-row">
+          <input type="number" id="invItemQty" class="config-input" placeholder="Qty" step="0.1" min="0">
+          <select id="invItemUnit" class="config-input"></select>
+        </div>
+        <select id="invItemCategory" class="config-input" style="width:100%; box-sizing:border-box; margin-top:8px;"></select>
+        <div class="weight-entry-row" style="margin-top:8px;">
+          <input type="number" id="invItemCost" class="config-input" placeholder="Cost $ (optional)" step="0.01" min="0">
+          <input type="number" id="invItemCostPerPound" class="config-input" placeholder="Cost per lb (optional)" step="0.01" min="0">
+        </div>
+        <input type="number" id="invItemParLevel" class="config-input" placeholder="Restock to (optional) - e.g. always keep 2 gallons" step="0.1" min="0" style="width:100%; box-sizing:border-box; margin-top:8px;">
+        <div class="weight-entry-row" style="margin-top:8px;">
+          <input type="number" id="invItemPackageSize" class="config-input" placeholder="Package size (optional, e.g. 400)" step="0.1" min="0">
+          <input type="text" id="invItemPackageLabel" class="config-input" placeholder="e.g. box, bag, dozen">
+        </div>
+        <input type="date" id="invItemExpiration" class="config-input" style="width:100%; max-width:100%; min-width:0; box-sizing:border-box; margin-top:8px;">
+        <label class="kitchen-checkbox-label" style="margin-top:10px;">
+          <input type="checkbox" id="invItemNotTracked"> Pantry staple (salt, oil, etc. - never flagged as missing/low)
+        </label>
+        <button class="ov-open-btn" id="invAddBtn" onclick="addInventoryItem()" style="margin-top:10px;">Add to Inventory</button>
+        <button class="ov-open-btn" id="invCancelEditBtn" onclick="cancelEditInventoryItem()" style="margin-top:8px; display:none; background:transparent;">Cancel Edit</button>
+        <div class="config-status" id="invAddStatus"></div>
       </div>
-      <input type="number" id="invItemParLevel" class="config-input" placeholder="Restock to (optional) - e.g. always keep 2 gallons" step="0.1" min="0" style="width:100%; box-sizing:border-box; margin-top:8px;">
-      <div class="weight-entry-row" style="margin-top:8px;">
-        <input type="number" id="invItemPackageSize" class="config-input" placeholder="Package size (optional, e.g. 400)" step="0.1" min="0">
-        <input type="text" id="invItemPackageLabel" class="config-input" placeholder="e.g. box, bag, dozen">
-      </div>
-      <input type="date" id="invItemExpiration" class="config-input" style="width:100%; max-width:100%; min-width:0; box-sizing:border-box; margin-top:8px;">
-      <label class="kitchen-checkbox-label" style="margin-top:10px;">
-        <input type="checkbox" id="invItemNotTracked"> Pantry staple (salt, oil, etc. - never flagged as missing/low)
-      </label>
-      <button class="ov-open-btn" id="invAddBtn" onclick="addInventoryItem()" style="margin-top:10px;">Add to Inventory</button>
-      <button class="ov-open-btn" id="invCancelEditBtn" onclick="cancelEditInventoryItem()" style="margin-top:8px; display:none; background:transparent;">Cancel Edit</button>
-      <div class="config-status" id="invAddStatus"></div>
     </div>
 
     <div class="config-box" id="inventoryListCard">
@@ -1402,12 +1410,17 @@
 
   <div class="kitchen-section" id="kitchenSectionRecipes" style="display:none;">
     <div class="config-box">
-      <div class="config-title" style="margin-bottom:10px;">Find a Recipe</div>
-      <div class="weight-entry-row">
-        <input type="text" id="mealdbSearchInput" class="config-input" placeholder="Search recipes (e.g. pasta)">
-        <button class="config-save" onclick="searchRecipes()">Search</button>
+      <div class="config-toggle" onclick="toggleKitchenCollapse_('recipeSearchBody','recipeSearchChevron')">
+        <div class="config-title">Find a Recipe</div>
+        <div class="config-chevron" id="recipeSearchChevron">▸</div>
       </div>
-      <div id="mealdbResults"></div>
+      <div class="config-body" id="recipeSearchBody">
+        <div class="weight-entry-row">
+          <input type="text" id="mealdbSearchInput" class="config-input" placeholder="Search recipes (e.g. pasta)">
+          <button class="config-save" onclick="searchRecipes()">Search</button>
+        </div>
+        <div id="mealdbResults"></div>
+      </div>
     </div>
 
     <button class="ov-open-btn" onclick="openNewRecipeForm()" style="margin-bottom:12px;">+ Add Recipe Manually</button>
@@ -1738,14 +1751,17 @@
   <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">
     <div class="app-tab-label">Trainer</div>
   </div>
-  <div class="app-tab" data-view="bodyhealth" onclick="showAppView('bodyhealth')">
+  <div class="app-tab" data-view="kitchen" onclick="showAppView('kitchen')">
+    <div class="app-tab-label">Kitchen</div>
+  </div>
+  <!-- Hidden for now (still fully intact - just remove this comment and
+       the style attribute below, add 'bodyhealth' back into viewOrder,
+       and drop the #view-bodyhealth display:none to bring it back). -->
+  <div class="app-tab" data-view="bodyhealth" onclick="showAppView('bodyhealth')" style="display:none;">
     <div class="app-tab-label">Health</div>
   </div>
   <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">
     <div class="app-tab-label">Calendar</div>
-  </div>
-  <div class="app-tab" data-view="kitchen" onclick="showAppView('kitchen')">
-    <div class="app-tab-label">Kitchen</div>
   </div>
   <div class="app-tab" data-view="weight" onclick="showAppView('weight')">
     <div class="app-tab-label">Weight</div>
@@ -2493,6 +2509,24 @@ function formatExpirationDate_(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 }
 
+// Generic collapse/expand for the Kitchen tab's heavier forms (Add Item,
+// Find a Recipe) - collapsed by default so the actual list is the first
+// thing you see on each subtab, same pattern already used for the
+// Settings API-connection sections.
+function toggleKitchenCollapse_(bodyId, chevronId) {
+  const body = document.getElementById(bodyId);
+  const chevron = document.getElementById(chevronId);
+  body.classList.toggle('expanded');
+  if (chevron) chevron.textContent = body.classList.contains('expanded') ? '▾' : '▸';
+}
+
+function expandKitchenCollapse_(bodyId, chevronId) {
+  const body = document.getElementById(bodyId);
+  const chevron = document.getElementById(chevronId);
+  body.classList.add('expanded');
+  if (chevron) chevron.textContent = '▾';
+}
+
 function renderInventoryRow_(it, today) {
   let expBadge = '';
   if (it.expirationDate) {
@@ -2639,6 +2673,7 @@ function openEditInventoryItem(id) {
   document.getElementById('invCancelEditBtn').style.display = 'block';
   document.getElementById('invAddStatus').textContent = '';
   document.getElementById('invAddStatus').classList.remove('warn');
+  expandKitchenCollapse_('invAddBody', 'invAddChevron');
   updateViewportHeight('kitchen', true);
 }
 
@@ -5248,7 +5283,9 @@ function restoreState() {
 
 /* ---------- Weekly Overview tab ---------- */
 
-const viewOrder = ['overview', 'pushups', 'tracker', 'bodyhealth', 'calendar', 'kitchen', 'weight', 'stats', 'music'];
+// 'bodyhealth' deliberately left out for now (see the app-tab and
+// #view-bodyhealth comments above) - add it back in to restore the tab.
+const viewOrder = ['overview', 'pushups', 'tracker', 'kitchen', 'calendar', 'weight', 'stats', 'music'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -5530,7 +5567,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-fix-category-grouping';
+const APP_BUILD_VERSION = '2026-08-12-nav-reorder-kitchen-cleanup';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
