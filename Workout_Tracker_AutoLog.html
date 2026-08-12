@@ -171,31 +171,31 @@
   .ov-hero-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 4px; }
 
   /* Overview page header - plain text sitting on the page, no card chrome */
-  .ov-page-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 4px 2px 14px; }
+  .ov-page-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 4px 2px 16px; }
   .ov-page-week { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); }
-  .ov-page-title { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.4px; margin-top: 2px; }
+  .ov-page-title { font-family: var(--font); font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-top: 2px; }
   .ov-edit-btn { font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
   .ov-page-head-actions { display: flex; align-items: center; gap: 10px; }
   .ov-gear-btn { font-size: 20px; line-height: 1; color: var(--muted); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
   .ov-gear-btn:active { color: var(--accent); }
-  .ov-build-stamp { font-family: var(--font); font-size: 10px; color: var(--muted); opacity: 0.5; text-align: right; margin: -8px 2px 8px; }
+  .ov-build-stamp { font-family: var(--font); font-size: 9px; color: var(--muted); opacity: 0.3; text-align: right; margin: -10px 2px 10px; }
 
   /* Big activity-ring hero (Apple Fitness style) - sits directly on the
      page background, no card box, so it reads as clearly primary versus
      the widget board below it. */
-  .ov-ring-hero { display: flex; align-items: center; gap: 16px; padding: 4px 2px 22px; cursor: pointer; }
+  .ov-ring-hero { display: flex; align-items: center; gap: 18px; padding: 4px 2px 28px; cursor: pointer; }
   .ov-ring-hero:active { opacity: 0.85; }
   .ov-ring { flex-shrink: 0; width: 128px; height: 128px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; background: conic-gradient(var(--accent) calc(var(--pct, 0) * 3.6deg), var(--surface2) 0deg); transition: background 0.6s ease; }
   .ov-ring.behind { background: conic-gradient(var(--red) calc(var(--pct, 0) * 3.6deg), var(--surface2) 0deg); }
   .ov-ring::after { content: ''; position: absolute; inset: 11px; background: var(--bg); border-radius: 50%; }
   .ov-ring-center { position: relative; z-index: 1; text-align: center; }
-  .ov-ring-num { font-family: var(--font); font-size: 30px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
-  .ov-ring-target { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .ov-ring-num { font-family: var(--font); font-size: 34px; font-weight: 800; letter-spacing: -0.6px; line-height: 1; }
+  .ov-ring-target { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 4px; }
   .ov-ring-info { flex: 1; min-width: 0; }
-  .ov-ring-info-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 16px; }
+  .ov-ring-info-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 18px; }
   .ov-ring-title { font-family: var(--font); font-size: 15px; font-weight: 700; }
   .ov-ring-stats { display: flex; align-items: flex-end; gap: 18px; }
-  .ov-ring-stat-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+  .ov-ring-stat-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; opacity: 0.8; }
   .ov-ring-stat-value { font-family: var(--font); font-size: 19px; font-weight: 800; letter-spacing: -0.2px; }
   .ov-ring-stat-value.ahead { color: var(--green); }
   .ov-ring-stat-value.behind { color: var(--red); }
@@ -205,14 +205,18 @@
 
   /* Resizable widget board (small/wide/large) - a real bento grid instead
      of a stack of identical cards. Resizing and reordering both live
-     behind the Edit button, not cluttering the normal view. */
-  .ov-board { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
-  .ov-widget { position: relative; background: var(--surface); border-radius: 20px; border: 1px solid rgba(245,230,210,0.06); padding: 14px 16px; grid-column: span 2; transition: background 0.15s; }
+     behind the Edit button, not cluttering the normal view. Cards carry
+     no visible border in normal use (just a soft fill + generous
+     spacing) so the board reads as one continuous surface rather than a
+     stack of boxes - the border only appears while actively rearranging,
+     as a functional "this one's selected" cue, not a permanent outline. */
+  .ov-board { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 16px; }
+  .ov-widget { position: relative; background: var(--surface); border-radius: 22px; border: 1px solid transparent; padding: 16px 18px; grid-column: span 2; transition: background 0.15s; }
   .ov-widget[data-size="small"] { grid-column: span 1; }
   .ov-widget[onclick] { cursor: pointer; }
   .ov-board:not(.editing) .ov-widget[onclick]:active { background: var(--surface2); }
-  .ov-widget-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
-  .ov-widget-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .ov-widget-label { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 12px; opacity: 0.8; }
+  .ov-widget-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .ov-widget-head .ov-widget-label { margin-bottom: 0; }
   .ov-widget-compact { display: none; font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
   .ov-widget[data-size="small"] .sp-playlists,
@@ -593,7 +597,7 @@
   </div>
 
   <div class="ov-board" id="ovBoard">
-    <div class="ov-widget" data-widget="spotify" data-size="wide" onclick="handleWidgetTap(event, 'music')">
+    <div class="ov-widget" data-widget="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
       <div class="ov-widget-edit-bar">
         <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
         <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
@@ -624,13 +628,13 @@
       </div>
     </div>
 
-    <div class="ov-widget" data-widget="upcoming" data-size="wide" onclick="handleWidgetTap(event, 'calendar')">
+    <div class="ov-widget" data-widget="weight" data-size="small" onclick="handleWidgetTap(event, 'weight')">
       <div class="ov-widget-edit-bar">
         <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
         <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
       </div>
-      <div class="ov-widget-label">Upcoming</div>
-      <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-widget-label">Weight</div>
+      <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
       <div class="ov-widget-sizepicker">
         <button onclick="setWidgetSize(event, this, 'small')">Small</button>
         <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
@@ -638,13 +642,13 @@
       </div>
     </div>
 
-    <div class="ov-widget" data-widget="weight" data-size="wide" onclick="handleWidgetTap(event, 'weight')">
+    <div class="ov-widget" data-widget="upcoming" data-size="wide" onclick="handleWidgetTap(event, 'calendar')">
       <div class="ov-widget-edit-bar">
         <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
         <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
       </div>
-      <div class="ov-widget-label">Weight</div>
-      <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-widget-label">Upcoming</div>
+      <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
       <div class="ov-widget-sizepicker">
         <button onclick="setWidgetSize(event, this, 'small')">Small</button>
         <button onclick="setWidgetSize(event, this, 'wide')">Wide</button>
@@ -698,7 +702,7 @@
       </div>
     </div>
 
-    <div class="ov-widget" data-widget="kitchen" data-size="wide" onclick="handleWidgetTap(event, 'kitchen')">
+    <div class="ov-widget" data-widget="kitchen" data-size="small" onclick="handleWidgetTap(event, 'kitchen')">
       <div class="ov-widget-edit-bar">
         <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
         <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
@@ -712,7 +716,7 @@
       </div>
     </div>
 
-    <div class="ov-widget" data-widget="shopping" data-size="wide" onclick="handleShoppingWidgetTap(event)">
+    <div class="ov-widget" data-widget="shopping" data-size="small" onclick="handleShoppingWidgetTap(event)">
       <div class="ov-widget-edit-bar">
         <button class="ov-widget-move" onclick="moveWidget(event, this, -1)">▲</button>
         <button class="ov-widget-move" onclick="moveWidget(event, this, 1)">▼</button>
@@ -5567,7 +5571,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-nav-reorder-kitchen-cleanup';
+const APP_BUILD_VERSION = '2026-08-12-overview-redesign';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
