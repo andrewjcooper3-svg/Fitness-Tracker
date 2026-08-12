@@ -2950,18 +2950,33 @@ function neededQty_(ing) {
   return (ing.qty != null && ing.qty !== '') ? Number(ing.qty) : 0;
 }
 
+// Rounds up to 2 decimal places - conservative in both directions a
+// converted quantity gets used: as a needed amount, it never
+// undershoots (so "can I make this" / the shopping shortfall don't
+// read yes/covered on a razor-thin margin that unit-conversion rounding
+// could tip the wrong way), and as the amount actually subtracted from
+// inventory when logging a meal made, it means tracked stock trends
+// slightly low over time rather than silently drifting optimistic.
+function roundUpQty_(n) {
+  return Math.ceil(n * 100) / 100;
+}
+
 // The ingredient's needed amount, converted into whatever unit the
 // resolved inventory item is actually tracked in - a recipe calling for
 // "5 oz" of cheese against half a pound in stock needs to compare 5oz
 // to 8oz (0.5lb), not 5 to 0.5. Falls back to the raw number when there's
 // no item yet, or the two units aren't convertible (e.g. "2 cloves" vs
 // an item tracked in "oz") - same behavior as before unit conversion
-// existed, since there's nothing sensible to convert in that case.
+// existed, since there's nothing sensible to convert in that case. The
+// conversion result is rounded up (never the raw, already-clean number
+// typed straight into a recipe) since unit math is the one place
+// floating-point drift or an unlucky fraction could otherwise round in
+// your favor.
 function neededQtyInItemUnit_(ing, item) {
   const raw = neededQty_(ing);
   if (!item) return raw;
   const converted = convertQty_(raw, ing.unit, item.unit);
-  return converted != null ? converted : raw;
+  return converted != null ? roundUpQty_(converted) : raw;
 }
 
 // Rounds to 2 decimal places and drops trailing zeros (2.5 stays 2.5,
@@ -5222,7 +5237,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-unit-conversion-made-this';
+const APP_BUILD_VERSION = '2026-08-12-conservative-rounding';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
