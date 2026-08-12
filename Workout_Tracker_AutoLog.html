@@ -256,17 +256,25 @@
   .ov-list-row .sp-playlists, .ov-list-row .sp-np-artist { display: none; }
   .ov-list-row .sp-status-dot { flex-shrink: 0; }
 
-  /* ---- v3 Overview: two gradient hero cards + a colorful tile grid ---- */
-  .ov-hero-card { border-radius: 24px; padding: 18px 20px; margin-bottom: 14px; color: #fff; cursor: pointer; position: relative; }
+  /* ---- v3 Overview: two gradient hero cards + a colorful tile grid ----
+     Sized to fit a modern phone screen with no scrolling - every
+     padding/gap/font-size here was deliberately trimmed down from a
+     looser first pass. ov-page-head/ov-build-stamp/ov-note are shared
+     with other tabs, so their spacing is trimmed here via a scoped
+     override rather than editing the shared base rule. */
+  #view-overview .ov-page-head { padding-bottom: 8px; }
+  #view-overview .ov-build-stamp { margin-bottom: 4px; }
+  #view-overview .ov-note { margin-top: 6px; }
+  .ov-hero-card { border-radius: 20px; padding: 11px 14px; margin-bottom: 8px; color: #fff; cursor: pointer; position: relative; }
   .ov-hero-card:active { opacity: 0.92; }
   .ov-hero-pushup { background: linear-gradient(135deg, #ff9466, #dd4a3f); }
   .ov-hero-water { background: linear-gradient(135deg, #52c6f5, #0d7fc9); cursor: default; }
-  .ov-hero-card-label { font-family: var(--font); font-size: 13px; font-weight: 700; opacity: 0.92; margin-bottom: 10px; }
-  .ov-hero-card-number { font-family: var(--font); font-size: 40px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
-  .ov-hero-card-sub { font-family: var(--font); font-size: 13px; font-weight: 600; opacity: 0.85; margin-top: 4px; }
-  .ov-hero-progress { height: 8px; background: rgba(255,255,255,0.25); border-radius: 5px; margin-top: 14px; overflow: hidden; }
-  .ov-hero-progress-fill { height: 100%; background: #fff; border-radius: 5px; transition: width 0.6s ease; }
-  .ov-hero-card-status { font-family: var(--font); font-size: 12.5px; font-weight: 600; opacity: 0.9; margin-top: 10px; }
+  .ov-hero-card-label { font-family: var(--font); font-size: 12px; font-weight: 700; opacity: 0.92; margin-bottom: 4px; }
+  .ov-hero-card-number { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.6px; line-height: 1; }
+  .ov-hero-card-sub { font-family: var(--font); font-size: 12px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
+  .ov-hero-progress { height: 6px; background: rgba(255,255,255,0.25); border-radius: 3px; margin-top: 7px; overflow: hidden; }
+  .ov-hero-progress-fill { height: 100%; background: #fff; border-radius: 3px; transition: width 0.6s ease; }
+  .ov-hero-card-status { font-family: var(--font); font-size: 11.5px; font-weight: 600; opacity: 0.9; margin-top: 6px; }
 
   /* Water's ring/buttons/chart were tuned for the old neutral surface
      background - lighten everything so it still reads clearly sitting
@@ -284,41 +292,47 @@
   /* Colorful icon-tile grid for everything else - each category gets
      its own tinted icon chip so the page reads at a glance, bento-style,
      instead of a flat monochrome list. */
-  .ov-tile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
-  .ov-tile { background: var(--surface); border-radius: 20px; padding: 14px 16px; cursor: pointer; transition: background 0.15s; }
+  .ov-tile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
+  .ov-tile { background: var(--surface); border-radius: 16px; padding: 9px 11px; cursor: pointer; transition: background 0.15s; position: relative; }
   .ov-tile:active { background: var(--surface2); }
   .ov-tile-wide { grid-column: span 2; }
-  .ov-tile-icon { width: 36px; height: 36px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 10px; }
+  .ov-tile-icon { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; line-height: 1; margin-bottom: 5px; }
   .ov-tile-icon.c-weight { background: rgba(183,148,246,0.24); }
   .ov-tile-icon.c-kitchen { background: rgba(245,185,66,0.24); }
   .ov-tile-icon.c-shopping { background: rgba(107,207,127,0.24); }
   .ov-tile-icon.c-upcoming { background: rgba(244,114,182,0.24); }
-  .ov-tile-label { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .ov-tile-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.8; margin-bottom: 2px; }
   .ov-tile .sp-np-artist, .ov-tile .sp-playlists { display: none; }
-  .ov-tile .sp-np-art-wrap { width: 36px; height: 36px; border-radius: 11px; margin-bottom: 10px; }
-  .ov-tile .sp-np-title { font-size: 13px; }
+  .ov-tile .sp-np-art-wrap { width: 26px; height: 26px; border-radius: 8px; margin-bottom: 5px; }
+  .ov-tile .sp-np-title { font-size: 12.5px; }
+  .ov-tile .ov-mini-empty { font-size: 12px; padding: 0; line-height: 1.3; }
+  .ov-tile .ov-mini-weight-value { font-size: 19px; }
+  /* Status dot moves to a small corner badge instead of sitting inline
+     next to the label - inline made the Spotify label sit visually
+     heavier/offset compared to every other tile's plain one-word label. */
+  .ov-tile .sp-status-dot { position: absolute; top: 13px; right: 13px; }
 
   /* Water widget - same ring-on-the-left layout as the Pushups hero,
      scaled down to widget size, with tap-to-log buttons standing in
      for the hero's stat column, plus an hourly bar chart below. */
   .wt-undo-btn { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); background: none; border: none; cursor: pointer; padding: 4px 2px; }
   .wt-undo-btn:active { color: var(--text); }
-  .wt-body { display: flex; align-items: center; gap: 14px; }
-  .wt-ring { flex-shrink: 0; width: 86px; height: 86px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; background: conic-gradient(var(--teal) calc(var(--pct, 0) * 3.6deg), var(--surface2) 0deg); transition: background 0.6s ease; }
-  .wt-ring::after { content: ''; position: absolute; inset: 8px; background: var(--surface); border-radius: 50%; }
+  .wt-body { display: flex; align-items: center; gap: 8px; }
+  .wt-ring { flex-shrink: 0; width: 62px; height: 62px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; background: conic-gradient(var(--teal) calc(var(--pct, 0) * 3.6deg), var(--surface2) 0deg); transition: background 0.6s ease; }
+  .wt-ring::after { content: ''; position: absolute; inset: 6px; background: var(--surface); border-radius: 50%; }
   .wt-ring-center { position: relative; z-index: 1; text-align: center; }
-  .wt-ring-num { font-family: var(--font); font-size: 19px; font-weight: 800; letter-spacing: -0.3px; line-height: 1; }
-  .wt-ring-target { font-family: var(--font); font-size: 10px; color: var(--muted); margin-top: 3px; }
-  .wt-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
-  .wt-add-btn { font-family: var(--font); font-size: 14px; font-weight: 700; color: white; background: var(--teal); border: none; border-radius: 12px; padding: 10px 0; cursor: pointer; width: 100%; }
+  .wt-ring-num { font-family: var(--font); font-size: 14px; font-weight: 800; letter-spacing: -0.3px; line-height: 1; }
+  .wt-ring-target { font-family: var(--font); font-size: 8.5px; color: var(--muted); margin-top: 2px; }
+  .wt-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .wt-add-btn { font-family: var(--font); font-size: 12.5px; font-weight: 700; color: white; background: var(--teal); border: none; border-radius: 10px; padding: 7px 0; cursor: pointer; width: 100%; }
   .wt-add-btn:active { opacity: 0.8; }
-  .wt-add-btn-secondary { font-size: 12.5px; font-weight: 600; color: var(--teal); background: rgba(91,154,148,0.14); padding: 8px 0; }
+  .wt-add-btn-secondary { font-size: 11.5px; font-weight: 600; color: var(--teal); background: rgba(91,154,148,0.14); padding: 6px 0; }
   .wt-btn-net { font-weight: 500; opacity: 0.75; }
   .wt-note { font-family: var(--font); font-size: 11px; color: var(--muted); text-align: center; }
-  .wt-chart-wrap { margin-top: 14px; }
-  .wt-chart { width: 100%; height: 64px; display: block; overflow: visible; }
-  .wt-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 10px; color: var(--muted); margin-top: 4px; }
-  .wt-chart-detail { font-family: var(--font); font-size: 11.5px; color: var(--text); margin-top: 7px; min-height: 15px; }
+  .wt-chart-wrap { margin-top: 6px; }
+  .wt-chart { width: 100%; height: 26px; display: block; overflow: visible; }
+  .wt-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 9.5px; color: var(--muted); margin-top: 2px; }
+  .wt-chart-detail { font-family: var(--font); font-size: 10.5px; color: var(--text); margin-top: 4px; min-height: 13px; }
   .wt-btn-row { display: flex; align-items: stretch; gap: 6px; }
   .wt-btn-row .wt-add-btn { flex: 1; }
   .wt-stepper { flex-shrink: 0; width: 30px; font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--muted); background: var(--surface2); border: none; border-radius: 9px; cursor: pointer; }
@@ -688,11 +702,12 @@
     </div>
 
     <div class="ov-tile" data-widget="spotify" onclick="handleWidgetTap(event, 'music')">
+      <span class="sp-status-dot" id="spStatusDot"></span>
       <div class="sp-np-art-wrap ov-tile-icon">
         <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
         <div class="sp-np-art-fallback" id="spNpArtFallback">🎵</div>
       </div>
-      <div class="ov-tile-label">Spotify <span class="sp-status-dot" id="spStatusDot"></span></div>
+      <div class="ov-tile-label">Spotify</div>
       <div class="sp-np-title" id="spNpTitle">Not connected</div>
       <div class="sp-np-artist" id="spNpArtist"></div>
       <div class="sp-playlists" id="spPlaylistTiles"><div class="sp-playlists-empty">Pin playlists in the Music tab</div></div>
@@ -5554,7 +5569,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-overview-v3-color-refresh';
+const APP_BUILD_VERSION = '2026-08-12-overview-v3-compact-fit';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
