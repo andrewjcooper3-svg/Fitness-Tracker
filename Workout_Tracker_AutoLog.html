@@ -1689,6 +1689,16 @@
   </div>
 </div>
 
+<div class="event-modal-overlay" id="ingredientMatchModalOverlay" onclick="closeIngredientMatchModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-title" style="margin-bottom:12px;">Confirm Ingredients</div>
+    <div id="ingredientMatchModalBody"></div>
+    <button class="config-save" style="width:100%; margin-top:4px;" onclick="confirmIngredientMatchModal()">Confirm &amp; Log</button>
+    <button class="event-modal-close" onclick="closeIngredientMatchModal(event)">Cancel</button>
+  </div>
+</div>
+
 <div class="event-modal-overlay" id="bodyHealthDetailModalOverlay" onclick="closeBodyHealthDetailModal(event)">
   <div class="event-modal-sheet" onclick="event.stopPropagation()">
     <div class="event-modal-handle"></div>
@@ -2837,6 +2847,10 @@ function renderIngredientEditor() {
   const inventory = loadInventory();
   el.innerHTML = editingIngredients.map((ing, i) => {
     const options = inventory.map(it => `<option value="${it.id}" ${ing.inventoryId === it.id ? 'selected' : ''}>${escapeHtml_(it.name)}</option>`).join('');
+    const suggestion = ing.name ? findUncertainIngredientMatch_(ing, inventory) : null;
+    const suggestionHtml = suggestion
+      ? `<div class="ov-mini-empty" style="margin-top:2px;">Did you mean "${escapeHtml_(suggestion.name)}"? <a href="#" onclick="editingIngredients[${i}].inventoryId='${suggestion.id}'; renderIngredientEditor(); return false;">Use it</a></div>`
+      : '';
     return `<div class="ingredient-row">
       <div class="ingredient-row-top">
         <input type="text" class="config-input" value="${escapeHtml_(ing.name || '')}" placeholder="Ingredient" oninput="editingIngredients[${i}].name=this.value">
@@ -2850,6 +2864,7 @@ function renderIngredientEditor() {
         <input type="text" class="config-input" value="${escapeHtml_(ing.unit || '')}" placeholder="Unit" oninput="editingIngredients[${i}].unit=this.value">
         <label class="kitchen-checkbox-label"><input type="checkbox" ${ing.notTracked ? 'checked' : ''} onchange="editingIngredients[${i}].notTracked=this.checked"> Staple</label>
       </div>
+      ${suggestionHtml}
     </div>`;
   }).join('');
 }
@@ -2867,16 +2882,17 @@ function removeIngredientRow(i) {
 // An unlinked ingredient is invisibly excluded from the shortage check
 // entirely (see getRecipeStatus) - which means a recipe whose ingredients
 // were never manually linked to an inventory item will *always* show
-// "Ready to make," no matter what's actually in stock. Auto-linking by an
-// exact (case-insensitive) name match closes that gap for the common case
-// of typing/importing an ingredient whose name matches an inventory item
-// you already have, without requiring a manual pick from the dropdown.
+// "Ready to make," no matter what's actually in stock. Auto-linking by a
+// "confident" name match (see classifyIngredientMatch_) closes that gap
+// for the common case of typing/importing an ingredient whose name
+// matches - or is a plain subset of - an inventory item you already
+// have, without requiring a manual pick from the dropdown. A merely
+// "uncertain" match is deliberately left unlinked here - it surfaces
+// instead as a "did you mean...?" suggestion for you to confirm.
 function autoLinkIngredients_(ingredients, inventory) {
-  const byName = {};
-  inventory.forEach(it => { byName[it.name.trim().toLowerCase()] = it; });
   ingredients.forEach(ing => {
     if (ing.inventoryId || ing.notTracked || !ing.name) return;
-    const match = byName[ing.name.trim().toLowerCase()];
+    const match = inventory.find(it => classifyIngredientMatch_(ing.name, it.name) === 'confident');
     if (match) ing.inventoryId = match.id;
   });
 }
@@ -3000,37 +3016,146 @@ function formatBuyAmount_(amount, unit, item) {
   return `${base} (${packages} ${label})`;
 }
 
+const INGREDIENT_MATCH_STOPWORDS_ = new Set(['a', 'an', 'of', 'the', 'with', 'and', 'for']);
+
+// Words that only ever narrow *how* an item is described, never *what*
+// it fundamentally is - safe to ignore when an inventory item's name
+// carries one but the ingredient's name doesn't (e.g. ingredient "Greek
+// Yogurt" vs item "Organic Greek Yogurt Plain"). A word NOT in this list
+// (almond, vanilla, skim, chocolate, unsweetened...) is treated as a real
+// distinguishing word, since silently substituting those could actually
+// change what gets cooked (dairy milk vs almond milk is not "the same
+// ingredient, extra detail").
+const INGREDIENT_SAFE_DESCRIPTORS_ = new Set([
+  'organic', 'natural', 'fresh', 'raw', 'pure', 'plain', 'whole',
+  'large', 'small', 'medium', 'extra', 'fine', 'coarse',
+  'free', 'range', 'grass', 'fed', 'cage', 'non', 'gmo', 'local'
+]);
+
+// Naive singularization - just enough to cover common recipe/grocery
+// plurals ("tomatoes" -> "tomato", "cherries" -> "cherry", "boxes" ->
+// "box") without pulling in a real NLP library for one word-ending check.
+function singularizeToken_(t) {
+  if (t.length > 4 && t.endsWith('ies')) return t.slice(0, -3) + 'y';
+  if (t.length > 4 && /(oes|ses|xes|ches|shes|zes)$/.test(t)) return t.slice(0, -2);
+  if (t.length > 3 && t.endsWith('s') && !t.endsWith('ss')) return t.slice(0, -1);
+  return t;
+}
+
+function tokenizeIngredientName_(name) {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(t => !INGREDIENT_MATCH_STOPWORDS_.has(t))
+    .map(singularizeToken_);
+}
+
+function ingredientMatchOverlapScore_(ingTokens, itemTokens) {
+  const itemSet = new Set(itemTokens);
+  const intersectionSize = ingTokens.filter(t => itemSet.has(t)).length;
+  const unionSize = new Set(ingTokens.concat(itemTokens)).size;
+  return unionSize ? intersectionSize / unionSize : 0;
+}
+
+// Classifies how well an ingredient name matches an inventory item name:
+//  'confident' - every word the ingredient asks for is present in the
+//                item, and any extra words the item adds are just safe
+//                descriptors (organic, plain, size, ...) - fine to
+//                auto-link without asking.
+//  'uncertain' - the names clearly share the same core item, but the
+//                item is missing (or adds) something specific enough
+//                that it could be wrong - e.g. ingredient "Vanilla Greek
+//                Yogurt" vs item "Plain Greek Yogurt", or ingredient
+//                "Milk" vs item "Almond Milk". Worth a quick confirm
+//                rather than a silent guess either way.
+//  null        - not related enough to suggest at all.
+function classifyIngredientMatch_(ingName, itemName) {
+  const ingTokens = tokenizeIngredientName_(ingName);
+  const itemTokens = tokenizeIngredientName_(itemName);
+  if (!ingTokens.length || !itemTokens.length) return null;
+  const ingSet = new Set(ingTokens);
+  const itemSet = new Set(itemTokens);
+  const isSubset = (tokens, set) => tokens.every(t => set.has(t));
+
+  if (isSubset(ingTokens, itemSet)) {
+    const extras = itemTokens.filter(t => !ingSet.has(t));
+    return extras.every(t => INGREDIENT_SAFE_DESCRIPTORS_.has(t)) ? 'confident' : 'uncertain';
+  }
+  if (isSubset(itemTokens, ingSet)) return 'uncertain';
+
+  const score = ingredientMatchOverlapScore_(ingTokens, itemTokens);
+  return score >= 0.4 ? 'uncertain' : null;
+}
+
 // Resolves an ingredient to a real inventory item without requiring it to
-// have ever been explicitly linked: an inventoryId (set by hand, or by
-// autoLinkIngredients_ below) is tried first since it survives an
-// inventory item later being renamed, but falls back to a live name match
-// (exact, then naive singular/plural) so an ingredient that was simply
-// typed - never linked at all - still resolves correctly every time this
-// runs. The dropdown in the ingredient editor is only needed to override
-// this when a name genuinely doesn't match (e.g. recipe says "Pasta",
-// inventory has "Fusilli"), not as a required step.
+// have ever been explicitly linked: an inventoryId (set by hand, by
+// autoLinkIngredients_, or by confirming a suggested match) is tried
+// first since it survives an inventory item later being renamed, but
+// falls back to a live "confident" name match so an ingredient that was
+// simply typed - never linked at all - still resolves correctly every
+// time this runs. Anything only "uncertain" is deliberately NOT resolved
+// here - see findUncertainIngredientMatch_ - since guessing wrong on a
+// distinguishing word (flavor, dairy vs. non-dairy, ...) is worse than
+// asking once.
 function resolveIngredientInventoryItem_(ing, inventory) {
   if (ing.inventoryId) {
     const linked = inventory.find(it => it.id === ing.inventoryId);
     if (linked) return linked;
   }
-  const name = (ing.name || '').trim().toLowerCase();
+  const name = (ing.name || '').trim();
   if (!name) return null;
-  const norm = s => s.trim().toLowerCase().replace(/s$/, '');
-  return inventory.find(it => it.name.trim().toLowerCase() === name)
-    || inventory.find(it => norm(it.name) === norm(name))
-    || null;
+  return inventory.find(it => classifyIngredientMatch_(name, it.name) === 'confident') || null;
 }
 
-function getRecipeStatus(recipe) {
+// Best "uncertain" candidate for an ingredient that isn't already
+// confidently resolved - surfaced as a "did you mean...?" suggestion in
+// the recipe editor and the Made This flow, never auto-applied.
+function findUncertainIngredientMatch_(ing, inventory) {
+  if (ing.inventoryId || ing.notTracked) return null;
+  const name = (ing.name || '').trim();
+  if (!name || resolveIngredientInventoryItem_(ing, inventory)) return null;
+  const ingTokens = tokenizeIngredientName_(name);
+  let best = null;
+  let bestScore = -1;
+  inventory.forEach(it => {
+    if (classifyIngredientMatch_(name, it.name) !== 'uncertain') return;
+    const score = ingredientMatchOverlapScore_(ingTokens, tokenizeIngredientName_(it.name));
+    if (score > bestScore) { bestScore = score; best = it; }
+  });
+  return best;
+}
+
+// oneTimeLinks (optional): { ingredientName: inventoryItemId } - a
+// substitution the user confirmed for just this one cook (see the
+// ingredient-match modal in logMealMade/handleMadeThisClick_), applied
+// on top of resolveIngredientInventoryItem_ without changing the
+// recipe's own ingredient link.
+function resolveIngredientForLog_(ing, inventory, oneTimeLinks) {
+  if (!ing.inventoryId && oneTimeLinks && oneTimeLinks[ing.name]) {
+    const item = inventory.find(it => it.id === oneTimeLinks[ing.name]);
+    if (item) return item;
+  }
+  return resolveIngredientInventoryItem_(ing, inventory);
+}
+
+function getRecipeStatus(recipe, oneTimeLinks) {
   const inventory = loadInventory();
   const missing = [];
+  const suggestions = [];
   recipe.ingredients.forEach(ing => {
     if (ing.notTracked) return;
-    const item = resolveIngredientInventoryItem_(ing, inventory);
-    if (!item || item.qty <= 0 || item.qty < neededQtyInItemUnit_(ing, item)) missing.push(ing.name);
+    const item = resolveIngredientForLog_(ing, inventory, oneTimeLinks);
+    if (!item || item.qty <= 0 || item.qty < neededQtyInItemUnit_(ing, item)) {
+      missing.push(ing.name);
+      if (!item) {
+        const suggestion = findUncertainIngredientMatch_(ing, inventory);
+        if (suggestion) suggestions.push({ ingredientName: ing.name, item: suggestion });
+      }
+    }
   });
-  return { canMake: missing.length === 0, missing };
+  return { canMake: missing.length === 0, missing, suggestions };
 }
 
 function renderRecipeList() {
@@ -3060,7 +3185,7 @@ function renderRecipeList() {
         <div class="recipe-card-actions">
           <button class="kitchen-btn-sm${planned ? ' kitchen-btn-active' : ''}" onclick="togglePlannedMeal('${r.id}')">${planned ? '✓ Planned' : 'Plan Meal'}</button>
           <button class="kitchen-btn-sm" onclick="openRecipeDetailModal('${r.id}')">View</button>
-          <button class="kitchen-btn-sm" onclick="logMealMade('${r.id}')">Made This</button>
+          <button class="kitchen-btn-sm" onclick="handleMadeThisClick_('${r.id}')">Made This</button>
           <button class="kitchen-btn-sm" onclick="editRecipe('${r.id}')">Edit</button>
           <button class="weight-history-del" onclick="deleteRecipe('${r.id}')">×</button>
         </div>
@@ -3069,22 +3194,44 @@ function renderRecipeList() {
   }).join('');
 }
 
+// Called by the Made This button instead of logMealMade directly - if
+// any ingredient isn't in stock but has a plausible ("uncertain") match
+// in inventory (e.g. recipe wants "Vanilla Greek Yogurt", you only have
+// "Plain Greek Yogurt"), this pauses to ask before logging rather than
+// either guessing the substitution or just reporting a shortage you
+// could actually cover. A recipe with no such ambiguity logs immediately
+// exactly as before.
+function handleMadeThisClick_(recipeId) {
+  const recipe = loadRecipes().find(r => r.id === recipeId);
+  if (!recipe) return;
+  const status = getRecipeStatus(recipe);
+  if (status.suggestions.length === 0) {
+    logMealMade(recipeId);
+    return;
+  }
+  openIngredientMatchModal_(recipeId, status.suggestions);
+}
+
 // No blocking confirm() here on purpose - a native confirm dialog is
 // known to be unreliable (can silently no-op) inside a Home Screen-
 // installed web app, which is exactly how this app is meant to be used.
 // Logging always goes through immediately; a shortage is reported
 // afterward as a status message instead of gating the action itself.
-function logMealMade(recipeId) {
+//
+// oneTimeLinks (optional): { ingredientName: inventoryItemId }, from
+// confirming a suggested substitution in the ingredient-match modal
+// without choosing "always use this" - applies only to this one log.
+function logMealMade(recipeId, oneTimeLinks) {
   const recipe = loadRecipes().find(r => r.id === recipeId);
   if (!recipe) return;
 
-  const status = getRecipeStatus(recipe);
+  const status = getRecipeStatus(recipe, oneTimeLinks);
   const inventory = loadInventory();
 
   const used = [];
   recipe.ingredients.forEach(ing => {
     if (ing.notTracked) return;
-    const item = resolveIngredientInventoryItem_(ing, inventory);
+    const item = resolveIngredientForLog_(ing, inventory, oneTimeLinks);
     if (item) {
       const usedQty = neededQtyInItemUnit_(ing, item);
       item.qty = Math.max(0, item.qty - usedQty);
@@ -3195,8 +3342,65 @@ function closeRecipeDetailModal(event) {
 }
 
 function logMealMadeFromModal() {
-  if (recipeDetailId) logMealMade(recipeDetailId);
+  if (recipeDetailId) handleMadeThisClick_(recipeDetailId);
   closeRecipeDetailModal();
+}
+
+/* ---- Ingredient match confirmation (Made This substitutions) ---- */
+
+let ingredientMatchModalRecipeId_ = null;
+let ingredientMatchModalChoices_ = [];
+
+function openIngredientMatchModal_(recipeId, suggestions) {
+  ingredientMatchModalRecipeId_ = recipeId;
+  ingredientMatchModalChoices_ = suggestions.map(s => ({ ingredientName: s.ingredientName, item: s.item, use: true, always: false }));
+  renderIngredientMatchModal_();
+  document.getElementById('ingredientMatchModalOverlay').classList.add('open');
+}
+
+function renderIngredientMatchModal_() {
+  const el = document.getElementById('ingredientMatchModalBody');
+  el.innerHTML = ingredientMatchModalChoices_.map((c, i) => `
+    <div class="settings-field" style="margin-bottom:14px;">
+      <div class="sp-config-label" style="margin:0 0 6px;">"${escapeHtml_(c.ingredientName)}" isn't in stock. Use "${escapeHtml_(c.item.name)}" instead?</div>
+      <label class="kitchen-checkbox-label"><input type="checkbox" ${c.use ? 'checked' : ''} onchange="ingredientMatchModalChoices_[${i}].use=this.checked; renderIngredientMatchModal_();"> Use it</label>
+      <label class="kitchen-checkbox-label" style="margin-left:14px;${c.use ? '' : ' opacity:0.4; pointer-events:none;'}"><input type="checkbox" ${c.always ? 'checked' : ''} ${c.use ? '' : 'disabled'} onchange="ingredientMatchModalChoices_[${i}].always=this.checked;"> Always use this match</label>
+    </div>`).join('');
+}
+
+function closeIngredientMatchModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('ingredientMatchModalOverlay').classList.remove('open');
+  ingredientMatchModalRecipeId_ = null;
+  ingredientMatchModalChoices_ = [];
+}
+
+function confirmIngredientMatchModal() {
+  const recipeId = ingredientMatchModalRecipeId_;
+  const recipes = loadRecipes();
+  const recipe = recipes.find(r => r.id === recipeId);
+  if (!recipe) { closeIngredientMatchModal(); return; }
+
+  let recipeChanged = false;
+  const oneTimeLinks = {};
+
+  ingredientMatchModalChoices_.forEach(c => {
+    if (!c.use) return;
+    if (c.always) {
+      const ing = recipe.ingredients.find(i => i.name === c.ingredientName);
+      if (ing && !ing.inventoryId) { ing.inventoryId = c.item.id; recipeChanged = true; }
+    } else {
+      oneTimeLinks[c.ingredientName] = c.item.id;
+    }
+  });
+
+  if (recipeChanged) {
+    saveRecipesList(recipes);
+    syncRecipeToSheet_(recipe);
+  }
+
+  closeIngredientMatchModal();
+  logMealMade(recipeId, oneTimeLinks);
 }
 
 // TheMealDB (themealdb.com) - free public recipe database, no signup/key
@@ -5236,7 +5440,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-fondue-ingredient-names';
+const APP_BUILD_VERSION = '2026-08-12-lenient-ingredient-matching';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
