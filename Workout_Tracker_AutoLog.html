@@ -256,6 +256,48 @@
   .ov-list-row .sp-playlists, .ov-list-row .sp-np-artist { display: none; }
   .ov-list-row .sp-status-dot { flex-shrink: 0; }
 
+  /* ---- v3 Overview: two gradient hero cards + a colorful tile grid ---- */
+  .ov-hero-card { border-radius: 24px; padding: 18px 20px; margin-bottom: 14px; color: #fff; cursor: pointer; position: relative; }
+  .ov-hero-card:active { opacity: 0.92; }
+  .ov-hero-pushup { background: linear-gradient(135deg, #ff9466, #dd4a3f); }
+  .ov-hero-water { background: linear-gradient(135deg, #52c6f5, #0d7fc9); cursor: default; }
+  .ov-hero-card-label { font-family: var(--font); font-size: 13px; font-weight: 700; opacity: 0.92; margin-bottom: 10px; }
+  .ov-hero-card-number { font-family: var(--font); font-size: 40px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+  .ov-hero-card-sub { font-family: var(--font); font-size: 13px; font-weight: 600; opacity: 0.85; margin-top: 4px; }
+  .ov-hero-progress { height: 8px; background: rgba(255,255,255,0.25); border-radius: 5px; margin-top: 14px; overflow: hidden; }
+  .ov-hero-progress-fill { height: 100%; background: #fff; border-radius: 5px; transition: width 0.6s ease; }
+  .ov-hero-card-status { font-family: var(--font); font-size: 12.5px; font-weight: 600; opacity: 0.9; margin-top: 10px; }
+
+  /* Water's ring/buttons/chart were tuned for the old neutral surface
+     background - lighten everything so it still reads clearly sitting
+     on the blue gradient instead. */
+  .ov-hero-water .wt-ring::after { background: rgba(0,0,0,0.16); }
+  .ov-hero-water .wt-ring-target { color: rgba(255,255,255,0.75); }
+  .ov-hero-water .wt-add-btn { background: rgba(255,255,255,0.24); color: #fff; }
+  .ov-hero-water .wt-add-btn-secondary { background: rgba(255,255,255,0.14); color: #fff; }
+  .ov-hero-water .wt-btn-net { color: rgba(255,255,255,0.8); }
+  .ov-hero-water .wt-stepper { background: rgba(255,255,255,0.16); color: rgba(255,255,255,0.85); }
+  .ov-hero-water .wt-stepper:active { color: #fff; }
+  .ov-hero-water .wt-chart-labels, .ov-hero-water .wt-chart-detail { color: rgba(255,255,255,0.75); }
+  .ov-hero-water .wt-undo-btn { color: rgba(255,255,255,0.85); }
+
+  /* Colorful icon-tile grid for everything else - each category gets
+     its own tinted icon chip so the page reads at a glance, bento-style,
+     instead of a flat monochrome list. */
+  .ov-tile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
+  .ov-tile { background: var(--surface); border-radius: 20px; padding: 14px 16px; cursor: pointer; transition: background 0.15s; }
+  .ov-tile:active { background: var(--surface2); }
+  .ov-tile-wide { grid-column: span 2; }
+  .ov-tile-icon { width: 36px; height: 36px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 10px; }
+  .ov-tile-icon.c-weight { background: rgba(183,148,246,0.24); }
+  .ov-tile-icon.c-kitchen { background: rgba(245,185,66,0.24); }
+  .ov-tile-icon.c-shopping { background: rgba(107,207,127,0.24); }
+  .ov-tile-icon.c-upcoming { background: rgba(244,114,182,0.24); }
+  .ov-tile-label { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .ov-tile .sp-np-artist, .ov-tile .sp-playlists { display: none; }
+  .ov-tile .sp-np-art-wrap { width: 36px; height: 36px; border-radius: 11px; margin-bottom: 10px; }
+  .ov-tile .sp-np-title { font-size: 13px; }
+
   /* Water widget - same ring-on-the-left layout as the Pushups hero,
      scaled down to widget size, with tap-to-log buttons standing in
      for the hero's stat column, plus an hourly bar chart below. */
@@ -586,111 +628,92 @@
   </div>
   <div class="ov-build-stamp" id="ovBuildStamp"></div>
 
-  <!-- One grouped card for the whole page - Water keeps its own richer
-       section (real interactive content: ring, log buttons, chart) but
-       lives inside the same card as everything else now, divided by the
-       same hairline rule instead of floating as a separate box. Every
-       inner id below is unchanged from the old per-widget cards, so all
-       existing render/update functions keep working with zero JS
-       changes - only where each piece sits in the page moved. -->
-  <div class="ov-list-card" id="ovBoard">
-    <div class="ov-list-section">
-      <div class="ov-widget-head">
-        <div class="ov-widget-label">Water</div>
-        <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
-      </div>
-      <div class="wt-body">
-        <div class="wt-ring" id="wtRing">
-          <div class="wt-ring-center">
-            <div class="wt-ring-num" id="wtRingNum">0</div>
-            <div class="wt-ring-target" id="wtRingTarget">of 100 oz</div>
-          </div>
-        </div>
-        <div class="wt-info">
-          <div class="wt-btn-row">
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', -1)">−</button>
-            <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', 1)">+</button>
-          </div>
-          <div class="wt-btn-row">
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', -1)">−</button>
-            <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', 1)">+</button>
-          </div>
-          <div class="wt-btn-row">
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', -1)">−</button>
-            <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
-            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', 1)">+</button>
-          </div>
+  <!-- v3: two bold gradient hero cards (the two things you actually log
+       throughout the day) plus a colorful icon-tile grid below for
+       everything else - a genuine layout + color refresh over the flat
+       monochrome list before it. Every functional id below is unchanged
+       from before, so all existing render/update functions keep working
+       with zero JS logic changes beyond the Pushups card (which gets a
+       new progress-bar target instead of plain text). -->
+  <div class="ov-hero-card ov-hero-pushup" data-widget="pushups" onclick="showAppView('tracker')">
+    <div class="ov-hero-card-label">💪 Pushups this week</div>
+    <div class="ov-hero-card-number" id="ovPushupNumber">0</div>
+    <div class="ov-hero-card-sub" id="ovPushupSub">of 0</div>
+    <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovPushupBar" style="width:0%"></div></div>
+    <div class="ov-hero-card-status" id="ovPushupStatus"></div>
+  </div>
+
+  <div class="ov-hero-card ov-hero-water" id="ovBoard">
+    <div class="ov-widget-head">
+      <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water</div>
+      <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
+    </div>
+    <div class="wt-body">
+      <div class="wt-ring" id="wtRing">
+        <div class="wt-ring-center">
+          <div class="wt-ring-num" id="wtRingNum">0</div>
+          <div class="wt-ring-target" id="wtRingTarget">of 100 oz</div>
         </div>
       </div>
-      <div class="wt-chart-wrap">
-        <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
-        <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
-        <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
+      <div class="wt-info">
+        <div class="wt-btn-row">
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', -1)">−</button>
+          <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', 1)">+</button>
+        </div>
+        <div class="wt-btn-row">
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', -1)">−</button>
+          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', 1)">+</button>
+        </div>
+        <div class="wt-btn-row">
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', -1)">−</button>
+          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
+          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', 1)">+</button>
+        </div>
       </div>
     </div>
+    <div class="wt-chart-wrap">
+      <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
+      <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+      <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
+    </div>
+  </div>
 
-    <div class="ov-list-row" data-widget="pushups" onclick="showAppView('tracker')">
-      <div class="ov-list-row-icon">💪</div>
-      <div class="ov-list-row-body">
-        <div class="ov-list-row-label">Pushups</div>
-        <div id="ovPushupPreview"><div class="ov-mini-empty">Loading…</div></div>
-      </div>
-      <div class="ov-list-row-chevron">›</div>
+  <div class="ov-tile-grid">
+    <div class="ov-tile" data-widget="weight" onclick="handleWidgetTap(event, 'weight')">
+      <div class="ov-tile-icon c-weight">⚖️</div>
+      <div class="ov-tile-label">Weight</div>
+      <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-list-row ov-widget" data-widget="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
-      <div class="sp-np-art-wrap ov-list-row-icon">
+    <div class="ov-tile" data-widget="spotify" onclick="handleWidgetTap(event, 'music')">
+      <div class="sp-np-art-wrap ov-tile-icon">
         <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
         <div class="sp-np-art-fallback" id="spNpArtFallback">🎵</div>
       </div>
-      <div class="ov-list-row-body">
-        <div class="ov-list-row-label">Spotify</div>
-        <div class="sp-np-title" id="spNpTitle">Not connected</div>
-        <div class="sp-np-artist" id="spNpArtist"></div>
-        <div class="sp-playlists" id="spPlaylistTiles">
-          <div class="sp-playlists-empty">Pin playlists in the Music tab</div>
-        </div>
-      </div>
-      <div class="sp-status-dot" id="spStatusDot"></div>
-      <div class="ov-list-row-chevron">›</div>
+      <div class="ov-tile-label">Spotify <span class="sp-status-dot" id="spStatusDot"></span></div>
+      <div class="sp-np-title" id="spNpTitle">Not connected</div>
+      <div class="sp-np-artist" id="spNpArtist"></div>
+      <div class="sp-playlists" id="spPlaylistTiles"><div class="sp-playlists-empty">Pin playlists in the Music tab</div></div>
     </div>
 
-    <div class="ov-list-row ov-widget" data-widget="upcoming" data-size="small" onclick="handleWidgetTap(event, 'calendar')">
-      <div class="ov-list-row-icon">📅</div>
-      <div class="ov-list-row-body">
-        <div class="ov-list-row-label">Upcoming</div>
-        <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
-      </div>
-      <div class="ov-list-row-chevron">›</div>
+    <div class="ov-tile" data-widget="kitchen" onclick="handleWidgetTap(event, 'kitchen')">
+      <div class="ov-tile-icon c-kitchen">🍳</div>
+      <div class="ov-tile-label">Kitchen</div>
+      <div id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-list-row ov-widget" data-widget="weight" data-size="small" onclick="handleWidgetTap(event, 'weight')">
-      <div class="ov-list-row-icon">⚖️</div>
-      <div class="ov-list-row-body">
-        <div class="ov-list-row-label">Weight</div>
-        <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
-      </div>
-      <div class="ov-list-row-chevron">›</div>
+    <div class="ov-tile" data-widget="shopping" onclick="handleShoppingWidgetTap(event)">
+      <div class="ov-tile-icon c-shopping">🛒</div>
+      <div class="ov-tile-label">Shopping</div>
+      <div id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-list-row ov-widget" data-widget="kitchen" data-size="small" onclick="handleWidgetTap(event, 'kitchen')">
-      <div class="ov-list-row-icon">🍳</div>
-      <div class="ov-list-row-body">
-        <div class="ov-list-row-label">Kitchen</div>
-        <div id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
-      </div>
-      <div class="ov-list-row-chevron">›</div>
-    </div>
-
-    <div class="ov-list-row ov-widget" data-widget="shopping" data-size="small" onclick="handleShoppingWidgetTap(event)">
-      <div class="ov-list-row-icon">🛒</div>
-      <div class="ov-list-row-body">
-        <div class="ov-list-row-label">Shopping</div>
-        <div id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
-      </div>
-      <div class="ov-list-row-chevron">›</div>
+    <div class="ov-tile ov-tile-wide" data-widget="upcoming" onclick="handleWidgetTap(event, 'calendar')">
+      <div class="ov-tile-icon c-upcoming">📅</div>
+      <div class="ov-tile-label">Upcoming</div>
+      <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
   </div>
 
@@ -5531,7 +5554,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-overview-unified-card-pushups-in-trainer';
+const APP_BUILD_VERSION = '2026-08-12-overview-v3-color-refresh';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -5680,7 +5703,10 @@ function renderWaterHourlyChart(entries) {
     const hgt = oz > 0 ? Math.max(3, (oz / maxVal) * chartH) : 1;
     const x = h * (barW + barGap);
     const y = chartH - hgt;
-    const color = oz > 0 ? 'var(--teal)' : 'var(--surface2)';
+    // White/translucent instead of --teal now that this chart sits on
+    // the Water hero card's own blue gradient background rather than
+    // the neutral surface color.
+    const color = oz > 0 ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.22)';
     bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hgt.toFixed(1)}" rx="1.5" fill="${color}"></rect>`;
     bars += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${chartH}" fill="transparent" style="cursor:pointer;" onclick="showWaterHourDetail(${h})" onmouseenter="showWaterHourDetail(${h})"></rect>`;
   });
@@ -5820,29 +5846,30 @@ function renderTrainerStats() {
   document.getElementById('ovDaysActive').textContent = `${activeDays} / 7`;
 }
 
-// Same row format as Weight/Kitchen/Shopping below it: a bold headline
-// plus a muted (or ahead/behind-colored) one-line sub-detail - folded in
-// from what used to be its own big ring hero, per feedback that it
-// should read as one more line in the same "summary of my life" list
-// rather than a special standalone widget.
+// Populates the gradient Pushups hero card: big number, a progress bar
+// for this week's target, and a one-line deficit/pace/days-logged
+// status underneath.
 function renderOverviewPushupMini() {
-  const el = document.getElementById('ovPushupPreview');
-  if (!el) return;
+  const numEl = document.getElementById('ovPushupNumber');
+  if (!numEl) return;
 
   const { days, totals } = computeWeekStats();
   const activeDays = days.filter(d => d.setsCompleted > 0).length;
   const stats = computePushupStats();
+  const pct = totals.pushupTarget ? Math.min(100, Math.round(totals.pushupTotal / totals.pushupTarget * 100)) : 0;
 
-  const headline = `<div class="ov-mini-weight-value">${totals.pushupTotal.toLocaleString()} <span style="font-size:13px; font-weight:600; color:var(--muted);">/ ${totals.pushupTarget.toLocaleString()} this week</span></div>`;
+  numEl.textContent = totals.pushupTotal.toLocaleString();
+  document.getElementById('ovPushupSub').textContent = 'of ' + totals.pushupTarget.toLocaleString();
+  document.getElementById('ovPushupBar').style.width = pct + '%';
 
+  const statusEl = document.getElementById('ovPushupStatus');
   if (stats.deficit === null) {
-    el.innerHTML = headline + `<div class="ov-mini-weight-sub">${activeDays}/7 days logged</div>`;
+    statusEl.textContent = `${activeDays}/7 days logged`;
     return;
   }
   const ahead = stats.deficit >= 0;
   const deficitText = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
-  const statusText = ahead ? 'on pace' : 'behind';
-  el.innerHTML = headline + `<div class="ov-mini-weight-sub ${ahead ? 'ahead' : 'behind'}">${deficitText} deficit · ${statusText} · ${activeDays}/7 days logged</div>`;
+  statusEl.textContent = `${deficitText} deficit · ${ahead ? 'on pace' : 'behind'} · ${activeDays}/7 days logged`;
 }
 
 function renderOverviewCalendarPreview() {
