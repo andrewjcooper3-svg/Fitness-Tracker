@@ -152,13 +152,12 @@
   .app-views-track { display: flex; align-items: flex-start; will-change: transform; }
   .app-view { flex: 0 0 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
   #view-overview { order: 0; }
-  #view-pushups { order: 1; }
-  #view-tracker { order: 2; }
-  #view-kitchen { order: 3; }
-  #view-calendar { order: 4; }
-  #view-weight { order: 5; }
-  #view-stats { order: 6; }
-  #view-music { order: 7; }
+  #view-tracker { order: 1; }
+  #view-kitchen { order: 2; }
+  #view-calendar { order: 3; }
+  #view-weight { order: 4; }
+  #view-stats { order: 5; }
+  #view-music { order: 6; }
   /* Hidden for now - see the app-tab comment above. Still in the DOM
      with the rest of its markup/logic untouched, just taken out of the
      swipe flow entirely (order no longer matters while it's display:none). */
@@ -234,19 +233,18 @@
   .ov-widget[data-size="wide"] .ov-widget-sizepicker button:nth-child(2),
   .ov-widget[data-size="large"] .ov-widget-sizepicker button:nth-child(3) { color: var(--accent); border-color: var(--accent); }
 
-  /* Water card - its own full-width card, since it has real interactive
-     content (ring, log buttons, hourly chart) that doesn't reduce to a
-     single line the way everything below it does. */
-  .ov-water-card { background: var(--surface); border-radius: 22px; padding: 16px 18px; margin-bottom: 14px; }
-
-  /* Everything else lives in ONE grouped card as hairline-divided rows,
-     not a separate box per item - the iOS-Settings / Copilot-list
-     pattern, so it reads as a single continuous surface rather than a
-     stack of tiles. Every id inside a row is unchanged from the old
+  /* Everything on Overview lives in ONE grouped card now - hairline-
+     divided sections/rows instead of a separate box per item, the
+     iOS-Settings / Copilot-list pattern, so the whole page reads as a
+     single continuous surface. Water gets a taller ".ov-list-section"
+     (real interactive content: ring, log buttons, hourly chart) while
+     everything else is a compact ".ov-list-row" - both just divided by
+     the same hairline rule. Every id inside is unchanged from the old
      per-widget cards, so the existing render functions (which look up
      an element by id, or read data-size off the closest .ov-widget)
      keep working without any JS changes. */
   .ov-list-card { background: var(--surface); border-radius: 22px; overflow: hidden; margin-bottom: 16px; }
+  .ov-list-section { padding: 16px 18px; border-bottom: 1px solid var(--border); }
   .ov-list-row { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
   .ov-list-row:last-child { border-bottom: none; }
   .ov-list-row:active { background: var(--surface2); }
@@ -588,50 +586,52 @@
   </div>
   <div class="ov-build-stamp" id="ovBuildStamp"></div>
 
-  <div class="ov-water-card">
-    <div class="ov-widget-head">
-      <div class="ov-widget-label">Water</div>
-      <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
-    </div>
-    <div class="wt-body">
-      <div class="wt-ring" id="wtRing">
-        <div class="wt-ring-center">
-          <div class="wt-ring-num" id="wtRingNum">0</div>
-          <div class="wt-ring-target" id="wtRingTarget">of 100 oz</div>
-        </div>
-      </div>
-      <div class="wt-info">
-        <div class="wt-btn-row">
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', -1)">−</button>
-          <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', 1)">+</button>
-        </div>
-        <div class="wt-btn-row">
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', -1)">−</button>
-          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', 1)">+</button>
-        </div>
-        <div class="wt-btn-row">
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', -1)">−</button>
-          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', 1)">+</button>
-        </div>
-      </div>
-    </div>
-    <div class="wt-chart-wrap">
-      <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
-      <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
-      <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
-    </div>
-  </div>
-
-  <!-- One grouped card, hairline-divided rows - no per-row box, so this
-       reads as a single continuous surface (iOS-settings / Copilot-list
-       style) instead of a stack of separate tiles. Every inner id below
-       is unchanged from the old per-widget cards, so all existing
-       render/update functions keep working with zero JS changes. -->
+  <!-- One grouped card for the whole page - Water keeps its own richer
+       section (real interactive content: ring, log buttons, chart) but
+       lives inside the same card as everything else now, divided by the
+       same hairline rule instead of floating as a separate box. Every
+       inner id below is unchanged from the old per-widget cards, so all
+       existing render/update functions keep working with zero JS
+       changes - only where each piece sits in the page moved. -->
   <div class="ov-list-card" id="ovBoard">
-    <div class="ov-list-row" data-widget="pushups" onclick="showAppView('pushups')">
+    <div class="ov-list-section">
+      <div class="ov-widget-head">
+        <div class="ov-widget-label">Water</div>
+        <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
+      </div>
+      <div class="wt-body">
+        <div class="wt-ring" id="wtRing">
+          <div class="wt-ring-center">
+            <div class="wt-ring-num" id="wtRingNum">0</div>
+            <div class="wt-ring-target" id="wtRingTarget">of 100 oz</div>
+          </div>
+        </div>
+        <div class="wt-info">
+          <div class="wt-btn-row">
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', -1)">−</button>
+            <button class="wt-add-btn" id="wtBtnWater" onclick="logWaterIntake(event, 'water')"></button>
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', 1)">+</button>
+          </div>
+          <div class="wt-btn-row">
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', -1)">−</button>
+            <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', 1)">+</button>
+          </div>
+          <div class="wt-btn-row">
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', -1)">−</button>
+            <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
+            <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', 1)">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="wt-chart-wrap">
+        <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
+        <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+        <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
+      </div>
+    </div>
+
+    <div class="ov-list-row" data-widget="pushups" onclick="showAppView('tracker')">
       <div class="ov-list-row-icon">💪</div>
       <div class="ov-list-row-body">
         <div class="ov-list-row-label">Pushups</div>
@@ -695,39 +695,6 @@
   </div>
 
   <div class="ov-note">Reflects what's checked off this week, saved on this device.<br>Automatically resets once a new week begins.</div>
-</div>
-
-<div id="view-pushups" class="app-view">
-  <div class="ov-hero pu-deficit-hero" id="puDeficitHero">
-    <div class="pu-deficit-top">
-      <div class="ov-hero-label">Pushup Deficit</div>
-      <div class="pu-status-badge" id="puStatusBadge">On Pace</div>
-    </div>
-    <div class="ov-hero-week" id="puDeficitSince"></div>
-    <div class="ov-hero-number" id="puDeficitNumber">0</div>
-    <div class="ov-hero-sub" id="puDeficitSub"></div>
-  </div>
-
-  <div class="pu-rings-card">
-    <div class="pu-ring-item">
-      <div class="pu-ring pu-ring-week" id="puWeekRing"><div class="pu-ring-pct" id="puWeekPct">0%</div></div>
-      <div class="pu-ring-label">Week</div>
-      <div class="pu-ring-value" id="puWeekValue">0 / 0</div>
-    </div>
-    <div class="pu-ring-item">
-      <div class="pu-ring pu-ring-month" id="puMonthRing"><div class="pu-ring-pct" id="puMonthPct">0%</div></div>
-      <div class="pu-ring-label">Month</div>
-      <div class="pu-ring-value" id="puMonthValue">0 / 0</div>
-    </div>
-    <div class="pu-ring-item">
-      <div class="pu-ring pu-ring-year" id="puYearRing"><div class="pu-ring-pct" id="puYearPct">0%</div></div>
-      <div class="pu-ring-label">Year</div>
-      <div class="pu-ring-value" id="puYearValue">0 / 50,000</div>
-    </div>
-  </div>
-
-
-  <div class="ov-note">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Year total starts from a 26,395 balance as of Jul 19, plus what's logged here since.</div>
 </div>
 
 <div id="view-calendar" class="app-view">
@@ -801,6 +768,37 @@
     </div>
   </div>
 </div>
+
+<!-- Pushup deficit tracking - moved here from its own top-level tab,
+     since it's exercise data same as everything else on this page. -->
+<div class="ov-hero pu-deficit-hero" id="puDeficitHero">
+  <div class="pu-deficit-top">
+    <div class="ov-hero-label">Pushup Deficit</div>
+    <div class="pu-status-badge" id="puStatusBadge">On Pace</div>
+  </div>
+  <div class="ov-hero-week" id="puDeficitSince"></div>
+  <div class="ov-hero-number" id="puDeficitNumber">0</div>
+  <div class="ov-hero-sub" id="puDeficitSub"></div>
+</div>
+
+<div class="pu-rings-card">
+  <div class="pu-ring-item">
+    <div class="pu-ring pu-ring-week" id="puWeekRing"><div class="pu-ring-pct" id="puWeekPct">0%</div></div>
+    <div class="pu-ring-label">Week</div>
+    <div class="pu-ring-value" id="puWeekValue">0 / 0</div>
+  </div>
+  <div class="pu-ring-item">
+    <div class="pu-ring pu-ring-month" id="puMonthRing"><div class="pu-ring-pct" id="puMonthPct">0%</div></div>
+    <div class="pu-ring-label">Month</div>
+    <div class="pu-ring-value" id="puMonthValue">0 / 0</div>
+  </div>
+  <div class="pu-ring-item">
+    <div class="pu-ring pu-ring-year" id="puYearRing"><div class="pu-ring-pct" id="puYearPct">0%</div></div>
+    <div class="pu-ring-label">Year</div>
+    <div class="pu-ring-value" id="puYearValue">0 / 50,000</div>
+  </div>
+</div>
+<div class="ov-note" style="margin-bottom:14px;">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Year total starts from a 26,395 balance as of Jul 19, plus what's logged here since.</div>
 
 <div class="sp-shuffle-bar" id="spShuffleBar" onclick="shufflePlayWorkoutPlaylist()">
   <div class="sp-shuffle-icon">🔀</div>
@@ -1711,9 +1709,6 @@
 <div class="app-tabs" id="appTabs">
   <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">
     <div class="app-tab-label">Overview</div>
-  </div>
-  <div class="app-tab" data-view="pushups" onclick="showAppView('pushups')">
-    <div class="app-tab-label">Pushups</div>
   </div>
   <div class="app-tab" data-view="tracker" onclick="showAppView('tracker')">
     <div class="app-tab-label">Trainer</div>
@@ -5057,7 +5052,7 @@ async function loadRemotePushupLedger() {
       local[date] = Math.max(local[date] || 0, data.ledger[date]);
     });
     localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(local));
-    if (viewOrder[currentViewIndex] === 'pushups') renderPushupsTab();
+    if (viewOrder[currentViewIndex] === 'tracker') renderPushupsTab();
     if (viewOrder[currentViewIndex] === 'overview') renderOverview();
   } catch (e) {
     // Offline/unreachable - whatever's cached locally stands.
@@ -5252,13 +5247,15 @@ function restoreState() {
 
 // 'bodyhealth' deliberately left out for now (see the app-tab and
 // #view-bodyhealth comments above) - add it back in to restore the tab.
-const viewOrder = ['overview', 'pushups', 'tracker', 'kitchen', 'calendar', 'weight', 'stats', 'music'];
+// 'pushups' no longer exists as its own tab - that content now lives at
+// the top of 'tracker' (Trainer), since it's exercise data same as
+// everything else there.
+const viewOrder = ['overview', 'tracker', 'kitchen', 'calendar', 'weight', 'stats', 'music'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
   if (view === 'overview') renderOverview();
-  if (view === 'tracker') renderTrainerStats();
-  if (view === 'pushups') { renderPushupsTab(); loadRemotePushupLedger(); }
+  if (view === 'tracker') { renderTrainerStats(); renderPushupsTab(); loadRemotePushupLedger(); }
   if (view === 'calendar') ensureCalendarLoaded();
   if (view === 'music') renderMusicTab();
   if (view === 'weight') { renderWeightTab(); loadRemoteWeightLog(); }
@@ -5534,7 +5531,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-overview-pushups-in-list';
+const APP_BUILD_VERSION = '2026-08-12-overview-unified-card-pushups-in-trainer';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -8054,9 +8051,6 @@ function refreshCurrentTab() {
   }
   if (view === 'tracker') {
     renderTrainerStats();
-    return Promise.resolve();
-  }
-  if (view === 'pushups') {
     renderPushupsTab();
     return loadRemotePushupLedger();
   }
