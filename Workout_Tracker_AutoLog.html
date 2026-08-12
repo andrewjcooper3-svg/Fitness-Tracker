@@ -1430,6 +1430,11 @@
 
     <div class="config-status" id="recipeActionStatus" style="margin-bottom:8px;"></div>
     <div id="recipeList"></div>
+
+    <div class="config-box" id="mealLogCard">
+      <div class="config-title" style="margin-bottom:6px;">Made This</div>
+      <div id="mealLogList"></div>
+    </div>
   </div>
 
   <div class="kitchen-section" id="kitchenSectionGrocery" style="display:none;">
@@ -2713,31 +2718,74 @@ async function handleBarcodeDecoded(barcode) {
   }
 }
 
-// OpenFoodFacts' unit/category strings are free text (whatever the
-// product's own packaging says) and no longer go straight into what
-// are now dropdowns - normalizeScannedUnit_ maps common raw strings
-// onto the fixed unit list, and category is re-derived from the
-// product name through the same keyword guesser everything else in
-// the app uses, rather than trusting OpenFoodFacts' own (much messier,
-// often multi-tag) category field. Either can come back empty, which
-// just leaves that dropdown on its blank option for you to pick by hand.
-const SCANNED_UNIT_ALIASES = {
+// Shared unit handling, used both to normalize OpenFoodFacts' free-text
+// units (whatever the product's own packaging says) onto the fixed
+// dropdown list, and - more importantly - to convert between an
+// ingredient's unit and an inventory item's unit when comparing/
+// subtracting quantities (a recipe calling for "5 oz" of cheese against
+// half a pound in stock needs to know those are the same kind of thing
+// before it can tell you're not actually short).
+//
+// UNIT_ALIASES_ maps any reasonable spelling/case onto a canonical
+// dropdown value. UNIT_DIMENSION_ then says what *kind* of measurement
+// each canonical unit is (weight/volume/count) and its size relative to
+// that dimension's base unit (grams for weight, milliliters for
+// volume) - convertQty_ uses that to convert between any two units of
+// the same dimension, and refuses (returns null) across dimensions
+// (ounces of cheese and "each" garlic cloves aren't convertible, and
+// callers fall back to the old direct-number comparison in that case).
+const UNIT_ALIASES_ = {
   'g': 'g', 'gram': 'g', 'grams': 'g',
   'kg': 'kg', 'kilogram': 'kg', 'kilograms': 'kg',
   'ml': 'ml', 'milliliter': 'ml', 'milliliters': 'ml', 'millilitre': 'ml', 'millilitres': 'ml',
   'l': 'L', 'liter': 'L', 'liters': 'L', 'litre': 'L', 'litres': 'L',
   'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
-  'fl oz': 'fl oz', 'fl. oz': 'fl oz', 'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz',
+  'fl oz': 'fl oz', 'fl. oz': 'fl oz', 'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz', 'floz': 'fl oz',
   'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb',
   'gal': 'gal', 'gallon': 'gal', 'gallons': 'gal',
   'qt': 'qt', 'quart': 'qt', 'quarts': 'qt',
   'cup': 'cup', 'cups': 'cup',
-  'tbsp': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
+  'tbsp': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp', 'tbs': 'tbsp',
   'tsp': 'tsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp',
   'ea': 'ea', 'each': 'ea', 'ct': 'ea', 'count': 'ea'
 };
+function normalizeUnit_(raw) {
+  return UNIT_ALIASES_[(raw || '').trim().toLowerCase()] || '';
+}
+// Back-compat alias - barcode scanning was the only caller before this
+// became shared with the recipe/inventory unit-conversion logic below.
 function normalizeScannedUnit_(raw) {
-  return SCANNED_UNIT_ALIASES[(raw || '').trim().toLowerCase()] || '';
+  return normalizeUnit_(raw);
+}
+
+const UNIT_DIMENSION_ = {
+  oz: { dim: 'weight', toBase: 28.3495 },
+  lb: { dim: 'weight', toBase: 453.592 },
+  g: { dim: 'weight', toBase: 1 },
+  kg: { dim: 'weight', toBase: 1000 },
+  'fl oz': { dim: 'volume', toBase: 29.5735 },
+  ml: { dim: 'volume', toBase: 1 },
+  L: { dim: 'volume', toBase: 1000 },
+  gal: { dim: 'volume', toBase: 3785.41 },
+  qt: { dim: 'volume', toBase: 946.353 },
+  cup: { dim: 'volume', toBase: 236.588 },
+  tbsp: { dim: 'volume', toBase: 14.7868 },
+  tsp: { dim: 'volume', toBase: 4.92892 },
+  ea: { dim: 'count', toBase: 1 }
+};
+
+// Converts `qty` from `fromUnit` to `toUnit`; null if either unit isn't
+// recognized or they're not the same dimension (can't turn cups into
+// pounds, and "each" never converts to anything).
+function convertQty_(qty, fromUnit, toUnit) {
+  const fromKey = normalizeUnit_(fromUnit);
+  const toKey = normalizeUnit_(toUnit);
+  if (!fromKey || !toKey) return null;
+  if (fromKey === toKey) return qty;
+  const from = UNIT_DIMENSION_[fromKey];
+  const to = UNIT_DIMENSION_[toKey];
+  if (!from || !to || from.dim !== to.dim || from.dim === 'count') return null;
+  return qty * from.toBase / to.toBase;
 }
 
 function prefillScannedProduct_(product, barcode, fields) {
@@ -2902,6 +2950,20 @@ function neededQty_(ing) {
   return (ing.qty != null && ing.qty !== '') ? Number(ing.qty) : 0;
 }
 
+// The ingredient's needed amount, converted into whatever unit the
+// resolved inventory item is actually tracked in - a recipe calling for
+// "5 oz" of cheese against half a pound in stock needs to compare 5oz
+// to 8oz (0.5lb), not 5 to 0.5. Falls back to the raw number when there's
+// no item yet, or the two units aren't convertible (e.g. "2 cloves" vs
+// an item tracked in "oz") - same behavior as before unit conversion
+// existed, since there's nothing sensible to convert in that case.
+function neededQtyInItemUnit_(ing, item) {
+  const raw = neededQty_(ing);
+  if (!item) return raw;
+  const converted = convertQty_(raw, ing.unit, item.unit);
+  return converted != null ? converted : raw;
+}
+
 // Rounds to 2 decimal places and drops trailing zeros (2.5 stays 2.5,
 // 2.0 becomes 2) - good enough for small kitchen quantities without
 // showing floating-point noise like 1.9999999999999998.
@@ -2952,12 +3014,13 @@ function getRecipeStatus(recipe) {
   recipe.ingredients.forEach(ing => {
     if (ing.notTracked) return;
     const item = resolveIngredientInventoryItem_(ing, inventory);
-    if (!item || item.qty <= 0 || item.qty < neededQty_(ing)) missing.push(ing.name);
+    if (!item || item.qty <= 0 || item.qty < neededQtyInItemUnit_(ing, item)) missing.push(ing.name);
   });
   return { canMake: missing.length === 0, missing };
 }
 
 function renderRecipeList() {
+  renderMealLog();
   const el = document.getElementById('recipeList');
   if (!el) return;
   const recipes = loadRecipes();
@@ -3009,9 +3072,9 @@ function logMealMade(recipeId) {
     if (ing.notTracked) return;
     const item = resolveIngredientInventoryItem_(ing, inventory);
     if (item) {
-      const usedQty = neededQty_(ing);
+      const usedQty = neededQtyInItemUnit_(ing, item);
       item.qty = Math.max(0, item.qty - usedQty);
-      used.push({ inventoryId: item.id, name: item.name, qtyUsed: usedQty });
+      used.push({ inventoryId: item.id, name: item.name, qtyUsed: usedQty, unit: item.unit });
     }
   });
   saveInventoryList(inventory);
@@ -3031,6 +3094,55 @@ function logMealMade(recipeId) {
   renderInventoryList();
   renderRecipeList();
   renderGroceryList();
+}
+
+function renderMealLog() {
+  const el = document.getElementById('mealLogList');
+  if (!el) return;
+  const log = loadMealLog();
+  if (log.length === 0) {
+    el.innerHTML = '<div class="ov-mini-empty">Nothing logged yet - tap "Made This" on a recipe.</div>';
+    return;
+  }
+
+  const sorted = log.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  el.innerHTML = sorted.map(entry => {
+    const usedText = entry.ingredientsUsed.length
+      ? entry.ingredientsUsed.map(u => `${formatQty_(u.qtyUsed)}${u.unit ? ' ' + escapeHtml_(u.unit) : ''} ${escapeHtml_(u.name)}`).join(', ')
+      : 'No inventory items used';
+    return `<div class="weight-history-row">
+      <div class="weight-history-date">${escapeHtml_(entry.recipeName)}<div class="ov-mini-empty" style="margin-top:2px;">${escapeHtml_(formatExpirationDate_(entry.date))} · ${usedText}</div></div>
+      <button class="weight-history-del" onclick="deleteMealLogEntry('${entry.id}')" title="Undo - adds these ingredients back to Inventory">×</button>
+    </div>`;
+  }).join('');
+}
+
+// Undoing a "Made This" log entry adds each ingredient's recorded
+// qtyUsed straight back onto its inventory item - not re-derived from
+// the recipe's current ingredients (which may have since been edited),
+// so this stays an exact inverse of whatever was actually subtracted at
+// the time, even if the recipe changed since. An item that's since been
+// deleted from Inventory entirely is silently skipped - nothing to add
+// back to.
+function deleteMealLogEntry(id) {
+  const log = loadMealLog();
+  const idx = log.findIndex(e => e.id === id);
+  if (idx === -1) return;
+  const entry = log[idx];
+
+  const inventory = loadInventory();
+  entry.ingredientsUsed.forEach(u => {
+    const item = inventory.find(i => i.id === u.inventoryId);
+    if (item) item.qty = (Number(item.qty) || 0) + u.qtyUsed;
+  });
+  saveInventoryList(inventory);
+
+  log.splice(idx, 1);
+  saveMealLog(log);
+
+  renderInventoryList();
+  renderGroceryList();
+  renderRecipeList();
 }
 
 let recipeDetailId = null;
@@ -3786,8 +3898,13 @@ function computeMealPlanGroceryItems(recipes) {
       if (ing.notTracked) return;
       const item = resolveIngredientInventoryItem_(ing, inventory);
       const key = item ? ('item:' + item.id) : ('name:' + ing.name.trim().toLowerCase());
-      if (!byKey[key]) byKey[key] = { name: item ? item.name : ing.name, item, unit: ing.unit, neededTotal: 0, hasUnspecified: false };
-      const q = neededQty_(ing);
+      // neededTotal accumulates in the resolved item's unit (falling
+      // back to the ingredient's own unit when unresolved), so it stays
+      // directly comparable to haveQty below even when two recipes
+      // phrase the same ingredient in different units (5 oz in one,
+      // 1/4 lb in another).
+      if (!byKey[key]) byKey[key] = { name: item ? item.name : ing.name, item, unit: item ? (item.unit || ing.unit) : ing.unit, neededTotal: 0, hasUnspecified: false };
+      const q = neededQtyInItemUnit_(ing, item);
       if (q > 0) byKey[key].neededTotal += q;
       else byKey[key].hasUnspecified = true;
     });
@@ -5105,7 +5222,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-shop-modal-full-fields';
+const APP_BUILD_VERSION = '2026-08-12-unit-conversion-made-this';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
