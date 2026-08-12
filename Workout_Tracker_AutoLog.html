@@ -1370,7 +1370,7 @@
     <div class="config-box">
       <div class="config-title" style="margin-bottom:10px;">Add Item</div>
       <button class="ov-open-btn" onclick="openBarcodeScanModal('inventory')" style="width:100%; margin-bottom:8px; background:var(--surface2);">Scan Barcode</button>
-      <input type="text" id="invItemName" class="config-input" placeholder="Item name" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+      <input type="text" id="invItemName" class="config-input" placeholder="Item name" style="width:100%; box-sizing:border-box; margin-bottom:8px;" onblur="maybePrefillExpiration_('invItemName','invItemExpiration')">
       <div class="weight-entry-row">
         <input type="number" id="invItemQty" class="config-input" placeholder="Qty" step="0.1" min="0">
         <select id="invItemUnit" class="config-input"></select>
@@ -1661,7 +1661,7 @@
     <button class="ov-open-btn" onclick="openBarcodeScanModal('shop')" style="width:100%; margin-bottom:8px; background:var(--surface2);">Scan Barcode</button>
     <div class="settings-field">
       <div class="sp-config-label" style="margin:0 0 6px;">Item name</div>
-      <input type="text" id="shopModalName" class="config-input" style="width:100%; box-sizing:border-box;">
+      <input type="text" id="shopModalName" class="config-input" style="width:100%; box-sizing:border-box;" onblur="maybePrefillExpiration_('shopModalName','shopModalExpiration')">
     </div>
     <div class="weight-entry-row" style="margin-top:8px;">
       <input type="number" id="shopModalQty" class="config-input" placeholder="Qty" step="0.1" min="0">
@@ -2493,6 +2493,43 @@ function formatExpirationDate_(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 }
 
+function renderInventoryRow_(it, today) {
+  let expBadge = '';
+  if (it.expirationDate) {
+    const exp = new Date(it.expirationDate + 'T00:00:00');
+    const daysLeft = Math.round((exp - today) / 86400000);
+    if (daysLeft < 0) expBadge = '<span class="kitchen-badge kitchen-badge-red">Expired</span>';
+    else if (daysLeft <= 3) expBadge = `<span class="kitchen-badge kitchen-badge-amber">${daysLeft}d left</span>`;
+    else expBadge = `<span class="kitchen-badge kitchen-badge-muted">${escapeHtml_(formatExpirationDate_(it.expirationDate))}</span>`;
+  }
+  const costPerPoundBadge = it.costPerPound != null ? `<span class="kitchen-badge kitchen-badge-muted">$${Number(it.costPerPound).toFixed(2)}/lb</span>` : '';
+  return `<div class="weight-history-row">
+    <div class="weight-history-date">${escapeHtml_(it.name)}${expBadge}${costPerPoundBadge}</div>
+    <div class="weight-history-value">${it.qty}${it.unit ? ' ' + escapeHtml_(it.unit) : ''}</div>
+    <button class="weight-history-edit" onclick="openEditInventoryItem('${it.id}')">Edit</button>
+    <button class="weight-history-del" onclick="deleteInventoryItem('${it.id}')">×</button>
+  </div>`;
+}
+
+// Soonest-expiring first within a group (so this list actually functions
+// as an expiration tracker, not just an alphabetical inventory) - items
+// with no expiration date sort to the end, then alphabetically among ties.
+function byFreshness_(a, b) {
+  if (a.expirationDate && b.expirationDate) {
+    if (a.expirationDate !== b.expirationDate) return a.expirationDate < b.expirationDate ? -1 : 1;
+  } else if (a.expirationDate || b.expirationDate) {
+    return a.expirationDate ? -1 : 1;
+  }
+  return a.name.localeCompare(b.name);
+}
+
+// Groups everything by food category (same categories/keyword-guessing
+// grocery items already get sorted into, so "cheese with cheese, onions
+// with peppers" stays consistent across the whole Kitchen tab) with
+// pantry staples pulled into their own section at the end - they're not
+// time-sensitive the way perishables are, so mixing them in with
+// fresh/dated items just adds noise to the part of the list you actually
+// need to watch.
 function renderInventoryList() {
   const el = document.getElementById('inventoryList');
   if (!el) return;
@@ -2504,36 +2541,23 @@ function renderInventoryList() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Soonest-expiring first (so this list actually functions as an
-  // expiration tracker, not just an alphabetical inventory) - items with
-  // no expiration date sort to the end, then alphabetically among ties.
-  const sorted = items.slice().sort((a, b) => {
-    if (a.expirationDate && b.expirationDate) {
-      if (a.expirationDate !== b.expirationDate) return a.expirationDate < b.expirationDate ? -1 : 1;
-    } else if (a.expirationDate || b.expirationDate) {
-      return a.expirationDate ? -1 : 1;
-    }
-    return a.name.localeCompare(b.name);
+  const staples = items.filter(it => it.notTracked);
+  const tracked = items.filter(it => !it.notTracked)
+    .map(it => Object.assign({}, it, { category: resolveGroceryCategory_(it.name, it.category) }));
+  const groups = groupByCategory_(tracked, GROCERY_CATEGORY_ORDER);
+
+  let html = '';
+  groups.forEach((group, gi) => {
+    html += renderCategoryHeader_(group.category, gi === 0);
+    html += group.items.slice().sort(byFreshness_).map(it => renderInventoryRow_(it, today)).join('');
   });
 
-  el.innerHTML = sorted.map(it => {
-    let expBadge = '';
-    if (it.expirationDate) {
-      const exp = new Date(it.expirationDate + 'T00:00:00');
-      const daysLeft = Math.round((exp - today) / 86400000);
-      if (daysLeft < 0) expBadge = '<span class="kitchen-badge kitchen-badge-red">Expired</span>';
-      else if (daysLeft <= 3) expBadge = `<span class="kitchen-badge kitchen-badge-amber">${daysLeft}d left</span>`;
-      else expBadge = `<span class="kitchen-badge kitchen-badge-muted">${escapeHtml_(formatExpirationDate_(it.expirationDate))}</span>`;
-    }
-    const staple = it.notTracked ? '<span class="kitchen-badge kitchen-badge-muted">Staple</span>' : '';
-    const costPerPoundBadge = it.costPerPound != null ? `<span class="kitchen-badge kitchen-badge-muted">$${Number(it.costPerPound).toFixed(2)}/lb</span>` : '';
-    return `<div class="weight-history-row">
-      <div class="weight-history-date">${escapeHtml_(it.name)}${staple}${expBadge}${costPerPoundBadge}</div>
-      <div class="weight-history-value">${it.qty}${it.unit ? ' ' + escapeHtml_(it.unit) : ''}</div>
-      <button class="weight-history-edit" onclick="openEditInventoryItem('${it.id}')">Edit</button>
-      <button class="weight-history-del" onclick="deleteInventoryItem('${it.id}')">×</button>
-    </div>`;
-  }).join('');
+  if (staples.length) {
+    html += renderCategoryHeader_('Pantry Staples', groups.length === 0);
+    html += staples.slice().sort((a, b) => a.name.localeCompare(b.name)).map(it => renderInventoryRow_(it, today)).join('');
+  }
+
+  el.innerHTML = html;
 }
 
 let editingInventoryId = null;
@@ -2656,8 +2680,8 @@ let barcodeScanControls_ = null;
 // than threaded through every function in between.
 let barcodeScanTarget_ = 'inventory';
 const BARCODE_TARGET_FIELDS = {
-  inventory: { name: 'invItemName', qty: 'invItemQty', unit: 'invItemUnit', category: 'invItemCategory', status: 'invAddStatus', doneLabel: 'Add to Inventory' },
-  shop: { name: 'shopModalName', qty: 'shopModalQty', unit: 'shopModalUnit', category: 'shopModalCategory', status: 'shopModalStatus', doneLabel: 'Check Off' }
+  inventory: { name: 'invItemName', qty: 'invItemQty', unit: 'invItemUnit', category: 'invItemCategory', expiration: 'invItemExpiration', status: 'invAddStatus', doneLabel: 'Add to Inventory' },
+  shop: { name: 'shopModalName', qty: 'shopModalQty', unit: 'shopModalUnit', category: 'shopModalCategory', expiration: 'shopModalExpiration', status: 'shopModalStatus', doneLabel: 'Check Off' }
 };
 
 function openBarcodeScanModal(target) {
@@ -2807,6 +2831,7 @@ function prefillScannedProduct_(product, barcode, fields) {
   if (normalizedUnit) document.getElementById(fields.unit).value = normalizedUnit;
   const guessedCategory = guessCategory_(name, GROCERY_CATEGORY_KEYWORDS, '');
   if (guessedCategory) document.getElementById(fields.category).value = guessedCategory;
+  maybePrefillExpiration_(fields.name, fields.expiration);
 
   const statusEl = document.getElementById(fields.status);
   statusEl.classList.remove('warn');
@@ -3819,6 +3844,57 @@ function resolveGroceryCategory_(name, explicitCategory) {
   return guessCategory_(name, GROCERY_CATEGORY_KEYWORDS, 'Other');
 }
 
+// Typical shelf life in days from purchase, used only to *suggest* a
+// starting expiration date when adding an item - never enforced, and
+// never overwrites a date you've already typed in. Focused mainly on
+// produce (which almost never gets a printed date to copy from), plus
+// a few other perishable categories where a rough default is still
+// better than leaving the field blank.
+const SHELF_LIFE_DAYS_ = {
+  banana: 5, apple: 21, orange: 14, lettuce: 7, spinach: 5, kale: 5,
+  tomato: 7, onion: 30, garlic: 30, potato: 30, carrot: 21, broccoli: 7,
+  cucumber: 7, pepper: 10, avocado: 5, lemon: 21, lime: 21, grape: 7,
+  berry: 5, strawberr: 5, blueberr: 10, raspberr: 3, mushroom: 7,
+  celery: 14, cabbage: 21, corn: 3, squash: 21, zucchini: 7,
+  cilantro: 7, parsley: 10, basil: 5, melon: 7, peach: 5, pear: 7,
+  plum: 5, mango: 5, pineapple: 5,
+  milk: 7, cheese: 21, yogurt: 14, butter: 60, cream: 10, egg: 28, 'sour cream': 14,
+  'ground beef': 2, chicken: 2, beef: 3, pork: 3, turkey: 2, bacon: 7, sausage: 3,
+  steak: 3, fish: 2, salmon: 2, shrimp: 2,
+  bread: 7, bagel: 7, tortilla: 14
+};
+
+// Longest keyword match wins, so a more specific entry (e.g. "ground
+// beef") isn't shadowed by a shorter generic one ("beef") that also
+// happens to appear in the name.
+function guessShelfLifeDays_(name) {
+  const n = (name || '').toLowerCase();
+  let best = null;
+  for (const kw in SHELF_LIFE_DAYS_) {
+    if (n.includes(kw) && (!best || kw.length > best.length)) best = kw;
+  }
+  return best ? SHELF_LIFE_DAYS_[best] : null;
+}
+
+function suggestedExpirationDate_(name) {
+  const days = guessShelfLifeDays_(name);
+  if (days == null) return '';
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return dateKey(d);
+}
+
+// Fills an expiration date input from a name field's current value, but
+// only if the date field is still blank - typing in the item name should
+// never clobber a date you already set or already typed yourself.
+function maybePrefillExpiration_(nameFieldId, expFieldId) {
+  const expEl = document.getElementById(expFieldId);
+  if (!expEl || expEl.value) return;
+  const nameEl = document.getElementById(nameFieldId);
+  const suggested = suggestedExpirationDate_(nameEl ? nameEl.value : '');
+  if (suggested) expEl.value = suggested;
+}
+
 function resolveHouseholdCategory_(name) {
   return guessCategory_(name, HOUSEHOLD_CATEGORY_KEYWORDS, 'Home & Other');
 }
@@ -3933,7 +4009,7 @@ function openShopItemModal_(kind, key, defaults) {
   document.getElementById('shopModalParLevel').value = defaults.parLevel != null ? defaults.parLevel : '';
   document.getElementById('shopModalPackageSize').value = defaults.packageSize != null ? defaults.packageSize : '';
   document.getElementById('shopModalPackageLabel').value = defaults.packageLabel || '';
-  document.getElementById('shopModalExpiration').value = '';
+  document.getElementById('shopModalExpiration').value = suggestedExpirationDate_(defaults.name || '');
   document.getElementById('shopModalNotTracked').checked = !!defaults.notTracked;
   const statusEl = document.getElementById('shopModalStatus');
   statusEl.textContent = '';
@@ -5440,7 +5516,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-lenient-ingredient-matching';
+const APP_BUILD_VERSION = '2026-08-12-inventory-grouping-expiration';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
