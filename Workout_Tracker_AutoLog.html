@@ -1432,6 +1432,12 @@
   </div>
 
   <div class="kitchen-section" id="kitchenSectionGrocery" style="display:none;">
+    <div class="config-box" id="shoppingTripBox">
+      <div class="config-title" style="margin-bottom:6px;">Shopping Trip</div>
+      <div class="ov-mini-empty" id="shoppingTripSummary">Check off items as you buy them, then end the trip to add them to Inventory.</div>
+      <button class="ov-open-btn" onclick="endShoppingTrip()" style="margin-top:8px; display:none;" id="endShoppingTripBtn">End Shopping Trip</button>
+    </div>
+
     <div class="config-box">
       <div class="config-title" style="margin-bottom:6px;">Meal Plan</div>
       <div class="ov-mini-empty" id="mealPlanSummary" style="margin-bottom:8px;"></div>
@@ -1639,6 +1645,31 @@
     </div>
     <button class="config-save" style="width:100%; margin-bottom:8px;" onclick="logMealMadeFromModal()">Made This</button>
     <button class="event-modal-close" onclick="closeRecipeDetailModal(event)">Close</button>
+  </div>
+</div>
+
+<div class="event-modal-overlay" id="shopItemModalOverlay" onclick="closeShopItemModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-title" style="margin-bottom:14px;">Add to Inventory</div>
+    <div class="settings-field">
+      <div class="sp-config-label" style="margin:0 0 6px;">Item name</div>
+      <input type="text" id="shopModalName" class="config-input" style="width:100%; box-sizing:border-box;">
+    </div>
+    <div class="weight-entry-row" style="margin-top:8px;">
+      <input type="number" id="shopModalQty" class="config-input" placeholder="Qty" step="0.1" min="0">
+      <input type="text" id="shopModalUnit" class="config-input" placeholder="Unit (g, cups, ea...)">
+    </div>
+    <div class="settings-field" style="margin-top:8px;">
+      <div class="sp-config-label" style="margin:0 0 6px;">Category (optional)</div>
+      <input type="text" id="shopModalCategory" class="config-input" style="width:100%; box-sizing:border-box;">
+    </div>
+    <div class="settings-field" style="margin-top:8px;">
+      <div class="sp-config-label" style="margin:0 0 6px;">Expiration date (optional)</div>
+      <input type="date" id="shopModalExpiration" class="config-input" style="width:100%; box-sizing:border-box;">
+    </div>
+    <button class="ov-open-btn" onclick="confirmShopItemDetails()" style="margin-top:14px;">Check Off</button>
+    <div class="config-status" id="shopModalStatus"></div>
   </div>
 </div>
 
@@ -3405,11 +3436,178 @@ function renderCategoryHeader_(category, isFirst) {
 const STORAGE_GROCERY_CHECKED_KEYS = 'WORKOUT_KITCHEN_GROCERY_CHECKED_KEYS';
 function loadGroceryCheckedKeys_() { return new Set(JSON.parse(localStorage.getItem(STORAGE_GROCERY_CHECKED_KEYS) || '[]')); }
 function saveGroceryCheckedKeys_(set) { localStorage.setItem(STORAGE_GROCERY_CHECKED_KEYS, JSON.stringify(Array.from(set))); }
-function toggleGroceryCheckedKey_(key) {
-  const set = loadGroceryCheckedKeys_();
-  if (set.has(key)) set.delete(key); else set.add(key);
-  saveGroceryCheckedKeys_(set);
+
+// Shopping trip: checking a grocery item off doesn't touch Inventory by
+// itself - it opens a modal asking for the actual purchased qty/unit/
+// category/expiration, and that gets held here (keyed the same way as
+// the checked-keys set above) until "End Shopping Trip" commits the
+// whole batch to Inventory at once. That two-step split matters because
+// checking items off happens continuously while walking the store, but
+// you don't actually have the real quantities/prices settled until
+// checkout - committing per-tap would mean editing half-finished
+// guesses instead of one clean batch at the end. Local-only, same
+// reasoning as the checked-keys set.
+const STORAGE_SHOPPING_TRIP_KEY = 'WORKOUT_KITCHEN_SHOPPING_TRIP';
+function loadShoppingTripCart_() { return JSON.parse(localStorage.getItem(STORAGE_SHOPPING_TRIP_KEY) || '{}'); }
+function saveShoppingTripCart_(cart) { localStorage.setItem(STORAGE_SHOPPING_TRIP_KEY, JSON.stringify(cart)); }
+function removeFromShoppingTripCart_(key) {
+  const cart = loadShoppingTripCart_();
+  if (cart[key]) { delete cart[key]; saveShoppingTripCart_(cart); }
+}
+
+function setGroceryManualChecked_(id, checked) {
+  const list = loadGroceryManual();
+  const item = list.find(i => i.id === id);
+  if (item) item.checked = checked;
+  saveGroceryManual(list);
+}
+
+// Rebuilt at the top of every renderGroceryList() call - lets the
+// checkbox tap handler (which only gets a kind+key, to keep the onclick
+// attribute simple) look up that item's real name/qty/unit/category/
+// inventory link for pre-filling the modal, without re-deriving it from
+// scratch or stuffing a JSON blob into an HTML attribute.
+let groceryItemDefaults_ = {};
+
+function handleGroceryCheckboxTap_(kind, key) {
+  const checked = kind === 'manual'
+    ? !!(loadGroceryManual().find(i => i.id === key) || {}).checked
+    : loadGroceryCheckedKeys_().has(key);
+
+  if (checked) {
+    // Un-checking needs no popup - just drop it back out of the cart.
+    removeFromShoppingTripCart_(key);
+    if (kind === 'manual') {
+      setGroceryManualChecked_(key, false);
+    } else {
+      const set = loadGroceryCheckedKeys_();
+      set.delete(key);
+      saveGroceryCheckedKeys_(set);
+    }
+    renderGroceryList();
+    return;
+  }
+  openShopItemModal_(kind, key, groceryItemDefaults_[key] || {});
+}
+
+let shopModalContext_ = null;
+
+function openShopItemModal_(kind, key, defaults) {
+  shopModalContext_ = { kind, key, inventoryId: defaults.inventoryId || null };
+  document.getElementById('shopModalName').value = defaults.name || '';
+  document.getElementById('shopModalQty').value = defaults.qty != null ? defaults.qty : '';
+  document.getElementById('shopModalUnit').value = defaults.unit || '';
+  document.getElementById('shopModalCategory').value = defaults.category || '';
+  document.getElementById('shopModalExpiration').value = '';
+  const statusEl = document.getElementById('shopModalStatus');
+  statusEl.textContent = '';
+  statusEl.classList.remove('warn');
+  document.getElementById('shopItemModalOverlay').classList.add('open');
+}
+
+function closeShopItemModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('shopItemModalOverlay').classList.remove('open');
+  shopModalContext_ = null;
+}
+
+function confirmShopItemDetails() {
+  if (!shopModalContext_) return;
+  const statusEl = document.getElementById('shopModalStatus');
+  const name = document.getElementById('shopModalName').value.trim();
+  const qty = parseFloat(document.getElementById('shopModalQty').value);
+  if (!name || !(qty >= 0)) {
+    statusEl.textContent = 'Enter a name and quantity.';
+    statusEl.classList.add('warn');
+    return;
+  }
+
+  const cart = loadShoppingTripCart_();
+  cart[shopModalContext_.key] = {
+    kind: shopModalContext_.kind,
+    inventoryId: shopModalContext_.inventoryId,
+    name,
+    qty,
+    unit: document.getElementById('shopModalUnit').value.trim(),
+    category: document.getElementById('shopModalCategory').value.trim(),
+    expirationDate: document.getElementById('shopModalExpiration').value || null
+  };
+  saveShoppingTripCart_(cart);
+
+  if (shopModalContext_.kind === 'manual') {
+    setGroceryManualChecked_(shopModalContext_.key, true);
+  } else {
+    const set = loadGroceryCheckedKeys_();
+    set.add(shopModalContext_.key);
+    saveGroceryCheckedKeys_(set);
+  }
+
+  document.getElementById('shopItemModalOverlay').classList.remove('open');
+  shopModalContext_ = null;
   renderGroceryList();
+}
+
+function renderShoppingTripStatus_() {
+  const summaryEl = document.getElementById('shoppingTripSummary');
+  const btn = document.getElementById('endShoppingTripBtn');
+  if (!summaryEl || !btn) return;
+  const count = Object.keys(loadShoppingTripCart_()).length;
+  if (count > 0) {
+    summaryEl.textContent = `${count} item${count === 1 ? '' : 's'} checked off, ready to add to Inventory.`;
+    btn.style.display = 'block';
+  } else {
+    summaryEl.textContent = 'Check off items as you buy them, then end the trip to add them to Inventory.';
+    btn.style.display = 'none';
+  }
+}
+
+// Commits the whole trip at once: an item already linked to an existing
+// Inventory row gets that qty added on top of what's on hand (you're
+// restocking, not replacing); anything unlinked (a new item, or a
+// manual list entry with no inventory match) gets created fresh. Then
+// clears the cart, the checked-keys set, and removes the manual items
+// that just got bought - a still-needed item was never checked off in
+// the first place, so nothing legitimate gets swept away.
+function endShoppingTrip() {
+  const cart = loadShoppingTripCart_();
+  const entries = Object.values(cart);
+  if (entries.length === 0) return;
+
+  const inventory = loadInventory();
+  entries.forEach(entry => {
+    const existing = entry.inventoryId && inventory.find(i => i.id === entry.inventoryId);
+    if (existing) {
+      existing.qty = (Number(existing.qty) || 0) + entry.qty;
+      if (entry.expirationDate) existing.expirationDate = entry.expirationDate;
+      if (entry.unit && !existing.unit) existing.unit = entry.unit;
+      if (entry.category && !existing.category) existing.category = entry.category;
+    } else {
+      inventory.push({
+        id: genId_(),
+        name: entry.name,
+        qty: entry.qty,
+        unit: entry.unit,
+        category: entry.category,
+        cost: null,
+        parLevel: null,
+        packageSize: null,
+        packageLabel: '',
+        expirationDate: entry.expirationDate,
+        notTracked: false
+      });
+    }
+  });
+  saveInventoryList(inventory);
+
+  const manual = loadGroceryManual().filter(item => !cart[item.id]);
+  saveGroceryManual(manual);
+  saveGroceryCheckedKeys_(new Set());
+  saveShoppingTripCart_({});
+
+  relinkAllRecipesToInventory_();
+  renderInventoryList();
+  renderGroceryList();
+  renderRecipeList();
 }
 
 /* ---- Grocery list ---- */
@@ -3514,8 +3712,15 @@ function renderMealPlanGroceryList() {
     group.items.forEach(it => {
       const key = 'mealplan:' + (it.item ? it.item.id : it.name.toLowerCase());
       const checked = checkedKeys.has(key);
+      groceryItemDefaults_[key] = {
+        name: it.name,
+        qty: it.amount != null ? it.amount : '',
+        unit: it.unit || '',
+        category: it.item ? (it.item.category || '') : '',
+        inventoryId: it.item ? it.item.id : null
+      };
       html += `<div class="weight-history-row">
-        <div class="checkbox${checked ? ' checked' : ''}" onclick="toggleGroceryCheckedKey_('${escapeJsAttr_(key)}')">${checked ? '✓' : ''}</div>
+        <div class="checkbox${checked ? ' checked' : ''}" onclick="handleGroceryCheckboxTap_('mealplan', '${escapeJsAttr_(key)}')">${checked ? '✓' : ''}</div>
         <div class="weight-history-date" style="${checked ? 'text-decoration:line-through; opacity:0.5;' : ''}">${escapeHtml_(it.name)}</div>
         <div class="weight-history-value kitchen-badge kitchen-badge-amber">${it.amount != null ? 'Need ' + escapeHtml_(formatBuyAmount_(it.amount, it.unit, it.item)) : 'Need some'}</div>
       </div>`;
@@ -3525,8 +3730,10 @@ function renderMealPlanGroceryList() {
 }
 
 function renderGroceryList() {
+  groceryItemDefaults_ = {};
   renderMealPlanGroceryList();
   renderGeneralGroceryList();
+  renderShoppingTripStatus_();
   renderOverviewKitchenPreview();
 }
 
@@ -3559,6 +3766,13 @@ function renderGeneralGroceryList() {
         const item = entry.data;
         const key = 'auto:' + (item.item ? item.item.id : item.name.toLowerCase());
         const checked = checkedKeys.has(key);
+        groceryItemDefaults_[key] = {
+          name: item.name,
+          qty: item.amount != null ? item.amount : '',
+          unit: item.unit || '',
+          category: item.item ? (item.item.category || '') : '',
+          inventoryId: item.item ? item.item.id : null
+        };
         const reasonBadge = item.amount != null
           ? ` <span class="kitchen-badge kitchen-badge-muted">${escapeHtml_(item.reason)}</span>`
           : '';
@@ -3566,15 +3780,16 @@ function renderGeneralGroceryList() {
           ? `Need ${escapeHtml_(formatBuyAmount_(item.amount, item.unit, item.item))}`
           : escapeHtml_(item.reason);
         html += `<div class="weight-history-row">
-          <div class="checkbox${checked ? ' checked' : ''}" onclick="toggleGroceryCheckedKey_('${escapeJsAttr_(key)}')">${checked ? '✓' : ''}</div>
+          <div class="checkbox${checked ? ' checked' : ''}" onclick="handleGroceryCheckboxTap_('auto', '${escapeJsAttr_(key)}')">${checked ? '✓' : ''}</div>
           <div class="weight-history-date" style="${checked ? 'text-decoration:line-through; opacity:0.5;' : ''}">${escapeHtml_(item.name)}${reasonBadge}</div>
           <div class="weight-history-value kitchen-badge kitchen-badge-amber">${valueBadge}</div>
         </div>`;
       } else {
         const item = entry.data;
+        groceryItemDefaults_[item.id] = { name: item.name, qty: '', unit: '', category: '', inventoryId: null };
         const style = item.checked ? 'text-decoration:line-through; opacity:0.5;' : '';
         html += `<div class="weight-history-row">
-          <div class="checkbox${item.checked ? ' checked' : ''}" onclick="toggleGroceryChecked('${item.id}')">${item.checked ? '✓' : ''}</div>
+          <div class="checkbox${item.checked ? ' checked' : ''}" onclick="handleGroceryCheckboxTap_('manual', '${item.id}')">${item.checked ? '✓' : ''}</div>
           <div class="weight-history-date" style="${style}">${escapeHtml_(item.name)}</div>
           <button class="weight-history-del" onclick="removeGroceryManual('${item.id}')">×</button>
         </div>`;
@@ -3595,13 +3810,6 @@ function addManualGroceryItem() {
   renderGroceryList();
 }
 
-function toggleGroceryChecked(id) {
-  const list = loadGroceryManual();
-  const item = list.find(i => i.id === id);
-  if (item) item.checked = !item.checked;
-  saveGroceryManual(list);
-  renderGroceryList();
-}
 
 function removeGroceryManual(id) {
   saveGroceryManual(loadGroceryManual().filter(i => i.id !== id));
@@ -4785,7 +4993,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-11-pancake-flip-anim';
+const APP_BUILD_VERSION = '2026-08-11-shopping-trip-flow';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
