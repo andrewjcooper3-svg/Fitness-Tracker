@@ -306,6 +306,15 @@
   .ov-glance-tile { background: var(--surface); border-radius: 18px; padding: 13px 15px; cursor: pointer; transition: background 0.15s; position: relative; grid-column: span 1; }
   .ov-glance-tile:active { background: var(--surface2); }
   .ov-glance-tile-wide { grid-column: span 2; }
+  /* A soft tinted glow instead of a flat neutral card - same hue as
+     each tile's icon, just faint enough to still read as "dark card"
+     rather than a colored block. Layered over --surface (not replacing
+     it) so it stays subtle. */
+  .ov-glance-tile[data-widget="weight"] { background: linear-gradient(135deg, rgba(183,148,246,0.13), rgba(183,148,246,0) 65%), var(--surface); }
+  .ov-glance-tile[data-widget="spotify"] { background: linear-gradient(135deg, rgba(29,185,84,0.13), rgba(29,185,84,0) 65%), var(--surface); }
+  .ov-glance-tile[data-widget="kitchen"] { background: linear-gradient(135deg, rgba(245,185,66,0.13), rgba(245,185,66,0) 65%), var(--surface); }
+  .ov-glance-tile[data-widget="shopping"] { background: linear-gradient(135deg, rgba(107,207,127,0.13), rgba(107,207,127,0) 65%), var(--surface); }
+  .ov-glance-tile[data-widget="upcoming"] { background: linear-gradient(135deg, rgba(244,114,182,0.13), rgba(244,114,182,0) 65%), var(--surface); }
   .ov-glance-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; margin-bottom: 7px; flex-shrink: 0; }
   .ov-glance-icon svg { display: block; }
   .ov-glance-icon.c-weight { background: rgba(183,148,246,0.22); color: #b794f6; }
@@ -5587,7 +5596,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-overview-fix-tile-padding-collision';
+const APP_BUILD_VERSION = '2026-08-12-overview-tile-color-tint';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
