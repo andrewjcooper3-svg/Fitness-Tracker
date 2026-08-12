@@ -3800,7 +3800,9 @@ function populateFoodDropdowns_() {
 const GROCERY_CATEGORY_KEYWORDS = {
   'Produce': ['apple', 'banana', 'orange', 'lettuce', 'spinach', 'kale', 'tomato', 'onion', 'garlic', 'potato', 'carrot', 'broccoli', 'cucumber', 'pepper', 'avocado', 'lemon', 'lime', 'grape', 'berry', 'strawberr', 'blueberr', 'raspberr', 'mushroom', 'celery', 'cabbage', 'corn', 'squash', 'zucchini', 'cilantro', 'parsley', 'basil', 'melon', 'peach', 'pear', 'plum', 'mango', 'pineapple'],
   'Meat & Seafood': ['chicken', 'beef', 'pork', 'turkey', 'bacon', 'sausage', 'steak', 'ground beef', 'fish', 'salmon', 'shrimp', 'tilapia', 'tuna', 'seafood', 'ham', 'ribs'],
-  'Dairy & Eggs': ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'egg', 'half and half', 'sour cream'],
+  'Dairy & Eggs': ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'egg', 'half and half', 'sour cream',
+    'gruyere', 'gruyère', 'fontina', 'parmesan', 'parmigiano', 'mozzarella', 'cheddar', 'gouda', 'brie',
+    'feta', 'ricotta', 'provolone', 'swiss', 'colby', 'havarti', 'muenster', 'kaltbach', 'vacherin'],
   'Bakery': ['bread', 'bagel', 'tortilla', 'roll', 'bun', 'muffin', 'croissant', 'cake', 'dough', 'pita'],
   'Frozen': ['frozen', 'ice cream', 'popsicle'],
   'Pantry & Dry Goods': ['rice', 'pasta', 'flour', 'sugar', 'cereal', 'oats', 'oatmeal', 'bean', 'lentil', 'quinoa', 'breadcrumb', 'baking soda', 'baking powder', 'noodle'],
@@ -3840,7 +3842,19 @@ function guessCategory_(name, keywordMap, fallback) {
 
 function resolveGroceryCategory_(name, explicitCategory) {
   const hint = (explicitCategory || '').trim().toLowerCase();
-  if (hint && GROCERY_CATEGORY_ALIASES[hint]) return GROCERY_CATEGORY_ALIASES[hint];
+  if (hint) {
+    // A category picked straight from the dropdown (e.g. "Dairy & Eggs")
+    // IS one of GROCERY_CATEGORY_ORDER verbatim - check that first,
+    // since GROCERY_CATEGORY_ALIASES only covers shorthand typed values
+    // ("dairy", "eggs") and never matched the canonical strings
+    // themselves. Without this, an explicit dropdown pick for anything
+    // whose name doesn't also happen to contain a recognized keyword
+    // (a specific cheese variety with no literal "cheese" in its name,
+    // say) got silently overridden by the keyword guess below.
+    const canonical = GROCERY_CATEGORY_ORDER.find(c => c.toLowerCase() === hint);
+    if (canonical) return canonical;
+    if (GROCERY_CATEGORY_ALIASES[hint]) return GROCERY_CATEGORY_ALIASES[hint];
+  }
   return guessCategory_(name, GROCERY_CATEGORY_KEYWORDS, 'Other');
 }
 
@@ -5516,7 +5530,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-inventory-grouping-expiration';
+const APP_BUILD_VERSION = '2026-08-12-fix-category-grouping';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
