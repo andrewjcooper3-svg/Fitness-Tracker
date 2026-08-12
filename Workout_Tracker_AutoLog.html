@@ -507,6 +507,8 @@
 
   .ov-mini-weight-value { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
   .ov-mini-weight-sub { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .ov-mini-weight-sub.ahead { color: var(--green); }
+  .ov-mini-weight-sub.behind { color: var(--red); }
 
   .kitchen-subtabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); border-radius: 14px; padding: 4px; }
   .kitchen-subtab { flex: 1; min-height: 44px; background: none; border: none; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 13px 0; border-radius: 11px; cursor: pointer; }
@@ -586,39 +588,6 @@
   </div>
   <div class="ov-build-stamp" id="ovBuildStamp"></div>
 
-  <div class="ov-ring-hero" id="ovPushupHero" onclick="showAppView('pushups')">
-    <div class="ov-ring" id="ovRingBig">
-      <div class="ov-ring-center">
-        <div class="ov-ring-num" id="ovHeroNumber">0</div>
-        <div class="ov-ring-target" id="ovHeroTarget">of 0</div>
-      </div>
-    </div>
-    <div class="ov-ring-info">
-      <div class="ov-ring-info-top">
-        <div class="ov-ring-title">Pushups this week</div>
-        <div class="pu-status-badge" id="ovStatusBadge">–</div>
-      </div>
-      <div class="ov-ring-stats">
-        <div class="ov-ring-stat">
-          <div class="ov-ring-stat-label">Deficit</div>
-          <div class="ov-ring-stat-value" id="ovMiniDeficit">–</div>
-        </div>
-        <div class="ov-ring-stat">
-          <div class="ov-ring-stat-label">Year</div>
-          <div class="ov-ring-stat-value" id="ovMiniYear">0%</div>
-        </div>
-        <div class="ov-ring-stat">
-          <div class="ov-ring-stat-label">Elapsed</div>
-          <div class="ov-ring-stat-value" id="ovMiniYearElapsed">0%</div>
-        </div>
-        <div class="ov-week-wheel-item" onclick="event.stopPropagation(); showAppView('tracker')">
-          <svg viewBox="0 0 44 44" class="ov-week-wheel"><g transform="rotate(-90 22 22)" id="ovWeekWheelSegs"></g></svg>
-          <div class="ov-week-wheel-count" id="ovWeekWheelLabel">0/7</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="ov-water-card">
     <div class="ov-widget-head">
       <div class="ov-widget-label">Water</div>
@@ -662,6 +631,15 @@
        is unchanged from the old per-widget cards, so all existing
        render/update functions keep working with zero JS changes. -->
   <div class="ov-list-card" id="ovBoard">
+    <div class="ov-list-row" data-widget="pushups" onclick="showAppView('pushups')">
+      <div class="ov-list-row-icon">💪</div>
+      <div class="ov-list-row-body">
+        <div class="ov-list-row-label">Pushups</div>
+        <div id="ovPushupPreview"><div class="ov-mini-empty">Loading…</div></div>
+      </div>
+      <div class="ov-list-row-chevron">›</div>
+    </div>
+
     <div class="ov-list-row ov-widget" data-widget="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
       <div class="sp-np-art-wrap ov-list-row-icon">
         <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
@@ -5556,7 +5534,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-overview-list-redesign';
+const APP_BUILD_VERSION = '2026-08-12-overview-pushups-in-list';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -5568,18 +5546,10 @@ function forceFullRefresh() {
 }
 
 function renderOverview() {
-  const { days, totals } = computeWeekStats();
-
   document.getElementById('ovWeekLabel').textContent = getWeekLabel();
   const stampEl = document.getElementById('ovBuildStamp');
   if (stampEl) stampEl.textContent = 'Build ' + APP_BUILD_VERSION;
 
-  const pushupPct = totals.pushupTarget ? Math.min(100, Math.round(totals.pushupTotal / totals.pushupTarget * 100)) : 0;
-  document.getElementById('ovHeroNumber').textContent = totals.pushupTotal;
-  document.getElementById('ovHeroTarget').textContent = 'of ' + totals.pushupTarget;
-  document.getElementById('ovRingBig').style.setProperty('--pct', pushupPct);
-
-  renderWeekWheel(days);
   renderOverviewPushupMini();
   renderOverviewWeightPreview();
   renderOverviewWaterWidget();
@@ -5853,35 +5823,29 @@ function renderTrainerStats() {
   document.getElementById('ovDaysActive').textContent = `${activeDays} / 7`;
 }
 
+// Same row format as Weight/Kitchen/Shopping below it: a bold headline
+// plus a muted (or ahead/behind-colored) one-line sub-detail - folded in
+// from what used to be its own big ring hero, per feedback that it
+// should read as one more line in the same "summary of my life" list
+// rather than a special standalone widget.
 function renderOverviewPushupMini() {
-  const stats = computePushupStats();
-  const deficitEl = document.getElementById('ovMiniDeficit');
-  const badgeEl = document.getElementById('ovStatusBadge');
-  const ringEl = document.getElementById('ovRingBig');
-  if (stats.deficit === null) {
-    deficitEl.textContent = '–';
-    deficitEl.classList.remove('ahead', 'behind');
-    badgeEl.textContent = 'No Data';
-    badgeEl.classList.remove('ahead', 'behind');
-    ringEl.classList.remove('behind');
-  } else {
-    const ahead = stats.deficit >= 0;
-    deficitEl.textContent = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
-    deficitEl.classList.toggle('ahead', ahead);
-    deficitEl.classList.toggle('behind', !ahead);
-    badgeEl.textContent = ahead ? 'On Pace' : 'Behind';
-    badgeEl.classList.toggle('ahead', ahead);
-    badgeEl.classList.toggle('behind', !ahead);
-    ringEl.classList.toggle('behind', !ahead);
-  }
-  const yearPct = stats.year.target ? Math.min(100, Math.round(stats.year.actual / stats.year.target * 100)) : 0;
-  document.getElementById('ovMiniYear').textContent = yearPct + '%';
+  const el = document.getElementById('ovPushupPreview');
+  if (!el) return;
 
-  const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const startOfNextYear = new Date(now.getFullYear() + 1, 0, 1);
-  const dayOfYearElapsedPct = Math.round((now - startOfYear) / (startOfNextYear - startOfYear) * 100);
-  document.getElementById('ovMiniYearElapsed').textContent = dayOfYearElapsedPct + '%';
+  const { days, totals } = computeWeekStats();
+  const activeDays = days.filter(d => d.setsCompleted > 0).length;
+  const stats = computePushupStats();
+
+  const headline = `<div class="ov-mini-weight-value">${totals.pushupTotal.toLocaleString()} <span style="font-size:13px; font-weight:600; color:var(--muted);">/ ${totals.pushupTarget.toLocaleString()} this week</span></div>`;
+
+  if (stats.deficit === null) {
+    el.innerHTML = headline + `<div class="ov-mini-weight-sub">${activeDays}/7 days logged</div>`;
+    return;
+  }
+  const ahead = stats.deficit >= 0;
+  const deficitText = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
+  const statusText = ahead ? 'on pace' : 'behind';
+  el.innerHTML = headline + `<div class="ov-mini-weight-sub ${ahead ? 'ahead' : 'behind'}">${deficitText} deficit · ${statusText} · ${activeDays}/7 days logged</div>`;
 }
 
 function renderOverviewCalendarPreview() {
