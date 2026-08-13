@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-add-to-playlist-error-detail';
+const APP_BUILD_VERSION = '2026-08-13-spotify-scope-diagnostic';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6976,7 +6976,14 @@ function storeSpotifyTokens(data) {
   localStorage.setItem(STORAGE_SPOTIFY_TOKENS, JSON.stringify({
     access_token: data.access_token,
     refresh_token: data.refresh_token || existing.refresh_token,
-    expires_at: Date.now() + (data.expires_in * 1000)
+    expires_at: Date.now() + (data.expires_in * 1000),
+    // Spotify's token response echoes back the scopes it actually
+    // granted - shown in Settings so a stale/insufficient grant (e.g.
+    // after adding a new scope to the app but not re-consenting) is
+    // visible directly instead of only showing up as a mystery 403
+    // later. A refresh response omits `scope` entirely, so keep
+    // whatever was captured at the original grant.
+    scope: data.scope || existing.scope || null
   }));
   syncSpotifyToRemote();
 }
@@ -7057,8 +7064,19 @@ function updateSpotifyConfigStatus() {
   const statusEl = document.getElementById('spotifyConfigStatus');
   const btn = document.getElementById('spotifyConnectBtn');
   if (isSpotifyConnected()) {
-    statusEl.textContent = '✓ Connected to Spotify.';
-    statusEl.className = 'config-status ok';
+    // Spotify's token response echoes back what it actually granted -
+    // checking that directly (instead of just assuming a reconnect
+    // worked) turns "why is this 403ing" into a definite answer instead
+    // of a guess.
+    const grantedScope = (getSpotifyTokens() || {}).scope || '';
+    const missingPlaylist = grantedScope && (!grantedScope.includes('playlist-modify-public') || !grantedScope.includes('playlist-modify-private'));
+    if (missingPlaylist) {
+      statusEl.textContent = '⚠ Connected, but missing playlist permissions - disconnect and reconnect to fix "Add to Playlist".';
+      statusEl.className = 'config-status warn';
+    } else {
+      statusEl.textContent = '✓ Connected to Spotify.';
+      statusEl.className = 'config-status ok';
+    }
     btn.textContent = 'Disconnect Spotify';
     btn.onclick = disconnectSpotify;
   } else {
