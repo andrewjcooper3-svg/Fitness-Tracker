@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-add-to-playlist-quick-access-grid';
+const APP_BUILD_VERSION = '2026-08-13-remove-workout-playlist-from-quick-access';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7698,8 +7698,10 @@ function renderDjQuickAccess() {
   const el = document.getElementById('djQuickAccess');
   if (!el) return;
   const cfg = getSpotifyPlaylistConfig();
-  const items = (cfg.pins || []).filter(Boolean).map(p => Object.assign({}, p, { isPin: true }));
-  if (cfg.workout) items.push(Object.assign({}, cfg.workout, { isPin: false }));
+  // Workout playlist deliberately excluded - it already has its own
+  // dedicated Shuffle Play bar (here and on the Trainer tab), so
+  // repeating it in Quick Access was redundant.
+  const items = (cfg.pins || []).filter(Boolean);
 
   el.innerHTML = '';
   if (items.length === 0) {
@@ -7718,15 +7720,11 @@ function renderDjQuickAccess() {
     if (p.image) art.src = p.image; else art.textContent = '🎵';
     artWrap.appendChild(art);
 
-    // Only true pins are unpin-able from here - the workout playlist is
-    // a separate setting (edited in the Settings modal), not a pin.
-    if (p.isPin) {
-      const unpinBtn = document.createElement('div');
-      unpinBtn.className = 'dj-pin-btn pinned';
-      unpinBtn.textContent = '×';
-      unpinBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePinPlaylist(p); });
-      artWrap.appendChild(unpinBtn);
-    }
+    const unpinBtn = document.createElement('div');
+    unpinBtn.className = 'dj-pin-btn pinned';
+    unpinBtn.textContent = '×';
+    unpinBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePinPlaylist(p); });
+    artWrap.appendChild(unpinBtn);
 
     const name = document.createElement('div');
     name.className = 'dj-quick-name';
