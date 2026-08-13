@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-add-to-playlist-alert-diagnostic';
+const APP_BUILD_VERSION = '2026-08-13-show-raw-granted-spotify-scope';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7065,17 +7065,25 @@ function updateSpotifyConfigStatus() {
   const btn = document.getElementById('spotifyConnectBtn');
   if (isSpotifyConnected()) {
     // Spotify's token response echoes back what it actually granted -
-    // checking that directly (instead of just assuming a reconnect
-    // worked) turns "why is this 403ing" into a definite answer instead
-    // of a guess.
+    // but per the OAuth2 spec, the server MAY omit the scope field
+    // entirely when the granted scope exactly matches what was
+    // requested, which reads identically to "couldn't check" here. So
+    // this shows the raw string (or says outright that Spotify didn't
+    // report one) instead of quietly treating "no data" the same as
+    // "confirmed fine".
     const grantedScope = (getSpotifyTokens() || {}).scope || '';
-    const missingPlaylist = grantedScope && (!grantedScope.includes('playlist-modify-public') || !grantedScope.includes('playlist-modify-private'));
-    if (missingPlaylist) {
-      statusEl.textContent = '⚠ Connected, but missing playlist permissions - disconnect and reconnect to fix "Add to Playlist".';
-      statusEl.className = 'config-status warn';
+    if (!grantedScope) {
+      statusEl.textContent = '✓ Connected to Spotify (Spotify didn\'t report which permissions were granted - not confirmable from here).';
+      statusEl.className = 'config-status';
     } else {
-      statusEl.textContent = '✓ Connected to Spotify.';
-      statusEl.className = 'config-status ok';
+      const missingPlaylist = !grantedScope.includes('playlist-modify-public') || !grantedScope.includes('playlist-modify-private');
+      if (missingPlaylist) {
+        statusEl.textContent = '⚠ Connected, but missing playlist permissions - disconnect and reconnect to fix "Add to Playlist". Granted: ' + grantedScope;
+        statusEl.className = 'config-status warn';
+      } else {
+        statusEl.textContent = '✓ Connected to Spotify. Granted: ' + grantedScope;
+        statusEl.className = 'config-status ok';
+      }
     }
     btn.textContent = 'Disconnect Spotify';
     btn.onclick = disconnectSpotify;
