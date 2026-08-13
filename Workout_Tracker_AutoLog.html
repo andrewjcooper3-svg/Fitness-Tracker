@@ -5693,7 +5693,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-12-tone-down-gradient-colors';
+const APP_BUILD_VERSION = '2026-08-12-fix-reps-require-checked-set';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7639,9 +7639,19 @@ async function loadRemoteExerciseHistory() {
 // Counts a set's reps toward the total if a number was typed in; if the
 // field was left blank but the set is checked off, assumes the target
 // (placeholder) reps were done rather than counting it as zero.
+// Only counts a set once its checkbox is actually marked complete - a
+// typed reps value alone used to count on its own (even unchecked),
+// which meant every rep listed in a workout got logged whether or not
+// you'd actually done/confirmed it. Now: not checked, doesn't count,
+// full stop - a typed value is just which number to use (what you
+// actually did) once it IS checked, falling back to the planned target
+// only when checked with nothing typed in.
 function sumReps(card) {
   let total = 0;
   card.querySelectorAll('.set-row').forEach(row => {
+    const checked = row.querySelector('.set-checkbox').classList.contains('checked');
+    if (!checked) return;
+
     const inputs = row.querySelectorAll('.set-input');
     const repsInput = inputs[1];
     if (!repsInput) return;
@@ -7652,11 +7662,8 @@ function sumReps(card) {
       return;
     }
 
-    const checked = row.querySelector('.set-checkbox').classList.contains('checked');
-    if (checked) {
-      const target = parseFloat(repsInput.placeholder);
-      if (!isNaN(target)) total += target;
-    }
+    const target = parseFloat(repsInput.placeholder);
+    if (!isNaN(target)) total += target;
   });
   return total;
 }
