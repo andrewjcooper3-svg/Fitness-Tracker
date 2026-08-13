@@ -164,26 +164,21 @@
   .app-tab.active { background: var(--surface2); }
   .app-tab.active .app-tab-label { color: var(--accent); font-weight: 700; }
   .icon { width: 22px; height: 22px; display: block; flex-shrink: 0; }
-  .ptr-bar { display: flex; align-items: center; justify-content: center; overflow: hidden; height: 0; }
-  .ptr-spinner { width: 28px; height: 28px; border-radius: 50%; background: var(--surface); box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--accent); }
-  .ptr-spinner.spinning { animation: ptr-spin 0.7s linear infinite; }
-  @keyframes ptr-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
   .app-views-viewport { overflow: hidden; position: relative; transition: height 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
   .app-views-track { display: flex; align-items: flex-start; will-change: transform; }
   .app-view { flex: 0 0 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
   #view-overview { order: 0; }
   #view-tracker { order: 1; }
   #view-kitchen { order: 2; }
-  #view-calendar { order: 3; }
-  #view-stats { order: 4; }
-  #view-music { order: 5; }
+  #view-music { order: 3; }
+  #view-calendar { order: 4; }
+  #view-stats { order: 5; }
   /* Hidden for now - see the app-tab comment above. Still in the DOM
      with the rest of its markup/logic untouched, just taken out of the
      swipe flow entirely (order no longer matters while it's display:none). */
   #view-bodyhealth { display: none; }
 
-  .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, var(--surface2) 100%); border-radius: 26px; padding: 20px; margin-bottom: 12px; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid var(--border); }
+  .ov-hero { background: linear-gradient(160deg, var(--surface) 0%, var(--surface2) 100%); border-radius: 26px; padding: 20px; margin-bottom: 12px; border: 1px solid var(--border); }
   .ov-hero-label { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); }
   .ov-hero-week { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--accent); margin-top: 2px; margin-bottom: 16px; }
   .ov-hero-number { font-family: var(--font); font-size: 42px; font-weight: 800; letter-spacing: -0.5px; line-height: 1; }
@@ -322,7 +317,13 @@
      row instead of stacked - reads at a glance without the extra height.
      Upcoming keeps its own block layout below (it lists several events,
      not a single value) so this only applies to the plain data tiles. */
-  .ov-glance-tile:not(.ov-glance-tile-wide) { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; }
+  /* Fixed height (not min-height) so all four tiles are always the same
+     footprint regardless of their content - e.g. the Spotify tile's
+     right side is a single track-title line while Weight/Kitchen/
+     Shopping's is two lines (value + sub), which without a locked height
+     would make Spotify visibly shorter than its neighbors depending on
+     what's currently playing. */
+  .ov-glance-tile:not(.ov-glance-tile-wide) { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; height: 68px; overflow: hidden; }
   .ov-glance-left { display: flex; flex-direction: column; align-items: flex-start; flex-shrink: 0; }
   .ov-glance-right { flex: 1; min-width: 0; text-align: right; }
   /* Category color now lives only in the border + icon chip, not a full
@@ -525,7 +526,7 @@
      with progress/transport/volume/devices each wrapped onto their own
      full-width row below via flex-basis - full control set, none of the
      old version's huge centered artwork and padding. */
-  .dj-hero { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 22px; padding: 14px 16px; margin-bottom: 16px; text-align: left; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid var(--border); }
+  .dj-hero { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 22px; padding: 14px 16px; margin-bottom: 16px; text-align: left; border: 1px solid var(--border); }
   .dj-art-wrap { width: 60px; height: 60px; margin: 0; border-radius: 14px; overflow: hidden; background: var(--surface2); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(0,0,0,0.35); flex-shrink: 0; }
   .dj-art { width: 100%; height: 100%; object-fit: cover; }
   .dj-art-fallback { font-size: 22px; }
@@ -585,7 +586,6 @@
 
   .dj-section { margin-bottom: 16px; }
   .dj-section-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
-  .dj-playlist-status { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--amber); min-height: 14px; margin: -4px 0 8px; padding: 0 2px; }
   .dj-quick-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
   .dj-quick-tile { flex-shrink: 0; width: 84px; cursor: pointer; }
   .dj-quick-art-wrap { position: relative; }
@@ -605,6 +605,12 @@
   .dj-playlist-row-name { flex: 1; min-width: 0; font-family: var(--font); font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dj-playlist-row-pin { font-size: 19px; color: var(--muted); cursor: pointer; flex-shrink: 0; padding: 12px; margin: -12px; }
   .dj-playlist-row-pin.pinned { color: #1DB954; }
+
+  /* Tapping a track row still plays it immediately - this is a separate
+     explicit control (same idea as the pin star) for "add to queue
+     without interrupting what's currently playing." */
+  .dj-queue-btn { font-size: 19px; line-height: 1; color: var(--muted); cursor: pointer; flex-shrink: 0; padding: 12px; margin: -12px; }
+  .dj-queue-btn:active { color: #1DB954; }
 
 
   /* Search - one box, debounced, grouped results underneath grouped by
@@ -751,8 +757,6 @@
 </script>
 </head>
 <body>
-
-<div class="ptr-bar" id="ptrBar"><div class="ptr-spinner" id="ptrSpinner">↓</div></div>
 
 <div class="app-views-viewport" id="appViewsViewport">
 <div class="app-views-track" id="appViewsTrack">
@@ -1879,7 +1883,6 @@
         <div class="ov-page-title">Playlists</div>
       </div>
     </div>
-    <div class="dj-playlist-status" id="djPlaylistStatus"></div>
     <div class="dj-playlist-list" id="djPlaylistGrid"><div class="sp-playlists-empty">Connect Spotify to see your playlists</div></div>
     <button class="event-modal-close" onclick="closeDjPlaylistsModal(event)" style="margin-top:10px;">Close</button>
   </div>
@@ -2007,14 +2010,14 @@
   <div class="app-tab" data-view="bodyhealth" onclick="showAppView('bodyhealth')" style="display:none;">
     <div class="app-tab-label">Health</div>
   </div>
+  <div class="app-tab" data-view="music" onclick="showAppView('music')">
+    <div class="app-tab-label">Music</div>
+  </div>
   <div class="app-tab" data-view="calendar" onclick="showAppView('calendar')">
     <div class="app-tab-label">Calendar</div>
   </div>
   <div class="app-tab" data-view="stats" onclick="showAppView('stats')">
     <div class="app-tab-label">Stats</div>
-  </div>
-  <div class="app-tab" data-view="music" onclick="showAppView('music')">
-    <div class="app-tab-label">Music</div>
   </div>
 </div>
 
@@ -5640,7 +5643,7 @@ function restoreState() {
 // tab - it opens as a modal from the Weight Trend card on Stats instead
 // (see openWeightDetailModal), so Stats' own render call already covers
 // keeping its mini chart fresh.
-const viewOrder = ['overview', 'tracker', 'kitchen', 'calendar', 'stats', 'music'];
+const viewOrder = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -5920,7 +5923,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-music-tab-compact-cards';
+const APP_BUILD_VERSION = '2026-08-13-queue-unlimited-pins-nav-shadow-cleanup';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7043,7 +7046,7 @@ function extractSpotifyPlaylistId(link) {
 }
 
 function getSpotifyPlaylistConfig() {
-  return JSON.parse(localStorage.getItem(STORAGE_SPOTIFY_PLAYLISTS) || '{"pins":[null,null,null],"workout":null}');
+  return JSON.parse(localStorage.getItem(STORAGE_SPOTIFY_PLAYLISTS) || '{"pins":[],"workout":null}');
 }
 
 function loadSpotifyPlaylistInputs() {
@@ -7052,8 +7055,8 @@ function loadSpotifyPlaylistInputs() {
 }
 
 // The workout playlist is still set by pasting a link (it's a single,
-// rarely-changed setting) - the 3 Quick Access pins are managed instead
-// via the pin star on any tile in Your Playlists, see togglePinPlaylist().
+// rarely-changed setting) - Quick Access pins are managed instead via the
+// pin star on any tile in Your Playlists, see togglePinPlaylist().
 function saveSpotifyWorkoutPlaylist() {
   const workoutLink = document.getElementById('spWorkoutPlaylistLink').value.trim();
   const existing = getSpotifyPlaylistConfig();
@@ -7064,7 +7067,7 @@ function saveSpotifyWorkoutPlaylist() {
     workout = (prev && prev.link === workoutLink) ? prev : { link: workoutLink, id: extractSpotifyPlaylistId(workoutLink), name: null };
   }
 
-  localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify({ pins: existing.pins || [null, null, null], workout: workout }));
+  localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify({ pins: existing.pins || [], workout: workout }));
   renderShuffleBar();
   syncSpotifyToRemote();
   refreshSpotifyPlaylistMetadata();
@@ -7075,18 +7078,12 @@ function isPlaylistPinned(id) {
   return (cfg.pins || []).some(p => p && p.id === id);
 }
 
-function flashDjPlaylistStatus(msg) {
-  const el = document.getElementById('djPlaylistStatus');
-  if (!el) return;
-  el.textContent = msg;
-  setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 3000);
-}
-
 // Toggles a playlist (given as {id, name, image}, straight from an
-// already-fetched tile - no link parsing needed) in or out of the 3
-// Quick Access slots. Storing a constructed open.spotify.com link
-// alongside id/name/image keeps this compatible with the Overview tile's
-// existing "tap to open" behavior, which reads p.link.
+// already-fetched tile - no link parsing needed) in or out of Quick
+// Access - no cap on how many can be pinned. Storing a constructed
+// open.spotify.com link alongside id/name/image keeps this compatible
+// with the Overview tile's existing "tap to open" behavior, which reads
+// p.link.
 function togglePinPlaylist(playlist) {
   const cfg = getSpotifyPlaylistConfig();
   const pins = (cfg.pins || []).filter(Boolean);
@@ -7095,10 +7092,6 @@ function togglePinPlaylist(playlist) {
   if (idx !== -1) {
     pins.splice(idx, 1);
   } else {
-    if (pins.length >= 3) {
-      flashDjPlaylistStatus('Unpin one first — max 3');
-      return;
-    }
     pins.push({
       id: playlist.id,
       name: playlist.name,
@@ -7106,7 +7099,6 @@ function togglePinPlaylist(playlist) {
       link: 'https://open.spotify.com/playlist/' + playlist.id
     });
   }
-  while (pins.length < 3) pins.push(null);
 
   localStorage.setItem(STORAGE_SPOTIFY_PLAYLISTS, JSON.stringify({ pins: pins, workout: cfg.workout }));
   renderPinnedPlaylists();
@@ -7520,6 +7512,29 @@ async function playSpotifyContextUri(uri) {
   setTimeout(refreshDjPlaybackState, 600);
 }
 
+// Adds without interrupting whatever's currently playing - the explicit
+// alternative to tapping the row itself, which still plays immediately.
+// Flashes a checkmark/warning on the button itself as feedback since
+// there's no separate status line next to every single row.
+async function addToSpotifyQueue(uri, btnEl) {
+  const original = btnEl.textContent;
+  btnEl.textContent = '…';
+  const resp = await spotifyApiRequest('POST', `/me/player/queue?uri=${encodeURIComponent(uri)}`);
+  btnEl.textContent = resp.ok ? '✓' : '⚠';
+  setTimeout(() => { btnEl.textContent = original; }, 1200);
+}
+
+// Shared by Top Tracks and Recently Played rows (search's version is
+// built inline in djSearchRow since it's assembled slightly differently).
+function djQueueBtn(uri) {
+  const btn = document.createElement('div');
+  btn.className = 'dj-queue-btn';
+  btn.textContent = '+';
+  btn.title = 'Add to queue';
+  btn.addEventListener('click', (e) => { e.stopPropagation(); addToSpotifyQueue(uri, btn); });
+  return btn;
+}
+
 // Reuses the same pinned/workout playlist config from the Overview tab's
 // Spotify card, but tapping here actually starts playback via the API
 // instead of just deep-linking out to the app.
@@ -7679,6 +7694,7 @@ async function loadDjRecentlyPlayed() {
     info.appendChild(artist);
     row.appendChild(art);
     row.appendChild(info);
+    row.appendChild(djQueueBtn(track.uri));
     el.appendChild(row);
   });
 
@@ -7722,7 +7738,10 @@ async function performDjSearch(query) {
   renderDjSearchResults(resp.data);
 }
 
-function djSearchRow(art, title, sub, roundArt, onClick) {
+// queueUri is only passed for songs/podcast episodes (single playable
+// items) - artists and playlists play as a context, not a queueable
+// item, so they don't get the button.
+function djSearchRow(art, title, sub, roundArt, onClick, queueUri) {
   const row = document.createElement('div');
   row.className = 'dj-search-item';
   row.addEventListener('click', onClick);
@@ -7741,6 +7760,14 @@ function djSearchRow(art, title, sub, roundArt, onClick) {
   info.appendChild(subEl);
   row.appendChild(artEl);
   row.appendChild(info);
+  if (queueUri) {
+    const queueBtn = document.createElement('div');
+    queueBtn.className = 'dj-queue-btn';
+    queueBtn.textContent = '+';
+    queueBtn.title = 'Add to queue';
+    queueBtn.addEventListener('click', (e) => { e.stopPropagation(); addToSpotifyQueue(queueUri, queueBtn); });
+    row.appendChild(queueBtn);
+  }
   return row;
 }
 
@@ -7772,12 +7799,12 @@ function renderDjSearchResults(data) {
 
   addGroup('Songs', tracks.slice(0, 5).map(t => {
     const art = t.album && t.album.images && t.album.images.length ? t.album.images[t.album.images.length - 1].url : null;
-    return djSearchRow(art, t.name, (t.artists || []).map(a => a.name).join(', '), false, () => playSpotifyTrackUri(t.uri));
+    return djSearchRow(art, t.name, (t.artists || []).map(a => a.name).join(', '), false, () => playSpotifyTrackUri(t.uri), t.uri);
   }));
 
   addGroup('Podcasts', episodes.slice(0, 5).map(ep => {
     const art = ep.images && ep.images.length ? ep.images[ep.images.length - 1].url : null;
-    return djSearchRow(art, ep.name, (ep.show && ep.show.name) || 'Episode', false, () => playSpotifyTrackUri(ep.uri));
+    return djSearchRow(art, ep.name, (ep.show && ep.show.name) || 'Episode', false, () => playSpotifyTrackUri(ep.uri), ep.uri);
   }));
 
   addGroup('Artists', artists.slice(0, 5).map(a => {
@@ -7873,6 +7900,7 @@ function renderDjTopTracks(tracks) {
     row.appendChild(rank);
     row.appendChild(art);
     row.appendChild(info);
+    row.appendChild(djQueueBtn(t.uri));
     el.appendChild(row);
   });
 }
@@ -8801,57 +8829,18 @@ function flushPendingLogs() {
 
 window.addEventListener('online', flushPendingLogs);
 
-/* ---------- Swipe left/right between tabs, and pull-down-to-refresh ---------- */
-
-// Re-runs whatever the active tab's own "refresh" action is - reused by
-// pull-to-refresh below regardless of which of the 5 tabs is showing.
-function refreshCurrentTab() {
-  const view = viewOrder[currentViewIndex];
-  if (view === 'overview') {
-    renderOverview();
-    return Promise.resolve(loadCalendarEvents());
-  }
-  if (view === 'tracker') {
-    renderTrainerStats();
-    renderPushupsTab();
-    return loadRemotePushupLedger();
-  }
-  if (view === 'calendar') {
-    return Promise.resolve(loadCalendarEvents());
-  }
-  if (view === 'music') {
-    return Promise.all([refreshDjPlaybackState(), loadDjPlaylists(), loadDjRecentlyPlayed()]);
-  }
-  if (view === 'stats') {
-    renderStatsTab();
-    return loadRemoteWeightLog();
-  }
-  if (view === 'kitchen') {
-    renderKitchenTab();
-    return Promise.all([loadRemoteKitchenState(), loadRemoteRecipes().then(applyPendingRecipeSeeds_)]);
-  }
-  if (view === 'bodyhealth') {
-    renderBodyHealthTab();
-    return loadRemoteBodyHealthLog();
-  }
-  return Promise.resolve();
-}
+/* ---------- Swipe left/right between tabs ---------- */
+// Pull-down-to-refresh used to live here too - removed in favor of the
+// single explicit refresh button on Overview (forceFullRefresh()) so
+// there's one obvious way to refresh instead of a gesture on every tab.
 
 (function initTabSwipeNav() {
   const viewport = document.getElementById('appViewsViewport');
   const track = document.getElementById('appViewsTrack');
-  const ptrBar = document.getElementById('ptrBar');
-  const ptrSpinner = document.getElementById('ptrSpinner');
   if (!viewport || !track) return;
 
-  const PTR_THRESHOLD = 60;
-  const PTR_MAX = 90;
-  const PTR_SETTLE = 46;
-  const PTR_RESISTANCE = 0.5;
-
   let startX = null, startY = null, startTarget = null;
-  let decided = false, dragging = false, pulling = false, currentDx = 0;
-  let ptrEligible = false, ptrRefreshing = false;
+  let decided = false, dragging = false, currentDx = 0;
 
   document.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) { startX = null; return; }
@@ -8860,11 +8849,7 @@ function refreshCurrentTab() {
     startY = e.touches[0].clientY;
     decided = false;
     dragging = false;
-    pulling = false;
     currentDx = 0;
-    // Only a pull that starts at the very top of the page counts - once
-    // scrolled down, the same downward drag should just be normal scroll.
-    ptrEligible = !ptrRefreshing && window.scrollY <= 0;
   }, { passive: true });
 
   document.addEventListener('touchmove', e => {
@@ -8875,17 +8860,15 @@ function refreshCurrentTab() {
 
     if (!decided) {
       // Wait for a small, unambiguous movement before committing to a
-      // horizontal drag, a pull-down, or letting the page's own
-      // scroll/tap behavior proceed untouched.
+      // horizontal drag, or letting the page's own scroll/tap behavior
+      // proceed untouched.
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
       decided = true;
       const blocked = startTarget && startTarget.closest &&
         startTarget.closest('input, textarea, button, .set-checkbox, .checkbox, .exercise-header, .day-tab, .app-tabs, .stats-chart');
       const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.4;
       dragging = !blocked && isHorizontal;
-      pulling = !blocked && !isHorizontal && dy > 0 && ptrEligible;
       if (dragging) track.style.transition = 'none';
-      if (pulling && ptrBar) ptrBar.style.transition = 'none';
     }
 
     if (dragging) {
@@ -8900,29 +8883,8 @@ function refreshCurrentTab() {
       const dxPercent = (resisted / width) * 100;
       track.style.transform = `translateX(calc(${-currentViewIndex * 100}% + ${dxPercent}%))`;
       e.preventDefault();
-      return;
-    }
-
-    if (pulling && ptrBar) {
-      const height = Math.min(PTR_MAX, Math.max(0, dy) * PTR_RESISTANCE);
-      ptrBar.style.height = height + 'px';
-      if (ptrSpinner) ptrSpinner.textContent = height >= PTR_THRESHOLD ? '↑' : '↓';
-      e.preventDefault();
     }
   }, { passive: false });
-
-  function runPullToRefresh() {
-    ptrRefreshing = true;
-    if (ptrBar) ptrBar.style.height = PTR_SETTLE + 'px';
-    if (ptrSpinner) { ptrSpinner.textContent = '↻'; ptrSpinner.classList.add('spinning'); }
-
-    const minDelay = new Promise(resolve => setTimeout(resolve, 500));
-    Promise.all([refreshCurrentTab(), minDelay]).finally(() => {
-      ptrRefreshing = false;
-      if (ptrSpinner) ptrSpinner.classList.remove('spinning');
-      if (ptrBar) ptrBar.style.height = '0px';
-    });
-  }
 
   document.addEventListener('touchend', () => {
     if (startX == null) return;
@@ -8936,18 +8898,6 @@ function refreshCurrentTab() {
       if (currentDx <= -threshold && currentViewIndex < viewOrder.length - 1) targetIndex++;
       else if (currentDx >= threshold && currentViewIndex > 0) targetIndex--;
       goToView(viewOrder[targetIndex], true);
-      return;
-    }
-
-    if (pulling) {
-      pulling = false;
-      const height = ptrBar ? (parseFloat(ptrBar.style.height) || 0) : 0;
-      if (ptrBar) ptrBar.style.transition = 'height 0.25s ease';
-      if (height >= PTR_THRESHOLD) {
-        runPullToRefresh();
-      } else if (ptrBar) {
-        ptrBar.style.height = '0px';
-      }
     }
   }, { passive: true });
 
@@ -8956,10 +8906,6 @@ function refreshCurrentTab() {
     if (dragging) {
       dragging = false;
       goToView(viewOrder[currentViewIndex], true);
-    }
-    if (pulling) {
-      pulling = false;
-      if (ptrBar) { ptrBar.style.transition = 'height 0.25s ease'; ptrBar.style.height = '0px'; }
     }
   }, { passive: true });
 })();
