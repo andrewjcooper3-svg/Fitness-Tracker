@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-spotify-scope-diagnostic';
+const APP_BUILD_VERSION = '2026-08-13-add-to-playlist-alert-diagnostic';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7647,6 +7647,17 @@ async function addTrackToPlaylist_(playlistId, playlistName, btnEl) {
     // used on a phone with no easy access to devtools - the full message
     // still goes to console for anyone who can check it.
     console.error('Add to playlist failed', resp.status, resp.data);
+    // TEMPORARY diagnostic - an alert() works on any device with zero
+    // setup (no devtools needed) to see the exact request/response while
+    // tracking down a persistent 403 that doesn't match any of the usual
+    // causes. Remove once this is resolved.
+    alert(
+      'Add to playlist failed\n\n' +
+      'Playlist ID: ' + playlistId + '\n' +
+      'Track URI: ' + djCurrentTrackUri + '\n' +
+      'HTTP status: ' + resp.status + '\n' +
+      'Full response: ' + JSON.stringify(resp.data)
+    );
   }
   if (btnEl) {
     const errMsg = resp.data && resp.data.error && resp.data.error.message;
