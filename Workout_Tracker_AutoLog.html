@@ -288,29 +288,18 @@
   #view-overview .ov-page-head { padding-bottom: 8px; }
   #view-overview .ov-build-stamp { margin-bottom: 4px; }
   #view-overview .ov-note { margin-top: 6px; }
-  .ov-hero-card { border-radius: 20px; padding: 11px 14px; margin-bottom: 8px; color: #fff; cursor: pointer; position: relative; }
+  .ov-hero-card { border-radius: 20px; padding: 11px 14px; margin-bottom: 8px; color: var(--text); background: var(--surface); border: 1.5px solid var(--border); cursor: pointer; position: relative; }
   .ov-hero-card:active { opacity: 0.92; }
-  .ov-hero-pushup { background: linear-gradient(135deg, #e0916f, #bf5c50); }
-  .ov-hero-water { background: linear-gradient(135deg, #6fa8c4, #3f7396); cursor: default; }
-  .ov-hero-card-label { font-family: var(--font); font-size: 12px; font-weight: 700; opacity: 0.92; margin-bottom: 4px; }
+  /* Category color now lives only in the border, matching the smaller
+     glance-tile treatment below - a quieter, lower-eyestrain read. */
+  .ov-hero-pushup { border-color: #e0916f; }
+  .ov-hero-water { border-color: #6fa8c4; cursor: default; }
+  .ov-hero-card-label { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
   .ov-hero-card-number { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.6px; line-height: 1; }
-  .ov-hero-card-sub { font-family: var(--font); font-size: 12px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
-  .ov-hero-progress { height: 6px; background: rgba(255,255,255,0.25); border-radius: 3px; margin-top: 7px; overflow: hidden; }
-  .ov-hero-progress-fill { height: 100%; background: #fff; border-radius: 3px; transition: width 0.6s ease; }
-  .ov-hero-card-status { font-family: var(--font); font-size: 11.5px; font-weight: 600; opacity: 0.9; margin-top: 6px; }
-
-  /* Water's ring/buttons/chart were tuned for the old neutral surface
-     background - lighten everything so it still reads clearly sitting
-     on the blue gradient instead. */
-  .ov-hero-water .wt-ring::after { background: rgba(0,0,0,0.16); }
-  .ov-hero-water .wt-ring-target { color: rgba(255,255,255,0.75); }
-  .ov-hero-water .wt-add-btn { background: rgba(255,255,255,0.24); color: #fff; }
-  .ov-hero-water .wt-add-btn-secondary { background: rgba(255,255,255,0.14); color: #fff; }
-  .ov-hero-water .wt-btn-net { color: rgba(255,255,255,0.8); }
-  .ov-hero-water .wt-stepper { background: rgba(255,255,255,0.16); color: rgba(255,255,255,0.85); }
-  .ov-hero-water .wt-stepper:active { color: #fff; }
-  .ov-hero-water .wt-chart-labels, .ov-hero-water .wt-chart-detail { color: rgba(255,255,255,0.75); }
-  .ov-hero-water .wt-undo-btn { color: rgba(255,255,255,0.85); }
+  .ov-hero-card-sub { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+  .ov-hero-progress { height: 6px; background: var(--surface2); border-radius: 3px; margin-top: 7px; overflow: hidden; }
+  .ov-hero-progress-fill { height: 100%; background: #e0916f; border-radius: 3px; transition: width 0.6s ease; }
+  .ov-hero-card-status { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); margin-top: 6px; }
 
   /* Colorful icon-tile grid for everything else - each category gets
      its own tinted icon chip so the page reads at a glance, bento-style,
@@ -326,25 +315,24 @@
      existing render functions' closest('.ov-widget') lookup still
      works) - .ov-widget's own grid-column:span 2 would otherwise win
      and force every tile to full width. */
-  .ov-glance-tile { border-radius: 18px; padding: 13px 15px; cursor: pointer; transition: opacity 0.15s; position: relative; grid-column: span 1; color: #fff; }
-  .ov-glance-tile:active { opacity: 0.9; }
+  .ov-glance-tile { border-radius: 18px; padding: 13px 15px; cursor: pointer; transition: opacity 0.15s; position: relative; grid-column: span 1; color: var(--text); background: var(--surface); border: 1.5px solid var(--border); }
+  .ov-glance-tile:active { opacity: 0.85; }
   .ov-glance-tile-wide { grid-column: span 2; }
-  /* Same full-gradient treatment as the Pushups/Water hero cards above,
-     just one hue per category, instead of a flat card with a small
-     tinted icon - this is the "more color" pass. */
-  .ov-glance-tile[data-widget="weight"] { background: linear-gradient(135deg, #a291c9, #7c68a3); }
-  .ov-glance-tile[data-widget="spotify"] { background: linear-gradient(135deg, #6bab7c, #3d8552); }
-  .ov-glance-tile[data-widget="kitchen"] { background: linear-gradient(135deg, #d9b36e, #bf8a3d); }
-  .ov-glance-tile[data-widget="shopping"] { background: linear-gradient(135deg, #86bf95, #4f8f64); }
-  .ov-glance-tile[data-widget="upcoming"] { background: linear-gradient(135deg, #d992b0, #b8628a); }
-  .ov-glance-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; margin-bottom: 7px; flex-shrink: 0; background: rgba(255,255,255,0.24); color: #fff; }
+  /* Category color now lives only in the border + icon chip, not a full
+     gradient fill - a quieter, lower-eyestrain read for daytime/work use. */
+  .ov-glance-tile[data-widget="weight"] { border-color: #a291c9; }
+  .ov-glance-tile[data-widget="spotify"] { border-color: #6bab7c; }
+  .ov-glance-tile[data-widget="kitchen"] { border-color: #d9b36e; }
+  .ov-glance-tile[data-widget="shopping"] { border-color: #86bf95; }
+  .ov-glance-tile[data-widget="upcoming"] { border-color: #d992b0; }
+  .ov-glance-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; margin-bottom: 7px; flex-shrink: 0; }
   .ov-glance-icon svg { display: block; }
-  .ov-glance-label { color: rgba(255,255,255,0.85) !important; opacity: 1 !important; }
-  .ov-glance-tile .ov-mini-empty, .ov-glance-tile .ov-mini-weight-sub, .ov-glance-tile .sp-np-title { color: rgba(255,255,255,0.92) !important; }
-  .ov-glance-tile .ov-mini-weight-value { color: #fff; }
-  .ov-glance-tile .sp-status-dot { background: rgba(255,255,255,0.5); }
-  .ov-glance-tile .sp-status-dot.live { background: #fff; box-shadow: 0 0 6px rgba(255,255,255,0.7); }
-  .ov-glance-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; opacity: 0.8; margin-bottom: 3px; }
+  .ov-glance-tile[data-widget="weight"] .ov-glance-icon { background: rgba(162,145,201,0.16); color: #a291c9; }
+  .ov-glance-tile[data-widget="spotify"] .ov-glance-icon { background: rgba(107,171,124,0.16); color: #6bab7c; }
+  .ov-glance-tile[data-widget="kitchen"] .ov-glance-icon { background: rgba(217,179,110,0.16); color: #d9b36e; }
+  .ov-glance-tile[data-widget="shopping"] .ov-glance-icon { background: rgba(134,191,149,0.16); color: #86bf95; }
+  .ov-glance-tile[data-widget="upcoming"] .ov-glance-icon { background: rgba(217,146,176,0.16); color: #d992b0; }
+  .ov-glance-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px; }
   .ov-glance-tile .sp-np-artist, .ov-glance-tile .sp-playlists { display: none; }
   .ov-glance-tile .sp-np-art-wrap { width: 28px; height: 28px; border-radius: 9px; margin-bottom: 7px; }
   .ov-glance-tile .sp-np-title { font-size: 12.5px; }
@@ -5762,7 +5750,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-weight-stats-modal-theme-cleanup';
+const APP_BUILD_VERSION = '2026-08-13-overview-tiles-border-only';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
