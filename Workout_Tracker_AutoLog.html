@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-remove-workout-playlist-from-quick-access';
+const APP_BUILD_VERSION = '2026-08-13-add-to-playlist-error-detail';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7622,13 +7622,21 @@ async function addTrackToPlaylist_(playlistId, playlistName, btnEl) {
   const original = btnEl ? btnEl.textContent : null;
   if (btnEl) { btnEl.textContent = '…'; btnEl.disabled = true; }
   const resp = await spotifyApiRequest('POST', `/playlists/${playlistId}/tracks`, { uris: [djCurrentTrackUri] });
-  if (resp.ok) saveLastAddPlaylist(playlistId, playlistName);
+  if (resp.ok) {
+    saveLastAddPlaylist(playlistId, playlistName);
+  } else {
+    // Surfaced on the button itself (status code) since this is normally
+    // used on a phone with no easy access to devtools - the full message
+    // still goes to console for anyone who can check it.
+    console.error('Add to playlist failed', resp.status, resp.data);
+  }
   if (btnEl) {
-    btnEl.textContent = resp.ok ? '✓ Added' : '⚠ Failed';
+    const errMsg = resp.data && resp.data.error && resp.data.error.message;
+    btnEl.textContent = resp.ok ? '✓ Added' : `⚠ ${resp.status}${errMsg ? ': ' + errMsg : ''}`;
     setTimeout(() => {
       btnEl.disabled = false;
       if (original !== null) btnEl.textContent = original;
-    }, 1200);
+    }, resp.ok ? 1200 : 5000);
   }
   return resp.ok;
 }
