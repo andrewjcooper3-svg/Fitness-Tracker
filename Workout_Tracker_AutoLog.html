@@ -520,12 +520,34 @@
   .sp-shuffle-playlist { font-family: var(--font); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
   .sp-shuffle-status { font-family: var(--font); font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; max-width: 90px; }
 
-  .dj-hero { background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 26px; padding: 22px 18px; margin-bottom: 16px; text-align: center; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid var(--border); }
-  .dj-art-wrap { width: 168px; height: 168px; margin: 0 auto 16px; border-radius: 18px; overflow: hidden; background: var(--surface2); display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 30px rgba(0,0,0,0.45); }
+  .dj-hero { position: relative; background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 26px; padding: 22px 18px; margin-bottom: 16px; text-align: center; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid var(--border); }
+  .dj-art-wrap { width: 168px; height: 168px; margin: 0 auto 16px; border-radius: 18px; overflow: hidden; background: var(--surface2); display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 30px rgba(0,0,0,0.45); flex-shrink: 0; transition: width 0.15s, height 0.15s; }
   .dj-art { width: 100%; height: 100%; object-fit: cover; }
   .dj-art-fallback { font-size: 48px; }
   .dj-track-title { font-family: var(--font); font-size: 18px; font-weight: 800; letter-spacing: -0.2px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dj-track-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 3px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Collapse toggle sits in the corner regardless of state - tapping it
+     (or, when collapsed, tapping anywhere else on the bar) swaps between
+     the full player and a slim mini-bar, same idea as a normal streaming
+     app's mini-player vs. full-screen player. Preference persists so the
+     tab reopens the way it was left. */
+  .dj-hero-toggle { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; border: none; background: var(--surface2); color: var(--muted); font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; }
+  .dj-hero-toggle:active { background: var(--border); }
+  .dj-hero.dj-collapsed { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; border-radius: 18px; cursor: pointer; }
+  .dj-hero.dj-collapsed .dj-hero-toggle { position: static; flex-shrink: 0; order: 3; }
+  .dj-hero.dj-collapsed .dj-art-wrap { width: 42px; height: 42px; margin: 0; border-radius: 10px; box-shadow: none; }
+  .dj-hero.dj-collapsed .dj-art-fallback { font-size: 18px; }
+  .dj-hero.dj-collapsed .dj-track-info { flex: 1; min-width: 0; order: 2; }
+  .dj-hero.dj-collapsed .dj-track-title { font-size: 13px; padding: 0; }
+  .dj-hero.dj-collapsed .dj-track-sub { font-size: 11px; padding: 0; margin-top: 1px; }
+  .dj-hero.dj-collapsed .dj-progress-row,
+  .dj-hero.dj-collapsed .dj-volume-row,
+  .dj-hero.dj-collapsed .dj-devices,
+  .dj-hero.dj-collapsed .dj-btn-toggle { display: none; }
+  .dj-hero.dj-collapsed .dj-controls { margin: 0; gap: 2px; order: 2; }
+  .dj-hero.dj-collapsed .dj-controls .dj-btn:not(.dj-btn-play) { display: none; }
+  .dj-hero.dj-collapsed .dj-btn-play { width: 38px; height: 38px; font-size: 16px; }
 
   .dj-progress-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
   .dj-time { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; width: 32px; flex-shrink: 0; }
@@ -581,6 +603,42 @@
   .dj-recent-tile { flex-shrink: 0; width: 72px; cursor: pointer; }
   .dj-recent-art { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
   .dj-recent-name { font-family: var(--font); font-size: 10px; font-weight: 600; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Search - one box, debounced, grouped results underneath grouped by
+     type (songs/artists/playlists/podcast episodes). Reuses the same row
+     look as Your Playlists for songs/playlists so it doesn't feel like a
+     bolted-on separate widget. */
+  .dj-search-row { position: relative; margin-bottom: 4px; }
+  .dj-search-input { width: 100%; box-sizing: border-box; font-family: var(--font); font-size: 14px; padding: 11px 36px 11px 14px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); }
+  .dj-search-input:focus { outline: none; border-color: #1DB954; }
+  .dj-search-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; }
+  .dj-search-results:not(:empty) { margin-top: 12px; }
+  .dj-search-group { margin-bottom: 12px; }
+  .dj-search-group:last-child { margin-bottom: 0; }
+  .dj-search-group-label { font-family: var(--font); font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; padding: 0 2px; }
+  .dj-search-item { display: flex; align-items: center; gap: 10px; padding: 6px 2px; cursor: pointer; border-radius: 10px; }
+  .dj-search-item:active { background: var(--surface2); }
+  .dj-search-art { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .dj-search-art.round { border-radius: 50%; }
+  .dj-search-info { flex: 1; min-width: 0; }
+  .dj-search-title { font-family: var(--font); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dj-search-sub { font-family: var(--font); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Top Tracks/Artists - segmented range picker (Spotify's own fixed
+     windows, see the note under it) driving the same playlist-row look
+     for tracks, plus a circular-art scroll row for artists. */
+  .dj-section-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .dj-section-label-row .dj-section-label { margin-bottom: 0; }
+  .dj-range-picker { display: flex; gap: 2px; background: var(--surface2); border-radius: 10px; padding: 2px; }
+  .dj-range-btn { font-family: var(--font); font-size: 10.5px; font-weight: 600; padding: 5px 8px; border-radius: 8px; border: none; background: none; color: var(--muted); cursor: pointer; }
+  .dj-range-btn.active { background: var(--surface); color: #1DB954; }
+  .dj-top-rank { width: 18px; flex-shrink: 0; text-align: center; font-family: var(--font); font-size: 13px; font-weight: 700; color: var(--muted); }
+  .dj-top-track-info { flex: 1; min-width: 0; }
+  .dj-top-track-artist { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dj-top-artists-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+  .dj-artist-tile { flex-shrink: 0; width: 76px; text-align: center; cursor: pointer; }
+  .dj-artist-art { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .dj-artist-name { font-family: var(--font); font-size: 11px; font-weight: 600; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .settings-field { margin-bottom: 14px; }
   .settings-field:last-of-type { margin-bottom: 0; }
@@ -817,13 +875,16 @@
 </div>
 
 <div id="view-music" class="app-view">
-  <div class="dj-hero" id="djHero">
+  <div class="dj-hero" id="djHero" onclick="onDjHeroClick(event)">
+    <button class="dj-hero-toggle" id="djHeroToggle" onclick="event.stopPropagation(); toggleDjHeroCollapsed()" title="Collapse/expand player">⌃</button>
     <div class="dj-art-wrap">
       <img class="dj-art" id="djArt" alt="" style="display:none;">
       <div class="dj-art-fallback" id="djArtFallback">🎵</div>
     </div>
-    <div class="dj-track-title" id="djTitle">Not connected</div>
-    <div class="dj-track-sub" id="djSubtitle"></div>
+    <div class="dj-track-info">
+      <div class="dj-track-title" id="djTitle">Not connected</div>
+      <div class="dj-track-sub" id="djSubtitle"></div>
+    </div>
 
     <div class="dj-progress-row">
       <div class="dj-time" id="djTimeElapsed">0:00</div>
@@ -832,24 +893,58 @@
     </div>
 
     <div class="dj-controls">
-      <button class="dj-btn dj-btn-toggle" id="djShuffleBtn" onclick="toggleSpotifyShuffle()">⇄</button>
-      <button class="dj-btn" onclick="spotifyPrevious()">⏮</button>
-      <button class="dj-btn dj-btn-play" id="djPlayPauseBtn" onclick="toggleSpotifyPlayPause()">▶</button>
-      <button class="dj-btn" onclick="spotifyNext()">⏭</button>
-      <button class="dj-btn dj-btn-toggle" id="djRepeatBtn" onclick="cycleSpotifyRepeat()">↻<span class="dj-repeat-one-dot" id="djRepeatOneDot"></span></button>
+      <button class="dj-btn dj-btn-toggle" id="djShuffleBtn" onclick="event.stopPropagation(); toggleSpotifyShuffle()">⇄</button>
+      <button class="dj-btn" onclick="event.stopPropagation(); spotifyPrevious()">⏮</button>
+      <button class="dj-btn dj-btn-play" id="djPlayPauseBtn" onclick="event.stopPropagation(); toggleSpotifyPlayPause()">▶</button>
+      <button class="dj-btn" onclick="event.stopPropagation(); spotifyNext()">⏭</button>
+      <button class="dj-btn dj-btn-toggle" id="djRepeatBtn" onclick="event.stopPropagation(); cycleSpotifyRepeat()">↻<span class="dj-repeat-one-dot" id="djRepeatOneDot"></span></button>
     </div>
 
     <div class="dj-volume-row">
       <div class="dj-volume-icon">🔊</div>
-      <input type="range" class="dj-volume-slider" id="djVolumeSlider" min="0" max="100" value="50" oninput="onSpotifyVolumeInput(this.value)">
+      <input type="range" class="dj-volume-slider" id="djVolumeSlider" min="0" max="100" value="50" oninput="onSpotifyVolumeInput(this.value)" onclick="event.stopPropagation()">
     </div>
 
     <div class="dj-devices" id="djDevices"></div>
   </div>
 
   <div class="dj-section">
+    <div class="dj-search-row">
+      <input type="text" id="djSearchInput" class="dj-search-input" placeholder="Search songs, artists, playlists, podcasts…" oninput="onDjSearchInput()">
+      <button class="dj-search-clear" id="djSearchClear" onclick="clearDjSearch()" style="display:none;">✕</button>
+    </div>
+    <div id="djSearchResults" class="dj-search-results"></div>
+  </div>
+
+  <div class="dj-section" id="djShuffleSection">
+    <div class="sp-shuffle-bar" onclick="shufflePlayWorkoutPlaylist()">
+      <div class="sp-shuffle-icon">🔀</div>
+      <div class="sp-shuffle-text">
+        <div class="sp-shuffle-label">Shuffle Play</div>
+        <div class="sp-shuffle-playlist">Not configured — set a playlist link in Settings</div>
+      </div>
+      <div class="sp-shuffle-status"></div>
+    </div>
+  </div>
+
+  <div class="dj-section">
     <div class="dj-section-label">Quick Access</div>
     <div class="dj-quick-row" id="djQuickAccess"><div class="sp-playlists-empty">Pin playlists below with ☆</div></div>
+  </div>
+
+  <div class="dj-section" id="djTopSection">
+    <div class="dj-section-label-row">
+      <div class="dj-section-label">Top Tracks</div>
+      <div class="dj-range-picker" id="djRangePicker">
+        <button class="dj-range-btn" data-range="short_term" onclick="setDjTopRange('short_term')">4 Wks</button>
+        <button class="dj-range-btn" data-range="medium_term" onclick="setDjTopRange('medium_term')">6 Mos</button>
+        <button class="dj-range-btn" data-range="long_term" onclick="setDjTopRange('long_term')">All Time</button>
+      </div>
+    </div>
+    <div class="dj-playlist-list" id="djTopTracks"><div class="sp-playlists-empty">Connect Spotify to see your top tracks</div></div>
+    <div class="dj-section-label" style="margin-top:14px;">Top Artists</div>
+    <div class="dj-top-artists-row" id="djTopArtists"></div>
+    <div class="ov-note" style="margin-top:6px;">Spotify's API only offers these fixed windows (no exact "this week") and has no top-podcasts equivalent - search above to find and play a podcast episode directly instead.</div>
   </div>
 
   <div class="dj-section">
@@ -909,13 +1004,13 @@
 </div>
 <div class="ov-note" style="margin-bottom:14px;">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Year total starts from a 26,395 balance as of Jul 19, plus what's logged here since.</div>
 
-<div class="sp-shuffle-bar" id="spShuffleBar" onclick="shufflePlayWorkoutPlaylist()">
+<div class="sp-shuffle-bar" onclick="shufflePlayWorkoutPlaylist()">
   <div class="sp-shuffle-icon">🔀</div>
   <div class="sp-shuffle-text">
     <div class="sp-shuffle-label">Shuffle Play</div>
-    <div class="sp-shuffle-playlist" id="spShufflePlaylistName">Not configured — set a playlist link in Settings</div>
+    <div class="sp-shuffle-playlist">Not configured — set a playlist link in Settings</div>
   </div>
-  <div class="sp-shuffle-status" id="spShuffleStatus"></div>
+  <div class="sp-shuffle-status"></div>
 </div>
 
 <div class="ov-grid">
@@ -5768,7 +5863,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-overview-tiles-data-on-right';
+const APP_BUILD_VERSION = '2026-08-13-music-tab-redesign';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6641,10 +6736,11 @@ function closeEventModal(event) {
 // registered exactly as-is in the Spotify app's dashboard).
 const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
 // playlist-read-private/-collaborative and user-read-recently-played were
-// added for the Music (DJ) tab's playlist grid and recently-played strip -
-// anyone who connected before those existed needs to disconnect/reconnect
-// once to re-consent to the wider scope.
-const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative user-read-recently-played';
+// added for the Music (DJ) tab's playlist grid and recently-played strip,
+// and user-top-read for the Top Tracks/Artists section - anyone who
+// connected before those existed needs to disconnect/reconnect once to
+// re-consent to the wider scope.
+const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative user-read-recently-played user-top-read';
 const STORAGE_SPOTIFY_CLIENT_ID = 'WORKOUT_SPOTIFY_CLIENT_ID';
 const STORAGE_SPOTIFY_TOKENS = 'WORKOUT_SPOTIFY_TOKENS';
 const STORAGE_SPOTIFY_PLAYLISTS = 'WORKOUT_SPOTIFY_PLAYLISTS';
@@ -6764,6 +6860,13 @@ function disconnectSpotify() {
   renderNowPlaying(null);
   renderDjHero(null);
   djPlaylistsLoaded = false;
+  djTopItemsLoadedOnce = false;
+  const topTracksEl = document.getElementById('djTopTracks');
+  const topArtistsEl = document.getElementById('djTopArtists');
+  if (topTracksEl) topTracksEl.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to see your top tracks</div>';
+  if (topArtistsEl) topArtistsEl.innerHTML = '';
+  const searchResultsEl = document.getElementById('djSearchResults');
+  if (searchResultsEl) searchResultsEl.innerHTML = '';
 }
 
 function getSpotifyTokens() {
@@ -7090,40 +7193,48 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) stopSpotifyPolling(); else startSpotifyPolling();
 });
 
+// The shuffle bar now appears on both the Trainer tab and the Music tab
+// (rather than one id-tagged element), so every reader/writer below
+// targets *all* instances by class instead of a single getElementById -
+// keeps whichever copies exist in sync without knowing how many there are.
 function renderShuffleBar() {
-  const nameEl = document.getElementById('spShufflePlaylistName');
-  if (!nameEl) return;
+  const nameEls = document.querySelectorAll('.sp-shuffle-playlist');
+  if (nameEls.length === 0) return;
   const cfg = getSpotifyPlaylistConfig();
-  nameEl.textContent = (cfg.workout && (cfg.workout.name || cfg.workout.link)) || 'Not configured — set a playlist link in Settings';
+  const text = (cfg.workout && (cfg.workout.name || cfg.workout.link)) || 'Not configured — set a playlist link in Settings';
+  nameEls.forEach(el => { el.textContent = text; });
+}
+
+function setShuffleBarStatus(text) {
+  document.querySelectorAll('.sp-shuffle-status').forEach(el => { el.textContent = text; });
 }
 
 async function shufflePlayWorkoutPlaylist() {
-  const statusEl = document.getElementById('spShuffleStatus');
   const cfg = getSpotifyPlaylistConfig();
 
   if (!isSpotifyConnected()) {
-    statusEl.textContent = 'Connect Spotify on Overview first';
-    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    setShuffleBarStatus('Connect Spotify on Overview first');
+    setTimeout(() => setShuffleBarStatus(''), 4000);
     return;
   }
   if (!cfg.workout || !cfg.workout.id) {
-    statusEl.textContent = 'No workout playlist configured';
-    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+    setShuffleBarStatus('No workout playlist configured');
+    setTimeout(() => setShuffleBarStatus(''), 4000);
     return;
   }
 
-  statusEl.textContent = 'Starting…';
+  setShuffleBarStatus('Starting…');
   await spotifyApiRequest('PUT', '/me/player/shuffle?state=true');
   const playResp = await spotifyApiRequest('PUT', '/me/player/play', { context_uri: 'spotify:playlist:' + cfg.workout.id });
 
   if (playResp.ok) {
-    statusEl.textContent = '▶ Playing on shuffle';
+    setShuffleBarStatus('▶ Playing on shuffle');
   } else if (playResp.status === 404) {
-    statusEl.textContent = '⚠ No active device — open Spotify first';
+    setShuffleBarStatus('⚠ No active device — open Spotify first');
   } else {
-    statusEl.textContent = '⚠ Could not start playback';
+    setShuffleBarStatus('⚠ Could not start playback');
   }
-  setTimeout(() => { statusEl.textContent = ''; }, 4000);
+  setTimeout(() => setShuffleBarStatus(''), 4000);
 }
 
 /* ---------- Music tab (full playback control - the "DJ page") ---------- */
@@ -7177,6 +7288,41 @@ function initDjProgressSeek() {
     djLastSnapshot.capturedAt = Date.now();
     await spotifyApiRequest('PUT', `/me/player/seek?position_ms=${seekMs}`);
   });
+}
+
+/* ---------- Music tab: collapsible mini-player ---------- */
+
+const STORAGE_DJ_HERO_COLLAPSED = 'WORKOUT_DJ_HERO_COLLAPSED';
+
+// Defaults to collapsed - the point is to get the full player out of the
+// way so search/playlists/top tracks are visible without scrolling past
+// it first, same as any streaming app's mini-player.
+function loadDjHeroCollapsedPref() {
+  const stored = localStorage.getItem(STORAGE_DJ_HERO_COLLAPSED);
+  return stored === null ? true : stored === '1';
+}
+
+function setDjHeroCollapsed(collapsed) {
+  const hero = document.getElementById('djHero');
+  const toggle = document.getElementById('djHeroToggle');
+  if (!hero) return;
+  hero.classList.toggle('dj-collapsed', collapsed);
+  if (toggle) toggle.textContent = collapsed ? '⌄' : '⌃';
+  localStorage.setItem(STORAGE_DJ_HERO_COLLAPSED, collapsed ? '1' : '0');
+}
+
+function toggleDjHeroCollapsed() {
+  setDjHeroCollapsed(!document.getElementById('djHero').classList.contains('dj-collapsed'));
+}
+
+// While collapsed, tapping anywhere on the mini-bar expands it (except the
+// play/pause button itself, which should just toggle playback) - avoids
+// needing to land precisely on the small chevron every time.
+function onDjHeroClick(e) {
+  const hero = document.getElementById('djHero');
+  if (!hero.classList.contains('dj-collapsed')) return;
+  if (e.target.closest('.dj-btn-play') || e.target.closest('.dj-hero-toggle')) return;
+  setDjHeroCollapsed(false);
 }
 
 function renderDjHero(state) {
@@ -7306,6 +7452,13 @@ async function playSpotifyPlaylist(id) {
 }
 async function playSpotifyTrackUri(uri) {
   await spotifyApiRequest('PUT', '/me/player/play', { uris: [uri] });
+  setTimeout(refreshDjPlaybackState, 600);
+}
+// Shared by playlists and, from search/top-artists, artists too - Spotify
+// treats "play this artist" the same way as "play this playlist", just a
+// different context_uri prefix (starts their popular-tracks radio).
+async function playSpotifyContextUri(uri) {
+  await spotifyApiRequest('PUT', '/me/player/play', { context_uri: uri });
   setTimeout(refreshDjPlaybackState, 600);
 }
 
@@ -7449,6 +7602,220 @@ async function loadDjRecentlyPlayed() {
   });
 }
 
+/* ---------- Music tab: search ---------- */
+
+let djSearchDebounce = null;
+
+function onDjSearchInput() {
+  const input = document.getElementById('djSearchInput');
+  document.getElementById('djSearchClear').style.display = input.value ? 'block' : 'none';
+  if (djSearchDebounce) clearTimeout(djSearchDebounce);
+  const query = input.value.trim();
+  if (!query) { document.getElementById('djSearchResults').innerHTML = ''; return; }
+  djSearchDebounce = setTimeout(() => performDjSearch(query), 400);
+}
+
+function clearDjSearch() {
+  const input = document.getElementById('djSearchInput');
+  input.value = '';
+  input.focus();
+  document.getElementById('djSearchClear').style.display = 'none';
+  document.getElementById('djSearchResults').innerHTML = '';
+}
+
+async function performDjSearch(query) {
+  const resultsEl = document.getElementById('djSearchResults');
+  if (!isSpotifyConnected()) {
+    resultsEl.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to search</div>';
+    return;
+  }
+  resultsEl.innerHTML = '<div class="sp-playlists-empty">Searching…</div>';
+  const resp = await spotifyApiRequest('GET', `/search?q=${encodeURIComponent(query)}&type=track,artist,playlist,episode&limit=6`);
+  if (!resp.ok || !resp.data) {
+    resultsEl.innerHTML = '<div class="sp-playlists-empty">Search failed - try again</div>';
+    return;
+  }
+  renderDjSearchResults(resp.data);
+}
+
+function djSearchRow(art, title, sub, roundArt, onClick) {
+  const row = document.createElement('div');
+  row.className = 'dj-search-item';
+  row.addEventListener('click', onClick);
+  const artEl = document.createElement(art ? 'img' : 'div');
+  artEl.className = 'dj-search-art' + (roundArt ? ' round' : '');
+  if (art) artEl.src = art; else artEl.textContent = '🎵';
+  const info = document.createElement('div');
+  info.className = 'dj-search-info';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'dj-search-title';
+  titleEl.textContent = title;
+  const subEl = document.createElement('div');
+  subEl.className = 'dj-search-sub';
+  subEl.textContent = sub;
+  info.appendChild(titleEl);
+  info.appendChild(subEl);
+  row.appendChild(artEl);
+  row.appendChild(info);
+  return row;
+}
+
+function renderDjSearchResults(data) {
+  const resultsEl = document.getElementById('djSearchResults');
+  resultsEl.innerHTML = '';
+
+  const tracks = (data.tracks && data.tracks.items) || [];
+  const artists = (data.artists && data.artists.items) || [];
+  const playlists = (data.playlists && data.playlists.items || []).filter(Boolean);
+  const episodes = (data.episodes && data.episodes.items || []).filter(Boolean);
+
+  if (tracks.length === 0 && artists.length === 0 && playlists.length === 0 && episodes.length === 0) {
+    resultsEl.innerHTML = '<div class="sp-playlists-empty">No results</div>';
+    return;
+  }
+
+  const addGroup = (label, items) => {
+    if (items.length === 0) return;
+    const group = document.createElement('div');
+    group.className = 'dj-search-group';
+    const labelEl = document.createElement('div');
+    labelEl.className = 'dj-search-group-label';
+    labelEl.textContent = label;
+    group.appendChild(labelEl);
+    items.forEach(row => group.appendChild(row));
+    resultsEl.appendChild(group);
+  };
+
+  addGroup('Songs', tracks.slice(0, 5).map(t => {
+    const art = t.album && t.album.images && t.album.images.length ? t.album.images[t.album.images.length - 1].url : null;
+    return djSearchRow(art, t.name, (t.artists || []).map(a => a.name).join(', '), false, () => playSpotifyTrackUri(t.uri));
+  }));
+
+  addGroup('Podcasts', episodes.slice(0, 5).map(ep => {
+    const art = ep.images && ep.images.length ? ep.images[ep.images.length - 1].url : null;
+    return djSearchRow(art, ep.name, (ep.show && ep.show.name) || 'Episode', false, () => playSpotifyTrackUri(ep.uri));
+  }));
+
+  addGroup('Artists', artists.slice(0, 5).map(a => {
+    const art = a.images && a.images.length ? a.images[a.images.length - 1].url : null;
+    return djSearchRow(art, a.name, 'Artist', true, () => playSpotifyContextUri(a.uri));
+  }));
+
+  addGroup('Playlists', playlists.slice(0, 5).map(pl => {
+    const art = pl.images && pl.images.length ? pl.images[0].url : null;
+    return djSearchRow(art, pl.name, (pl.owner && pl.owner.display_name) || 'Playlist', false, () => playSpotifyPlaylist(pl.id));
+  }));
+}
+
+/* ---------- Music tab: Top Tracks/Artists ---------- */
+
+const STORAGE_DJ_TOP_RANGE = 'WORKOUT_DJ_TOP_RANGE';
+
+function getDjTopRange() {
+  return localStorage.getItem(STORAGE_DJ_TOP_RANGE) || 'short_term';
+}
+
+function setDjTopRange(range) {
+  localStorage.setItem(STORAGE_DJ_TOP_RANGE, range);
+  renderDjRangePicker();
+  loadDjTopItems();
+}
+
+function renderDjRangePicker() {
+  const range = getDjTopRange();
+  document.querySelectorAll('.dj-range-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.range === range);
+  });
+}
+
+async function loadDjTopItems() {
+  const tracksEl = document.getElementById('djTopTracks');
+  const artistsEl = document.getElementById('djTopArtists');
+  if (!tracksEl || !artistsEl) return;
+
+  if (!isSpotifyConnected()) {
+    tracksEl.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to see your top tracks</div>';
+    artistsEl.innerHTML = '';
+    return;
+  }
+
+  tracksEl.innerHTML = '<div class="sp-playlists-empty">Loading…</div>';
+  artistsEl.innerHTML = '';
+  const range = getDjTopRange();
+  const [tracksResp, artistsResp] = await Promise.all([
+    spotifyApiRequest('GET', `/me/top/tracks?time_range=${range}&limit=10`),
+    spotifyApiRequest('GET', `/me/top/artists?time_range=${range}&limit=10`)
+  ]);
+  renderDjTopTracks((tracksResp.ok && tracksResp.data && tracksResp.data.items) || []);
+  renderDjTopArtists((artistsResp.ok && artistsResp.data && artistsResp.data.items) || []);
+}
+
+function renderDjTopTracks(tracks) {
+  const el = document.getElementById('djTopTracks');
+  if (tracks.length === 0) {
+    el.innerHTML = '<div class="sp-playlists-empty">Not enough listening history yet for this range</div>';
+    return;
+  }
+  el.innerHTML = '';
+  tracks.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'dj-playlist-row';
+    row.addEventListener('click', () => playSpotifyTrackUri(t.uri));
+
+    const rank = document.createElement('div');
+    rank.className = 'dj-top-rank';
+    rank.textContent = String(i + 1);
+
+    const images = t.album && t.album.images;
+    const art = document.createElement(images && images.length ? 'img' : 'div');
+    art.className = 'dj-playlist-row-art';
+    if (images && images.length) art.src = images[images.length - 1].url; else art.textContent = '🎵';
+
+    const info = document.createElement('div');
+    info.className = 'dj-top-track-info';
+    const name = document.createElement('div');
+    name.className = 'dj-playlist-row-name';
+    name.textContent = t.name;
+    const artist = document.createElement('div');
+    artist.className = 'dj-top-track-artist';
+    artist.textContent = (t.artists || []).map(a => a.name).join(', ');
+    info.appendChild(name);
+    info.appendChild(artist);
+
+    row.appendChild(rank);
+    row.appendChild(art);
+    row.appendChild(info);
+    el.appendChild(row);
+  });
+}
+
+function renderDjTopArtists(artists) {
+  const el = document.getElementById('djTopArtists');
+  if (artists.length === 0) {
+    el.innerHTML = '<div class="sp-playlists-empty">Not enough listening history yet</div>';
+    return;
+  }
+  el.innerHTML = '';
+  artists.forEach(a => {
+    const tile = document.createElement('div');
+    tile.className = 'dj-artist-tile';
+    tile.addEventListener('click', () => playSpotifyContextUri(a.uri));
+
+    const images = a.images;
+    const art = document.createElement(images && images.length ? 'img' : 'div');
+    art.className = 'dj-artist-art';
+    if (images && images.length) art.src = images[images.length - 1].url; else art.textContent = '🎵';
+
+    const name = document.createElement('div');
+    name.className = 'dj-artist-name';
+    name.textContent = a.name;
+
+    tile.appendChild(art);
+    tile.appendChild(name);
+    el.appendChild(tile);
+  });
+}
+
 async function refreshDjPlaybackState() {
   if (!isSpotifyConnected()) { renderDjHero(null); return; }
   const resp = await spotifyApiRequest('GET', '/me/player?additional_types=episode,track');
@@ -7476,11 +7843,16 @@ function stopDjPolling() {
   stopDjProgressTicker();
 }
 
+let djTopItemsLoadedOnce = false;
+
 function renderMusicTab() {
+  renderShuffleBar();
   renderDjQuickAccess();
   startDjPolling();
   if (!djPlaylistsLoaded) loadDjPlaylists();
   loadDjRecentlyPlayed();
+  renderDjRangePicker();
+  if (!djTopItemsLoadedOnce) { djTopItemsLoadedOnce = true; loadDjTopItems(); }
 }
 
 function showDay(day) {
@@ -8548,6 +8920,8 @@ goToView('overview', false);
   renderPinnedPlaylists();
   renderShuffleBar();
   initDjProgressSeek();
+  setDjHeroCollapsed(loadDjHeroCollapsedPref());
+  renderDjRangePicker();
   renderDjHero(null);
   if (isSpotifyConnected()) {
     startSpotifyPolling();
