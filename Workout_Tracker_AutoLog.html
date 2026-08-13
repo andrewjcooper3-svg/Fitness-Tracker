@@ -5750,7 +5750,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-overview-tiles-border-only';
+const APP_BUILD_VERSION = '2026-08-13-calendar-client-side-past-day-filter';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6496,7 +6496,18 @@ async function loadCalendarEvents() {
     const data = await res.json();
     if (data.status !== 'success') throw new Error(data.message || 'Unknown error');
 
-    lastCalendarEvents = data.events || [];
+    // Belt-and-suspenders filter: keep only events whose calendar day is
+    // today or later, regardless of whatever overlap math the Worker used
+    // to decide an event was "in range" server-side. A multi-day event that
+    // started yesterday but technically still overlaps today would
+    // otherwise render grouped under yesterday's heading (its ev.start day)
+    // with no indication it's still relevant - simplest fix is to just
+    // never show a day-group before today at all.
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    lastCalendarEvents = (data.events || []).filter(ev => {
+      const evDay = new Date(ev.start); evDay.setHours(0, 0, 0, 0);
+      return evDay >= todayStart;
+    });
     renderOverviewCalendarPreview();
 
     if (lastCalendarEvents.length === 0) {
