@@ -552,6 +552,7 @@
   .dj-hero.dj-collapsed .dj-progress-row,
   .dj-hero.dj-collapsed .dj-volume-row,
   .dj-hero.dj-collapsed .dj-devices,
+  .dj-hero.dj-collapsed .dj-add-row,
   .dj-hero.dj-collapsed .dj-btn-toggle { display: none; }
   .dj-hero.dj-collapsed .dj-controls { flex-basis: auto; margin: 0; gap: 2px; order: 2; }
   .dj-hero.dj-collapsed .dj-controls .dj-btn:not(.dj-btn-play) { display: none; }
@@ -575,6 +576,16 @@
   .dj-btn-play { background: #1DB954; color: #05230f; font-size: 19px; width: 50px; height: 50px; }
   .dj-btn-play:active { background: #1ed760; }
 
+  /* Quick Add re-adds to whichever playlist was used last (label always
+     names it); the secondary button opens the full picker and is how a
+     "last playlist" gets set to begin with. */
+  .dj-add-row { flex-basis: 100%; display: flex; gap: 8px; margin-top: 2px; }
+  .dj-add-btn { flex: 1; min-width: 0; font-family: var(--font); font-size: 11.5px; font-weight: 700; padding: 8px 6px; border-radius: 10px; border: none; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(29,185,84,0.16); color: #1DB954; }
+  .dj-add-btn:active { background: rgba(29,185,84,0.28); }
+  .dj-add-btn:disabled { opacity: 0.4; cursor: default; }
+  .dj-add-btn-secondary { background: var(--surface2); color: var(--text); }
+  .dj-add-btn-secondary:active { background: var(--border); }
+
   .dj-volume-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; margin-top: 0; padding: 2px 0; }
   .dj-volume-icon { font-size: 13px; flex-shrink: 0; }
   .dj-volume-slider { flex: 1; accent-color: #1DB954; height: 26px; }
@@ -586,10 +597,12 @@
 
   .dj-section { margin-bottom: 16px; }
   .dj-section-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
-  .dj-quick-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
-  .dj-quick-tile { flex-shrink: 0; width: 84px; cursor: pointer; }
+  /* 4 per row, wrapping to another row past that, instead of a horizontal
+     scroller - every pin visible at a glance instead of hidden off-screen. */
+  .dj-quick-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .dj-quick-tile { cursor: pointer; }
   .dj-quick-art-wrap { position: relative; }
-  .dj-quick-art { width: 84px; height: 84px; border-radius: 12px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .dj-quick-art { width: 100%; aspect-ratio: 1; border-radius: 12px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
   .dj-quick-name { font-family: var(--font); font-size: 11px; font-weight: 600; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dj-pin-btn { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 14px; color: rgba(245,230,210,0.7); cursor: pointer; }
   .dj-pin-btn.pinned { color: #1DB954; }
@@ -916,6 +929,11 @@
       <button class="dj-btn dj-btn-play" id="djPlayPauseBtn" onclick="event.stopPropagation(); toggleSpotifyPlayPause()">▶</button>
       <button class="dj-btn" onclick="event.stopPropagation(); spotifyNext()">⏭</button>
       <button class="dj-btn dj-btn-toggle" id="djRepeatBtn" onclick="event.stopPropagation(); cycleSpotifyRepeat()">↻<span class="dj-repeat-one-dot" id="djRepeatOneDot"></span></button>
+    </div>
+
+    <div class="dj-add-row">
+      <button class="dj-add-btn" id="djQuickAddBtn" disabled onclick="event.stopPropagation(); quickAddCurrentTrack()">No recent playlist</button>
+      <button class="dj-add-btn dj-add-btn-secondary" onclick="event.stopPropagation(); openAddToPlaylistPicker()">Add to Playlist…</button>
     </div>
 
     <div class="dj-volume-row">
@@ -1899,6 +1917,20 @@
     </div>
     <div class="dj-playlist-list" id="djRecentRow"><div class="sp-playlists-empty">Connect Spotify first</div></div>
     <button class="event-modal-close" onclick="closeDjRecentModal(event)" style="margin-top:10px;">Close</button>
+  </div>
+</div>
+
+<div class="event-modal-overlay" id="djAddToPlaylistModalOverlay" onclick="closeAddToPlaylistModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-head" style="padding-bottom:10px;">
+      <div>
+        <div class="ov-page-week">Music</div>
+        <div class="ov-page-title">Add to Playlist</div>
+      </div>
+    </div>
+    <div class="dj-playlist-list" id="djAddToPlaylistList"><div class="sp-playlists-empty">Loading…</div></div>
+    <button class="event-modal-close" onclick="closeAddToPlaylistModal(event)" style="margin-top:10px;">Cancel</button>
   </div>
 </div>
 
@@ -5923,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-queue-unlimited-pins-nav-shadow-cleanup';
+const APP_BUILD_VERSION = '2026-08-13-add-to-playlist-quick-access-grid';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6797,10 +6829,11 @@ function closeEventModal(event) {
 const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
 // playlist-read-private/-collaborative and user-read-recently-played were
 // added for the Music (DJ) tab's playlist grid and recently-played strip,
-// and user-top-read for the Top Tracks/Artists section - anyone who
-// connected before those existed needs to disconnect/reconnect once to
-// re-consent to the wider scope.
-const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative user-read-recently-played user-top-read';
+// user-top-read for the Top Tracks/Artists section, and playlist-modify-
+// public/-private to actually add the current track to a playlist -
+// anyone who connected before those existed needs to disconnect/reconnect
+// once to re-consent to the wider scope.
+const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative user-read-recently-played user-top-read playlist-modify-public playlist-modify-private';
 const STORAGE_SPOTIFY_CLIENT_ID = 'WORKOUT_SPOTIFY_CLIENT_ID';
 const STORAGE_SPOTIFY_TOKENS = 'WORKOUT_SPOTIFY_TOKENS';
 const STORAGE_SPOTIFY_PLAYLISTS = 'WORKOUT_SPOTIFY_PLAYLISTS';
@@ -7311,6 +7344,11 @@ function updateDjProgressDisplay(progressMs, durationMs) {
 // often just to move a progress bar.
 let djLastSnapshot = null;
 let djProgressTimer = null;
+// Whatever's currently playing, kept in sync by renderDjHero() on every
+// poll - the "add to playlist" buttons act on this, not on anything
+// track-row-specific, since they're about the now-playing item.
+let djCurrentTrackUri = null;
+let djCurrentTrackName = null;
 
 function startDjProgressTicker() {
   stopDjProgressTicker();
@@ -7398,6 +7436,9 @@ function renderDjHero(state) {
     stopDjProgressTicker();
     updateDjProgressDisplay(0, 0);
     renderDjDevices([]);
+    djCurrentTrackUri = null;
+    djCurrentTrackName = null;
+    renderQuickAddButton();
     return;
   }
 
@@ -7432,6 +7473,13 @@ function renderDjHero(state) {
   };
   updateDjProgressDisplay(djLastSnapshot.progressMs, djLastSnapshot.durationMs);
   if (djLastSnapshot.isPlaying) startDjProgressTicker(); else stopDjProgressTicker();
+
+  // Playlists can hold episodes as well as tracks, so this stays uniform
+  // regardless of isEpisode - both URI kinds work with the same
+  // playlist-add endpoint.
+  djCurrentTrackUri = item.uri || null;
+  djCurrentTrackName = item.name || null;
+  renderQuickAddButton();
 }
 
 function renderDjDevices(devices, activeDeviceId) {
@@ -7535,6 +7583,114 @@ function djQueueBtn(uri) {
   return btn;
 }
 
+/* ---------- Music tab: add current track to a playlist ---------- */
+// Two controls, kept deliberately simple: Quick Add re-adds to whichever
+// playlist was used last (remembered locally, not synced across devices -
+// this is a fast one-tap action, not a setting), and the picker button
+// always works and is how a "last playlist" gets set in the first place.
+
+const STORAGE_SPOTIFY_LAST_ADD_PLAYLIST = 'WORKOUT_SPOTIFY_LAST_ADD_PLAYLIST';
+
+function getLastAddPlaylist() {
+  return JSON.parse(localStorage.getItem(STORAGE_SPOTIFY_LAST_ADD_PLAYLIST) || 'null');
+}
+
+function saveLastAddPlaylist(id, name) {
+  localStorage.setItem(STORAGE_SPOTIFY_LAST_ADD_PLAYLIST, JSON.stringify({ id, name }));
+  renderQuickAddButton();
+}
+
+// Reflects three states: no last playlist yet (forces the picker button
+// instead), a last playlist but nothing currently playing (nothing to
+// add), or ready to go - label always names the target so a tap is never
+// a guess about where the song is headed.
+function renderQuickAddButton() {
+  const btn = document.getElementById('djQuickAddBtn');
+  if (!btn) return;
+  const last = getLastAddPlaylist();
+  if (!last) {
+    btn.disabled = true;
+    btn.textContent = 'No recent playlist';
+    return;
+  }
+  btn.disabled = !djCurrentTrackUri;
+  btn.textContent = '+ ' + last.name;
+}
+
+async function addTrackToPlaylist_(playlistId, playlistName, btnEl) {
+  if (!djCurrentTrackUri) return false;
+  const original = btnEl ? btnEl.textContent : null;
+  if (btnEl) { btnEl.textContent = '…'; btnEl.disabled = true; }
+  const resp = await spotifyApiRequest('POST', `/playlists/${playlistId}/tracks`, { uris: [djCurrentTrackUri] });
+  if (resp.ok) saveLastAddPlaylist(playlistId, playlistName);
+  if (btnEl) {
+    btnEl.textContent = resp.ok ? '✓ Added' : '⚠ Failed';
+    setTimeout(() => {
+      btnEl.disabled = false;
+      if (original !== null) btnEl.textContent = original;
+    }, 1200);
+  }
+  return resp.ok;
+}
+
+function quickAddCurrentTrack() {
+  const last = getLastAddPlaylist();
+  if (!last || !djCurrentTrackUri) return;
+  addTrackToPlaylist_(last.id, last.name, document.getElementById('djQuickAddBtn'));
+}
+
+function openAddToPlaylistPicker() {
+  if (!djCurrentTrackUri) return;
+  document.getElementById('djAddToPlaylistModalOverlay').classList.add('open');
+  renderAddToPlaylistList();
+  if (!djPlaylistsLoaded) loadDjPlaylists();
+}
+
+function closeAddToPlaylistModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('djAddToPlaylistModalOverlay').classList.remove('open');
+}
+
+function renderAddToPlaylistList() {
+  const el = document.getElementById('djAddToPlaylistList');
+  if (!el) return;
+  if (!djPlaylistsCache) {
+    el.innerHTML = '<div class="sp-playlists-empty">Loading…</div>';
+    return;
+  }
+  if (djPlaylistsCache.length === 0) {
+    el.innerHTML = '<div class="sp-playlists-empty">No playlists found</div>';
+    return;
+  }
+  el.innerHTML = '';
+  djPlaylistsCache.forEach(pl => {
+    const row = document.createElement('div');
+    row.className = 'dj-playlist-row';
+
+    const art = document.createElement(pl.image ? 'img' : 'div');
+    art.className = 'dj-playlist-row-art';
+    if (pl.image) art.src = pl.image; else art.textContent = '🎵';
+
+    const name = document.createElement('div');
+    name.className = 'dj-playlist-row-name';
+    name.textContent = pl.name;
+
+    const addBtn = document.createElement('div');
+    addBtn.className = 'dj-queue-btn';
+    addBtn.textContent = '+';
+    addBtn.title = 'Add here';
+
+    row.appendChild(art);
+    row.appendChild(name);
+    row.appendChild(addBtn);
+    row.addEventListener('click', async () => {
+      const ok = await addTrackToPlaylist_(pl.id, pl.name, addBtn);
+      if (ok) setTimeout(() => closeAddToPlaylistModal(), 700);
+    });
+    el.appendChild(row);
+  });
+}
+
 // Reuses the same pinned/workout playlist config from the Overview tab's
 // Spotify card, but tapping here actually starts playback via the API
 // instead of just deep-linking out to the app.
@@ -7613,6 +7769,7 @@ async function loadDjPlaylists() {
   }));
   djPlaylistsLoaded = true;
   renderDjPlaylistGrid();
+  renderAddToPlaylistList();
   if (previewEl) previewEl.textContent = djPlaylistsCache.length ? `${djPlaylistsCache.length} playlist${djPlaylistsCache.length === 1 ? '' : 's'}` : 'None yet';
 }
 
@@ -7964,6 +8121,7 @@ let djTopItemsLoadedOnce = false;
 function renderMusicTab() {
   renderShuffleBar();
   renderDjQuickAccess();
+  renderQuickAddButton();
   startDjPolling();
   if (!djPlaylistsLoaded) loadDjPlaylists();
   loadDjRecentlyPlayed();
