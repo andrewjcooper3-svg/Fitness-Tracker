@@ -520,58 +520,65 @@
   .sp-shuffle-playlist { font-family: var(--font); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
   .sp-shuffle-status { font-family: var(--font); font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; max-width: 90px; }
 
-  .dj-hero { position: relative; background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 26px; padding: 22px 18px; margin-bottom: 16px; text-align: center; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid var(--border); }
-  .dj-art-wrap { width: 168px; height: 168px; margin: 0 auto 16px; border-radius: 18px; overflow: hidden; background: var(--surface2); display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 30px rgba(0,0,0,0.45); flex-shrink: 0; transition: width 0.15s, height 0.15s; }
+  /* Default state is a compact single card: a small art thumbnail + title
+     sit on one row (like a normal streaming app's now-playing header),
+     with progress/transport/volume/devices each wrapped onto their own
+     full-width row below via flex-basis - full control set, none of the
+     old version's huge centered artwork and padding. */
+  .dj-hero { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: radial-gradient(circle at 50% 0%, rgba(29,185,84,0.16), var(--surface) 60%); border-radius: 22px; padding: 14px 16px; margin-bottom: 16px; text-align: left; box-shadow: 0 10px 28px rgba(0,0,0,0.35); border: 1px solid var(--border); }
+  .dj-art-wrap { width: 60px; height: 60px; margin: 0; border-radius: 14px; overflow: hidden; background: var(--surface2); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(0,0,0,0.35); flex-shrink: 0; }
   .dj-art { width: 100%; height: 100%; object-fit: cover; }
-  .dj-art-fallback { font-size: 48px; }
-  .dj-track-title { font-family: var(--font); font-size: 18px; font-weight: 800; letter-spacing: -0.2px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dj-track-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 3px; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dj-art-fallback { font-size: 22px; }
+  .dj-track-info { flex: 1; min-width: 0; padding-right: 26px; }
+  .dj-track-title { font-family: var(--font); font-size: 14.5px; font-weight: 800; letter-spacing: -0.2px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dj-track-sub { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* Collapse toggle sits in the corner regardless of state - tapping it
      (or, when collapsed, tapping anywhere else on the bar) swaps between
-     the full player and a slim mini-bar, same idea as a normal streaming
-     app's mini-player vs. full-screen player. Preference persists so the
-     tab reopens the way it was left. */
-  .dj-hero-toggle { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; border: none; background: var(--surface2); color: var(--muted); font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; }
+     this compact card and a slimmer mini-bar. Preference persists so the
+     tab reopens the way it was left; defaults to expanded (this compact
+     view) since that's the useful one - the mini-bar is an extra option,
+     not the default. */
+  .dj-hero-toggle { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--surface2); color: var(--muted); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1; }
   .dj-hero-toggle:active { background: var(--border); }
-  .dj-hero.dj-collapsed { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; border-radius: 18px; cursor: pointer; }
+  .dj-hero.dj-collapsed { flex-wrap: nowrap; padding: 9px 12px; border-radius: 16px; cursor: pointer; }
   .dj-hero.dj-collapsed .dj-hero-toggle { position: static; flex-shrink: 0; order: 3; }
-  .dj-hero.dj-collapsed .dj-art-wrap { width: 42px; height: 42px; margin: 0; border-radius: 10px; box-shadow: none; }
-  .dj-hero.dj-collapsed .dj-art-fallback { font-size: 18px; }
-  .dj-hero.dj-collapsed .dj-track-info { flex: 1; min-width: 0; order: 2; }
-  .dj-hero.dj-collapsed .dj-track-title { font-size: 13px; padding: 0; }
-  .dj-hero.dj-collapsed .dj-track-sub { font-size: 11px; padding: 0; margin-top: 1px; }
+  .dj-hero.dj-collapsed .dj-art-wrap { width: 38px; height: 38px; border-radius: 9px; box-shadow: none; }
+  .dj-hero.dj-collapsed .dj-art-fallback { font-size: 16px; }
+  .dj-hero.dj-collapsed .dj-track-info { order: 2; padding-right: 0; }
+  .dj-hero.dj-collapsed .dj-track-title { font-size: 12.5px; }
+  .dj-hero.dj-collapsed .dj-track-sub { font-size: 10.5px; }
   .dj-hero.dj-collapsed .dj-progress-row,
   .dj-hero.dj-collapsed .dj-volume-row,
   .dj-hero.dj-collapsed .dj-devices,
   .dj-hero.dj-collapsed .dj-btn-toggle { display: none; }
-  .dj-hero.dj-collapsed .dj-controls { margin: 0; gap: 2px; order: 2; }
+  .dj-hero.dj-collapsed .dj-controls { flex-basis: auto; margin: 0; gap: 2px; order: 2; }
   .dj-hero.dj-collapsed .dj-controls .dj-btn:not(.dj-btn-play) { display: none; }
-  .dj-hero.dj-collapsed .dj-btn-play { width: 38px; height: 38px; font-size: 16px; }
+  .dj-hero.dj-collapsed .dj-btn-play { width: 34px; height: 34px; font-size: 15px; }
 
-  .dj-progress-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
-  .dj-time { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; width: 32px; flex-shrink: 0; }
+  .dj-progress-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; margin-top: 0; }
+  .dj-time { font-family: var(--font); font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; width: 30px; flex-shrink: 0; }
   /* Padding here enlarges the actual tap/drag target for seeking well
      past the visible bar's thickness, matching iOS's ~44pt minimum
      without making the bar itself look thick. */
-  .dj-progress-track { flex: 1; padding: 12px 0; cursor: pointer; }
-  .dj-progress-bar { height: 5px; border-radius: 3px; background: var(--surface2); overflow: hidden; }
+  .dj-progress-track { flex: 1; padding: 8px 0; cursor: pointer; }
+  .dj-progress-bar { height: 4px; border-radius: 3px; background: var(--surface2); overflow: hidden; }
   .dj-progress-fill { height: 100%; background: #1DB954; border-radius: 3px; width: 0%; }
 
-  .dj-controls { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 12px; }
-  .dj-btn { position: relative; background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+  .dj-controls { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 2px; }
+  .dj-btn { position: relative; background: none; border: none; color: var(--text); font-size: 18px; cursor: pointer; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
   .dj-btn:active { background: var(--surface2); }
   .dj-btn-toggle.active { color: #1DB954; }
-  .dj-repeat-one-dot { display: none; position: absolute; top: 6px; right: 9px; width: 6px; height: 6px; border-radius: 50%; background: #1DB954; }
+  .dj-repeat-one-dot { display: none; position: absolute; top: 5px; right: 7px; width: 5px; height: 5px; border-radius: 50%; background: #1DB954; }
   .dj-btn-toggle.repeat-one .dj-repeat-one-dot { display: block; }
-  .dj-btn-play { background: #1DB954; color: #05230f; font-size: 24px; width: 62px; height: 62px; }
+  .dj-btn-play { background: #1DB954; color: #05230f; font-size: 19px; width: 50px; height: 50px; }
   .dj-btn-play:active { background: #1ed760; }
 
-  .dj-volume-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 8px; }
-  .dj-volume-icon { font-size: 14px; flex-shrink: 0; }
-  .dj-volume-slider { flex: 1; accent-color: #1DB954; height: 30px; }
+  .dj-volume-row { flex-basis: 100%; display: flex; align-items: center; gap: 8px; margin-top: 0; padding: 2px 0; }
+  .dj-volume-icon { font-size: 13px; flex-shrink: 0; }
+  .dj-volume-slider { flex: 1; accent-color: #1DB954; height: 26px; }
 
-  .dj-devices { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+  .dj-devices { flex-basis: 100%; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 0; }
   .dj-device-chip { font-family: var(--font); font-size: 12px; font-weight: 600; padding: 9px 15px; border-radius: 20px; background: var(--surface2); color: var(--muted); cursor: pointer; transition: all 0.15s; }
   .dj-device-chip:active { background: #453b2f; }
   .dj-device-chip.active { background: rgba(29,185,84,0.2); color: #1DB954; }
@@ -599,10 +606,6 @@
   .dj-playlist-row-pin { font-size: 19px; color: var(--muted); cursor: pointer; flex-shrink: 0; padding: 12px; margin: -12px; }
   .dj-playlist-row-pin.pinned { color: #1DB954; }
 
-  .dj-recent-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
-  .dj-recent-tile { flex-shrink: 0; width: 72px; cursor: pointer; }
-  .dj-recent-art { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-  .dj-recent-name { font-family: var(--font); font-size: 10px; font-weight: 600; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* Search - one box, debounced, grouped results underneath grouped by
      type (songs/artists/playlists/podcast episodes). Reuses the same row
@@ -626,10 +629,10 @@
 
   /* Top Tracks/Artists - segmented range picker (Spotify's own fixed
      windows, see the note under it) driving the same playlist-row look
-     for tracks, plus a circular-art scroll row for artists. */
-  .dj-section-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-  .dj-section-label-row .dj-section-label { margin-bottom: 0; }
-  .dj-range-picker { display: flex; gap: 2px; background: var(--surface2); border-radius: 10px; padding: 2px; }
+     for tracks, plus a circular-art scroll row for artists. Lives inside
+     the Top Tracks modal now, sitting in its ov-page-head next to the
+     title (that element is already flex/space-between). */
+  .dj-range-picker { display: flex; gap: 2px; background: var(--surface2); border-radius: 10px; padding: 2px; flex-shrink: 0; }
   .dj-range-btn { font-family: var(--font); font-size: 10.5px; font-weight: 600; padding: 5px 8px; border-radius: 8px; border: none; background: none; color: var(--muted); cursor: pointer; }
   .dj-range-btn.active { background: var(--surface); color: #1DB954; }
   .dj-top-rank { width: 18px; flex-shrink: 0; text-align: center; font-family: var(--font); font-size: 13px; font-weight: 700; color: var(--muted); }
@@ -639,6 +642,17 @@
   .dj-artist-tile { flex-shrink: 0; width: 76px; text-align: center; cursor: pointer; }
   .dj-artist-art { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 22px; }
   .dj-artist-name { font-family: var(--font); font-size: 11px; font-weight: 600; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Top Tracks, Playlists, and Recently Played each collapse down to one
+     square card - tap opens the full list in a modal (same pattern as the
+     Overview tiles opening the Weight modal) instead of three long lists
+     stacked one after another on the main tab. */
+  .dj-card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .dj-card { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; border-radius: 18px; padding: 10px 6px; background: var(--surface); border: 1.5px solid var(--border); cursor: pointer; transition: opacity 0.15s; }
+  .dj-card:active { opacity: 0.85; }
+  .dj-card-icon { width: 34px; height: 34px; border-radius: 10px; background: rgba(29,185,84,0.14); color: #1DB954; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .dj-card-label { font-family: var(--font); font-size: 11px; font-weight: 700; color: var(--text); }
+  .dj-card-value { font-family: var(--font); font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; padding: 0 2px; }
 
   .settings-field { margin-bottom: 14px; }
   .settings-field:last-of-type { margin-bottom: 0; }
@@ -932,30 +946,22 @@
     <div class="dj-quick-row" id="djQuickAccess"><div class="sp-playlists-empty">Pin playlists below with ☆</div></div>
   </div>
 
-  <div class="dj-section" id="djTopSection">
-    <div class="dj-section-label-row">
-      <div class="dj-section-label">Top Tracks</div>
-      <div class="dj-range-picker" id="djRangePicker">
-        <button class="dj-range-btn" data-range="short_term" onclick="setDjTopRange('short_term')">4 Wks</button>
-        <button class="dj-range-btn" data-range="medium_term" onclick="setDjTopRange('medium_term')">6 Mos</button>
-        <button class="dj-range-btn" data-range="long_term" onclick="setDjTopRange('long_term')">All Time</button>
-      </div>
+  <div class="dj-card-grid">
+    <div class="dj-card" onclick="openDjTopModal()">
+      <div class="dj-card-icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M7 4h10v6a5 5 0 0 1-10 0V4z"></path><path d="M7 6H4a3 3 0 0 0 3 4"></path><path d="M17 6h3a3 3 0 0 1-3 4"></path></svg></div>
+      <div class="dj-card-label">Top Tracks</div>
+      <div class="dj-card-value" id="djTopCardPreview">Connect Spotify</div>
     </div>
-    <div class="dj-playlist-list" id="djTopTracks"><div class="sp-playlists-empty">Connect Spotify to see your top tracks</div></div>
-    <div class="dj-section-label" style="margin-top:14px;">Top Artists</div>
-    <div class="dj-top-artists-row" id="djTopArtists"></div>
-    <div class="ov-note" style="margin-top:6px;">Spotify's API only offers these fixed windows (no exact "this week") and has no top-podcasts equivalent - search above to find and play a podcast episode directly instead.</div>
-  </div>
-
-  <div class="dj-section">
-    <div class="dj-section-label">Your Playlists</div>
-    <div class="dj-playlist-status" id="djPlaylistStatus"></div>
-    <div class="dj-playlist-list" id="djPlaylistGrid"><div class="sp-playlists-empty">Connect Spotify to see your playlists</div></div>
-  </div>
-
-  <div class="dj-section">
-    <div class="dj-section-label">Recently Played</div>
-    <div class="dj-recent-row" id="djRecentRow"><div class="sp-playlists-empty">Connect Spotify first</div></div>
+    <div class="dj-card" onclick="openDjPlaylistsModal()">
+      <div class="dj-card-icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle></svg></div>
+      <div class="dj-card-label">Playlists</div>
+      <div class="dj-card-value" id="djPlaylistsCardPreview">Connect Spotify</div>
+    </div>
+    <div class="dj-card" onclick="openDjRecentModal()">
+      <div class="dj-card-icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg></div>
+      <div class="dj-card-label">Recently Played</div>
+      <div class="dj-card-value" id="djRecentCardPreview">Connect Spotify</div>
+    </div>
   </div>
 
   <div class="ov-note">Full playback control via Spotify's Web API - needs Premium and an active device (open Spotify somewhere first). Connect Spotify and set your workout playlist in Settings (gear icon, Overview tab).</div>
@@ -1839,6 +1845,57 @@
 
     <div class="ov-note">Enter manually, or set up an Apple Shortcut to auto-log your Fitdays weigh-in from Apple Health — see the setup steps for the URL to POST to.</div>
     <button class="event-modal-close" onclick="closeWeightDetailModal(event)" style="margin-top:10px;">Close</button>
+  </div>
+</div>
+
+<div class="event-modal-overlay" id="djTopModalOverlay" onclick="closeDjTopModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-head" style="padding-bottom:10px;">
+      <div>
+        <div class="ov-page-week">Music</div>
+        <div class="ov-page-title">Top Tracks</div>
+      </div>
+      <div class="dj-range-picker" id="djRangePicker">
+        <button class="dj-range-btn" data-range="short_term" onclick="setDjTopRange('short_term')">4 Wks</button>
+        <button class="dj-range-btn" data-range="medium_term" onclick="setDjTopRange('medium_term')">6 Mos</button>
+        <button class="dj-range-btn" data-range="long_term" onclick="setDjTopRange('long_term')">All Time</button>
+      </div>
+    </div>
+    <div class="dj-playlist-list" id="djTopTracks"><div class="sp-playlists-empty">Connect Spotify to see your top tracks</div></div>
+    <div class="dj-section-label" style="margin-top:16px;">Top Artists</div>
+    <div class="dj-top-artists-row" id="djTopArtists"></div>
+    <div class="ov-note" style="margin-top:10px;">Spotify's API only offers these fixed windows (no exact "this week") and has no top-podcasts equivalent - search the Music tab to find and play a podcast episode directly instead.</div>
+    <button class="event-modal-close" onclick="closeDjTopModal(event)" style="margin-top:10px;">Close</button>
+  </div>
+</div>
+
+<div class="event-modal-overlay" id="djPlaylistsModalOverlay" onclick="closeDjPlaylistsModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-head" style="padding-bottom:10px;">
+      <div>
+        <div class="ov-page-week">Music</div>
+        <div class="ov-page-title">Playlists</div>
+      </div>
+    </div>
+    <div class="dj-playlist-status" id="djPlaylistStatus"></div>
+    <div class="dj-playlist-list" id="djPlaylistGrid"><div class="sp-playlists-empty">Connect Spotify to see your playlists</div></div>
+    <button class="event-modal-close" onclick="closeDjPlaylistsModal(event)" style="margin-top:10px;">Close</button>
+  </div>
+</div>
+
+<div class="event-modal-overlay" id="djRecentModalOverlay" onclick="closeDjRecentModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-head" style="padding-bottom:10px;">
+      <div>
+        <div class="ov-page-week">Music</div>
+        <div class="ov-page-title">Recently Played</div>
+      </div>
+    </div>
+    <div class="dj-playlist-list" id="djRecentRow"><div class="sp-playlists-empty">Connect Spotify first</div></div>
+    <button class="event-modal-close" onclick="closeDjRecentModal(event)" style="margin-top:10px;">Close</button>
   </div>
 </div>
 
@@ -5863,7 +5920,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-music-tab-redesign';
+const APP_BUILD_VERSION = '2026-08-13-music-tab-compact-cards';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7294,12 +7351,13 @@ function initDjProgressSeek() {
 
 const STORAGE_DJ_HERO_COLLAPSED = 'WORKOUT_DJ_HERO_COLLAPSED';
 
-// Defaults to collapsed - the point is to get the full player out of the
-// way so search/playlists/top tracks are visible without scrolling past
-// it first, same as any streaming app's mini-player.
+// Defaults to expanded - the "expanded" card is itself compact now (small
+// art thumbnail, tight rows) so there's no real need to default to the
+// even-slimmer mini-bar; that's just an extra option for anyone who wants
+// less than the compact card.
 function loadDjHeroCollapsedPref() {
   const stored = localStorage.getItem(STORAGE_DJ_HERO_COLLAPSED);
-  return stored === null ? true : stored === '1';
+  return stored === null ? false : stored === '1';
 }
 
 function setDjHeroCollapsed(collapsed) {
@@ -7517,12 +7575,19 @@ let djPlaylistsCache = null;
 
 async function loadDjPlaylists() {
   const el = document.getElementById('djPlaylistGrid');
+  const previewEl = document.getElementById('djPlaylistsCardPreview');
   if (!el) return;
-  if (!isSpotifyConnected()) { el.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to see your playlists</div>'; djPlaylistsCache = null; return; }
+  if (!isSpotifyConnected()) {
+    el.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to see your playlists</div>';
+    djPlaylistsCache = null;
+    if (previewEl) previewEl.textContent = 'Connect Spotify';
+    return;
+  }
 
   const resp = await spotifyApiRequest('GET', '/me/playlists?limit=24');
   if (!resp.ok || !resp.data || !resp.data.items) {
     el.innerHTML = '<div class="sp-playlists-empty">Could not load playlists</div>';
+    if (previewEl) previewEl.textContent = 'Could not load';
     return;
   }
 
@@ -7533,6 +7598,7 @@ async function loadDjPlaylists() {
   }));
   djPlaylistsLoaded = true;
   renderDjPlaylistGrid();
+  if (previewEl) previewEl.textContent = djPlaylistsCache.length ? `${djPlaylistsCache.length} playlist${djPlaylistsCache.length === 1 ? '' : 's'}` : 'None yet';
 }
 
 // Spotify-library-style rows: art on the left, title to the right, one
@@ -7571,35 +7637,53 @@ function renderDjPlaylistGrid() {
 
 async function loadDjRecentlyPlayed() {
   const el = document.getElementById('djRecentRow');
+  const previewEl = document.getElementById('djRecentCardPreview');
   if (!el) return;
-  if (!isSpotifyConnected()) { el.innerHTML = '<div class="sp-playlists-empty">Connect Spotify first</div>'; return; }
+  if (!isSpotifyConnected()) {
+    el.innerHTML = '<div class="sp-playlists-empty">Connect Spotify first</div>';
+    if (previewEl) previewEl.textContent = 'Connect Spotify';
+    return;
+  }
 
   const resp = await spotifyApiRequest('GET', '/me/player/recently-played?limit=15');
   if (!resp.ok || !resp.data || !resp.data.items) {
     el.innerHTML = '<div class="sp-playlists-empty">Could not load recent plays</div>';
+    if (previewEl) previewEl.textContent = 'Could not load';
     return;
   }
 
   el.innerHTML = '';
   const seen = new Set();
+  let firstTrackName = null;
   resp.data.items.forEach(entry => {
     const track = entry.track;
     if (!track || seen.has(track.uri)) return; // de-dupe repeats from one long listen
     seen.add(track.uri);
-    const tile = document.createElement('div');
-    tile.className = 'dj-recent-tile';
-    tile.addEventListener('click', () => playSpotifyTrackUri(track.uri));
+    if (!firstTrackName) firstTrackName = track.name;
+    const row = document.createElement('div');
+    row.className = 'dj-playlist-row';
+    row.addEventListener('click', () => playSpotifyTrackUri(track.uri));
     const images = track.album && track.album.images;
     const art = document.createElement(images && images.length ? 'img' : 'div');
-    art.className = 'dj-recent-art';
+    art.className = 'dj-playlist-row-art';
     if (images && images.length) art.src = images[images.length - 1].url; else art.textContent = '🎵';
+    const info = document.createElement('div');
+    info.className = 'dj-top-track-info';
     const name = document.createElement('div');
-    name.className = 'dj-recent-name';
+    name.className = 'dj-playlist-row-name';
     name.textContent = track.name;
-    tile.appendChild(art);
-    tile.appendChild(name);
-    el.appendChild(tile);
+    const artist = document.createElement('div');
+    artist.className = 'dj-top-track-artist';
+    artist.textContent = (track.artists || []).map(a => a.name).join(', ');
+    info.appendChild(name);
+    info.appendChild(artist);
+    row.appendChild(art);
+    row.appendChild(info);
+    el.appendChild(row);
   });
+
+  if (el.children.length === 0) el.innerHTML = '<div class="sp-playlists-empty">Nothing played yet</div>';
+  if (previewEl) previewEl.textContent = firstTrackName || 'Nothing yet';
 }
 
 /* ---------- Music tab: search ---------- */
@@ -7731,11 +7815,13 @@ function renderDjRangePicker() {
 async function loadDjTopItems() {
   const tracksEl = document.getElementById('djTopTracks');
   const artistsEl = document.getElementById('djTopArtists');
+  const previewEl = document.getElementById('djTopCardPreview');
   if (!tracksEl || !artistsEl) return;
 
   if (!isSpotifyConnected()) {
     tracksEl.innerHTML = '<div class="sp-playlists-empty">Connect Spotify to see your top tracks</div>';
     artistsEl.innerHTML = '';
+    if (previewEl) previewEl.textContent = 'Connect Spotify';
     return;
   }
 
@@ -7746,8 +7832,10 @@ async function loadDjTopItems() {
     spotifyApiRequest('GET', `/me/top/tracks?time_range=${range}&limit=10`),
     spotifyApiRequest('GET', `/me/top/artists?time_range=${range}&limit=10`)
   ]);
-  renderDjTopTracks((tracksResp.ok && tracksResp.data && tracksResp.data.items) || []);
+  const tracks = (tracksResp.ok && tracksResp.data && tracksResp.data.items) || [];
+  renderDjTopTracks(tracks);
   renderDjTopArtists((artistsResp.ok && artistsResp.data && artistsResp.data.items) || []);
+  if (previewEl) previewEl.textContent = tracks.length ? tracks[0].name : 'Not enough history';
 }
 
 function renderDjTopTracks(tracks) {
@@ -7853,6 +7941,36 @@ function renderMusicTab() {
   loadDjRecentlyPlayed();
   renderDjRangePicker();
   if (!djTopItemsLoadedOnce) { djTopItemsLoadedOnce = true; loadDjTopItems(); }
+}
+
+// Top Tracks/Artists, Playlists, and Recently Played each moved off the
+// main Music tab into their own modal (same "square card -> tap -> full
+// detail sheet" pattern as the Overview tiles) - all three modals reuse
+// the exact same content element ids the render functions above already
+// target, so nothing about the loading/rendering logic itself changed,
+// only where that markup lives in the page.
+function openDjTopModal() {
+  document.getElementById('djTopModalOverlay').classList.add('open');
+}
+function closeDjTopModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('djTopModalOverlay').classList.remove('open');
+}
+
+function openDjPlaylistsModal() {
+  document.getElementById('djPlaylistsModalOverlay').classList.add('open');
+}
+function closeDjPlaylistsModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('djPlaylistsModalOverlay').classList.remove('open');
+}
+
+function openDjRecentModal() {
+  document.getElementById('djRecentModalOverlay').classList.add('open');
+}
+function closeDjRecentModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('djRecentModalOverlay').classList.remove('open');
 }
 
 function showDay(day) {
