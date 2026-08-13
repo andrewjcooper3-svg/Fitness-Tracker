@@ -318,6 +318,13 @@
   .ov-glance-tile { border-radius: 18px; padding: 13px 15px; cursor: pointer; transition: opacity 0.15s; position: relative; grid-column: span 1; color: var(--text); background: var(--surface); border: 1.5px solid var(--border); }
   .ov-glance-tile:active { opacity: 0.85; }
   .ov-glance-tile-wide { grid-column: span 2; }
+  /* Icon+label on the left, the actual number/status on the right, on one
+     row instead of stacked - reads at a glance without the extra height.
+     Upcoming keeps its own block layout below (it lists several events,
+     not a single value) so this only applies to the plain data tiles. */
+  .ov-glance-tile:not(.ov-glance-tile-wide) { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; }
+  .ov-glance-left { display: flex; flex-direction: column; align-items: flex-start; flex-shrink: 0; }
+  .ov-glance-right { flex: 1; min-width: 0; text-align: right; }
   /* Category color now lives only in the border + icon chip, not a full
      gradient fill - a quieter, lower-eyestrain read for daytime/work use. */
   .ov-glance-tile[data-widget="weight"] { border-color: #a291c9; }
@@ -325,7 +332,7 @@
   .ov-glance-tile[data-widget="kitchen"] { border-color: #d9b36e; }
   .ov-glance-tile[data-widget="shopping"] { border-color: #86bf95; }
   .ov-glance-tile[data-widget="upcoming"] { border-color: #d992b0; }
-  .ov-glance-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; margin-bottom: 7px; flex-shrink: 0; }
+  .ov-glance-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; margin-bottom: 6px; flex-shrink: 0; }
   .ov-glance-icon svg { display: block; }
   .ov-glance-tile[data-widget="weight"] .ov-glance-icon { background: rgba(162,145,201,0.16); color: #a291c9; }
   .ov-glance-tile[data-widget="spotify"] .ov-glance-icon { background: rgba(107,171,124,0.16); color: #6bab7c; }
@@ -333,8 +340,9 @@
   .ov-glance-tile[data-widget="shopping"] .ov-glance-icon { background: rgba(134,191,149,0.16); color: #86bf95; }
   .ov-glance-tile[data-widget="upcoming"] .ov-glance-icon { background: rgba(217,146,176,0.16); color: #d992b0; }
   .ov-glance-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px; }
+  .ov-glance-tile:not(.ov-glance-tile-wide) .ov-glance-label { margin-bottom: 0; }
   .ov-glance-tile .sp-np-artist, .ov-glance-tile .sp-playlists { display: none; }
-  .ov-glance-tile .sp-np-art-wrap { width: 28px; height: 28px; border-radius: 9px; margin-bottom: 7px; }
+  .ov-glance-tile .sp-np-art-wrap { width: 28px; height: 28px; border-radius: 9px; margin-bottom: 6px; }
   .ov-glance-tile .sp-np-title { font-size: 12.5px; }
   .ov-glance-tile .ov-mini-empty { font-size: 12px; padding: 0; line-height: 1.3; }
   .ov-glance-tile .ov-mini-weight-value { font-size: 19px; }
@@ -749,33 +757,43 @@
        box is genuinely pixel-aligned. -->
   <div class="ov-glance-grid">
     <div class="ov-glance-tile ov-widget" data-widget="weight" data-size="small" onclick="if (!overviewEditing) openWeightDetailModal()">
-      <div class="ov-glance-icon c-weight"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="4" height="6" rx="1"></rect><rect x="17" y="9" width="4" height="6" rx="1"></rect><line x1="7" y1="12" x2="17" y2="12"></line></svg></div>
-      <div class="ov-glance-label">Weight</div>
-      <div id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-glance-left">
+        <div class="ov-glance-icon c-weight"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="4" height="6" rx="1"></rect><rect x="17" y="9" width="4" height="6" rx="1"></rect><line x1="7" y1="12" x2="17" y2="12"></line></svg></div>
+        <div class="ov-glance-label">Weight</div>
+      </div>
+      <div class="ov-glance-right" id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
     <div class="ov-glance-tile ov-widget" data-widget="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
       <span class="sp-status-dot" id="spStatusDot"></span>
-      <div class="sp-np-art-wrap ov-glance-icon c-spotify">
-        <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
-        <div class="sp-np-art-fallback" id="spNpArtFallback"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.4 14.4a.6.6 0 0 1-.83.2c-2.3-1.4-5.2-1.7-8.6-.9a.6.6 0 1 1-.27-1.17c3.7-.85 6.9-.48 9.5 1.1a.6.6 0 0 1 .2.77zm1.2-2.7a.75.75 0 0 1-1.03.25c-2.6-1.6-6.6-2.06-9.7-1.13a.75.75 0 0 1-.43-1.44c3.5-1.06 7.9-.55 10.9 1.3a.75.75 0 0 1 .26 1.02zm.1-2.8C14.8 9.1 9.6 8.9 6.6 9.8a.9.9 0 1 1-.52-1.72c3.5-1.06 9.2-.83 12.8 1.28a.9.9 0 0 1-.9 1.56z"></path></svg></div>
+      <div class="ov-glance-left">
+        <div class="sp-np-art-wrap ov-glance-icon c-spotify">
+          <img class="sp-np-art" id="spNpArt" alt="" style="display:none;">
+          <div class="sp-np-art-fallback" id="spNpArtFallback"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.4 14.4a.6.6 0 0 1-.83.2c-2.3-1.4-5.2-1.7-8.6-.9a.6.6 0 1 1-.27-1.17c3.7-.85 6.9-.48 9.5 1.1a.6.6 0 0 1 .2.77zm1.2-2.7a.75.75 0 0 1-1.03.25c-2.6-1.6-6.6-2.06-9.7-1.13a.75.75 0 0 1-.43-1.44c3.5-1.06 7.9-.55 10.9 1.3a.75.75 0 0 1 .26 1.02zm.1-2.8C14.8 9.1 9.6 8.9 6.6 9.8a.9.9 0 1 1-.52-1.72c3.5-1.06 9.2-.83 12.8 1.28a.9.9 0 0 1-.9 1.56z"></path></svg></div>
+        </div>
+        <div class="ov-glance-label">Spotify</div>
       </div>
-      <div class="ov-glance-label">Spotify</div>
-      <div class="sp-np-title" id="spNpTitle">Not connected</div>
-      <div class="sp-np-artist" id="spNpArtist"></div>
-      <div class="sp-playlists" id="spPlaylistTiles"><div class="sp-playlists-empty">Pin playlists in the Music tab</div></div>
+      <div class="ov-glance-right">
+        <div class="sp-np-title" id="spNpTitle">Not connected</div>
+        <div class="sp-np-artist" id="spNpArtist"></div>
+        <div class="sp-playlists" id="spPlaylistTiles"><div class="sp-playlists-empty">Pin playlists in the Music tab</div></div>
+      </div>
     </div>
 
     <div class="ov-glance-tile ov-widget" data-widget="kitchen" data-size="small" onclick="handleWidgetTap(event, 'kitchen')">
-      <div class="ov-glance-icon c-kitchen"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="13" r="7"></circle><line x1="17" y1="13" x2="22" y2="13"></line></svg></div>
-      <div class="ov-glance-label">Kitchen</div>
-      <div id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-glance-left">
+        <div class="ov-glance-icon c-kitchen"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="13" r="7"></circle><line x1="17" y1="13" x2="22" y2="13"></line></svg></div>
+        <div class="ov-glance-label">Kitchen</div>
+      </div>
+      <div class="ov-glance-right" id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
     <div class="ov-glance-tile ov-widget" data-widget="shopping" data-size="small" onclick="handleShoppingWidgetTap(event)">
-      <div class="ov-glance-icon c-shopping"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"></path></svg></div>
-      <div class="ov-glance-label">Shopping</div>
-      <div id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
+      <div class="ov-glance-left">
+        <div class="ov-glance-icon c-shopping"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"></path></svg></div>
+        <div class="ov-glance-label">Shopping</div>
+      </div>
+      <div class="ov-glance-right" id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
     <div class="ov-glance-tile ov-glance-tile-wide ov-widget" data-widget="upcoming" data-size="small" onclick="handleWidgetTap(event, 'calendar')">
@@ -5750,7 +5768,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-calendar-client-side-past-day-filter';
+const APP_BUILD_VERSION = '2026-08-13-overview-tiles-data-on-right';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
