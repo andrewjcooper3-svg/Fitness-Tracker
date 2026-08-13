@@ -323,7 +323,13 @@ function expandRecurrence(event, rangeStart, rangeEnd) {
 
   if (!event.rrule) {
     const occEnd = event.end || event.start;
-    if (occEnd >= rangeStart && event.start <= rangeEnd) {
+    // All-day events store DTEND as the day *after* the last day the event
+    // occupies (RFC 5545's exclusive-end convention), so an event that only
+    // covered yesterday has occEnd === today's rangeStart exactly - ">="
+    // wrongly treats that touching boundary as still overlapping today.
+    // Timed events' end is a real inclusive instant, so they keep ">=".
+    const startsInRange = event.allDay ? occEnd > rangeStart : occEnd >= rangeStart;
+    if (startsInRange && event.start <= rangeEnd) {
       return [{ summary: event.summary, allDay: event.allDay, start: event.start, end: event.end, location: event.location, description: event.description }];
     }
     return [];
@@ -349,7 +355,8 @@ function expandRecurrence(event, rangeStart, rangeEnd) {
 
     if (!exdateSet.has(current.getTime())) {
       const occEnd = duration ? new Date(current.getTime() + duration) : null;
-      if ((occEnd || current) >= rangeStart && current <= rangeEnd) {
+      const startsInRange = event.allDay ? (occEnd || current) > rangeStart : (occEnd || current) >= rangeStart;
+      if (startsInRange && current <= rangeEnd) {
         occurrences.push({ summary: event.summary, allDay: event.allDay, start: new Date(current), end: occEnd, location: event.location, description: event.description });
       }
     }
