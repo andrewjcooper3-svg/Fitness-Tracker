@@ -5958,7 +5958,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-bpm-display-and-playlist-dedupe';
+const APP_BUILD_VERSION = '2026-08-13-bpm-failure-diagnostic';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7385,6 +7385,7 @@ let djTempoTrackId = null;
 // Audio Features is one of the endpoints Spotify has restricted for
 // newer apps - if it 403s, this just clears the tempo display instead
 // of leaving stale/wrong text up.
+let djTempoDiagnosticShown_ = false;
 async function loadDjTempo(trackId) {
   const el = document.getElementById('djTempo');
   if (!el) return;
@@ -7392,6 +7393,18 @@ async function loadDjTempo(trackId) {
   el.textContent = (resp.ok && resp.data && typeof resp.data.tempo === 'number')
     ? Math.round(resp.data.tempo) + ' BPM'
     : '';
+  // TEMPORARY diagnostic - once per session, so a blocked BPM lookup
+  // shows exactly what Spotify said instead of just silently showing
+  // nothing. Remove once this is sorted out one way or the other.
+  if (!resp.ok && !djTempoDiagnosticShown_) {
+    djTempoDiagnosticShown_ = true;
+    alert(
+      'BPM lookup failed\n\n' +
+      'Track ID: ' + trackId + '\n' +
+      'HTTP status: ' + resp.status + '\n' +
+      'Full response: ' + JSON.stringify(resp.data)
+    );
+  }
 }
 
 function startDjProgressTicker() {
