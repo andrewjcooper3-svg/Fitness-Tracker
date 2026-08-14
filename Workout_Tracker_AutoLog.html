@@ -533,7 +533,6 @@
   .dj-track-info { flex: 1; min-width: 0; padding-right: 26px; }
   .dj-track-title { font-family: var(--font); font-size: 14.5px; font-weight: 800; letter-spacing: -0.2px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dj-track-sub { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dj-track-tempo { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: #1DB954; margin-top: 1px; }
 
   /* Collapse toggle sits in the corner regardless of state - tapping it
      (or, when collapsed, tapping anywhere else on the bar) swaps between
@@ -550,7 +549,6 @@
   .dj-hero.dj-collapsed .dj-track-info { order: 2; padding-right: 0; }
   .dj-hero.dj-collapsed .dj-track-title { font-size: 12.5px; }
   .dj-hero.dj-collapsed .dj-track-sub { font-size: 10.5px; }
-  .dj-hero.dj-collapsed .dj-track-tempo,
   .dj-hero.dj-collapsed .dj-progress-row,
   .dj-hero.dj-collapsed .dj-volume-row,
   .dj-hero.dj-collapsed .dj-devices,
@@ -917,7 +915,6 @@
     <div class="dj-track-info">
       <div class="dj-track-title" id="djTitle">Not connected</div>
       <div class="dj-track-sub" id="djSubtitle"></div>
-      <div class="dj-track-tempo" id="djTempo"></div>
     </div>
 
     <div class="dj-progress-row">
@@ -5958,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-bpm-failure-diagnostic';
+const APP_BUILD_VERSION = '2026-08-13-remove-bpm-fix-dedupe-check';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7378,34 +7375,6 @@ let djProgressTimer = null;
 // track-row-specific, since they're about the now-playing item.
 let djCurrentTrackUri = null;
 let djCurrentTrackName = null;
-// Tracks which track's tempo is currently shown, so a poll tick that
-// finds the same song still playing doesn't refetch its BPM every time.
-let djTempoTrackId = null;
-
-// Audio Features is one of the endpoints Spotify has restricted for
-// newer apps - if it 403s, this just clears the tempo display instead
-// of leaving stale/wrong text up.
-let djTempoDiagnosticShown_ = false;
-async function loadDjTempo(trackId) {
-  const el = document.getElementById('djTempo');
-  if (!el) return;
-  const resp = await spotifyApiRequest('GET', `/audio-features/${trackId}`);
-  el.textContent = (resp.ok && resp.data && typeof resp.data.tempo === 'number')
-    ? Math.round(resp.data.tempo) + ' BPM'
-    : '';
-  // TEMPORARY diagnostic - once per session, so a blocked BPM lookup
-  // shows exactly what Spotify said instead of just silently showing
-  // nothing. Remove once this is sorted out one way or the other.
-  if (!resp.ok && !djTempoDiagnosticShown_) {
-    djTempoDiagnosticShown_ = true;
-    alert(
-      'BPM lookup failed\n\n' +
-      'Track ID: ' + trackId + '\n' +
-      'HTTP status: ' + resp.status + '\n' +
-      'Full response: ' + JSON.stringify(resp.data)
-    );
-  }
-}
 
 function startDjProgressTicker() {
   stopDjProgressTicker();
@@ -7495,8 +7464,6 @@ function renderDjHero(state) {
     renderDjDevices([]);
     djCurrentTrackUri = null;
     djCurrentTrackName = null;
-    djTempoTrackId = null;
-    document.getElementById('djTempo').textContent = '';
     renderQuickAddButton();
     return;
   }
@@ -7539,16 +7506,6 @@ function renderDjHero(state) {
   djCurrentTrackUri = item.uri || null;
   djCurrentTrackName = item.name || null;
   renderQuickAddButton();
-
-  // Episodes don't have audio features at all - clear rather than leave
-  // a stale BPM from whatever track played before it.
-  if (isEpisode || !item.id) {
-    djTempoTrackId = null;
-    document.getElementById('djTempo').textContent = '';
-  } else if (item.id !== djTempoTrackId) {
-    djTempoTrackId = item.id;
-    loadDjTempo(item.id);
-  }
 }
 
 function renderDjDevices(devices, activeDeviceId) {
@@ -7691,14 +7648,23 @@ function renderQuickAddButton() {
 // playlist rather than looping forever on a huge one; a request that
 // fails outright (rather than just running out of pages) returns false
 // so the add still goes through instead of silently blocking on doubt.
+// We only confirmed the WRITE endpoint got renamed from /tracks to
+// /items - the read side may never have changed, so this tries /items
+// first and falls back to /tracks if that fails outright, rather than
+// assuming symmetry and silently reporting "not found" on every call.
 async function playlistContainsTrack_(playlistId, trackUri) {
-  let path = `/playlists/${playlistId}/items?fields=items(track(uri)),next&limit=100`;
-  for (let page = 0; path && page < 10; page++) {
-    const resp = await spotifyApiRequest('GET', path);
-    if (!resp.ok || !resp.data) return false;
-    const items = resp.data.items || [];
-    if (items.some(it => it.track && it.track.uri === trackUri)) return true;
-    path = resp.data.next ? resp.data.next.replace('https://api.spotify.com/v1', '') : null;
+  for (const base of ['items', 'tracks']) {
+    let path = `/playlists/${playlistId}/${base}?fields=items(track(uri)),next&limit=100`;
+    let reachedEndpoint = false;
+    for (let page = 0; path && page < 10; page++) {
+      const resp = await spotifyApiRequest('GET', path);
+      if (!resp.ok || !resp.data) break;
+      reachedEndpoint = true;
+      const items = resp.data.items || [];
+      if (items.some(it => it.track && it.track.uri === trackUri)) return true;
+      path = resp.data.next ? resp.data.next.replace('https://api.spotify.com/v1', '') : null;
+    }
+    if (reachedEndpoint) return false;
   }
   return false;
 }
