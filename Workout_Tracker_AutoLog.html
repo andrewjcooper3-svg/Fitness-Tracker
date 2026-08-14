@@ -5960,7 +5960,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-card-sizing-and-item-shape-diagnostic';
+const APP_BUILD_VERSION = '2026-08-13-fix-dedupe-empty-fields-filter';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7658,30 +7658,26 @@ function renderQuickAddButton() {
 // but Spotify's read can lag a moment behind a write it just served, so
 // a same-session immediate re-add of the same track can still slip past
 // this - djRecentlyAddedToPlaylist_ below covers exactly that gap.
-let djItemShapeDiagnosticShown_ = false;
+// Handles whichever shape a playlist item actually comes back in - the
+// `fields=items(track(uri))` filter was confirmed to strip everything
+// down to an empty object against the newer endpoint, so this fetches
+// full items instead and checks every plausible spot a URI could live.
+function extractItemUri_(it) {
+  if (!it) return null;
+  return (it.track && it.track.uri) || (it.episode && it.episode.uri) || (it.item && it.item.uri) || it.uri || null;
+}
+
 async function playlistContainsTrack_(playlistId, trackUri) {
   for (const base of ['items', 'tracks']) {
-    let path = `/playlists/${playlistId}/${base}?fields=items(track(uri)),next&limit=100`;
+    let path = `/playlists/${playlistId}/${base}?limit=100`;
     let reachedEndpoint = false;
-    let sawAnyItems = false;
-    let firstItemRaw = null;
     for (let page = 0; path && page < 10; page++) {
       const resp = await spotifyApiRequest('GET', path);
       if (!resp.ok || !resp.data) break;
       reachedEndpoint = true;
       const items = resp.data.items || [];
-      if (items.length && !firstItemRaw) { sawAnyItems = true; firstItemRaw = items[0]; }
-      if (items.some(it => it.track && it.track.uri === trackUri)) return true;
+      if (items.some(it => extractItemUri_(it) === trackUri)) return true;
       path = resp.data.next ? resp.data.next.replace('https://api.spotify.com/v1', '') : null;
-    }
-    // TEMPORARY diagnostic - the fields filter may not match the /items
-    // endpoint's actual response shape, silently returning items with no
-    // usable track.uri on them (so nothing ever matches, even a track
-    // that's genuinely there). Shows the raw shape of one real item once,
-    // so this can be confirmed instead of guessed. Remove once resolved.
-    if (reachedEndpoint && sawAnyItems && !djItemShapeDiagnosticShown_) {
-      djItemShapeDiagnosticShown_ = true;
-      alert(`Item shape check (endpoint: ${base})\n\nFirst item raw JSON:\n${JSON.stringify(firstItemRaw)}\n\nLooking for track.uri === ${trackUri}`);
     }
     if (reachedEndpoint) return false;
   }
