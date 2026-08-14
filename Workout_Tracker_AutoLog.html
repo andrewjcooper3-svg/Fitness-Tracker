@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-remove-bpm-fix-dedupe-check';
+const APP_BUILD_VERSION = '2026-08-13-dedupe-check-diagnostic';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7645,28 +7645,49 @@ function renderQuickAddButton() {
 
 // Pages through the playlist's existing items looking for this exact
 // URI. Capped at 10 pages (1000 items) as a sane ceiling for a personal
-// playlist rather than looping forever on a huge one; a request that
-// fails outright (rather than just running out of pages) returns false
-// so the add still goes through instead of silently blocking on doubt.
+// playlist rather than looping forever on a huge one.
 // We only confirmed the WRITE endpoint got renamed from /tracks to
 // /items - the read side may never have changed, so this tries /items
-// first and falls back to /tracks if that fails outright, rather than
-// assuming symmetry and silently reporting "not found" on every call.
+// first and falls back to /tracks if that fails outright.
+let djDedupeDiagnosticShown_ = false;
 async function playlistContainsTrack_(playlistId, trackUri) {
+  const diag = [];
   for (const base of ['items', 'tracks']) {
     let path = `/playlists/${playlistId}/${base}?fields=items(track(uri)),next&limit=100`;
     let reachedEndpoint = false;
+    let totalItems = 0;
+    let lastResp = null;
     for (let page = 0; path && page < 10; page++) {
       const resp = await spotifyApiRequest('GET', path);
+      lastResp = resp;
       if (!resp.ok || !resp.data) break;
       reachedEndpoint = true;
       const items = resp.data.items || [];
-      if (items.some(it => it.track && it.track.uri === trackUri)) return true;
+      totalItems += items.length;
+      if (items.some(it => it.track && it.track.uri === trackUri)) {
+        diag.push(`${base}: FOUND (status ${resp.status}, ${totalItems} items seen)`);
+        showDedupeDiagnostic_(diag, true);
+        return true;
+      }
       path = resp.data.next ? resp.data.next.replace('https://api.spotify.com/v1', '') : null;
     }
-    if (reachedEndpoint) return false;
+    diag.push(reachedEndpoint
+      ? `${base}: reached, ${totalItems} items, no match (last status ${lastResp.status})`
+      : `${base}: FAILED - status ${lastResp ? lastResp.status : '?'} ${lastResp ? JSON.stringify(lastResp.data) : ''}`);
+    if (reachedEndpoint) { showDedupeDiagnostic_(diag, false); return false; }
   }
+  showDedupeDiagnostic_(diag, false);
   return false;
+}
+
+// TEMPORARY diagnostic - once per session, shows exactly what each
+// endpoint attempt returned so a wrongly-added duplicate can be traced
+// to a specific cause instead of guessed at again. Remove once fixed.
+function showDedupeDiagnostic_(diag, found) {
+  if (djDedupeDiagnosticShown_) return;
+  djDedupeDiagnosticShown_ = true;
+  console.error('Dedupe check:', diag);
+  alert('Duplicate check result: ' + (found ? 'FOUND (should skip add)' : 'NOT FOUND (will add)') + '\n\n' + diag.join('\n'));
 }
 
 async function addTrackToPlaylist_(playlistId, playlistName, btnEl) {
