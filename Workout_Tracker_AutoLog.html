@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-dedupe-check-diagnostic';
+const APP_BUILD_VERSION = '2026-08-13-dedupe-session-memory-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7648,54 +7648,42 @@ function renderQuickAddButton() {
 // playlist rather than looping forever on a huge one.
 // We only confirmed the WRITE endpoint got renamed from /tracks to
 // /items - the read side may never have changed, so this tries /items
-// first and falls back to /tracks if that fails outright.
-let djDedupeDiagnosticShown_ = false;
+// first and falls back to /tracks if that fails outright. Confirmed
+// working (correctly reads the playlist and finds no false positives),
+// but Spotify's read can lag a moment behind a write it just served, so
+// a same-session immediate re-add of the same track can still slip past
+// this - djRecentlyAddedToPlaylist_ below covers exactly that gap.
 async function playlistContainsTrack_(playlistId, trackUri) {
-  const diag = [];
   for (const base of ['items', 'tracks']) {
     let path = `/playlists/${playlistId}/${base}?fields=items(track(uri)),next&limit=100`;
     let reachedEndpoint = false;
-    let totalItems = 0;
-    let lastResp = null;
     for (let page = 0; path && page < 10; page++) {
       const resp = await spotifyApiRequest('GET', path);
-      lastResp = resp;
       if (!resp.ok || !resp.data) break;
       reachedEndpoint = true;
       const items = resp.data.items || [];
-      totalItems += items.length;
-      if (items.some(it => it.track && it.track.uri === trackUri)) {
-        diag.push(`${base}: FOUND (status ${resp.status}, ${totalItems} items seen)`);
-        showDedupeDiagnostic_(diag, true);
-        return true;
-      }
+      if (items.some(it => it.track && it.track.uri === trackUri)) return true;
       path = resp.data.next ? resp.data.next.replace('https://api.spotify.com/v1', '') : null;
     }
-    diag.push(reachedEndpoint
-      ? `${base}: reached, ${totalItems} items, no match (last status ${lastResp.status})`
-      : `${base}: FAILED - status ${lastResp ? lastResp.status : '?'} ${lastResp ? JSON.stringify(lastResp.data) : ''}`);
-    if (reachedEndpoint) { showDedupeDiagnostic_(diag, false); return false; }
+    if (reachedEndpoint) return false;
   }
-  showDedupeDiagnostic_(diag, false);
   return false;
 }
 
-// TEMPORARY diagnostic - once per session, shows exactly what each
-// endpoint attempt returned so a wrongly-added duplicate can be traced
-// to a specific cause instead of guessed at again. Remove once fixed.
-function showDedupeDiagnostic_(diag, found) {
-  if (djDedupeDiagnosticShown_) return;
-  djDedupeDiagnosticShown_ = true;
-  console.error('Dedupe check:', diag);
-  alert('Duplicate check result: ' + (found ? 'FOUND (should skip add)' : 'NOT FOUND (will add)') + '\n\n' + diag.join('\n'));
-}
+// Session-only memory of "playlistId|trackUri" pairs this device has
+// just added - checked before the network round-trip so a quick repeat
+// add is always caught even if Spotify's own read hasn't caught up to
+// the write yet.
+const djRecentlyAddedToPlaylist_ = new Set();
 
 async function addTrackToPlaylist_(playlistId, playlistName, btnEl) {
   if (!djCurrentTrackUri) return false;
   const original = btnEl ? btnEl.textContent : null;
   if (btnEl) { btnEl.textContent = '…'; btnEl.disabled = true; }
 
-  if (await playlistContainsTrack_(playlistId, djCurrentTrackUri)) {
+  const dedupeKey = playlistId + '|' + djCurrentTrackUri;
+  const alreadyIn = djRecentlyAddedToPlaylist_.has(dedupeKey) || await playlistContainsTrack_(playlistId, djCurrentTrackUri);
+  if (alreadyIn) {
     saveLastAddPlaylist(playlistId, playlistName);
     if (btnEl) {
       btnEl.textContent = '✓ Already in';
@@ -7712,6 +7700,7 @@ async function addTrackToPlaylist_(playlistId, playlistName, btnEl) {
   // regardless of scope, ownership, or anything else about the request.
   const resp = await spotifyApiRequest('POST', `/playlists/${playlistId}/items`, { uris: [djCurrentTrackUri] });
   if (resp.ok) {
+    djRecentlyAddedToPlaylist_.add(dedupeKey);
     saveLastAddPlaylist(playlistId, playlistName);
   } else {
     console.error('Add to playlist failed', resp.status, resp.data);
