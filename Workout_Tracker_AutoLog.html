@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-add-playlist-creation-diagnostic';
+const APP_BUILD_VERSION = '2026-08-13-fix-playlist-add-endpoint';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7647,31 +7647,14 @@ async function addTrackToPlaylist_(playlistId, playlistName, btnEl) {
   if (!djCurrentTrackUri) return false;
   const original = btnEl ? btnEl.textContent : null;
   if (btnEl) { btnEl.textContent = '…'; btnEl.disabled = true; }
-  const resp = await spotifyApiRequest('POST', `/playlists/${playlistId}/tracks`, { uris: [djCurrentTrackUri] });
+  // Spotify renamed this endpoint from /tracks to /items for newer apps -
+  // the old path now gets flatly rejected with an unexplained 403
+  // regardless of scope, ownership, or anything else about the request.
+  const resp = await spotifyApiRequest('POST', `/playlists/${playlistId}/items`, { uris: [djCurrentTrackUri] });
   if (resp.ok) {
     saveLastAddPlaylist(playlistId, playlistName);
   } else {
     console.error('Add to playlist failed', resp.status, resp.data);
-    // TEMPORARY diagnostic - also tries creating a brand new playlist
-    // (a different write endpoint, same write scope) so a single failed
-    // attempt tells us whether ALL playlist writes are blocked or just
-    // adding items to an existing one specifically. Safe to ignore/
-    // delete the test playlist if it succeeds. Remove this whole
-    // secondary check once the 403 is actually diagnosed.
-    let createResult = 'skipped (could not get your Spotify user id)';
-    const meResp = await spotifyApiRequest('GET', '/me');
-    if (meResp.ok && meResp.data && meResp.data.id) {
-      const createResp = await spotifyApiRequest('POST', `/users/${meResp.data.id}/playlists`, { name: 'API Test - safe to delete', public: false });
-      createResult = `${createResp.status} ${JSON.stringify(createResp.data)}`;
-    }
-    alert(
-      'Add to playlist failed\n\n' +
-      'Playlist ID: ' + playlistId + '\n' +
-      'Track URI: ' + djCurrentTrackUri + '\n' +
-      'HTTP status: ' + resp.status + '\n' +
-      'Full response: ' + JSON.stringify(resp.data) + '\n\n' +
-      'Test: creating a brand new playlist instead -\n' + createResult
-    );
   }
   if (btnEl) {
     const errMsg = resp.data && resp.data.error && resp.data.error.message;
