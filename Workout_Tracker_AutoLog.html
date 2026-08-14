@@ -5955,7 +5955,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-show-raw-granted-spotify-scope';
+const APP_BUILD_VERSION = '2026-08-13-add-playlist-creation-diagnostic';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7651,20 +7651,26 @@ async function addTrackToPlaylist_(playlistId, playlistName, btnEl) {
   if (resp.ok) {
     saveLastAddPlaylist(playlistId, playlistName);
   } else {
-    // Surfaced on the button itself (status code) since this is normally
-    // used on a phone with no easy access to devtools - the full message
-    // still goes to console for anyone who can check it.
     console.error('Add to playlist failed', resp.status, resp.data);
-    // TEMPORARY diagnostic - an alert() works on any device with zero
-    // setup (no devtools needed) to see the exact request/response while
-    // tracking down a persistent 403 that doesn't match any of the usual
-    // causes. Remove once this is resolved.
+    // TEMPORARY diagnostic - also tries creating a brand new playlist
+    // (a different write endpoint, same write scope) so a single failed
+    // attempt tells us whether ALL playlist writes are blocked or just
+    // adding items to an existing one specifically. Safe to ignore/
+    // delete the test playlist if it succeeds. Remove this whole
+    // secondary check once the 403 is actually diagnosed.
+    let createResult = 'skipped (could not get your Spotify user id)';
+    const meResp = await spotifyApiRequest('GET', '/me');
+    if (meResp.ok && meResp.data && meResp.data.id) {
+      const createResp = await spotifyApiRequest('POST', `/users/${meResp.data.id}/playlists`, { name: 'API Test - safe to delete', public: false });
+      createResult = `${createResp.status} ${JSON.stringify(createResp.data)}`;
+    }
     alert(
       'Add to playlist failed\n\n' +
       'Playlist ID: ' + playlistId + '\n' +
       'Track URI: ' + djCurrentTrackUri + '\n' +
       'HTTP status: ' + resp.status + '\n' +
-      'Full response: ' + JSON.stringify(resp.data)
+      'Full response: ' + JSON.stringify(resp.data) + '\n\n' +
+      'Test: creating a brand new playlist instead -\n' + createResult
     );
   }
   if (btnEl) {
