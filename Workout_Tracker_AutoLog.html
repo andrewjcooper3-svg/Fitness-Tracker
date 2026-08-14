@@ -667,11 +667,16 @@
      Overview tiles opening the Weight modal) instead of three long lists
      stacked one after another on the main tab. */
   .dj-card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
-  .dj-card { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; border-radius: 18px; padding: 10px 6px; background: var(--surface); border: 1.5px solid var(--border); cursor: pointer; transition: opacity 0.15s; }
+  /* min-width: 0 overrides the grid item's default auto-sizing, which
+     otherwise expands to fit whatever nowrap text is inside (a long
+     song/playlist title) instead of respecting the 1fr column width -
+     without it, one long title stretches its card and pushes the third
+     one off-screen instead of all three staying a fixed equal size. */
+  .dj-card { aspect-ratio: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; border-radius: 18px; padding: 10px 6px; background: var(--surface); border: 1.5px solid var(--border); cursor: pointer; transition: opacity 0.15s; }
   .dj-card:active { opacity: 0.85; }
   .dj-card-icon { width: 34px; height: 34px; border-radius: 10px; background: rgba(29,185,84,0.14); color: #1DB954; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .dj-card-label { font-family: var(--font); font-size: 11px; font-weight: 700; color: var(--text); }
-  .dj-card-value { font-family: var(--font); font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; padding: 0 2px; }
+  .dj-card-value { font-family: var(--font); font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; min-width: 0; width: 100%; padding: 0 2px; }
 
   .settings-field { margin-bottom: 14px; }
   .settings-field:last-of-type { margin-bottom: 0; }
@@ -5955,7 +5960,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-dedupe-session-memory-fix';
+const APP_BUILD_VERSION = '2026-08-13-card-sizing-and-item-shape-diagnostic';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7653,17 +7658,30 @@ function renderQuickAddButton() {
 // but Spotify's read can lag a moment behind a write it just served, so
 // a same-session immediate re-add of the same track can still slip past
 // this - djRecentlyAddedToPlaylist_ below covers exactly that gap.
+let djItemShapeDiagnosticShown_ = false;
 async function playlistContainsTrack_(playlistId, trackUri) {
   for (const base of ['items', 'tracks']) {
     let path = `/playlists/${playlistId}/${base}?fields=items(track(uri)),next&limit=100`;
     let reachedEndpoint = false;
+    let sawAnyItems = false;
+    let firstItemRaw = null;
     for (let page = 0; path && page < 10; page++) {
       const resp = await spotifyApiRequest('GET', path);
       if (!resp.ok || !resp.data) break;
       reachedEndpoint = true;
       const items = resp.data.items || [];
+      if (items.length && !firstItemRaw) { sawAnyItems = true; firstItemRaw = items[0]; }
       if (items.some(it => it.track && it.track.uri === trackUri)) return true;
       path = resp.data.next ? resp.data.next.replace('https://api.spotify.com/v1', '') : null;
+    }
+    // TEMPORARY diagnostic - the fields filter may not match the /items
+    // endpoint's actual response shape, silently returning items with no
+    // usable track.uri on them (so nothing ever matches, even a track
+    // that's genuinely there). Shows the raw shape of one real item once,
+    // so this can be confirmed instead of guessed. Remove once resolved.
+    if (reachedEndpoint && sawAnyItems && !djItemShapeDiagnosticShown_) {
+      djItemShapeDiagnosticShown_ = true;
+      alert(`Item shape check (endpoint: ${base})\n\nFirst item raw JSON:\n${JSON.stringify(firstItemRaw)}\n\nLooking for track.uri === ${trackUri}`);
     }
     if (reachedEndpoint) return false;
   }
