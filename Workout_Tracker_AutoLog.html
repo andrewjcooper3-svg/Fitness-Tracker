@@ -2815,6 +2815,28 @@ const PENDING_RECIPE_SEEDS = [
       { name: 'Cornichons', qty: null, unit: 'for dipping' },
       { name: 'Peppers', qty: null, unit: 'for dipping' }
     ]
+  },
+  {
+    id: 'seed-shrimp-scampi-20260815',
+    version: 1,
+    name: 'Shrimp Scampi',
+    image: '',
+    instructions: '1. Bring a large pot of well-salted water to a boil. Cook the 12 oz linguine until al dente per package directions. Reserve ½ cup pasta water, then drain.\n\n2. Pat the 1½ lb shrimp dry and season lightly with a pinch of the salt and pepper.\n\n3. Heat the 3 tbsp olive oil and 2 tbsp of the butter in a large skillet over medium-high heat until the butter melts and just starts to foam.\n\n4. Add the 6 cloves garlic and ½ tsp red pepper flakes. Cook, stirring, for about 30 seconds until fragrant - don\'t let the garlic brown or it turns bitter.\n\n5. Add the shrimp in a single layer and cook 1-2 minutes per side, until just pink and opaque. Remove the shrimp to a plate - they\'ll finish cooking later in the sauce.\n\n6. Pour in the ½ cup white wine and 3 tbsp lemon juice, scraping up any browned bits from the bottom of the pan. Simmer 2-3 minutes until reduced slightly.\n\n7. Reduce heat to low. Add the remaining 4 tbsp butter and swirl/stir until melted and the sauce looks glossy and emulsified.\n\n8. Return the shrimp (and any juices on the plate) to the pan along with the drained linguine. Toss to coat, adding a splash of the reserved pasta water if the sauce needs loosening.\n\n9. Stir in the lemon zest and chopped parsley. Taste and adjust salt and pepper.\n\n10. Serve immediately, topped with grated Parmesan if desired.\n\nNote: I don\'t have live web access from here, so this follows a well-established classic scampi technique (butter + olive oil base, a generous amount of garlic, a wine-and-lemon pan reduction) rather than one specific named source.',
+    ingredients: [
+      { name: 'Linguine', qty: 12, unit: 'oz' },
+      { name: 'Shrimp', qty: 1.5, unit: 'lb' },
+      { name: 'Unsalted Butter', qty: 6, unit: 'tbsp' },
+      { name: 'Olive Oil', qty: 3, unit: 'tbsp' },
+      { name: 'Garlic Clove', qty: 6, unit: 'clove' },
+      { name: 'Dry White Wine', qty: 0.5, unit: 'cup' },
+      { name: 'Lemon Juice', qty: 3, unit: 'tbsp' },
+      { name: 'Lemon Zest', qty: 1, unit: 'tsp' },
+      { name: 'Red Pepper Flakes', qty: 0.5, unit: 'tsp' },
+      { name: 'Parsley', qty: 0.25, unit: 'cup' },
+      { name: 'Kosher Salt', qty: 1, unit: 'tsp' },
+      { name: 'Black Pepper', qty: 0.25, unit: 'tsp' },
+      { name: 'Parmesan Cheese', qty: 0.25, unit: 'cup' }
+    ]
   }
 ];
 
@@ -5960,7 +5982,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-13-fix-dedupe-empty-fields-filter';
+const APP_BUILD_VERSION = '2026-08-15-add-shrimp-scampi-recipe';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
