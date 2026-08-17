@@ -39,6 +39,7 @@
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+
   .header { padding: 16px 2px 14px; margin-bottom: 14px; }
   .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
   .header-title { font-family: var(--font); font-size: 30px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.05; }
@@ -179,6 +180,22 @@
   .app-tab.active { background: var(--surface2); }
   .app-tab.active .app-tab-label { color: var(--accent); font-weight: 700; }
   .icon { width: 22px; height: 22px; display: block; flex-shrink: 0; }
+
+  /* Desktop sidebar nav - hidden by default (mobile/landscape-phone),
+     shown only by the >=900px media query above. Fixed at the true
+     viewport edge rather than nested in body's own centered box, so it
+     stays put regardless of how wide the screen is. */
+  .app-sidebar { display: none; flex-direction: column; position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: var(--surface); border-right: 1px solid var(--border); padding: 24px 14px; overflow-y: auto; z-index: 50; box-sizing: border-box; }
+  .app-sidebar-brand { padding: 6px 10px 28px; }
+  .app-sidebar-brand-title { font-family: var(--font); font-size: 20px; font-weight: 800; letter-spacing: -0.4px; }
+  .app-sidebar-brand-sub { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+  .app-sidebar-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; cursor: pointer; transition: background 0.15s; }
+  .app-sidebar-item:hover { background: var(--surface2); }
+  .app-sidebar-item svg { flex-shrink: 0; color: var(--muted); }
+  .app-sidebar-item-label { font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--muted); }
+  .app-sidebar-item.active { background: var(--surface2); }
+  .app-sidebar-item.active svg { color: var(--accent); }
+  .app-sidebar-item.active .app-sidebar-item-label { color: var(--accent); font-weight: 700; }
   .app-views-viewport { overflow: hidden; position: relative; transition: height 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
   .app-views-track { display: flex; align-items: flex-start; will-change: transform; }
   .app-view { flex: 0 0 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
@@ -776,6 +793,64 @@
 
   .barcode-video-wrap { position: relative; width: 100%; aspect-ratio: 3 / 4; background: #000; border-radius: 16px; overflow: hidden; }
   .barcode-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Landscape phone / small tablet: same single-column layout as portrait,
+     just given more breathing room instead of staying pinned to the
+     480px portrait width - no component restructuring, unlike the
+     desktop tier below. Placed at the end of the stylesheet (not next
+     to body{} up top) so these overrides win the cascade against the
+     later same-specificity base rules they target (.app-tabs,
+     .app-sidebar, .ov-glance-grid, etc.) regardless of source order
+     up there. */
+  @media (min-width: 600px) and (max-width: 899.98px) {
+    body { max-width: 640px; }
+    .app-tabs { max-width: 640px; }
+  }
+
+  /* Desktop: a left sidebar nav replaces the top tab bar, and the app
+     views get room to lay out wider (see the per-view desktop rules
+     further down for #view-tracker's two-column reflow etc.). The
+     sidebar is a genuinely new, separate piece of markup (.app-sidebar)
+     rather than a restyled .app-tabs, so the existing top-bar swipe/tab
+     logic needs zero JS changes - sidebar items call the exact same
+     showAppView()/showDay() functions the top tabs already use. */
+  @media (min-width: 900px) {
+    body { max-width: none; margin: 0; padding: 32px 40px 40px calc(220px + 40px); }
+    .app-tabs { display: none; }
+    .app-sidebar { display: flex; }
+    .app-views-viewport { max-width: 1220px; margin: 0 auto; }
+
+    /* Trainer: day-tabs + the active day's exercises in a wide left
+       column, the pushup deficit/rings/stats glance stuff in a
+       narrower right column - both visible together instead of a long
+       single scroll. Both columns are single wrapper elements
+       (.tracker-main-col / .tracker-side-rail, see the HTML) placed
+       into ONE grid row rather than one row per item - giving each
+       item its own numbered row shared a track set across both
+       columns, so the short right column kept getting stretched (or
+       leaving dead gaps) to match the much taller exercise list.
+       Wrapping each column so its total height is sized independently.
+       The rail is sticky so it stays in view while the longer exercise
+       list scrolls past on the left. */
+    #view-tracker { display: grid; grid-template-columns: 1fr 340px; column-gap: 24px; align-items: start; }
+    #view-tracker > .header { grid-column: 1 / -1; grid-row: 1; }
+    #view-tracker > .tracker-main-col { grid-column: 1; grid-row: 2; }
+    #view-tracker > .tracker-side-rail { grid-column: 2; grid-row: 2; position: sticky; top: 24px; display: flex; flex-direction: column; }
+
+    /* Overview: the two hero cards (Pushups/Water) side by side instead
+       of stacked full-width, and the glance-tile grid widened from 2
+       columns to 3 so more of it fits without scrolling. Flexbox on the
+       view (not inline-block on the cards) so this can't fall into the
+       classic inline-block-plus-whitespace gap bug - every other direct
+       child just gets flex-basis:100% to stay full-width/stacked as before. */
+    #view-overview { display: flex; flex-wrap: wrap; column-gap: 16px; }
+    #view-overview > .ov-page-head,
+    #view-overview > .ov-build-stamp,
+    #view-overview > .ov-glance-grid,
+    #view-overview > .ov-note { flex: 1 1 100%; }
+    #view-overview > .ov-hero-card { flex: 1 1 calc(50% - 8px); min-width: 0; }
+    .ov-glance-grid { grid-template-columns: repeat(3, 1fr); }
+  }
 </style>
 <script>
   // Applies a saved manual Light/Dark override (if any) before body
@@ -1024,7 +1099,13 @@
 </div>
 
 <!-- Pushup deficit tracking - moved here from its own top-level tab,
-     since it's exercise data same as everything else on this page. -->
+     since it's exercise data same as everything else on this page.
+     Wrapped in .tracker-side-rail purely so the desktop two-column
+     layout can size/stick this group independently of the much taller
+     exercise list next to it - the wrapper carries no CSS of its own
+     outside the desktop media query, so portrait/landscape stacking is
+     completely unaffected (a plain div doesn't change normal flow). -->
+<div class="tracker-side-rail">
 <div class="ov-hero pu-deficit-hero" id="puDeficitHero">
   <div class="pu-deficit-top">
     <div class="ov-hero-label">Pushup Deficit</div>
@@ -1077,7 +1158,15 @@
     <div class="ov-tile-value" id="ovDaysActive">0 / 7</div>
   </div>
 </div>
+</div>
+<!-- /.tracker-side-rail -->
 
+<!-- Wrapped in .tracker-main-col to match .tracker-side-rail - two
+     independent grid cells (one row) instead of many shared row-tracks,
+     so this column's height is never coupled to the rail's. No CSS of
+     its own outside the desktop media query, so portrait/landscape
+     flow is unaffected. -->
+<div class="tracker-main-col">
 <div class="day-tabs">
   <div class="day-tab gym active" onclick="showDay('mon')"><div class="tab-lbl">Mon</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
   <div class="day-tab home" onclick="showDay('tue')"><div class="tab-lbl">Tue</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
@@ -1204,6 +1293,8 @@
   <button class="copy-btn" id="sun-copy" onclick="copySummary('sun')">📎 Copy to Clipboard</button>
   <div class="log-status" id="sun-log-status"></div>
 </div>
+</div>
+<!-- /.tracker-main-col -->
 
 </div>
 
@@ -1820,6 +1911,41 @@
   </div>
   <div class="app-tab" data-view="stats" onclick="showAppView('stats')">
     <div class="app-tab-label">Stats</div>
+  </div>
+</div>
+
+<!-- Desktop-only sidebar nav (see the >=900px media query for .app-tabs
+     vs. .app-sidebar visibility). Calls the exact same showAppView()
+     as the top tabs - kept in sync by syncSidebarActiveState_(), called
+     from goToView() alongside the existing .app-tab active-class update. -->
+<div class="app-sidebar" id="appSidebar">
+  <div class="app-sidebar-brand">
+    <div class="app-sidebar-brand-title">AJC</div>
+    <div class="app-sidebar-brand-sub">Balanced Growth</div>
+  </div>
+  <div class="app-sidebar-item active" data-view="overview" onclick="showAppView('overview')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="2"></rect><rect x="14" y="3" width="7" height="5" rx="2"></rect><rect x="14" y="12" width="7" height="9" rx="2"></rect><rect x="3" y="16" width="7" height="5" rx="2"></rect></svg>
+    <div class="app-sidebar-item-label">Overview</div>
+  </div>
+  <div class="app-sidebar-item" data-view="tracker" onclick="showAppView('tracker')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5 3 10l3.5 3.5M17.5 6.5 21 10l-3.5 3.5"></path><path d="M9 17 15 7"></path></svg>
+    <div class="app-sidebar-item-label">Trainer</div>
+  </div>
+  <div class="app-sidebar-item" data-view="kitchen" onclick="showAppView('kitchen')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a3 3 0 0 0 3 3v8"></path><path d="M4 3v10"></path><path d="M8 3v7"></path><path d="M18 3c-2 1-3 3-3 6s1 5 3 6v6"></path></svg>
+    <div class="app-sidebar-item-label">Kitchen</div>
+  </div>
+  <div class="app-sidebar-item" data-view="music" onclick="showAppView('music')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l11-2v12"></path><circle cx="6" cy="18" r="3"></circle><circle cx="17" cy="16" r="3"></circle></svg>
+    <div class="app-sidebar-item-label">Music</div>
+  </div>
+  <div class="app-sidebar-item" data-view="calendar" onclick="showAppView('calendar')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M3 9h18M8 2v4M16 2v4"></path></svg>
+    <div class="app-sidebar-item-label">Calendar</div>
+  </div>
+  <div class="app-sidebar-item" data-view="stats" onclick="showAppView('stats')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"></path></svg>
+    <div class="app-sidebar-item-label">Stats</div>
   </div>
 </div>
 
@@ -5626,6 +5752,10 @@ function goToView(view, animate) {
   document.querySelectorAll('.app-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`.app-tab[data-view="${view}"]`).classList.add('active');
 
+  document.querySelectorAll('.app-sidebar-item').forEach(t => t.classList.remove('active'));
+  const sidebarItem = document.querySelector(`.app-sidebar-item[data-view="${view}"]`);
+  if (sidebarItem) sidebarItem.classList.add('active');
+
   // The DJ tab polls playback state on its own faster cadence while it's
   // actually the visible tab - stop that as soon as it's left, rather
   // than leaving a second timer running alongside the Overview one.
@@ -5860,7 +5990,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-data-driven-weekly-plan';
+const APP_BUILD_VERSION = '2026-08-17-responsive-desktop-landscape';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
