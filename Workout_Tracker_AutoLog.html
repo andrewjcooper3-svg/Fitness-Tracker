@@ -38,7 +38,7 @@
     --nav-bg: rgba(244,246,251,0.82);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px)) 12px; max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 
   .header { padding: 16px 2px 14px; margin-bottom: 14px; }
   .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
@@ -167,11 +167,11 @@
 
   .app-tabs {
     position: fixed; left: 0; right: 0; top: 0; margin: 0 auto; max-width: 480px;
-    display: flex; align-items: center; gap: 2px; z-index: 50;
+    display: flex; align-items: center; justify-content: center; gap: 2px; z-index: 50;
     height: 44px; box-sizing: content-box;
     background: var(--nav-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
-    padding: calc(env(safe-area-inset-top, 0px)) 6px 0;
+    padding: calc(env(safe-area-inset-top, 0px)) max(6px, env(safe-area-inset-right, 0px)) 0 max(6px, env(safe-area-inset-left, 0px));
     overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
   }
   .app-tabs::-webkit-scrollbar { display: none; }
@@ -6004,7 +6004,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-fix-landscape-breakpoint';
+const APP_BUILD_VERSION = '2026-08-17-safe-area-and-centered-tabs';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
