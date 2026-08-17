@@ -906,6 +906,13 @@
     #view-tracker > .ov-grid {
       max-height: calc(100vh - (56px + env(safe-area-inset-top, 0px)) - (24px + env(safe-area-inset-bottom, 0px)));
       overflow-y: auto;
+      /* Nested overflow:auto inside an ancestor with a transform
+         (.app-views-track, transform:translateX() for the swipe
+         carousel) is a known source of touch scroll not actually
+         working on iOS Safari, even though it renders/scrolls fine in
+         Chromium - this forces WebKit onto its own scrolling
+         compositing layer, which is the standard fix. */
+      -webkit-overflow-scrolling: touch;
       position: static;
       scrollbar-width: none;
     }
@@ -6075,7 +6082,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-consolidate-exercise-total-bar';
+const APP_BUILD_VERSION = '2026-08-17-webkit-nested-scroll-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
