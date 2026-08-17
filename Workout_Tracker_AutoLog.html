@@ -794,31 +794,29 @@
   .barcode-video-wrap { position: relative; width: 100%; aspect-ratio: 3 / 4; background: #000; border-radius: 16px; overflow: hidden; }
   .barcode-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
 
-  /* Landscape phone / small tablet: same single-column layout as portrait,
-     just given more breathing room instead of staying pinned to the
-     480px portrait width - no component restructuring, unlike the
-     desktop tier below. Placed at the end of the stylesheet (not next
-     to body{} up top) so these overrides win the cascade against the
+  /* Landscape phone, narrow (iPhone SE/mini etc.): same single-column
+     layout as portrait, just given more breathing room instead of
+     staying pinned to the 480px portrait width - no component
+     restructuring. Placed at the end of the stylesheet (not next to
+     body{} up top) so these overrides win the cascade against the
      later same-specificity base rules they target (.app-tabs,
      .app-sidebar, .ov-glance-grid, etc.) regardless of source order
      up there. */
-  @media (min-width: 600px) and (max-width: 899.98px) {
+  @media (min-width: 600px) and (max-width: 767.98px) {
     body { max-width: 640px; }
     .app-tabs { max-width: 640px; }
   }
 
-  /* Desktop: a left sidebar nav replaces the top tab bar, and the app
-     views get room to lay out wider (see the per-view desktop rules
-     further down for #view-tracker's two-column reflow etc.). The
-     sidebar is a genuinely new, separate piece of markup (.app-sidebar)
-     rather than a restyled .app-tabs, so the existing top-bar swipe/tab
-     logic needs zero JS changes - sidebar items call the exact same
-     showAppView()/showDay() functions the top tabs already use. */
-  @media (min-width: 900px) {
-    body { max-width: none; margin: 0; padding: 32px 40px 40px calc(220px + 40px); }
-    .app-tabs { display: none; }
-    .app-sidebar { display: flex; }
-    .app-views-viewport { max-width: 1220px; margin: 0 auto; }
+  /* Wide layout: the Trainer/Overview two-column reflow, shared by
+     both wide landscape phones (768px+, top tabs stay - most modern
+     phones are 800-950px wide in landscape, e.g. iPhone Pro Max is
+     932px, so this is the common case, not an edge case) and real
+     desktop (which layers the sidebar nav on top via the min-width:
+     1100px block below). Kept as one shared block instead of repeating
+     the grid rules in both tiers. */
+  @media (min-width: 768px) {
+    body { max-width: 960px; }
+    .app-tabs { max-width: 960px; }
 
     /* Trainer: day-tabs + the active day's exercises in a wide left
        column, the pushup deficit/rings/stats glance stuff in a
@@ -832,7 +830,7 @@
        Wrapping each column so its total height is sized independently.
        The rail is sticky so it stays in view while the longer exercise
        list scrolls past on the left. */
-    #view-tracker { display: grid; grid-template-columns: 1fr 340px; column-gap: 24px; align-items: start; }
+    #view-tracker { display: grid; grid-template-columns: 1fr 300px; column-gap: 20px; align-items: start; }
     #view-tracker > .header { grid-column: 1 / -1; grid-row: 1; }
     #view-tracker > .tracker-main-col { grid-column: 1; grid-row: 2; }
     #view-tracker > .tracker-side-rail { grid-column: 2; grid-row: 2; position: sticky; top: 24px; display: flex; flex-direction: column; }
@@ -850,6 +848,22 @@
     #view-overview > .ov-note { flex: 1 1 100%; }
     #view-overview > .ov-hero-card { flex: 1 1 calc(50% - 8px); min-width: 0; }
     .ov-glance-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* Desktop only (genuinely wide windows - past where any phone or
+     tablet lands in either orientation): a left sidebar nav replaces
+     the top tab bar, and the columns get a bit more room. The sidebar
+     is a genuinely new, separate piece of markup (.app-sidebar) rather
+     than a restyled .app-tabs, so the existing top-bar swipe/tab logic
+     needs zero JS changes - sidebar items call the exact same
+     showAppView()/showDay() functions the top tabs already use. */
+  @media (min-width: 1100px) {
+    body { max-width: none; margin: 0; padding: 32px 40px 40px calc(220px + 40px); }
+    .app-tabs { display: none; }
+    .app-sidebar { display: flex; }
+    .app-views-viewport { max-width: 1220px; margin: 0 auto; }
+
+    #view-tracker { grid-template-columns: 1fr 340px; column-gap: 24px; }
   }
 </style>
 <script>
@@ -5990,7 +6004,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-responsive-desktop-landscape';
+const APP_BUILD_VERSION = '2026-08-17-fix-landscape-breakpoint';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
