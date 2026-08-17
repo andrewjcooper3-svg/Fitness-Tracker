@@ -825,6 +825,7 @@ function getPushupLedgerFromSheets_() {
       const day = row[1];
       const exercise = row[2];
       if (exercise !== 'Pushups') return;
+      if (row[8] !== 'Yes') return; // Only count sets actually checked off complete, not just logged/typed.
       const dayIdx = PUSHUP_LEDGER_DAY_INDEX[day];
       if (dayIdx == null) return;
       const reps = Number(row[7]);

@@ -447,7 +447,9 @@
   .pu-ring-week { --ring-color: var(--accent); }
   .pu-ring-month { --ring-color: var(--purple); }
   .pu-ring-year { --ring-color: var(--teal); }
-  .pu-ring-pct { position: relative; z-index: 1; font-family: var(--font); font-weight: 800; font-size: 16px; letter-spacing: -0.2px; }
+  .pu-ring-pct { position: relative; z-index: 1; font-family: var(--font); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .pu-ring-pct-actual { font-weight: 800; font-size: 15px; letter-spacing: -0.2px; }
+  .pu-ring-pct-predicted { font-weight: 600; font-size: 9px; color: var(--muted); }
   .pu-ring-label { font-family: var(--font); font-size: 12px; font-weight: 700; }
   .pu-ring-value { font-family: var(--font); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -5519,6 +5521,30 @@ function updatePushupLedger() {
   localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(ledger));
 }
 
+// One-time correction: the backend's per-day pushup ledger used to sum
+// every logged Pushups set regardless of whether it was actually checked
+// off complete, so historical days (and the Stats chart built from them)
+// showed more reps than were really done. Once code.gs is redeployed
+// with that fix, this replaces (not max-merges) the locally cached
+// ledger with the corrected totals - a plain max-merge would keep
+// whichever number is bigger forever, so it could never self-correct
+// down to the now-accurate (lower) value on its own.
+const PUSHUP_LEDGER_COMPLETED_FIX_KEY = 'WORKOUT_PUSHUP_LEDGER_COMPLETED_FIX_20260817';
+async function recomputeHistoricalPushupLedgerOnce_() {
+  if (localStorage.getItem(PUSHUP_LEDGER_COMPLETED_FIX_KEY)) return;
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return; // Retries next load - the flag is only set on success.
+  try {
+    const res = await fetch(url + '?action=loadPushupLedger');
+    const data = await res.json();
+    if (data.status !== 'success' || !data.ledger) return;
+    localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(data.ledger));
+    localStorage.setItem(PUSHUP_LEDGER_COMPLETED_FIX_KEY, '1');
+  } catch (e) {
+    // Offline/unreachable - try again next load since the flag isn't set.
+  }
+}
+
 // The ledger above only ever lived in this one browser's localStorage -
 // wiped by a cache clear, a new device, or Safari evicting storage, and
 // history for past weeks was gone for good even though the actual sets
@@ -5530,6 +5556,7 @@ function updatePushupLedger() {
 // off - so a partial local session never gets overwritten by a smaller
 // number, but a wiped/empty local ledger fully recovers from the sheet.
 async function loadRemotePushupLedger() {
+  await recomputeHistoricalPushupLedgerOnce_();
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
   try {
@@ -6033,7 +6060,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-exercise-reorder-quality-notes-collapse';
+const APP_BUILD_VERSION = '2026-08-17-pushup-ring-predicted-pace-and-ledger-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6499,10 +6526,16 @@ function renderOverviewShoppingPreview() {
 
 /* ---------- Pushups tab (week/month/year goals + running deficit) ---------- */
 
-function setGoalRing(ringId, pctId, valueId, actual, target) {
+// The ring's fill still tracks actual completion (pct), but the number
+// inside now shows that alongside the predicted/expected pace (how much
+// of the target should already be done by today) so "42%" alone doesn't
+// look fine on, say, day 2 of the week when the real pace target is 90%.
+function setGoalRing(ringId, pctId, valueId, actual, target, pctPredicted) {
   const pct = target ? Math.min(100, Math.round(actual / target * 100)) : 0;
+  const predictedPct = Math.round((pctPredicted || 0) * 100);
   document.getElementById(ringId).style.setProperty('--pct', pct);
-  document.getElementById(pctId).textContent = pct + '%';
+  document.getElementById(pctId).innerHTML =
+    `<div class="pu-ring-pct-actual">${pct}%</div><div class="pu-ring-pct-predicted">of ${predictedPct}%</div>`;
   document.getElementById(valueId).textContent = `${actual.toLocaleString()} / ${target.toLocaleString()}`;
 }
 
@@ -6517,17 +6550,32 @@ function computePushupStats() {
   // This week's figure reuses whatever target is configured on the live
   // day panels, so it automatically reflects catch-up weeks vs. the
   // normal baseline without any special-casing here.
-  const weekTotals = computeWeekStats().totals;
+  const weekStats = computeWeekStats();
+  const weekTotals = weekStats.totals;
 
   // This month: baseline pace (165/day, every day but Sunday) across the
   // whole calendar month, actual pulled from whatever's logged so far.
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  let monthActual = 0, monthTarget = 0;
+  let monthActual = 0, monthTarget = 0, monthTargetSoFar = 0;
   for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
     monthActual += ledger[dateKey(d)] || 0;
-    if (d.getDay() !== 0) monthTarget += PUSHUP_DAILY_BASELINE;
+    if (d.getDay() !== 0) {
+      monthTarget += PUSHUP_DAILY_BASELINE;
+      if (d <= today) monthTargetSoFar += PUSHUP_DAILY_BASELINE;
+    }
   }
+
+  // Predicted-pace percentage for the week/month rings: how much of the
+  // period's target should already be locked in by today, weighted by
+  // each day's actual target (not a flat day-count) - so a Sunday rest
+  // day, which contributes 0 to the target, doesn't drag the expected
+  // pace down on a day that was never supposed to have any reps.
+  const weekDayIdx = (today.getDay() + 6) % 7; // Monday=0 ... Sunday=6
+  let weekTargetSoFar = 0;
+  weekStats.days.forEach((d, i) => { if (i <= weekDayIdx) weekTargetSoFar += d.pushupTarget; });
+  const pctWeekPredicted = weekTotals.pushupTarget ? weekTargetSoFar / weekTotals.pushupTarget : 0;
+  const pctMonthPredicted = monthTarget ? monthTargetSoFar / monthTarget : 0;
 
   // This year: fixed 50,000 goal. Starts from the real carried-forward
   // total (tracked outside this ledger) and adds only the days logged
@@ -6579,9 +6627,9 @@ function computePushupStats() {
   const deficit = Math.round((pctGoalComplete - pctYearElapsed) * PUSHUP_YEAR_GOAL);
 
   return {
-    week: { actual: weekTotals.pushupTotal, target: weekTotals.pushupTarget },
-    month: { actual: monthActual, target: monthTarget },
-    year: { actual: yearActual, target: PUSHUP_YEAR_GOAL },
+    week: { actual: weekTotals.pushupTotal, target: weekTotals.pushupTarget, pctPredicted: pctWeekPredicted },
+    month: { actual: monthActual, target: monthTarget, pctPredicted: pctMonthPredicted },
+    year: { actual: yearActual, target: PUSHUP_YEAR_GOAL, pctPredicted: pctYearElapsed },
     deficit: deficit,
     pctYearElapsed: pctYearElapsed,
     pctGoalComplete: pctGoalComplete
@@ -6590,9 +6638,9 @@ function computePushupStats() {
 
 function renderPushupsTab() {
   const stats = computePushupStats();
-  setGoalRing('puWeekRing', 'puWeekPct', 'puWeekValue', stats.week.actual, stats.week.target);
-  setGoalRing('puMonthRing', 'puMonthPct', 'puMonthValue', stats.month.actual, stats.month.target);
-  setGoalRing('puYearRing', 'puYearPct', 'puYearValue', stats.year.actual, stats.year.target);
+  setGoalRing('puWeekRing', 'puWeekPct', 'puWeekValue', stats.week.actual, stats.week.target, stats.week.pctPredicted);
+  setGoalRing('puMonthRing', 'puMonthPct', 'puMonthValue', stats.month.actual, stats.month.target, stats.month.pctPredicted);
+  setGoalRing('puYearRing', 'puYearPct', 'puYearValue', stats.year.actual, stats.year.target, stats.year.pctPredicted);
 
   const heroEl = document.getElementById('puDeficitHero');
   const badgeEl = document.getElementById('puStatusBadge');
