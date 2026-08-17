@@ -109,7 +109,8 @@
   .exercise-toggle { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); flex-shrink: 0; }
   .exercise-name { font-family: var(--font); font-size: 15px; font-weight: 600; flex: 1; }
   .exercise-meta { font-family: var(--font); font-size: 13px; color: var(--muted); }
-  .exercise-history-note { font-family: var(--font); font-size: 11px; color: var(--muted); padding: 7px 14px; background: rgba(0,0,0,0.14); border-bottom: 1px solid var(--border); }
+  .exercise-history-note { font-family: var(--font); font-size: 11px; color: var(--muted); padding: 7px 14px; background: rgba(0,0,0,0.14); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .exercise-total-inline { font-weight: 500; color: var(--muted); white-space: nowrap; }
   .exercise-history-up { color: var(--green); font-weight: 600; }
   .exercise-history-down { color: var(--red); font-weight: 600; }
   .exercise-history-neutral { color: var(--muted); font-weight: 600; }
@@ -136,7 +137,6 @@
   .set-checkbox { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
   .set-checkbox:hover, .set-checkbox:active { border-color: var(--accent); }
   .set-checkbox.checked { background: var(--green); border-color: var(--green); color: white; }
-  .exercise-total { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--muted); padding: 9px 14px; border-top: 1px solid var(--border); }
   .add-set-btn { display: block; width: 100%; background: transparent; border: none; border-top: 1px solid var(--border); color: var(--accent); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 10px; cursor: pointer; }
   .add-set-btn:hover, .add-set-btn:active { background: var(--surface2); }
   .add-exercise-btn { display: block; width: 100%; background: var(--surface); border: none; color: var(--accent); font-family: var(--font); font-size: 14px; font-weight: 600; padding: 12px; border-radius: 14px; cursor: pointer; margin-bottom: 10px; transition: all 0.15s; }
@@ -6075,7 +6075,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-header-scrolls-compact-stats-col';
+const APP_BUILD_VERSION = '2026-08-17-consolidate-exercise-total-bar';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -8617,12 +8617,27 @@ function formatHistoryDelta_(delta, unit) {
   return `<span class="exercise-history-neutral">→0${unit}</span>`;
 }
 
+// The history-deltas (▲/▼ vs last time) and the running rep total share
+// one bar now instead of two separate ones (deltas at top, total at the
+// bottom) - this creates/finds that shared bar and its two independent
+// spans, so updateExerciseHistoryNote() and updateExerciseTotal() can
+// each update their own half without touching the other's.
+function ensureExerciseInfoBar_(card) {
+  let bar = card.querySelector('.exercise-history-note');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'exercise-history-note';
+    bar.innerHTML = '<span class="exercise-history-deltas"></span><span class="exercise-total-inline"></span>';
+    card.querySelector('.exercise-header').insertAdjacentElement('afterend', bar);
+  }
+  return bar;
+}
+
 function updateExerciseHistoryNote(card) {
   if (!card) return;
   const name = getExerciseName(card).trim().toLowerCase();
   const historyMap = JSON.parse(localStorage.getItem(STORAGE_EXERCISE_HISTORY_KEY) || '{}');
   const entry = name ? historyMap[name] : null;
-  let noteEl = card.querySelector('.exercise-history-note');
 
   const target = entry ? getExerciseTargetForHistory_(card) : null;
   const parts = [];
@@ -8633,17 +8648,8 @@ function updateExerciseHistoryNote(card) {
     parts.push(formatHistoryDelta_(target.reps - entry.reps, ' reps'));
   }
 
-  if (parts.length === 0) {
-    if (noteEl) noteEl.remove();
-    return;
-  }
-
-  if (!noteEl) {
-    noteEl = document.createElement('div');
-    noteEl.className = 'exercise-history-note';
-    card.querySelector('.exercise-header').insertAdjacentElement('afterend', noteEl);
-  }
-  noteEl.innerHTML = parts.join(' &nbsp;&nbsp; ');
+  const bar = ensureExerciseInfoBar_(card);
+  bar.querySelector('.exercise-history-deltas').innerHTML = parts.join(' &nbsp;&nbsp; ');
 }
 
 function renderExerciseHistoryNotes() {
@@ -8728,16 +8734,9 @@ function parseExerciseCard(card) {
 /* ---------- Adding sets / exercises + live totals ---------- */
 
 function updateExerciseTotal(card) {
-  const setsContainer = card.querySelector('.exercise-sets');
   const total = sumReps(card);
-
-  let totalEl = setsContainer.querySelector('.exercise-total');
-  if (!totalEl) {
-    totalEl = document.createElement('div');
-    totalEl.className = 'exercise-total';
-    const addBtn = setsContainer.querySelector('.add-set-btn');
-    setsContainer.insertBefore(totalEl, addBtn || null);
-  }
+  const bar = ensureExerciseInfoBar_(card);
+  const totalEl = bar.querySelector('.exercise-total-inline');
 
   if (getExerciseName(card).toLowerCase() === 'pushups') {
     const target = card.closest('.day-panel').dataset.pushupTarget;
