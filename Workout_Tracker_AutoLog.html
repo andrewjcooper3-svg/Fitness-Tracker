@@ -852,19 +852,42 @@
   }
 
   /* Wide landscape phone / tablet only (768-1099px, NOT desktop):
-     shrink the page/day titles to give more of the limited vertical
-     space (phones in landscape are short) to actual data, drop the
-     right rail back to plain static flow instead of sticky (sticky
-     was landing oddly inside the swipe/carousel track on-device), and
-     hide the baseline-pace note since it's the least useful line on a
-     screen this short. None of this touches real desktop (>=1100px),
-     which has plenty of vertical room and wasn't reported as an issue. */
+     shrink the page/day titles and collapse the title/subtitle/week
+     line into one row to give more of the limited vertical space
+     (phones in landscape are short) to actual data, and hide the
+     baseline-pace note since it's the least useful line on a screen
+     this short. None of this touches real desktop (>=1100px), which
+     has plenty of vertical room and wasn't reported as an issue.
+
+     Both Trainer columns are capped to the remaining viewport height
+     and scroll independently (position:sticky doesn't work here -
+     .app-views-viewport, the swipe-carousel's clipping ancestor, has
+     overflow:hidden but never actually scrolls itself, so sticky has
+     no scroll container to react to and just sits static). This is
+     what actually gets "only the workouts scroll, the pushup/progress
+     side stays put": the header stays fixed at the top, and each
+     column scrolls in its own lane instead of the whole page scrolling
+     together - scrolling the exercise list no longer carries the
+     pushup deficit/rings/stats out of view. */
   @media (min-width: 768px) and (max-width: 1099.98px) {
     .header-title { font-size: 22px; }
     .day-title { font-size: 17px; }
     .ov-page-title { font-size: 20px; }
-    #view-tracker > .tracker-side-rail { position: static; }
     .tracker-side-rail > .ov-note { display: none; }
+
+    #view-tracker > .header { padding: 10px 2px 8px; margin-bottom: 8px; }
+    .header-info { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .header-sub, .header-week { margin-top: 0; }
+
+    #view-tracker > .tracker-main-col,
+    #view-tracker > .tracker-side-rail {
+      max-height: calc(100vh - (56px + env(safe-area-inset-top, 0px)) - (24px + env(safe-area-inset-bottom, 0px)) - 62px);
+      overflow-y: auto;
+      position: static;
+      scrollbar-width: none;
+    }
+    #view-tracker > .tracker-main-col::-webkit-scrollbar,
+    #view-tracker > .tracker-side-rail::-webkit-scrollbar { display: none; }
   }
 
   /* Desktop only (genuinely wide windows - past where any phone or
@@ -1121,7 +1144,7 @@
 
 <div class="header">
   <div class="header-top">
-    <div>
+    <div class="header-info">
       <div class="header-title">TRAINER</div>
       <div class="header-sub">Balanced Growth - 100% Lean</div>
       <div class="header-week" id="weekLabel"></div>
@@ -6021,7 +6044,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-set-swipe-delete-and-landscape-tweaks';
+const APP_BUILD_VERSION = '2026-08-17-landscape-split-scroll-panes';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
