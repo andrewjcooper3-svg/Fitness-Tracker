@@ -91,6 +91,13 @@
   .badge-travel { background: rgba(91, 154, 148, 0.16); color: var(--teal); }
   .badge-rest { background: rgba(156, 107, 122, 0.16); color: var(--purple); }
   .section-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin: 14px 0 8px; }
+  .section-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0 8px; }
+  .section-label-row .section-label { margin: 0; }
+  .collapse-all-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; }
+  .collapse-all-btn:hover, .collapse-all-btn:active { background: var(--surface2); color: var(--text); }
+  .day-notes-input { width: 100%; box-sizing: border-box; background: var(--surface); border: none; border-radius: 14px; color: var(--text); font-family: var(--font); font-size: 14px; padding: 12px 14px; outline: none; resize: vertical; min-height: 60px; margin-bottom: 4px; }
+  .day-notes-input:focus { box-shadow: 0 0 0 1.5px var(--accent); }
+  .day-notes-input::placeholder { color: var(--muted); }
   .exercise-card { background: var(--surface); border-radius: 16px; overflow: hidden; margin-bottom: 10px; position: relative; }
   .exercise-card.exercise-dragging { box-shadow: 0 8px 20px rgba(0,0,0,0.4); opacity: 0.95; }
   .exercise-card-inner { position: relative; z-index: 1; background: var(--surface); transition: transform 0.2s ease; touch-action: pan-y; }
@@ -107,13 +114,21 @@
   .exercise-history-neutral { color: var(--muted); font-weight: 600; }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
-  .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+  .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 52px 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
   .set-row:last-child { border-bottom: none; }
   .set-num { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; }
   .set-input-group { display: flex; flex-direction: column; gap: 2px; }
   .set-input-label { font-family: var(--font); font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
   .set-input { font-family: var(--font); font-size: 14px; color: var(--text); background: transparent; border: none; border-bottom: 1px solid var(--border); outline: none; padding: 4px 2px; width: 100%; font-variant-numeric: tabular-nums; }
   .set-input:focus { border-bottom-color: var(--accent); }
+  .set-quality { display: flex; gap: 3px; flex-shrink: 0; justify-content: center; }
+  .quality-box { width: 14px; height: 14px; border-radius: 4px; cursor: pointer; transition: all 0.15s; box-sizing: border-box; background: transparent; }
+  .quality-box.quality-green { border: 2px solid var(--green); }
+  .quality-box.quality-yellow { border: 2px solid var(--amber); }
+  .quality-box.quality-red { border: 2px solid var(--red); }
+  .quality-box.quality-green.active { background: var(--green); }
+  .quality-box.quality-yellow.active { background: var(--amber); }
+  .quality-box.quality-red.active { background: var(--red); }
   .set-checkbox { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
   .set-checkbox:hover, .set-checkbox:active { border-color: var(--accent); }
   .set-checkbox.checked { background: var(--green); border-color: var(--green); color: white; }
@@ -1077,7 +1092,10 @@
   <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-gym">🏋 GYM</div></div>
   <div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Arms + Core.</span></div>
 
-  <div class="section-label">Workouts</div>
+  <div class="section-label">Day Notes</div>
+  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('mon')">Collapse All</button></div>
 
   <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Leg Press</div><div class="exercise-meta">245 lb · 3 × 10</div></div>
@@ -1107,25 +1125,6 @@
   </div>
 
   <div class="exercise-card">
-    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Glute Kickback</div><div class="exercise-meta">30 lb · 4 × 10</div></div>
-    <div class="exercise-sets">
-      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="30 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Each leg - backed off from 35 to 30, lower back was bothering last week"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="30 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Each leg"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="30 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Each leg"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">4</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="30 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Each leg"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-    </div>
-  </div>
-
-  <div class="exercise-card">
-    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Single Arm DB Row (Left Emphasis)</div><div class="exercise-meta">45 lb · 3 × 10</div></div>
-    <div class="exercise-sets">
-      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT catch-up"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT catch-up"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT catch-up"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-    </div>
-  </div>
-
-  <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Machine Chest Press</div><div class="exercise-meta">85 lb · 2 × 10</div></div>
     <div class="exercise-sets">
       <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="85 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Minimal (pushups cover)"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
@@ -1134,11 +1133,12 @@
   </div>
 
   <div class="exercise-card">
-    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Lateral Raise</div><div class="exercise-meta">15 lb · 3 × 12</div></div>
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Glute Kickback</div><div class="exercise-meta">30 lb · 4 × 10</div></div>
     <div class="exercise-sets">
-      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="15 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Shoulder health - no 17.5s available, 15 is the real target"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="15 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="15 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="30 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Each leg - backed off from 35 to 30, lower back was bothering last week"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="30 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Each leg"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="30 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Each leg"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">4</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="30 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Each leg"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
     </div>
   </div>
 
@@ -1157,6 +1157,24 @@
       <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="40 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Backed off from 45"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
       <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="40 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
       <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="40 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Single Arm DB Row (Left Emphasis)</div><div class="exercise-meta">45 lb · 3 × 10</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT catch-up"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT catch-up"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT catch-up"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Lateral Raise</div><div class="exercise-meta">15 lb · 3 × 12</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="15 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Shoulder health - no 17.5s available, 15 is the real target"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="15 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="15 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="12"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
     </div>
   </div>
 
@@ -1199,7 +1217,10 @@
   <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
   <div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div>
 
-  <div class="section-label">Workouts</div>
+  <div class="section-label">Day Notes</div>
+  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('tue')">Collapse All</button></div>
 
   <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
@@ -1221,7 +1242,10 @@
   <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-gym">🏋 GYM</div></div>
   <div class="alert amber">⏱ <span>Est. time: 45-50 min. Focus: Legs + Back + Chest. Left arm emphasis. Progressing lifts that were completed clean last week; holding anything marked tough, and Leg Curl ramps slightly higher than Monday's reduced weight.</span></div>
 
-  <div class="section-label">Workouts</div>
+  <div class="section-label">Day Notes</div>
+  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('wed')">Collapse All</button></div>
 
   <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Leg Press</div><div class="exercise-meta">245 lb · 4 × 10</div></div>
@@ -1244,39 +1268,20 @@
   </div>
 
   <div class="exercise-card">
-    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Lat Pulldown</div><div class="exercise-meta">100 lb · 3 × 10</div></div>
-    <div class="exercise-sets">
-      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="100 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="100 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="100 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-    </div>
-  </div>
-
-  <div class="exercise-card">
-    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">CS DB Row (Left Arm Focus)</div><div class="exercise-meta">45 lb ea · 4 × 10</div></div>
-    <div class="exercise-sets">
-      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb ea"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT focus"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb ea"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT focus"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb ea"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT focus"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">4</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb ea"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT focus"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-    </div>
-  </div>
-
-  <div class="exercise-card">
-    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Inclined Dumbbell Chest Press</div><div class="exercise-meta">45 lb · 3 × 10</div></div>
-    <div class="exercise-sets">
-      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
-    </div>
-  </div>
-
-  <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Machine Chest Press</div><div class="exercise-meta">90 lb · 3 × 10</div></div>
     <div class="exercise-sets">
       <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="90 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Progressed from 85 - clean completion last week"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
       <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="90 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
       <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="90 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Lat Pulldown</div><div class="exercise-meta">100 lb · 3 × 10</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="100 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="100 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="100 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
     </div>
   </div>
 
@@ -1304,6 +1309,25 @@
       <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="70 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="15"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="Progressed from 65 - clean completion last week"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
       <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="70 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="15"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
       <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="70 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="15"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">CS DB Row (Left Arm Focus)</div><div class="exercise-meta">45 lb ea · 4 × 10</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb ea"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT focus"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb ea"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT focus"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb ea"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT focus"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">4</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb ea"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text" placeholder="LEFT focus"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+    </div>
+  </div>
+
+  <div class="exercise-card">
+    <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Inclined Dumbbell Chest Press</div><div class="exercise-meta">45 lb · 3 × 10</div></div>
+    <div class="exercise-sets">
+      <div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">2</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
+      <div class="set-row"><div class="set-num">3</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="45 lb"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="10"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>
     </div>
   </div>
 
@@ -1343,7 +1367,10 @@
   <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
   <div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div>
 
-  <div class="section-label">Workouts</div>
+  <div class="section-label">Day Notes</div>
+  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('thu')">Collapse All</button></div>
 
   <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
@@ -1365,7 +1392,10 @@
   <div class="day-header"><div class="day-title">FRIDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
   <div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div>
 
-  <div class="section-label">Workouts</div>
+  <div class="section-label">Day Notes</div>
+  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('fri')">Collapse All</button></div>
 
   <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 3 × 55</div></div>
@@ -1387,6 +1417,9 @@
   <div class="day-header"><div class="day-title">SAT</div><div class="day-badge badge-travel">🧘 RECOVERY</div></div>
   <div class="alert amber">🧘 <span>Lighter week — lifting paused for Saturday, swapped for stretching + a pushup catch-up set. Back to the normal "C day" (Split Squat/Hinge/Row/Press) next Saturday.</span></div>
 
+  <div class="section-label">Day Notes</div>
+  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+
   <div class="section-label">Stretching</div>
 
   <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Hip Flexor Stretch — 60s/side</div></div></div>
@@ -1398,7 +1431,7 @@
   <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Cat-Cow Spinal Mobility — 10 reps</div></div></div>
   <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Child's Pose — 60s</div></div></div>
 
-  <div class="section-label">Workouts</div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sat')">Collapse All</button></div>
 
   <div class="exercise-card">
     <div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">Pushups</div><div class="exercise-meta">BW · 4 × 55 · Rest 60s</div></div>
@@ -1434,6 +1467,10 @@
 <div id="day-sun" class="day-panel" data-pushup-target="0">
   <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-rest">😴 REST</div></div>
   <div class="alert amber">🧘 <span>Full rest day — no lifting, no pushups. Let the week's work absorb.</span></div>
+
+  <div class="section-label">Day Notes</div>
+  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+
   <button class="summary-btn" onclick="generateSummary('sun')">📋 Generate Week Summary</button>
   <div class="summary-output" id="sun-summary"></div>
   <button class="copy-btn" id="sun-copy" onclick="copySummary('sun')">📎 Copy to Clipboard</button>
@@ -5330,11 +5367,13 @@ function serializeDay(day) {
     const nameInput = card.querySelector('.exercise-name-input');
     const sets = Array.from(card.querySelectorAll('.set-row')).map(row => {
       const inputs = row.querySelectorAll('.set-input');
+      const activeQuality = row.querySelector('.quality-box.active');
       return {
         weight: inputs[0] ? inputs[0].value : '',
         reps: inputs[1] ? inputs[1].value : '',
         notes: inputs[2] ? inputs[2].value : '',
-        checked: row.querySelector('.set-checkbox').classList.contains('checked')
+        checked: row.querySelector('.set-checkbox').classList.contains('checked'),
+        quality: activeQuality ? activeQuality.dataset.quality : ''
       };
     });
     return { id: card.dataset.exId, custom: !!nameInput, name: nameInput ? nameInput.value : '', sets: sets };
@@ -5344,7 +5383,8 @@ function serializeDay(day) {
     checked: item.classList.contains('checked')
   }));
 
-  return { exercises: exercises, checkItems: checkItems };
+  const dayNotesEl = panel.querySelector('.day-notes-input');
+  return { exercises: exercises, checkItems: checkItems, dayNotes: dayNotesEl ? dayNotesEl.value : '' };
 }
 
 function saveState() {
@@ -5627,6 +5667,10 @@ function restoreDay(day, savedDay) {
         if (inputs[1]) inputs[1].value = savedSet.reps || '';
         if (inputs[2]) inputs[2].value = savedSet.notes || '';
         if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
+        if (savedSet.quality) {
+          const qualityBox = row.querySelector('.quality-box[data-quality="' + savedSet.quality + '"]');
+          if (qualityBox) qualityBox.classList.add('active');
+        }
       });
 
       updateExerciseTotal(card);
@@ -5657,6 +5701,10 @@ function restoreDay(day, savedDay) {
         if (inputs[1]) inputs[1].value = savedSet.reps || '';
         if (inputs[2]) inputs[2].value = savedSet.notes || '';
         if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
+        if (savedSet.quality) {
+          const qualityBox = row.querySelector('.quality-box[data-quality="' + savedSet.quality + '"]');
+          if (qualityBox) qualityBox.classList.add('active');
+        }
       });
 
       updateExerciseTotal(card);
@@ -5671,6 +5719,9 @@ function restoreDay(day, savedDay) {
       item.querySelector('.checkbox').textContent = '✓';
     }
   });
+
+  const dayNotesEl = panel.querySelector('.day-notes-input');
+  if (dayNotesEl && savedDay.dayNotes) dayNotesEl.value = savedDay.dayNotes;
 }
 
 function restoreState() {
@@ -5982,7 +6033,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-weekly-progression-review';
+const APP_BUILD_VERSION = '2026-08-17-exercise-reorder-quality-notes-collapse';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -8301,6 +8352,41 @@ function toggleSetCheck(el) {
   saveState();
 }
 
+// Per-set quality tag: green = good set/easy weight, yellow = tough weight
+// but got it done, red = too tough - couldn't finish or had to lower the
+// weight. Clicking the already-active box clears it back to unset.
+const SET_QUALITY_LABELS = { green: 'Good set - easy weight', yellow: 'Tough weight but got it done', red: "Too tough - couldn't finish / lowered weight" };
+
+function initSetQuality(row) {
+  if (row.querySelector('.set-quality')) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'set-quality';
+  wrap.innerHTML = Object.keys(SET_QUALITY_LABELS).map(c =>
+    `<div class="quality-box quality-${c}" data-quality="${c}" title="${SET_QUALITY_LABELS[c]}" onclick="toggleSetQuality(this)"></div>`
+  ).join('');
+  const checkbox = row.querySelector('.set-checkbox');
+  row.insertBefore(wrap, checkbox);
+}
+
+function toggleSetQuality(box) {
+  const wasActive = box.classList.contains('active');
+  box.parentElement.querySelectorAll('.quality-box').forEach(b => b.classList.remove('active'));
+  if (!wasActive) box.classList.add('active');
+  saveState();
+}
+
+function collapseAllExercises(day) {
+  const panel = document.getElementById('day-' + day);
+  panel.querySelectorAll('.exercise-card').forEach(card => {
+    const sets = card.querySelector('.exercise-sets');
+    if (sets && sets.classList.contains('expanded')) {
+      sets.classList.remove('expanded');
+      const toggle = card.querySelector('.exercise-header .exercise-toggle');
+      if (toggle) toggle.textContent = '▸';
+    }
+  });
+}
+
 function toggleCheck(el) {
   el.classList.toggle('checked');
   el.querySelector('.checkbox').textContent = el.classList.contains('checked') ? '✓' : '';
@@ -8648,6 +8734,7 @@ function addSet(btn) {
     `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>`;
   container.insertBefore(row, btn);
   initSetDeleteBtn(row);
+  initSetQuality(row);
   updateExerciseTotal(container.closest('.exercise-card'));
   saveState();
 }
@@ -8673,7 +8760,7 @@ function initExerciseSets(card) {
   }
 
   initExerciseSwipe(card);
-  card.querySelectorAll('.set-row').forEach(initSetDeleteBtn);
+  card.querySelectorAll('.set-row').forEach(row => { initSetDeleteBtn(row); initSetQuality(row); });
   updateExerciseTotal(card);
   updateExerciseHistoryNote(card);
 }
@@ -8951,6 +9038,11 @@ function generateSummary(day) {
   const panel = document.getElementById('day-' + day);
   let lines = [`SESSION SUMMARY — ${dayNames[day].toUpperCase()}`, getWeekLabel(), '─────────────────────────────'];
 
+  const dayNotesEl = panel.querySelector('.day-notes-input');
+  if (dayNotesEl && dayNotesEl.value.trim()) {
+    lines.push(''); lines.push('DAY NOTES:'); lines.push(dayNotesEl.value.trim());
+  }
+
   const exercises = panel.querySelectorAll('.exercise-card');
   if (exercises.length > 0) {
     lines.push(''); lines.push('EXERCISES:');
@@ -8968,10 +9060,12 @@ function generateSummary(day) {
         const notes = inputs[2].value || '';
         const isChecked = row.querySelector('.set-checkbox').classList.contains('checked');
         const checkmark = isChecked ? '✓' : '–';
+        const activeQuality = row.querySelector('.quality-box.active');
+        const qualityTag = activeQuality ? { green: ' [Good]', yellow: ' [Tough]', red: ' [Too Tough]' }[activeQuality.dataset.quality] || '' : '';
 
         let setLine = `  Set ${setNum}: ${weight} × ${reps}`;
         if (notes) setLine += ` | ${notes}`;
-        setLine += ` ${checkmark}`;
+        setLine += ` ${checkmark}${qualityTag}`;
         lines.push(setLine);
       });
 
