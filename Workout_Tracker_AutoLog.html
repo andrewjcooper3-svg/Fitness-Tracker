@@ -856,8 +856,11 @@
      line into one row to give more of the limited vertical space
      (phones in landscape are short) to actual data, and hide the
      baseline-pace note since it's the least useful line on a screen
-     this short. None of this touches real desktop (>=1100px), which
-     has plenty of vertical room and wasn't reported as an issue.
+     this short. Widened from 960px to 1080px so the layout actually
+     uses the space up to the desktop breakpoint instead of leaving an
+     empty margin on wider phones/tablets in this tier. None of this
+     touches real desktop (>=1100px), which has plenty of vertical room
+     and wasn't reported as an issue.
 
      Both Trainer columns are capped to the remaining viewport height
      and scroll independently (position:sticky doesn't work here -
@@ -865,29 +868,57 @@
      overflow:hidden but never actually scrolls itself, so sticky has
      no scroll container to react to and just sits static). This is
      what actually gets "only the workouts scroll, the pushup/progress
-     side stays put": the header stays fixed at the top, and each
-     column scrolls in its own lane instead of the whole page scrolling
-     together - scrolling the exercise list no longer carries the
-     pushup deficit/rings/stats out of view. */
+     side stays put": each column scrolls in its own lane instead of
+     the whole page scrolling together - scrolling the exercise list no
+     longer carries the pushup deficit/rings/stats out of view.
+
+     The header is deliberately NOT pinned above the columns like the
+     rail is - it's reparented (see initTrainerLandscapeReflow_ near
+     the bottom of the script) to be the first thing inside the
+     scrollable exercise column, so it scrolls away with the workouts
+     instead of permanently occupying screen height. The Sets/Total
+     Reps/Days Active tiles are reparented the other way, out to a
+     third column in the reclaimed margin, compacted into a narrow
+     stack instead of a wide 3-up row - it doesn't need to breathe like
+     the exercise list does, and freeing it from the bottom of the
+     rail leaves more of the rail's capped height for the deficit/rings
+     card above it. */
   @media (min-width: 768px) and (max-width: 1099.98px) {
+    body { max-width: 1080px; }
+    .app-tabs { max-width: 1080px; }
+
     .header-title { font-size: 22px; }
     .day-title { font-size: 17px; }
     .ov-page-title { font-size: 20px; }
     .tracker-side-rail > .ov-note { display: none; }
 
-    #view-tracker > .header { padding: 10px 2px 8px; margin-bottom: 8px; }
+    #view-tracker .header { padding: 10px 2px 8px; margin-bottom: 8px; }
     .header-info { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
     .header-sub, .header-week { margin-top: 0; }
 
+    #view-tracker { grid-template-columns: 1fr 300px 140px; }
+    #view-tracker > .tracker-main-col { grid-row: 1; }
+    #view-tracker > .tracker-side-rail { grid-row: 1; }
+    #view-tracker > .ov-grid { grid-column: 3; grid-row: 1; }
+
     #view-tracker > .tracker-main-col,
-    #view-tracker > .tracker-side-rail {
-      max-height: calc(100vh - (56px + env(safe-area-inset-top, 0px)) - (24px + env(safe-area-inset-bottom, 0px)) - 62px);
+    #view-tracker > .tracker-side-rail,
+    #view-tracker > .ov-grid {
+      max-height: calc(100vh - (56px + env(safe-area-inset-top, 0px)) - (24px + env(safe-area-inset-bottom, 0px)));
       overflow-y: auto;
       position: static;
       scrollbar-width: none;
     }
     #view-tracker > .tracker-main-col::-webkit-scrollbar,
-    #view-tracker > .tracker-side-rail::-webkit-scrollbar { display: none; }
+    #view-tracker > .tracker-side-rail::-webkit-scrollbar,
+    #view-tracker > .ov-grid::-webkit-scrollbar { display: none; }
+
+    /* Compact vertical stack instead of the wide 3-up row it uses
+       everywhere else - this column is only 140px wide. */
+    #view-tracker > .ov-grid { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+    #view-tracker > .ov-grid .ov-tile { padding: 0; border-left: none; }
+    #view-tracker > .ov-grid .ov-tile-label { font-size: 9px; margin-bottom: 3px; }
+    #view-tracker > .ov-grid .ov-tile-value { font-size: 16px; }
   }
 
   /* Desktop only (genuinely wide windows - past where any phone or
@@ -6044,7 +6075,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-landscape-split-scroll-panes';
+const APP_BUILD_VERSION = '2026-08-17-header-scrolls-compact-stats-col';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9415,6 +9446,40 @@ window.addEventListener('online', flushPendingLogs);
 })();
 
 renderWeeklyPlan_();
+
+// The Trainer view's header and its Sets/Total-Reps/Days-Active tiles
+// swap parents in the 768-1099px landscape-phone/tablet tier (see the
+// matching @media block in <style> above): the header moves inside the
+// scrollable exercise column so it scrolls away with the workouts
+// instead of staying permanently pinned above them, and the stats
+// tiles move out to their own third column in the reclaimed margin.
+// Both are pure reparenting - no content is duplicated or recreated -
+// and get reverted outside that width range, so portrait/desktop keep
+// their original DOM order untouched.
+(function initTrainerLandscapeReflow_() {
+  const viewTracker = document.getElementById('view-tracker');
+  const header = viewTracker && viewTracker.querySelector(':scope > .header, .tracker-main-col > .header');
+  const mainCol = viewTracker && viewTracker.querySelector(':scope > .tracker-main-col');
+  const sideRail = viewTracker && viewTracker.querySelector(':scope > .tracker-side-rail');
+  const statsGrid = viewTracker && viewTracker.querySelector('.ov-grid');
+  if (!viewTracker || !header || !mainCol || !sideRail || !statsGrid) return;
+
+  const mq = window.matchMedia('(min-width: 768px) and (max-width: 1099.98px)');
+
+  function apply() {
+    if (mq.matches) {
+      if (header.parentElement !== mainCol) mainCol.insertBefore(header, mainCol.firstChild);
+      if (statsGrid.parentElement !== viewTracker) viewTracker.appendChild(statsGrid);
+    } else {
+      if (header.parentElement !== viewTracker) viewTracker.insertBefore(header, viewTracker.firstChild);
+      if (statsGrid.parentElement !== sideRail) sideRail.appendChild(statsGrid);
+    }
+    goToView(viewOrder[currentViewIndex], false);
+  }
+
+  apply();
+  mq.addEventListener('change', apply);
+})();
 
 document.querySelectorAll('.exercise-sets').forEach((el, i) => {
   if (i === 0) {
