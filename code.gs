@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-11-settings-sheet';
+const BACKEND_BUILD_VERSION = '2026-08-17-pushup-ledger-completed-only';
 
 const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Set', 'Target Weight', 'Actual Weight', 'Target Reps', 'Actual Reps', 'Completed', 'Notes'];
 const COLUMN_WIDTHS = [140, 90, 190, 50, 100, 100, 90, 90, 90, 240];
