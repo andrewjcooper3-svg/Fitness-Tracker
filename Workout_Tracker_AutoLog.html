@@ -115,8 +115,11 @@
   .exercise-history-neutral { color: var(--muted); font-weight: 600; }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
-  .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 70px 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+  .set-row { position: relative; overflow: hidden; border-bottom: 1px solid var(--border); }
   .set-row:last-child { border-bottom: none; }
+  .set-row-inner { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 70px 30px; gap: 8px; padding: 11px 14px; align-items: center; position: relative; z-index: 1; background: var(--surface); transition: transform 0.2s ease; touch-action: pan-y; }
+  .set-row-inner.swiping { transition: none; }
+  .set-swipe-delete-btn { position: absolute; top: 0; right: 0; bottom: 0; width: 84px; background: #c0392b; color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; }
   .set-num { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; }
   .set-input-group { display: flex; flex-direction: column; gap: 2px; }
   .set-input-label { font-family: var(--font); font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
@@ -133,8 +136,6 @@
   .set-checkbox { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
   .set-checkbox:hover, .set-checkbox:active { border-color: var(--accent); }
   .set-checkbox.checked { background: var(--green); border-color: var(--green); color: white; }
-  .set-delete-btn { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
-  .set-delete-btn:hover, .set-delete-btn:active { background: rgba(193, 87, 58, 0.16); color: var(--red); }
   .exercise-total { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--muted); padding: 9px 14px; border-top: 1px solid var(--border); }
   .add-set-btn { display: block; width: 100%; background: transparent; border: none; border-top: 1px solid var(--border); color: var(--accent); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 10px; cursor: pointer; }
   .add-set-btn:hover, .add-set-btn:active { background: var(--surface2); }
@@ -848,6 +849,22 @@
     #view-overview > .ov-note { flex: 1 1 100%; }
     #view-overview > .ov-hero-card { flex: 1 1 calc(50% - 8px); min-width: 0; }
     .ov-glance-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* Wide landscape phone / tablet only (768-1099px, NOT desktop):
+     shrink the page/day titles to give more of the limited vertical
+     space (phones in landscape are short) to actual data, drop the
+     right rail back to plain static flow instead of sticky (sticky
+     was landing oddly inside the swipe/carousel track on-device), and
+     hide the baseline-pace note since it's the least useful line on a
+     screen this short. None of this touches real desktop (>=1100px),
+     which has plenty of vertical room and wasn't reported as an issue. */
+  @media (min-width: 768px) and (max-width: 1099.98px) {
+    .header-title { font-size: 22px; }
+    .day-title { font-size: 17px; }
+    .ov-page-title { font-size: 20px; }
+    #view-tracker > .tracker-side-rail { position: static; }
+    .tracker-side-rail > .ov-note { display: none; }
   }
 
   /* Desktop only (genuinely wide windows - past where any phone or
@@ -6004,7 +6021,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-safe-area-and-centered-tabs';
+const APP_BUILD_VERSION = '2026-08-17-set-swipe-delete-and-landscape-tweaks';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -8682,14 +8699,115 @@ function renumberSets(card) {
   });
 }
 
-function initSetDeleteBtn(row) {
-  if (row.querySelector('.set-delete-btn')) return;
+// Swipe-left-to-delete on an individual set, same pattern as
+// initExerciseSwipe()/deleteExercise() below - just scoped one level
+// down to a single .set-row instead of the whole .exercise-card. Must
+// run AFTER initSetQuality() has added the quality boxes, since it
+// moves every current child of the row into a new .set-row-inner
+// wrapper (initSetQuality()'s insertBefore call needs the checkbox to
+// still be a direct child of row at that point).
+const SET_SWIPE_OPEN_PX = 84;
+let setSwipeState = null;
+let setOpenSwipeRow = null;
+
+function initSetSwipe(row) {
+  if (row.querySelector(':scope > .set-row-inner')) return;
+
+  const inner = document.createElement('div');
+  inner.className = 'set-row-inner';
+  while (row.firstChild) inner.appendChild(row.firstChild);
+
   const delBtn = document.createElement('div');
-  delBtn.className = 'set-delete-btn';
-  delBtn.textContent = '✕';
+  delBtn.className = 'set-swipe-delete-btn';
+  delBtn.textContent = 'Delete';
   delBtn.onclick = () => deleteSet(delBtn);
+
   row.appendChild(delBtn);
+  row.appendChild(inner);
+
+  inner.addEventListener('pointerdown', onSetSwipeStart);
+  inner.addEventListener('pointermove', onSetSwipeMove);
+  inner.addEventListener('pointerup', onSetSwipeEnd);
+  inner.addEventListener('pointercancel', onSetSwipeEnd);
 }
+
+function onSetSwipeStart(e) {
+  if (e.target.closest('input, textarea, .set-checkbox, .quality-box')) return;
+  // Stops here so a swipe starting on a set-row never also triggers the
+  // exercise-level swipe (initExerciseSwipe listens further up the
+  // same .exercise-card) - swiping the whole exercise still works by
+  // starting the gesture from the exercise header instead.
+  e.stopPropagation();
+  const inner = e.currentTarget;
+  const row = inner.closest('.set-row');
+  setSwipeState = {
+    pointerId: e.pointerId,
+    row, inner,
+    startX: e.clientX,
+    startY: e.clientY,
+    startTranslate: row.dataset.swipeOpen === '1' ? -SET_SWIPE_OPEN_PX : 0,
+    deciding: true,
+    isSwipe: false
+  };
+}
+
+function onSetSwipeMove(e) {
+  const state = setSwipeState;
+  if (!state || e.pointerId !== state.pointerId) return;
+  e.stopPropagation();
+  const dx = e.clientX - state.startX;
+  const dy = e.clientY - state.startY;
+
+  if (state.deciding) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    state.deciding = false;
+    state.isSwipe = Math.abs(dx) > Math.abs(dy);
+    if (!state.isSwipe) { setSwipeState = null; return; }
+    state.inner.classList.add('swiping');
+    state.inner.setPointerCapture(state.pointerId);
+  }
+  if (!state.isSwipe) return;
+
+  e.preventDefault();
+  const translate = Math.max(-SET_SWIPE_OPEN_PX, Math.min(0, state.startTranslate + dx));
+  state.inner.style.transform = `translateX(${translate}px)`;
+}
+
+function onSetSwipeEnd(e) {
+  const state = setSwipeState;
+  if (!state || e.pointerId !== state.pointerId) return;
+  e.stopPropagation();
+  setSwipeState = null;
+  if (!state.isSwipe) return;
+
+  state.inner.classList.remove('swiping');
+  const dx = e.clientX - state.startX;
+  const translate = state.startTranslate + dx;
+  setSetSwipeOpen(state.row, state.inner, translate < -SET_SWIPE_OPEN_PX / 2);
+}
+
+function setSetSwipeOpen(row, inner, open) {
+  if (open && setOpenSwipeRow && setOpenSwipeRow !== row) {
+    closeSetSwipe(setOpenSwipeRow);
+  }
+  inner.style.transform = open ? `translateX(-${SET_SWIPE_OPEN_PX}px)` : '';
+  row.dataset.swipeOpen = open ? '1' : '0';
+  setOpenSwipeRow = open ? row : (setOpenSwipeRow === row ? null : setOpenSwipeRow);
+}
+
+function closeSetSwipe(row) {
+  const inner = row.querySelector(':scope > .set-row-inner');
+  if (inner) inner.style.transform = '';
+  row.dataset.swipeOpen = '0';
+  if (setOpenSwipeRow === row) setOpenSwipeRow = null;
+}
+
+document.addEventListener('pointerdown', (e) => {
+  if (!setOpenSwipeRow) return;
+  if (e.target.closest('.set-row') !== setOpenSwipeRow) {
+    closeSetSwipe(setOpenSwipeRow);
+  }
+}, true);
 
 // Sets can be deleted freely, but an exercise always keeps at least one row
 // (delete the whole exercise instead of emptying it - addSet() relies on a
@@ -8727,8 +8845,8 @@ function addSet(btn) {
     `<div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div>` +
     `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>`;
   container.insertBefore(row, btn);
-  initSetDeleteBtn(row);
   initSetQuality(row);
+  initSetSwipe(row);
   updateExerciseTotal(container.closest('.exercise-card'));
   saveState();
 }
@@ -8754,7 +8872,7 @@ function initExerciseSets(card) {
   }
 
   initExerciseSwipe(card);
-  card.querySelectorAll('.set-row').forEach(row => { initSetDeleteBtn(row); initSetQuality(row); });
+  card.querySelectorAll('.set-row').forEach(row => { initSetQuality(row); initSetSwipe(row); });
   updateExerciseTotal(card);
   updateExerciseHistoryNote(card);
 }
