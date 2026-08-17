@@ -114,15 +114,15 @@
   .exercise-history-neutral { color: var(--muted); font-weight: 600; }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
-  .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 52px 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
+  .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 70px 30px 22px; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--border); align-items: center; }
   .set-row:last-child { border-bottom: none; }
   .set-num { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; }
   .set-input-group { display: flex; flex-direction: column; gap: 2px; }
   .set-input-label { font-family: var(--font); font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
   .set-input { font-family: var(--font); font-size: 14px; color: var(--text); background: transparent; border: none; border-bottom: 1px solid var(--border); outline: none; padding: 4px 2px; width: 100%; font-variant-numeric: tabular-nums; }
   .set-input:focus { border-bottom-color: var(--accent); }
-  .set-quality { display: flex; gap: 3px; flex-shrink: 0; justify-content: center; }
-  .quality-box { width: 14px; height: 14px; border-radius: 4px; cursor: pointer; transition: all 0.15s; box-sizing: border-box; background: transparent; }
+  .set-quality { display: flex; gap: 4px; flex-shrink: 0; justify-content: center; }
+  .quality-box { width: 20px; height: 20px; border-radius: 6px; cursor: pointer; transition: all 0.15s; box-sizing: border-box; background: transparent; }
   .quality-box.quality-green { border: 2px solid var(--green); }
   .quality-box.quality-yellow { border: 2px solid var(--amber); }
   .quality-box.quality-red { border: 2px solid var(--red); }
@@ -6088,7 +6088,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-manual-pushup-ledger-correction';
+const APP_BUILD_VERSION = '2026-08-17-quality-to-sheet-and-history-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -8510,7 +8510,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-17-pushup-ledger-completed-only';
+const EXPECTED_BACKEND_VERSION = '2026-08-17-exercise-history-fix-and-quality-column';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
@@ -8722,6 +8722,7 @@ function parseExerciseCard(card) {
 
   const sets = Array.from(rows).map((row, i) => {
     const inputs = row.querySelectorAll('.set-input');
+    const activeQuality = row.querySelector('.quality-box.active');
     return {
       setNum: i + 1,
       targetWeight: targetWeight,
@@ -8729,6 +8730,7 @@ function parseExerciseCard(card) {
       actualWeight: asNumberOrString(actualOrTarget(inputs[0])),
       actualReps: actualOrTarget(inputs[1]),
       completed: row.querySelector('.set-checkbox').classList.contains('checked'),
+      quality: activeQuality ? activeQuality.dataset.quality : '',
       notes: inputs[2] ? inputs[2].value.trim() : ''
     };
   });

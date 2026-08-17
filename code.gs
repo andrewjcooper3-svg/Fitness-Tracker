@@ -28,10 +28,21 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-17-pushup-ledger-completed-only';
+const BACKEND_BUILD_VERSION = '2026-08-17-exercise-history-fix-and-quality-column';
 
-const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Set', 'Target Weight', 'Actual Weight', 'Target Reps', 'Actual Reps', 'Completed', 'Notes'];
-const COLUMN_WIDTHS = [140, 90, 190, 50, 100, 100, 90, 90, 90, 240];
+// Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
+// tough but done / too tough or had to lower the weight) - the same
+// signal a coach would use to decide whether to progress, hold, or back
+// off that exercise next time, captured here so it's available for
+// automated progression suggestions later instead of only living in
+// freeform Notes text. Appended at the END of HEADERS (not inserted
+// before Notes) deliberately - every week-sheet tab created before this
+// column existed already has a 10-column header baked in, and a purely
+// trailing addition means new rows appended to those old tabs still
+// land Notes in its original column; migrateWeekSheetHeader_ below
+// upgrades an old tab's header row in place the next time it's touched.
+const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Set', 'Target Weight', 'Actual Weight', 'Target Reps', 'Actual Reps', 'Completed', 'Notes', 'Quality'];
+const COLUMN_WIDTHS = [140, 90, 190, 50, 100, 100, 90, 90, 90, 240, 90];
 
 // One pastel per day of week so blocks of rows are easy to tell apart at a glance.
 const DAY_COLORS = {
@@ -99,14 +110,40 @@ function formatNewSheet_(sheet) {
     sheet.setColumnWidth(i + 1, width);
   });
 
-  // Center the numeric-ish columns (Set through Completed) for the whole sheet.
+  // Center the numeric-ish columns (Set through Completed), plus Quality
+  // separately since it now sits after Notes rather than contiguous with them.
   sheet.getRange(1, 4, sheet.getMaxRows(), 6).setHorizontalAlignment('center');
+  sheet.getRange(1, 11, sheet.getMaxRows(), 1).setHorizontalAlignment('center');
+}
+
+// A week-sheet tab created before the Quality column existed only has
+// the old 10-column header row. Since Quality was appended at the END
+// of HEADERS (not inserted before Notes - see the comment on HEADERS
+// above), an old tab just needs that one header cell added on to reach
+// 11 columns; every existing data row's Notes stays exactly where it
+// already was, and simply has no Quality value (correctly - that data
+// genuinely predates the feature) until a set on that tab gets a
+// quality tag going forward.
+function migrateWeekSheetHeader_(sheet) {
+  const existingHeaders = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+  if (existingHeaders[HEADERS.length - 1] === HEADERS[HEADERS.length - 1]) return;
+
+  const headerCell = sheet.getRange(1, HEADERS.length);
+  headerCell.setValue('Quality');
+  headerCell.setFontWeight('bold');
+  headerCell.setBackground('#1a1d24');
+  headerCell.setFontColor('#ffffff');
+  sheet.setColumnWidth(HEADERS.length, COLUMN_WIDTHS[HEADERS.length - 1]);
+  sheet.getRange(1, HEADERS.length, sheet.getMaxRows(), 1).setHorizontalAlignment('center');
 }
 
 function getOrCreateWeekSheet_(weekLabel) {
   const ss = getOrCreateSpreadsheet_();
   let sheet = ss.getSheetByName(weekLabel);
-  if (sheet) return sheet;
+  if (sheet) {
+    migrateWeekSheetHeader_(sheet);
+    return sheet;
+  }
 
   const sheets = ss.getSheets();
   if (sheets.length === 1 && sheets[0].getLastRow() === 0) {
@@ -875,6 +912,7 @@ function getExerciseHistory_() {
     rows.forEach(function (row) {
       const day = row[1], exercise = row[2];
       if (!exercise) return;
+      if (row[8] !== 'Yes') return; // Only a set actually checked off complete counts as "last time you did this."
       const actualWeight = Number(row[5]);
       if (isNaN(actualWeight) || actualWeight <= 0) return;
       const actualReps = Number(row[7]);
@@ -946,6 +984,15 @@ function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
 
   let rowsAdded = 0;
 
+  // Sheet cell gets the capitalized label ("Green"/"Yellow"/"Red") rather
+  // than the client's lowercase internal key, so it reads cleanly next to
+  // "Yes"/"No" in Completed - still an exact, easily-matched string for
+  // whatever reads it later (a script, a formula, a future automation).
+  function formatQuality_(quality) {
+    if (!quality) return '';
+    return quality.charAt(0).toUpperCase() + quality.slice(1);
+  }
+
   if (exercises.length > 0) {
     exercises.forEach(function (ex) {
       const sets = Array.isArray(ex.sets) ? ex.sets : [];
@@ -961,19 +1008,20 @@ function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
             s.targetReps != null ? s.targetReps : '',
             s.actualReps != null ? s.actualReps : '',
             s.completed ? 'Yes' : 'No',
-            s.notes || ''
+            s.notes || '',
+            formatQuality_(s.quality)
           ]);
           rowsAdded++;
         });
       } else {
         // An exercise with no set data - log a bare placeholder row for it.
-        appendRow([timestamp, day, ex.name || '', '', '', '', '', '', '', '']);
+        appendRow([timestamp, day, ex.name || '', '', '', '', '', '', '', '', '']);
         rowsAdded++;
       }
     });
   } else {
     // No exercises for the day (e.g. a rest/cardio-only day) - log a single placeholder row.
-    appendRow([timestamp, day, '', '', '', '', '', '', '', notes || '']);
+    appendRow([timestamp, day, '', '', '', '', '', '', '', notes || '', '']);
     rowsAdded = 1;
   }
 
