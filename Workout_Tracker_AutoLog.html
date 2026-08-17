@@ -5568,11 +5568,39 @@ async function loadRemotePushupLedger() {
       local[date] = Math.max(local[date] || 0, data.ledger[date]);
     });
     localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(local));
+    applyManualPushupLedgerCorrection20260817_();
     if (viewOrder[currentViewIndex] === 'tracker') renderPushupsTab();
     if (viewOrder[currentViewIndex] === 'overview') renderOverview();
   } catch (e) {
     // Offline/unreachable - whatever's cached locally stands.
   }
+}
+
+// Requested one-time correction of 3 weeks' worth of historical pushup
+// totals (weeks of Jul 20, Aug 3, and Aug 10, 2026), hand-derived from
+// the actual per-set PDF exports for those weeks - counting only sets
+// marked Completed=Yes, not every typed/target rep. Deliberately
+// excludes the week of Jul 13 (the user asked to ignore that log for
+// this correction). Force-overwrites rather than max-merges, since the
+// corrected (often lower) number is the right one here, and re-applied
+// after every remote ledger sync - not just once - so an inflated
+// number from a not-yet-redeployed backend can't silently re-clobber
+// these 21 days on the next load before code.gs is redeployed.
+function applyManualPushupLedgerCorrection20260817_() {
+  const corrected = {
+    // Week of Jul 20 - Jul 26
+    '2026-07-20': 240, '2026-07-21': 206, '2026-07-22': 180, '2026-07-23': 0,
+    '2026-07-24': 240, '2026-07-25': 120, '2026-07-26': 0,
+    // Week of Aug 3 - Aug 9
+    '2026-08-03': 0, '2026-08-04': 340, '2026-08-05': 165, '2026-08-06': 0,
+    '2026-08-07': 0, '2026-08-08': 155, '2026-08-09': 335,
+    // Week of Aug 10 - Aug 16
+    '2026-08-10': 0, '2026-08-11': 190, '2026-08-12': 180, '2026-08-13': 155,
+    '2026-08-14': 0, '2026-08-15': 80, '2026-08-16': 385
+  };
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  Object.keys(corrected).forEach(key => { ledger[key] = corrected[key]; });
+  localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(ledger));
 }
 
 // One-time seed of the Week-of-Jul-13 reps actually reviewed from the
@@ -6060,7 +6088,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-pushup-ring-predicted-pace-and-ledger-fix';
+const APP_BUILD_VERSION = '2026-08-17-manual-pushup-ledger-correction';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9340,6 +9368,7 @@ initAddExerciseButtons();
 tagExerciseIds();
 loadSettingsIntoState();
 seedHistoricalPushupLedger();
+applyManualPushupLedgerCorrection20260817_();
 seedYearCarryForward();
 forceYearCarryResetJul27();
 migrateStaleDayTemplates20260727();
