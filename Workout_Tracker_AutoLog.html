@@ -888,15 +888,40 @@
     body { max-width: 1080px; }
     .app-tabs { max-width: 1080px; }
 
-    .header-title { font-size: 22px; }
     .day-title { font-size: 17px; }
     .ov-page-title { font-size: 20px; }
     .tracker-side-rail > .ov-note { display: none; }
     .tracker-side-rail > .sp-shuffle-bar { display: none; }
 
-    #view-tracker .header { padding: 10px 2px 8px; margin-bottom: 8px; }
-    .header-info { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-    .header-sub, .header-week { margin-top: 0; }
+    /* The title row folds into the tab bar itself instead of costing
+       its own row (whether pinned above the columns or scrolling away
+       with them, as in the last two iterations of this) - title and
+       subtitle absolutely positioned at the bar's left edge, the week
+       range at its right edge, both vertically centered in the 44px
+       bar. .header-info/.header-week are reparented into #appTabs by
+       initTrainerLandscapeReflow_ near the bottom of the script (only
+       while Trainer is the active tab - gated on body.view-is-tracker,
+       same mechanism as the two side pills), leaving the now-empty
+       .header hidden rather than costing any space in the scrollable
+       exercise column it used to sit in. */
+    #view-tracker > .header { display: none; }
+    .app-tabs > .header-info, .app-tabs > .header-week { display: none; }
+    body.view-is-tracker .app-tabs > .header-info {
+      display: flex; align-items: baseline; gap: 6px;
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      white-space: nowrap;
+    }
+    body.view-is-tracker .app-tabs > .header-info .header-title { font-size: 15px; }
+    /* Dropped entirely rather than shrunk further - at the narrow end
+       of this tier (768px) even a tiny "Balanced Growth - 100% Lean"
+       collided with the first tab; title + the week range on the
+       right is enough context for a bar this compact. */
+    body.view-is-tracker .app-tabs > .header-info .header-sub { display: none; }
+    body.view-is-tracker .app-tabs > .header-week {
+      display: block;
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 10px; margin-top: 0; white-space: nowrap;
+    }
 
     /* Small round icon button, sitting in the bottom third of the
        screen on the left edge - top:80% with translateY(-50%) centers
@@ -6150,7 +6175,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-narrower-pills';
+const APP_BUILD_VERSION = '2026-08-17-title-into-top-bar';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9539,20 +9564,29 @@ renderWeeklyPlan_();
 // desktop keep their original DOM order untouched.
 (function initTrainerLandscapeReflow_() {
   const viewTracker = document.getElementById('view-tracker');
-  const header = viewTracker && viewTracker.querySelector(':scope > .header, .tracker-main-col > .header');
-  const mainCol = viewTracker && viewTracker.querySelector(':scope > .tracker-main-col');
+  const header = viewTracker && viewTracker.querySelector(':scope > .header');
+  const headerInfo = header && header.querySelector('.header-info');
+  const headerWeek = headerInfo && headerInfo.querySelector('.header-week');
   const sideRail = viewTracker && viewTracker.querySelector(':scope > .tracker-side-rail');
   const statsGrid = viewTracker && document.querySelector('.ov-grid');
-  if (!viewTracker || !header || !mainCol || !sideRail || !statsGrid) return;
+  const appTabs = document.getElementById('appTabs');
+  if (!viewTracker || !header || !headerInfo || !headerWeek || !sideRail || !statsGrid || !appTabs) return;
 
   const mq = window.matchMedia('(min-width: 768px) and (max-width: 1099.98px)');
 
   function apply() {
     if (mq.matches) {
-      if (header.parentElement !== mainCol) mainCol.insertBefore(header, mainCol.firstChild);
+      // Extract the week label out of .header-info FIRST, then move
+      // .header-info itself - both land as direct children of the tab
+      // bar (left cluster = title/subtitle, right = week), leaving
+      // .header behind as an empty, CSS-hidden shell rather than
+      // needing to relocate it anywhere.
+      if (headerWeek.parentElement !== appTabs) appTabs.appendChild(headerWeek);
+      if (headerInfo.parentElement !== appTabs) appTabs.insertBefore(headerInfo, appTabs.firstChild);
       if (statsGrid.parentElement !== document.body) document.body.appendChild(statsGrid);
     } else {
-      if (header.parentElement !== viewTracker) viewTracker.insertBefore(header, viewTracker.firstChild);
+      if (headerWeek.parentElement !== headerInfo) headerInfo.appendChild(headerWeek);
+      if (headerInfo.parentElement !== header) header.insertBefore(headerInfo, header.firstChild);
       if (statsGrid.parentElement !== sideRail) sideRail.appendChild(statsGrid);
     }
     goToView(viewOrder[currentViewIndex], false);
