@@ -898,42 +898,30 @@
     .header-info { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
     .header-sub, .header-week { margin-top: 0; }
 
-    /* Both pills below are sized to match the Dynamic Island's own
-       footprint rotated into landscape (~126 x 37pt - a fixed, known
-       Apple hardware shape, roughly 110x44 in CSS px) rather than an
-       arbitrary size, and vertically centered so they read as an
-       echo of it rather than two unrelated floating widgets: the
-       island itself sits vertically centered on the edge in landscape
-       (it's horizontally centered along the physical top edge in
-       portrait, and that edge becomes the left edge on rotation), so
-       top:50% without any translateY starts each pill right at that
-       same center point and lets it hang below - "sits right below
-       it" - rather than straddling/overlapping the island itself.
-
-       Both are position:fixed but deliberately NOT moved out to a
-       body-level sibling the way you might expect (compare
-       .sp-shuffle-fab, which IS body-level) - .ov-grid stays nested
-       inside .app-views-track (the swipe carousel's transformed
-       wrapper), and a `transform` on an ancestor makes it the
-       containing block for fixed descendants too. That's normally a
-       bug to avoid, but here it's exactly what's wanted: the pill's
-       fixed position resolves against the CURRENT VIEW's slice of the
-       track, not the true document, so it slides off with the rest of
-       the Trainer panel when you switch tabs instead of persisting
-       everywhere the way the Shuffle Play button does. */
+    /* Small round icon button, sitting in the bottom third of the
+       screen on the left edge - top:80% with translateY(-50%) centers
+       it on that 80%-down point rather than starting there, so it
+       doesn't run past the bottom edge. position:fixed here is a
+       body-level element (a sibling of .app-tabs/.app-sidebar, not
+       nested inside .app-views-track, the swipe carousel's transformed
+       wrapper) specifically so top/left resolve against the true
+       viewport - a `transform` on an ancestor would otherwise become
+       the containing block for position:fixed descendants, and
+       .app-views-track is sized to fit all views side by side (many
+       screens wide), not the current one. */
     .sp-shuffle-fab {
-      display: flex; align-items: flex-start; justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       position: fixed;
       left: 0;
-      top: 50%;
-      width: 44px; height: 110px; border-radius: 22px;
-      padding-top: 14px;
+      top: 80%;
+      transform: translateY(-50%);
+      width: 46px; height: 46px; border-radius: 50%;
       background: linear-gradient(135deg, #1db954, #169c46);
-      color: #fff; font-size: 18px; border: none; cursor: pointer;
+      color: #fff; font-size: 19px; border: none; cursor: pointer;
       box-shadow: 0 3px 10px rgba(0,0,0,0.3);
       z-index: 60;
     }
-    .sp-shuffle-fab:active { transform: scale(0.96); }
+    .sp-shuffle-fab:active { transform: translateY(-50%) scale(0.94); }
 
     #view-tracker { grid-template-columns: 1fr 300px; }
     #view-tracker > .tracker-main-col { grid-row: 1; }
@@ -956,25 +944,30 @@
     #view-tracker > .tracker-main-col::-webkit-scrollbar,
     #view-tracker > .tracker-side-rail::-webkit-scrollbar { display: none; }
 
-    /* Same pill as .sp-shuffle-fab, mirrored to the right edge - see
-       the shared comment above on why this is body-level rather than
-       nested under #view-tracker like the grid-column approach it
-       replaces. Escaping the grid via position:fixed means the
-       grid-column reservation for it is gone too (reverted to a plain
-       2-column 1fr/300px grid above), so the exercise list floats
-       independent of column width entirely instead of needing a 3rd
-       track. Hidden by default (even in this tier) and only shown
-       while body carries .view-is-tracker, toggled by goToView() -
-       being body-level means it's always in the DOM regardless of
-       which tab is active, unlike before when it was naturally hidden
-       by living inside the off-screen Trainer panel. */
+    /* Tall pill on the right edge, mirroring .sp-shuffle-fab's
+       body-level positioning (see its comment above for why - a
+       transform on .app-views-track, the swipe carousel's wrapper,
+       would otherwise become the containing block for position:fixed
+       and that wrapper is sized to fit all views side by side, not
+       just the current one). Escaping the grid this way also means
+       the grid-column reservation for it is gone (reverted to a plain
+       2-column 1fr/300px grid above), so the exercise list gets that
+       width back instead of needing a 3rd track for it. Hidden by
+       default (even in this tier) and only shown while body carries
+       .view-is-tracker, toggled by goToView() - being body-level means
+       it's always in the DOM regardless of which tab is active, unlike
+       before when it was naturally hidden by living inside the
+       off-screen Trainer panel. top:50% + translateY(-50%) genuinely
+       centers it (unlike the shuffle button, which is deliberately
+       offset toward the bottom third instead). */
     .ov-grid { display: none; }
     body.view-is-tracker .ov-grid {
       display: flex; flex-direction: column; justify-content: space-around; align-items: center;
       position: fixed;
       right: 0;
       top: 50%;
-      width: 44px; height: 110px; border-radius: 22px;
+      transform: translateY(-50%);
+      width: 44px; height: 280px; border-radius: 22px;
       background: var(--surface);
       box-shadow: 0 3px 10px rgba(0,0,0,0.25);
       z-index: 55;
@@ -6157,7 +6150,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-dynamic-island-matched-pills';
+const APP_BUILD_VERSION = '2026-08-17-fab-circle-tall-centered-stats-pill';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
