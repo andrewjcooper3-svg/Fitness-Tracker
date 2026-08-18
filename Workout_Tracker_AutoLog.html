@@ -898,31 +898,49 @@
     .header-info { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
     .header-sub, .header-week { margin-top: 0; }
 
-    /* Shuffle Play moves out of the rail (hidden above) into this small
-       fixed icon button in the left safe-area gutter instead - one tap
-       from anywhere, and one less card competing for the rail's capped
-       height. */
+    /* Both pills below are sized to match the Dynamic Island's own
+       footprint rotated into landscape (~126 x 37pt - a fixed, known
+       Apple hardware shape, roughly 110x44 in CSS px) rather than an
+       arbitrary size, and vertically centered so they read as an
+       echo of it rather than two unrelated floating widgets: the
+       island itself sits vertically centered on the edge in landscape
+       (it's horizontally centered along the physical top edge in
+       portrait, and that edge becomes the left edge on rotation), so
+       top:50% without any translateY starts each pill right at that
+       same center point and lets it hang below - "sits right below
+       it" - rather than straddling/overlapping the island itself.
+
+       Both are position:fixed but deliberately NOT moved out to a
+       body-level sibling the way you might expect (compare
+       .sp-shuffle-fab, which IS body-level) - .ov-grid stays nested
+       inside .app-views-track (the swipe carousel's transformed
+       wrapper), and a `transform` on an ancestor makes it the
+       containing block for fixed descendants too. That's normally a
+       bug to avoid, but here it's exactly what's wanted: the pill's
+       fixed position resolves against the CURRENT VIEW's slice of the
+       track, not the true document, so it slides off with the rest of
+       the Trainer panel when you switch tabs instead of persisting
+       everywhere the way the Shuffle Play button does. */
     .sp-shuffle-fab {
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: flex-start; justify-content: center;
       position: fixed;
       left: 0;
-      bottom: 0;
-      width: 42px; height: 42px; border-radius: 50%;
+      top: 50%;
+      width: 44px; height: 110px; border-radius: 22px;
+      padding-top: 14px;
       background: linear-gradient(135deg, #1db954, #169c46);
       color: #fff; font-size: 18px; border: none; cursor: pointer;
       box-shadow: 0 3px 10px rgba(0,0,0,0.3);
       z-index: 60;
     }
-    .sp-shuffle-fab:active { transform: scale(0.94); }
+    .sp-shuffle-fab:active { transform: scale(0.96); }
 
-    #view-tracker { grid-template-columns: 1fr 300px 90px; }
+    #view-tracker { grid-template-columns: 1fr 300px; }
     #view-tracker > .tracker-main-col { grid-row: 1; }
     #view-tracker > .tracker-side-rail { grid-row: 1; }
-    #view-tracker > .ov-grid { grid-column: 3; grid-row: 1; }
 
     #view-tracker > .tracker-main-col,
-    #view-tracker > .tracker-side-rail,
-    #view-tracker > .ov-grid {
+    #view-tracker > .tracker-side-rail {
       max-height: calc(100vh - (56px + env(safe-area-inset-top, 0px)) - (24px + env(safe-area-inset-bottom, 0px)));
       overflow-y: auto;
       /* Nested overflow:auto inside an ancestor with a transform
@@ -936,22 +954,35 @@
       scrollbar-width: none;
     }
     #view-tracker > .tracker-main-col::-webkit-scrollbar,
-    #view-tracker > .tracker-side-rail::-webkit-scrollbar,
-    #view-tracker > .ov-grid::-webkit-scrollbar { display: none; }
+    #view-tracker > .tracker-side-rail::-webkit-scrollbar { display: none; }
 
-    /* Compact vertical stack instead of the wide 3-up row it uses
-       everywhere else - this column is only 90px wide, so padding and
-       type are trimmed down to fit comfortably at that width.
-       align-self:stretch overrides #view-tracker's align-items:start
-       (which would otherwise leave this column its own short natural
-       height, floating at the top with empty space below it) so it
-       fills the same full height as the exercise list and rail next to
-       it - justify-content:space-between then spreads the three tiles
-       evenly down that height instead of leaving them bunched at top. */
-    #view-tracker > .ov-grid { display: flex; flex-direction: column; justify-content: space-between; align-self: stretch; gap: 7px; padding: 12px 8px; }
-    #view-tracker > .ov-grid .ov-tile { padding: 0; border-left: none; }
-    #view-tracker > .ov-grid .ov-tile-label { font-size: 8px; margin-bottom: 2px; letter-spacing: 0.1px; }
-    #view-tracker > .ov-grid .ov-tile-value { font-size: 14px; }
+    /* Same pill as .sp-shuffle-fab, mirrored to the right edge - see
+       the shared comment above on why this is body-level rather than
+       nested under #view-tracker like the grid-column approach it
+       replaces. Escaping the grid via position:fixed means the
+       grid-column reservation for it is gone too (reverted to a plain
+       2-column 1fr/300px grid above), so the exercise list floats
+       independent of column width entirely instead of needing a 3rd
+       track. Hidden by default (even in this tier) and only shown
+       while body carries .view-is-tracker, toggled by goToView() -
+       being body-level means it's always in the DOM regardless of
+       which tab is active, unlike before when it was naturally hidden
+       by living inside the off-screen Trainer panel. */
+    .ov-grid { display: none; }
+    body.view-is-tracker .ov-grid {
+      display: flex; flex-direction: column; justify-content: space-around; align-items: center;
+      position: fixed;
+      right: 0;
+      top: 50%;
+      width: 44px; height: 110px; border-radius: 22px;
+      background: var(--surface);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+      z-index: 55;
+      padding: 6px 2px;
+    }
+    body.view-is-tracker .ov-grid .ov-tile { padding: 0; border-left: none; text-align: center; }
+    body.view-is-tracker .ov-grid .ov-tile-label { font-size: 6px; margin-bottom: 1px; letter-spacing: 0px; }
+    body.view-is-tracker .ov-grid .ov-tile-value { font-size: 11px; }
   }
 
   /* Desktop only (genuinely wide windows - past where any phone or
@@ -5885,6 +5916,13 @@ function goToView(view, animate) {
   const sidebarItem = document.querySelector(`.app-sidebar-item[data-view="${view}"]`);
   if (sidebarItem) sidebarItem.classList.add('active');
 
+  // Body-level markers for the landscape-tier Trainer pills
+  // (.ov-grid moved next to .sp-shuffle-fab - see
+  // initTrainerLandscapeReflow_) so their CSS can show the stats pill
+  // only while Trainer is actually the active tab, same as it would
+  // have been automatically had it stayed nested inside #view-tracker.
+  document.body.classList.toggle('view-is-tracker', view === 'tracker');
+
   // The DJ tab polls playback state on its own faster cadence while it's
   // actually the visible tab - stop that as soon as it's left, rather
   // than leaving a second timer running alongside the Overview one.
@@ -6119,7 +6157,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-fab-true-corner-stats-col-stretch';
+const APP_BUILD_VERSION = '2026-08-17-dynamic-island-matched-pills';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9495,16 +9533,23 @@ renderWeeklyPlan_();
 // matching @media block in <style> above): the header moves inside the
 // scrollable exercise column so it scrolls away with the workouts
 // instead of staying permanently pinned above them, and the stats
-// tiles move out to their own third column in the reclaimed margin.
-// Both are pure reparenting - no content is duplicated or recreated -
-// and get reverted outside that width range, so portrait/desktop keep
-// their original DOM order untouched.
+// tiles move all the way out to a body-level pill next to
+// .sp-shuffle-fab (same reason that button lives at body level - a
+// transform on an ancestor, .app-views-track for the swipe carousel,
+// would otherwise become the containing block for its position:fixed,
+// and that ancestor is sized to fit ALL views side by side, not the
+// current one, making top:50%/right:0 resolve against a box several
+// screens wide/tall instead of the viewport). Unlike the Shuffle Play
+// button, this pill should only show while Trainer is the active tab,
+// so goToView() toggles a body.view-is-tracker class the CSS gates on.
+// All reparenting is reverted outside the width range, so portrait/
+// desktop keep their original DOM order untouched.
 (function initTrainerLandscapeReflow_() {
   const viewTracker = document.getElementById('view-tracker');
   const header = viewTracker && viewTracker.querySelector(':scope > .header, .tracker-main-col > .header');
   const mainCol = viewTracker && viewTracker.querySelector(':scope > .tracker-main-col');
   const sideRail = viewTracker && viewTracker.querySelector(':scope > .tracker-side-rail');
-  const statsGrid = viewTracker && viewTracker.querySelector('.ov-grid');
+  const statsGrid = viewTracker && document.querySelector('.ov-grid');
   if (!viewTracker || !header || !mainCol || !sideRail || !statsGrid) return;
 
   const mq = window.matchMedia('(min-width: 768px) and (max-width: 1099.98px)');
@@ -9512,7 +9557,7 @@ renderWeeklyPlan_();
   function apply() {
     if (mq.matches) {
       if (header.parentElement !== mainCol) mainCol.insertBefore(header, mainCol.firstChild);
-      if (statsGrid.parentElement !== viewTracker) viewTracker.appendChild(statsGrid);
+      if (statsGrid.parentElement !== document.body) document.body.appendChild(statsGrid);
     } else {
       if (header.parentElement !== viewTracker) viewTracker.insertBefore(header, viewTracker.firstChild);
       if (statsGrid.parentElement !== sideRail) sideRail.appendChild(statsGrid);
