@@ -551,6 +551,7 @@
   .sp-shuffle-bar { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, rgba(29,185,84,0.16), var(--surface) 70%); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; cursor: pointer; transition: background 0.15s; }
   .sp-shuffle-bar:hover, .sp-shuffle-bar:active { background: linear-gradient(135deg, rgba(29,185,84,0.24), var(--surface2) 70%); }
   .sp-shuffle-fab { display: none; }
+  .app-bar-title, .app-bar-right { display: none; }
   .sp-shuffle-icon { font-size: 20px; flex-shrink: 0; }
   .sp-shuffle-text { flex: 1; min-width: 0; }
   .sp-shuffle-label { font-family: var(--font); font-size: 11px; font-weight: 700; color: #1DB954; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -873,16 +874,13 @@
      the whole page scrolling together - scrolling the exercise list no
      longer carries the pushup deficit/rings/stats out of view.
 
-     The header is deliberately NOT pinned above the columns like the
-     rail is - it's reparented (see initTrainerLandscapeReflow_ near
-     the bottom of the script) to be the first thing inside the
-     scrollable exercise column, so it scrolls away with the workouts
-     instead of permanently occupying screen height. The Sets/Total
-     Reps/Days Active tiles are reparented the other way, out to a
-     third column in the reclaimed margin, compacted into a narrow
-     stack instead of a wide 3-up row - it doesn't need to breathe like
-     the exercise list does, and freeing it from the bottom of the
-     rail leaves more of the rail's capped height for the deficit/rings
+     The page header costs no row at all here - it's hidden and drawn
+     in the tab bar instead (see the .app-bar-* rules below and
+     updateTopBar_ near the bottom of the script). The Sets/Total
+     Reps/Days Active tiles go the other way, out to a body-level pill
+     against the right edge (see initLandscapeReflow_), which both
+     frees the exercise list from reserving a column for them and
+     leaves more of the rail's capped height for the deficit/rings
      card above it. */
   @media (min-width: 768px) and (max-width: 1099.98px) {
     body { max-width: 1080px; }
@@ -893,34 +891,44 @@
     .tracker-side-rail > .ov-note { display: none; }
     .tracker-side-rail > .sp-shuffle-bar { display: none; }
 
-    /* The title row folds into the tab bar itself instead of costing
-       its own row (whether pinned above the columns or scrolling away
-       with them, as in the last two iterations of this) - title and
-       subtitle absolutely positioned at the bar's left edge, the week
-       range at its right edge, both vertically centered in the 44px
-       bar. .header-info/.header-week are reparented into #appTabs by
-       initTrainerLandscapeReflow_ near the bottom of the script (only
-       while Trainer is the active tab - gated on body.view-is-tracker,
-       same mechanism as the two side pills), leaving the now-empty
-       .header hidden rather than costing any space in the scrollable
-       exercise column it used to sit in. */
-    #view-tracker > .header { display: none; }
-    .app-tabs > .header-info, .app-tabs > .header-week { display: none; }
-    body.view-is-tracker .app-tabs > .header-info {
-      display: flex; align-items: baseline; gap: 6px;
+    /* EVERY view's page header folds into the tab bar rather than
+       costing a row of its own: title pinned at the bar's left edge,
+       meta/date at its right, both vertically centered in the 44px
+       bar and filled per-view by updateTopBar_(). The source headers
+       are hidden below, listed per view rather than by a blanket
+       .ov-page-head rule: the modals that reuse that class (Weight,
+       Top Tracks, ...) must keep theirs, and so must #view-bodyhealth,
+       which isn't in viewOrder and so never gets a bar title to
+       replace it. Any buttons those headers owned are relocated into
+       #appBarActions by the same JS, so hiding a header never strands
+       a control - Settings is only reachable via Overview's gear.
+       (Kitchen's decorative cook animation lives inside its header and
+       goes with it - aria-hidden, so no function is lost.) */
+    #view-tracker > .header,
+    #view-overview > .ov-page-head,
+    #view-kitchen > .ov-page-head,
+    #view-stats > .ov-page-head,
+    #view-calendar > .cal-header { display: none; }
+
+    .app-bar-title {
+      display: block;
       position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      font-family: var(--font); font-size: 15px; font-weight: 800;
+      letter-spacing: -0.3px; white-space: nowrap;
+    }
+    .app-bar-right {
+      display: flex; align-items: center; gap: 8px;
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
       white-space: nowrap;
     }
-    body.view-is-tracker .app-tabs > .header-info .header-title { font-size: 15px; }
-    /* Dropped entirely rather than shrunk further - at the narrow end
-       of this tier (768px) even a tiny "Balanced Growth - 100% Lean"
-       collided with the first tab; title + the week range on the
-       right is enough context for a bar this compact. */
-    body.view-is-tracker .app-tabs > .header-info .header-sub { display: none; }
-    body.view-is-tracker .app-tabs > .header-week {
-      display: block;
-      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
-      font-size: 10px; margin-top: 0; white-space: nowrap;
+    .app-bar-meta { font-family: var(--font); font-size: 10px; font-weight: 500; color: var(--muted); }
+    .app-bar-actions { display: flex; align-items: center; gap: 4px; }
+    /* The relocated buttons keep their own classes, so shrink them to
+       suit a 44px bar instead of the roomy page header they came from. */
+    .app-bar-actions .ov-gear-btn,
+    .app-bar-actions .cal-refresh-btn {
+      width: 26px; height: 26px; font-size: 13px; padding: 0;
+      display: flex; align-items: center; justify-content: center;
     }
 
     /* Small round icon button, sitting in the bottom third of the
@@ -933,8 +941,11 @@
        viewport - a `transform` on an ancestor would otherwise become
        the containing block for position:fixed descendants, and
        .app-views-track is sized to fit all views side by side (many
-       screens wide), not the current one. */
-    .sp-shuffle-fab {
+       screens wide), not the current one. Gated on body.view-is-tracker
+       (toggled by goToView()) so it only appears on Trainer, like the
+       stats pill on the other edge - being body-level it would
+       otherwise persist across every tab. */
+    body.view-is-tracker .sp-shuffle-fab {
       display: flex; align-items: center; justify-content: center;
       position: fixed;
       left: 0;
@@ -946,7 +957,7 @@
       box-shadow: 0 3px 10px rgba(0,0,0,0.3);
       z-index: 60;
     }
-    .sp-shuffle-fab:active { transform: translateY(-50%) scale(0.94); }
+    body.view-is-tracker .sp-shuffle-fab:active { transform: translateY(-50%) scale(0.94); }
 
     #view-tracker { grid-template-columns: 1fr 300px; }
     #view-tracker > .tracker-main-col { grid-row: 1; }
@@ -2078,6 +2089,19 @@
   </div>
   <div class="app-tab" data-view="stats" onclick="showAppView('stats')">
     <div class="app-tab-label">Stats</div>
+  </div>
+
+  <!-- Landscape-tier only (hidden everywhere else): the active view's
+       title sits at the bar's left edge and its meta/date at the right,
+       so no view needs to spend a row of its own on a page header. Both
+       are filled by updateTopBar_() on every view change; #appBarActions
+       receives whichever header buttons the active view owns (Overview's
+       refresh/settings, Calendar's refresh) so hiding those headers
+       never strands a control. -->
+  <div class="app-bar-title" id="appBarTitle"></div>
+  <div class="app-bar-right" id="appBarRight">
+    <span class="app-bar-meta" id="appBarMeta"></span>
+    <span class="app-bar-actions" id="appBarActions"></span>
   </div>
 </div>
 
@@ -5411,6 +5435,20 @@ function getWeekLabel() {
   return `Week of ${fmt(monday)} - ${fmt(sunday)}, ${sunday.getFullYear()}`;
 }
 
+// Same range without the "Week of" prefix or the year, for the
+// landscape top bar - the full label plus Overview's two buttons
+// overran the tab cluster at the narrow end of that tier (768px).
+// Built from the same primitives rather than by stripping getWeekLabel()
+// so a future format change there can't silently reintroduce that
+// overlap.
+function getWeekLabelShort() {
+  const monday = getWeekMonday();
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${fmt(monday)} - ${fmt(sunday)}`;
+}
+
 // restoreState() only ever checks for a week rollover once, at page load -
 // if the app/PWA is left open (foregrounded or just backgrounded, never
 // force-quit or reloaded) across the Sunday-to-Monday boundary, the day
@@ -5934,12 +5972,14 @@ function goToView(view, animate) {
   const sidebarItem = document.querySelector(`.app-sidebar-item[data-view="${view}"]`);
   if (sidebarItem) sidebarItem.classList.add('active');
 
-  // Body-level markers for the landscape-tier Trainer pills
-  // (.ov-grid moved next to .sp-shuffle-fab - see
-  // initTrainerLandscapeReflow_) so their CSS can show the stats pill
-  // only while Trainer is actually the active tab, same as it would
-  // have been automatically had it stayed nested inside #view-tracker.
+  // Body-level marker for the landscape-tier Trainer pills (.ov-grid
+  // and .sp-shuffle-fab both sit at body level - see
+  // initLandscapeReflow_) so their CSS can show them only while
+  // Trainer is actually the active tab, the way they would have been
+  // hidden for free had they stayed nested inside #view-tracker.
   document.body.classList.toggle('view-is-tracker', view === 'tracker');
+
+  updateTopBar_(view);
 
   // The DJ tab polls playback state on its own faster cadence while it's
   // actually the visible tab - stop that as soon as it's left, rather
@@ -6175,7 +6215,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-title-into-top-bar';
+const APP_BUILD_VERSION = '2026-08-17-all-headers-into-top-bar';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9546,54 +9586,93 @@ window.addEventListener('online', flushPendingLogs);
 
 renderWeeklyPlan_();
 
-// The Trainer view's header and its Sets/Total-Reps/Days-Active tiles
-// swap parents in the 768-1099px landscape-phone/tablet tier (see the
-// matching @media block in <style> above): the header moves inside the
-// scrollable exercise column so it scrolls away with the workouts
-// instead of staying permanently pinned above them, and the stats
-// tiles move all the way out to a body-level pill next to
-// .sp-shuffle-fab (same reason that button lives at body level - a
-// transform on an ancestor, .app-views-track for the swipe carousel,
-// would otherwise become the containing block for its position:fixed,
-// and that ancestor is sized to fit ALL views side by side, not the
-// current one, making top:50%/right:0 resolve against a box several
-// screens wide/tall instead of the viewport). Unlike the Shuffle Play
-// button, this pill should only show while Trainer is the active tab,
-// so goToView() toggles a body.view-is-tracker class the CSS gates on.
-// All reparenting is reverted outside the width range, so portrait/
-// desktop keep their original DOM order untouched.
-(function initTrainerLandscapeReflow_() {
-  const viewTracker = document.getElementById('view-tracker');
-  const header = viewTracker && viewTracker.querySelector(':scope > .header');
-  const headerInfo = header && header.querySelector('.header-info');
-  const headerWeek = headerInfo && headerInfo.querySelector('.header-week');
-  const sideRail = viewTracker && viewTracker.querySelector(':scope > .tracker-side-rail');
-  const statsGrid = viewTracker && document.querySelector('.ov-grid');
-  const appTabs = document.getElementById('appTabs');
-  if (!viewTracker || !header || !headerInfo || !headerWeek || !sideRail || !statsGrid || !appTabs) return;
+// In the 768-1099px landscape-phone/tablet tier, every view's page
+// header is hidden (see the matching @media block in <style> above) and
+// its title/meta drawn in the tab bar instead, so no view spends a row
+// on a header. Titles are declared here rather than scraped out of each
+// view's markup because those headers are structurally all over the
+// place - .header vs .ov-page-head vs .cal-header, some with buttons,
+// one with a decorative SVG, Music with no header at all.
+const TOP_BAR_VIEW_INFO = {
+  overview: { title: 'Overview', meta: getWeekLabelShort },
+  tracker:  { title: 'TRAINER',  meta: getWeekLabelShort },
+  kitchen:  { title: 'Kitchen',  meta: '' },
+  music:    { title: 'Music',    meta: '' },
+  calendar: { title: 'Upcoming', meta: '' },
+  stats:    { title: 'Stats',    meta: 'Trends' }
+};
 
-  const mq = window.matchMedia('(min-width: 768px) and (max-width: 1099.98px)');
+// Headers that own buttons hand them to the bar while their view is
+// active, and take them back afterwards - hiding Overview's header
+// would otherwise make Settings unreachable, since its gear is the only
+// entry point. Resolved once at init: after the first relocation the
+// original selectors no longer match, so the elements (and where to put
+// them back) have to be captured up front.
+const TOP_BAR_ACTION_SELECTORS = {
+  overview: '#view-overview > .ov-page-head > .ov-page-head-actions',
+  calendar: '#view-calendar > .cal-header > .cal-refresh-btn'
+};
+const topBarActionHomes_ = new Map();
+const topBarMediaQuery_ = window.matchMedia('(min-width: 768px) and (max-width: 1099.98px)');
+
+function initTopBarActions_() {
+  Object.keys(TOP_BAR_ACTION_SELECTORS).forEach(view => {
+    const el = document.querySelector(TOP_BAR_ACTION_SELECTORS[view]);
+    if (el) topBarActionHomes_.set(view, { el, parent: el.parentElement, next: el.nextSibling });
+  });
+}
+
+function updateTopBar_(view) {
+  const titleEl = document.getElementById('appBarTitle');
+  const metaEl = document.getElementById('appBarMeta');
+  const actionsEl = document.getElementById('appBarActions');
+  if (!titleEl || !metaEl || !actionsEl) return;
+
+  const info = TOP_BAR_VIEW_INFO[view];
+  titleEl.textContent = info ? info.title : '';
+  metaEl.textContent = info ? (typeof info.meta === 'function' ? info.meta() : info.meta) : '';
+
+  const inLandscape = topBarMediaQuery_.matches;
+  topBarActionHomes_.forEach((home, actionView) => {
+    if (inLandscape && actionView === view) {
+      if (home.el.parentElement !== actionsEl) actionsEl.appendChild(home.el);
+    } else if (home.el.parentElement !== home.parent) {
+      home.parent.insertBefore(home.el, home.next);
+    }
+  });
+}
+
+// The Sets/Total-Reps/Days-Active tiles move out to a body-level pill
+// next to .sp-shuffle-fab in the same tier - that button lives at body
+// level because a transform on an ancestor (.app-views-track, for the
+// swipe carousel) would otherwise become the containing block for its
+// position:fixed, and that ancestor is sized to fit ALL views side by
+// side, so top:50%/right:0 would resolve against a box several screens
+// wide instead of the viewport. Both should only show on Trainer, so
+// goToView() toggles the body.view-is-tracker class their CSS gates on.
+// Reverted outside the width range, leaving portrait/desktop DOM order
+// untouched.
+(function initLandscapeReflow_() {
+  // Ahead of the guard below - the bar's borrowed buttons have nothing
+  // to do with the Trainer elements it checks for.
+  initTopBarActions_();
+
+  const viewTracker = document.getElementById('view-tracker');
+  const sideRail = viewTracker && viewTracker.querySelector(':scope > .tracker-side-rail');
+  const statsGrid = document.querySelector('.ov-grid');
+  if (!viewTracker || !sideRail || !statsGrid) return;
 
   function apply() {
-    if (mq.matches) {
-      // Extract the week label out of .header-info FIRST, then move
-      // .header-info itself - both land as direct children of the tab
-      // bar (left cluster = title/subtitle, right = week), leaving
-      // .header behind as an empty, CSS-hidden shell rather than
-      // needing to relocate it anywhere.
-      if (headerWeek.parentElement !== appTabs) appTabs.appendChild(headerWeek);
-      if (headerInfo.parentElement !== appTabs) appTabs.insertBefore(headerInfo, appTabs.firstChild);
+    if (topBarMediaQuery_.matches) {
       if (statsGrid.parentElement !== document.body) document.body.appendChild(statsGrid);
-    } else {
-      if (headerWeek.parentElement !== headerInfo) headerInfo.appendChild(headerWeek);
-      if (headerInfo.parentElement !== header) header.insertBefore(headerInfo, header.firstChild);
-      if (statsGrid.parentElement !== sideRail) sideRail.appendChild(statsGrid);
+    } else if (statsGrid.parentElement !== sideRail) {
+      sideRail.appendChild(statsGrid);
     }
     goToView(viewOrder[currentViewIndex], false);
   }
 
   apply();
-  mq.addEventListener('change', apply);
+  topBarMediaQuery_.addEventListener('change', apply);
 })();
 
 document.querySelectorAll('.exercise-sets').forEach((el, i) => {
