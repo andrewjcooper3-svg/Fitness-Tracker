@@ -905,8 +905,8 @@
     .sp-shuffle-fab {
       display: flex; align-items: center; justify-content: center;
       position: fixed;
-      left: max(8px, env(safe-area-inset-left, 0px));
-      bottom: max(12px, env(safe-area-inset-bottom, 0px));
+      left: env(safe-area-inset-left, 0px);
+      bottom: env(safe-area-inset-bottom, 0px);
       width: 42px; height: 42px; border-radius: 50%;
       background: linear-gradient(135deg, #1db954, #169c46);
       color: #fff; font-size: 18px; border: none; cursor: pointer;
@@ -6113,7 +6113,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-narrower-stats-col-shuffle-fab';
+const APP_BUILD_VERSION = '2026-08-17-shuffle-fab-flush-corner';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
