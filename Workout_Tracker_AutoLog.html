@@ -428,14 +428,16 @@
   /* Needs .wt-btn-row to outrank the generic `.wt-btn-row .wt-add-btn
      { flex: 1 }` above - otherwise Add absorbs all the spare width and
      the drink name is truncated for no reason. */
-  .wt-btn-row .wt-drink-add { flex: 0 0 46px; padding-left: 0; padding-right: 0; }
-  .wt-amt-row { align-items: center; gap: 4px; }
-  /* The drink row carries four controls now, so the select is the only
-     flexible one - everything else is fixed width and the drink name
-     truncates instead of pushing the size box or Add off the row. */
-  .wt-drink-select { flex: 1 1 0; }
+  .wt-btn-row .wt-drink-add { flex: 1 1 0; min-width: 0; padding-left: 0; padding-right: 0; }
+  /* Four controls sharing one row: the drink takes half, and size,
+     shots and Add split the rest evenly. Done with a 3:1:1:1 flex ratio
+     on flex-basis:0 rather than percentages, so the gaps come out of
+     the free space automatically and it still balances when the shot
+     picker is hidden (then it's 3:1:1, drink a little wider). */
+  .wt-drink-select { flex: 3 1 0; }
+  .wt-amt-field { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 2px; }
   .wt-amt-input {
-    flex: 0 0 38px; min-width: 0; font-family: var(--font); font-size: 11.5px; font-weight: 600;
+    flex: 1 1 0; min-width: 0; font-family: var(--font); font-size: 11.5px; font-weight: 600;
     color: var(--text); background: var(--surface2); border: none; border-radius: 9px;
     padding: 5px 6px; outline: none; text-align: right; -moz-appearance: textfield;
   }
@@ -443,9 +445,9 @@
   .wt-amt-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .wt-amt-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); flex-shrink: 0; }
   .wt-shot-select {
-    flex: 0 0 auto; font-family: var(--font); font-size: 10.5px; font-weight: 600;
+    flex: 1 1 0; min-width: 0; font-family: var(--font); font-size: 10.5px; font-weight: 600;
     color: var(--text); background: var(--surface2); border: none; border-radius: 9px;
-    padding: 5px 4px; outline: none; cursor: pointer;
+    padding: 5px 2px; outline: none; cursor: pointer; text-align: center;
   }
   .wt-drink-preview {
     flex: 1 1 0; min-width: 0; text-align: right; font-family: var(--font); font-size: 10px;
@@ -1165,19 +1167,15 @@
         </div>
         <div class="wt-btn-row">
           <select class="wt-drink-select" id="wtDrinkSelect" onclick="event.stopPropagation()" onchange="onDrinkSelectChange_(event)"></select>
-          <input type="number" class="wt-amt-input" id="wtDrinkOz" min="0" step="0.5" inputmode="decimal"
-                 onclick="event.stopPropagation()" oninput="onDrinkAmountChange_(event)" title="Size in ounces">
-          <span class="wt-amt-label">oz</span>
-          <button class="wt-add-btn wt-add-btn-secondary wt-drink-add" id="wtBtnDrink" onclick="logWaterIntake(event)">Add</button>
-        </div>
-        <!-- Only the shot picker and the live readout are left on their
-             own row, and it hides entirely when neither applies (juice,
-             milk) rather than sitting there empty. The shot picker shows
-             only for drinks where caffeine or alcohol comes from a pour
-             rather than the volume. -->
-        <div class="wt-btn-row wt-amt-row" id="wtAmtRow">
+          <!-- Input and its unit travel together as a single flex item
+               so the row still splits into four even columns. -->
+          <span class="wt-amt-field">
+            <input type="number" class="wt-amt-input" id="wtDrinkOz" min="0" step="0.5" inputmode="decimal"
+                   onclick="event.stopPropagation()" oninput="onDrinkAmountChange_(event)" title="Size in ounces">
+            <span class="wt-amt-label">oz</span>
+          </span>
           <select class="wt-shot-select" id="wtDrinkShots" onclick="event.stopPropagation()" onchange="onDrinkAmountChange_(event)"></select>
-          <span class="wt-drink-preview" id="wtDrinkPreview"></span>
+          <button class="wt-add-btn wt-add-btn-secondary wt-drink-add" id="wtBtnDrink" onclick="logWaterIntake(event)">Add</button>
         </div>
         <!-- Start on the left, optional end on the right. Leaving the
              end blank logs the drink at a single moment; filling it in
@@ -6465,7 +6463,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-19-condensed-drink-row';
+const APP_BUILD_VERSION = '2026-08-19-four-column-drink-row';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6794,15 +6792,21 @@ function syncDrinkAmountFields_() {
   ozInput.value = prefs.oz;
   shotSel.style.display = usesShots ? '' : 'none';
   if (usesShots) {
+    // Abbreviated: this column is roughly a sixth of the row now, so
+    // "2 shots" would clip. The full wording lives in the title.
     shotSel.innerHTML = [1, 2, 3, 4].map(n =>
-      `<option value="${n}">${n} shot${n > 1 ? 's' : ''}</option>`).join('');
+      `<option value="${n}">${n}×</option>`).join('');
     shotSel.value = String(Math.min(4, Math.max(1, prefs.shots || 1)));
+    shotSel.title = 'Shots';
   }
   renderDrinkPreview_();
 }
 
-// Live readout of what pressing Add will actually record, so the rates
-// aren't invisible once the fixed sizes left the dropdown labels.
+// Readout of what pressing Add will record. Currently NOT rendered -
+// the widget is deliberately kept to three rows (water / drink / time),
+// so #wtDrinkPreview isn't in the markup and this returns immediately.
+// Re-adding a `<span id="wtDrinkPreview">` anywhere brings it back;
+// the .wt-drink-preview style is kept for that.
 function renderDrinkPreview_() {
   const el = document.getElementById('wtDrinkPreview');
   const sel = document.getElementById('wtDrinkSelect');
@@ -6815,15 +6819,6 @@ function renderDrinkPreview_() {
   if (a.alcoholOz > 0) bits.push(`${(a.alcoholOz / 0.6).toFixed(1)} std drinks`);
   el.textContent = bits.join(' · ');
 
-  // With the size box moved up to the drink row, this row can end up
-  // holding nothing at all (milk, juice) - collapse it rather than
-  // leaving a blank gap in the card.
-  const row = document.getElementById('wtAmtRow');
-  const shotSel = document.getElementById('wtDrinkShots');
-  if (row) {
-    const shotsVisible = shotSel && shotSel.style.display !== 'none';
-    row.style.display = (shotsVisible || bits.length) ? '' : 'none';
-  }
 }
 
 function readDrinkAmountFields_() {
