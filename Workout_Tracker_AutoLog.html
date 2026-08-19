@@ -449,9 +449,12 @@
     color: var(--text); background: var(--surface2); border: none; border-radius: 9px;
     padding: 5px 2px; outline: none; cursor: pointer; text-align: center;
   }
+  /* margin-left:auto pushes it to the right of the status strip and
+     takes over the spacing job the chevron used to do. */
   .wt-drink-preview {
-    flex: 1 1 0; min-width: 0; text-align: right; font-family: var(--font); font-size: 10px;
-    font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-left: auto; padding-left: 8px; min-width: 0; text-align: right;
+    font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .wt-time-row { align-items: center; gap: 4px; }
   .wt-time-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); flex-shrink: 0; }
@@ -475,7 +478,9 @@
   .wt-caffeine-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
   .wt-alcohol-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); flex-shrink: 0; }
   .wt-line-sep { width: 1px; height: 10px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
-  .wt-caffeine-chev { margin-left: auto; opacity: 0.7; }
+  .wt-caffeine-chev { opacity: 0.7; margin-left: 2px; }
+  /* The on-board half keeps its own dots/separators laid out inline. */
+  #wtCaffeineOnBoard { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .wt-time-input-optional { color: var(--muted); }
   .caff-bac-value { color: var(--purple); }
   .caff-legend { display: flex; gap: 14px; margin-top: 8px; }
@@ -1189,7 +1194,13 @@
         </div>
       </div>
     </div>
-    <div class="wt-caffeine-line" id="wtCaffeineLine" onclick="openCaffeineModal(event)"></div>
+    <!-- Left: what's on board now (tap for the decay chart). Right:
+         what pressing Add would record. Sharing one strip so the
+         widget stays at three input rows. -->
+    <div class="wt-caffeine-line" id="wtCaffeineLine" onclick="openCaffeineModal(event)">
+      <span id="wtCaffeineOnBoard"></span>
+      <span class="wt-drink-preview" id="wtDrinkPreview"></span>
+    </div>
     <div class="wt-chart-wrap" id="wtChartWrap">
       <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
       <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
@@ -6463,7 +6474,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-19-four-column-drink-row';
+const APP_BUILD_VERSION = '2026-08-19-pending-on-status-strip';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6802,11 +6813,10 @@ function syncDrinkAmountFields_() {
   renderDrinkPreview_();
 }
 
-// Readout of what pressing Add will record. Currently NOT rendered -
-// the widget is deliberately kept to three rows (water / drink / time),
-// so #wtDrinkPreview isn't in the markup and this returns immediately.
-// Re-adding a `<span id="wtDrinkPreview">` anywhere brings it back;
-// the .wt-drink-preview style is kept for that.
+// Readout of what pressing Add will record - the drink dropdown no
+// longer carries fixed sizes, so this is the only confirmation of what
+// a custom size resolves to before committing it. Shares the on-board
+// strip at the bottom rather than taking a row of its own.
 function renderDrinkPreview_() {
   const el = document.getElementById('wtDrinkPreview');
   const sel = document.getElementById('wtDrinkSelect');
@@ -6817,8 +6827,10 @@ function renderDrinkPreview_() {
   if (Math.round(a.hydrationOz) !== Math.round(a.rawOz)) bits.push(`${Math.round(a.hydrationOz)} oz net`);
   if (a.caffeineMg > 0) bits.push(`${Math.round(a.caffeineMg)} mg`);
   if (a.alcoholOz > 0) bits.push(`${(a.alcoholOz / 0.6).toFixed(1)} std drinks`);
-  el.textContent = bits.join(' · ');
-
+  // Prefixed so it can't be misread as more of the on-board figures on
+  // the left - this half is what Add would log, not what's in you.
+  el.textContent = bits.length ? 'Pending - ' + bits.join(' · ') : '';
+  syncWaterStatusRow_();
 }
 
 function readDrinkAmountFields_() {
@@ -6958,7 +6970,7 @@ function renderOverviewWaterWidget() {
 // there's nothing on board, so the card stays as quiet as before for
 // anyone only logging water.
 function renderCaffeineLine_() {
-  const el = document.getElementById('wtCaffeineLine');
+  const el = document.getElementById('wtCaffeineOnBoard');
   if (!el) return;
   const doses = getRecentDrinkDoses_();
   const mg = currentCaffeineMg_(new Date(), doses);
@@ -6968,9 +6980,22 @@ function renderCaffeineLine_() {
   if (mg >= 1) parts.push(`<span class="wt-caffeine-dot"></span>${Math.round(mg)} mg caffeine`);
   if (bac >= 0.001) parts.push(`<span class="wt-alcohol-dot"></span>${bac.toFixed(3)} BAC`);
 
-  if (!parts.length) { el.style.display = 'none'; return; }
-  el.style.display = '';
-  el.innerHTML = parts.join('<span class="wt-line-sep"></span>') + ' <span class="wt-caffeine-chev">›</span>';
+  el.innerHTML = parts.length
+    ? parts.join('<span class="wt-line-sep"></span>') + ' <span class="wt-caffeine-chev">›</span>'
+    : '';
+  syncWaterStatusRow_();
+}
+
+// The strip carries two independent halves, so it only collapses when
+// BOTH are empty - otherwise a drink with nothing on board yet would
+// hide the readout of what Add is about to log, and vice versa.
+function syncWaterStatusRow_() {
+  const row = document.getElementById('wtCaffeineLine');
+  const onBoard = document.getElementById('wtCaffeineOnBoard');
+  const preview = document.getElementById('wtDrinkPreview');
+  if (!row) return;
+  const has = (onBoard && onBoard.innerHTML) || (preview && preview.textContent);
+  row.style.display = has ? '' : 'none';
 }
 
 function openCaffeineModal(event) {
