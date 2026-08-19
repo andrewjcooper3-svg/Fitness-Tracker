@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-17-exercise-history-fix-and-quality-column';
+const BACKEND_BUILD_VERSION = '2026-08-19-water-draft-sync';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -828,6 +828,62 @@ function loadOverviewLayoutState_() {
   return raw ? JSON.parse(raw) : null;
 }
 
+// A day's drinks are only written to the Water Log sheet once the day
+// is over, so while it's still in progress they live here instead -
+// that's what lets a drink logged on the phone show up on the laptop
+// the same afternoon rather than tomorrow.
+//
+// Script Properties rather than sheet rows (same as the layout blob
+// above): this is scratch state, rewritten on every tap and discarded
+// once the day is flushed, so it has no business accumulating rows in
+// a sheet.
+//
+// Deliberately a dumb store - it keeps whatever it's handed and does no
+// merging. The client reads, merges and writes back, which is what
+// makes two devices converge; doing it here would need locking to be
+// any safer and would still lose the merge the client has to do anyway.
+const WATER_DRAFT_KEY_PREFIX = 'WATER_DRAFT_';
+
+function saveWaterDraft_(date, entries, deleted) {
+  if (!date) return;
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(WATER_DRAFT_KEY_PREFIX + date, JSON.stringify({
+    entries: entries || [],
+    deleted: deleted || [],
+    savedAt: new Date().toISOString()
+  }));
+  pruneWaterDrafts_(props, date);
+}
+
+function loadWaterDraft_(date) {
+  if (!date) return null;
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(WATER_DRAFT_KEY_PREFIX + date);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return null; // Malformed blob - treat as no draft rather than throwing.
+  }
+}
+
+// Once a day's rows are in the sheet its draft is dead weight, and a
+// device that goes quiet for a while shouldn't leave keys behind
+// forever. Anything more than a week older than the date being written
+// is dropped.
+function pruneWaterDrafts_(props, currentDate) {
+  const cutoff = new Date(currentDate + 'T00:00:00');
+  if (isNaN(cutoff.getTime())) return;
+  cutoff.setDate(cutoff.getDate() - 7);
+
+  const all = props.getProperties();
+  Object.keys(all).forEach(function (key) {
+    if (key.indexOf(WATER_DRAFT_KEY_PREFIX) !== 0) return;
+    const d = new Date(key.slice(WATER_DRAFT_KEY_PREFIX.length) + 'T00:00:00');
+    if (!isNaN(d.getTime()) && d < cutoff) props.deleteProperty(key);
+  });
+}
+
 // Derives day-by-day pushup totals directly from the already-synced
 // per-set workout log (every week's own sheet, one row per set) instead
 // of trusting a separate local-only running tally - so a wiped/reset
@@ -1037,6 +1093,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadWaterDraft') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', draft: loadWaterDraft_(e.parameter.date) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadWeightLog') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', entries: getWeightLog_() }))
@@ -1201,6 +1263,13 @@ function doPost(e) {
 
     if (data.action === 'saveSettingsState') {
       saveSettingsState_(data.dailyBaseline, data.yearGoal, data.maxHR, data.yearCarry, data.waterGoal, data.drinkAmounts);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveWaterDraft') {
+      saveWaterDraft_(data.date, data.entries, data.deleted);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);

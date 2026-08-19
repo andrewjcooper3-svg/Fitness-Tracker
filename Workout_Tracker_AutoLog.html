@@ -5942,7 +5942,13 @@ function applyOneTimeWaterWipe20260819_() {
   const todayKey = dateKey(new Date());
 
   const store = getWaterEntryStore_();
-  delete store.days[todayKey];
+  // Tombstoned, not just dropped - the in-progress copy on the backend
+  // may still hold these, and a plain delete would let the next sync
+  // merge them straight back. Tombstones make the wipe travel instead.
+  const wipedIds = (store.days[todayKey] || []).map(drinkEntryId_);
+  store.deleted = store.deleted || {};
+  store.deleted[todayKey] = (store.deleted[todayKey] || []).concat(wipedIds);
+  store.days[todayKey] = [];
   saveWaterEntryStore_(store);
 
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
@@ -5953,9 +5959,8 @@ function applyOneTimeWaterWipe20260819_() {
   if (wiped.indexOf(todayKey) === -1) wiped.push(todayKey);
   localStorage.setItem(STORAGE_WATER_WIPED_DAYS_KEY, JSON.stringify(wiped));
 
-  // Nothing to send: the day is now empty and the new batched flush only
-  // pushes days that still have entries.
-  markWaterDaySynced_(todayKey);
+  // Deliberately NOT marked synced: drinks logged later today still need
+  // to sync across devices and still need flushing to the sheet tonight.
   localStorage.setItem(WATER_WIPE_FLAG_KEY, '1');
 }
 
@@ -6474,7 +6479,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-19-pending-on-status-strip';
+const APP_BUILD_VERSION = '2026-08-19-water-draft-device-sync';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6526,17 +6531,54 @@ const WATER_ENTRY_RETENTION_DAYS = 7;
 
 function getWaterEntryStore_() {
   const raw = JSON.parse(localStorage.getItem(STORAGE_WATER_ENTRIES_KEY) || 'null');
-  if (!raw) return { days: {} };
-  if (raw.days) return raw;
-  if (raw.date && Array.isArray(raw.entries)) return { days: { [raw.date]: raw.entries } };
-  return { days: {} };
+  if (!raw) return { days: {}, deleted: {} };
+  if (raw.days) return { days: raw.days, deleted: raw.deleted || {} };
+  if (raw.date && Array.isArray(raw.entries)) return { days: { [raw.date]: raw.entries }, deleted: {} };
+  return { days: {}, deleted: {} };
 }
 
 function saveWaterEntryStore_(store) {
   const keep = Object.keys(store.days).sort().slice(-WATER_ENTRY_RETENTION_DAYS);
   const pruned = {};
-  keep.forEach(k => { pruned[k] = store.days[k]; });
-  localStorage.setItem(STORAGE_WATER_ENTRIES_KEY, JSON.stringify({ days: pruned }));
+  const prunedDeleted = {};
+  keep.forEach(k => {
+    pruned[k] = store.days[k];
+    if ((store.deleted || {})[k]) prunedDeleted[k] = store.deleted[k];
+  });
+  localStorage.setItem(STORAGE_WATER_ENTRIES_KEY, JSON.stringify({ days: pruned, deleted: prunedDeleted }));
+}
+
+// Every entry carries an id from the moment it's logged, because that's
+// what lets two devices merge a day instead of overwriting each other -
+// see mergeWaterDay_. Entries predating ids get a stable one derived
+// from their own contents, so they merge rather than duplicating.
+function newDrinkId_() {
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+}
+
+function drinkEntryId_(e) {
+  return e.id || `legacy-${e.loggedAt}-${e.type}-${e.rawOz}`;
+}
+
+// Union of both sides' entries by id, minus anything either side has
+// tombstoned. Deletions have to travel as tombstones rather than just
+// absences, otherwise the other device's copy would keep resurrecting
+// an entry that was undone here.
+function mergeWaterDay_(localEntries, localDeleted, remoteEntries, remoteDeleted) {
+  const deleted = {};
+  (localDeleted || []).concat(remoteDeleted || []).forEach(id => { deleted[id] = true; });
+
+  const byId = {};
+  (localEntries || []).concat(remoteEntries || []).forEach(e => {
+    if (!e || !e.loggedAt) return;
+    const id = drinkEntryId_(e);
+    if (deleted[id]) return;
+    if (!byId[id]) byId[id] = Object.assign({}, e, { id: id });
+  });
+
+  const entries = Object.keys(byId).map(id => byId[id])
+    .sort((a, b) => new Date(a.loggedAt) - new Date(b.loggedAt));
+  return { entries: entries, deleted: Object.keys(deleted) };
 }
 
 function getTodayWaterEntries_() {
@@ -6619,6 +6661,79 @@ function getRecentDrinkDoses_() {
 // it's over. A browser can't actually run code at midnight, so "at
 // midnight" really means "the next time the app is open after the day
 // ends" - flushed on load and whenever the tab is brought back.
+// Today's drinks aren't in the sheet yet (that happens once the day is
+// over), so without this a drink logged on the phone wouldn't reach the
+// laptop until tomorrow. The backend holds an in-progress copy of the
+// day; this pulls it, merges both sides, writes the result back, and
+// leaves the merged version locally - so both devices converge whichever
+// one syncs first.
+//
+// Debounced because it fires on every tap: several quick logs collapse
+// into one round trip.
+let waterDraftSyncTimer_ = null;
+
+function scheduleWaterDraftSync_() {
+  clearTimeout(waterDraftSyncTimer_);
+  waterDraftSyncTimer_ = setTimeout(() => syncWaterDraft_(), 1200);
+}
+
+async function syncWaterDraft_(dayKey) {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+
+  const day = dayKey || dateKey(new Date());
+  const store = getWaterEntryStore_();
+  const localEntries = store.days[day] || [];
+  const localDeleted = (store.deleted || {})[day] || [];
+
+  // A PAST day already written to the sheet must not be revived here -
+  // its draft is cleared on flush, and re-posting would recreate it.
+  // Today is never in that state (flushing only ever touches days that
+  // have ended), so it always syncs.
+  if (day < dateKey(new Date()) && (getSyncedWaterDays_() || []).indexOf(day) !== -1) return;
+
+  let remote = null;
+  try {
+    const res = await fetch(url + '?action=loadWaterDraft&date=' + encodeURIComponent(day));
+    const data = await res.json();
+    if (data.status === 'success' && data.draft) remote = data.draft;
+  } catch (e) {
+    return; // Offline/unreachable - local stands, retried on the next tap or focus.
+  }
+
+  const merged = mergeWaterDay_(localEntries, localDeleted, remote && remote.entries, remote && remote.deleted);
+
+  const changedLocally = merged.entries.length !== localEntries.length
+    || merged.deleted.length !== localDeleted.length;
+  if (changedLocally) {
+    const s = getWaterEntryStore_();
+    s.days[day] = merged.entries;
+    s.deleted = s.deleted || {};
+    s.deleted[day] = merged.deleted;
+    saveWaterEntryStore_(s);
+    recomputeWaterLedgerForDay_(day, merged.entries);
+    renderOverviewWaterWidget();
+  }
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'saveWaterDraft', date: day, entries: merged.entries, deleted: merged.deleted })
+    });
+  } catch (e) {
+    // Local copy stands; the next sync will push it.
+  }
+}
+
+// The day total is derived from the merged entry list rather than
+// nudged up and down per tap, so an entry arriving from another device
+// can't leave the ring disagreeing with the entries behind it.
+function recomputeWaterLedgerForDay_(day, entries) {
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
+  ledger[day] = (entries || []).reduce((sum, e) => sum + (Number(e.hydrationOz) || 0), 0);
+  localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
+}
+
 function getSyncedWaterDays_() {
   return JSON.parse(localStorage.getItem(STORAGE_WATER_SYNCED_DAYS_KEY) || 'null');
 }
@@ -6635,8 +6750,13 @@ function markWaterDaySynced_(day) {
 function seedWaterSyncedDays_() {
   if (getSyncedWaterDays_()) return;
   const todayKey = dateKey(new Date());
-  const days = Object.keys(getWaterEntryStore_().days).filter(d => d <= todayKey);
-  if (days.indexOf(todayKey) === -1) days.push(todayKey);
+  // Strictly BEFORE today. Marking today as already-sent would both
+  // block its draft from syncing to other devices and stop it being
+  // written to the sheet tonight, losing everything logged after the
+  // upgrade. (Today's pre-upgrade rows are already in the sheet, but
+  // the one-time wipe clears them locally, so tonight's flush writes
+  // only what was logged after it - no duplicates.)
+  const days = Object.keys(getWaterEntryStore_().days).filter(d => d < todayKey);
   localStorage.setItem(STORAGE_WATER_SYNCED_DAYS_KEY, JSON.stringify(days.sort()));
 }
 
@@ -6671,6 +6791,13 @@ async function flushCompletedWaterDays_() {
         if (!data || data.status !== 'success') throw new Error('rejected');
       }
       markWaterDaySynced_(day);
+      // The sheet is now the record for this day, so drop its
+      // in-progress copy - otherwise another device could still merge
+      // from it and re-flush the same rows.
+      await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'saveWaterDraft', date: day, entries: [], deleted: [] })
+      }).catch(() => {});
     } catch (e) {
       // Offline or the Sheet rejected it - leave the day pending and
       // try again on the next load rather than dropping the data.
@@ -7280,6 +7407,7 @@ function logWaterIntake(event, type) {
   localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
 
   const entry = {
+    id: newDrinkId_(),
     type: drinkType,
     rawOz: amounts.rawOz,
     hydrationOz: amounts.hydrationOz,
@@ -7295,8 +7423,10 @@ function logWaterIntake(event, type) {
 
   resetDrinkTimeToNow_();
   renderOverviewWaterWidget();
-  // Deliberately no network call here - the day is pushed to the Sheet
-  // as one batch once it's over. See flushCompletedWaterDays_.
+  // No sheet write here - the day is written as one batch once it's
+  // over (flushCompletedWaterDays_). This only shares the in-progress
+  // day with your other devices.
+  scheduleWaterDraftSync_();
 }
 
 // Undoes the most recent entry - locally that's unambiguous (today's own
@@ -7313,15 +7443,21 @@ function undoLastWaterEntry(event) {
   saveTodayWaterEntries_(state);
 
   const todayKey = dateKey(new Date());
-  const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
-  ledger[todayKey] = Math.max(0, (ledger[todayKey] || 0) - removed.hydrationOz);
-  localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
+  // Tombstoned rather than just dropped: another device still holding
+  // this entry would otherwise merge it straight back on the next sync.
+  const store = getWaterEntryStore_();
+  store.deleted = store.deleted || {};
+  store.deleted[todayKey] = (store.deleted[todayKey] || []).concat([drinkEntryId_(removed)]);
+  saveWaterEntryStore_(store);
+
+  recomputeWaterLedgerForDay_(todayKey, store.days[todayKey] || []);
 
   renderOverviewWaterWidget();
-  // No server call either: today hasn't been sent yet, so undoing is
-  // purely local. This also retires the old 'undoLastWater' round trip,
-  // which deleted whatever row happened to be last in the sheet - not
-  // necessarily the one just undone, if another device had logged since.
+  // No sheet write: today hasn't been sent yet, so the undo only has to
+  // reach your other devices. This also retires the old 'undoLastWater'
+  // round trip, which deleted whatever row happened to be last in the
+  // sheet - not necessarily the one just undone.
+  scheduleWaterDraftSync_();
 }
 
 async function loadRemoteWaterLedger() {
@@ -9498,7 +9634,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-17-exercise-history-fix-and-quality-column';
+const EXPECTED_BACKEND_VERSION = '2026-08-19-water-draft-sync';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
@@ -10574,8 +10710,10 @@ setInterval(checkForWeekRollover_, 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     // Coming back to the tab is also the moment a day may have rolled
-    // over, so this is where a finished day gets pushed to the Sheet.
+    // over, so this is where a finished day gets pushed to the Sheet -
+    // and where drinks logged on another device get picked up.
     flushCompletedWaterDays_();
+    syncWaterDraft_();
     loadRemoteWaterLedger();
   }
 });
@@ -10591,6 +10729,7 @@ loadRemoteOverviewLayoutState();
 seedWaterSyncedDays_();
 applyOneTimeWaterWipe20260819_();
 flushCompletedWaterDays_();
+syncWaterDraft_();
 loadRemoteWaterLedger();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
