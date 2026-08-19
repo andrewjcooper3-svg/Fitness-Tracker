@@ -442,7 +442,14 @@
     margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
   }
   .wt-caffeine-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+  .wt-alcohol-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); flex-shrink: 0; }
+  .wt-line-sep { width: 1px; height: 10px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
   .wt-caffeine-chev { margin-left: auto; opacity: 0.7; }
+  .wt-time-input-optional { color: var(--muted); }
+  .caff-bac-value { color: var(--purple); }
+  .caff-legend { display: flex; gap: 14px; margin-top: 8px; }
+  .caff-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); }
+  .caff-key-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .ov-widget[data-size="small"] .wt-body { flex-direction: column; gap: 10px; }
   .ov-widget[data-size="small"] .wt-ring { width: 64px; height: 64px; }
   .ov-widget[data-size="small"] .wt-ring-num { font-size: 15px; }
@@ -1135,6 +1142,13 @@
           <span class="wt-time-label">at</span>
           <input type="time" class="wt-time-input" id="wtDrinkTime" onclick="event.stopPropagation()">
           <button class="wt-time-now" id="wtTimeNow" onclick="resetDrinkTimeToNow_(event)" title="Reset to now">now</button>
+        </div>
+        <!-- Optional: leave blank to log the drink at a single moment.
+             Filling it in spreads the drink evenly across the window. -->
+        <div class="wt-btn-row wt-time-row">
+          <span class="wt-time-label">to</span>
+          <input type="time" class="wt-time-input wt-time-input-optional" id="wtDrinkTimeEnd" onclick="event.stopPropagation()">
+          <button class="wt-time-now" id="wtTimeEndClear" onclick="clearDrinkEndTime_(event)" title="Clear - log at a single time">clear</button>
         </div>
       </div>
     </div>
@@ -1946,24 +1960,26 @@
     <div class="event-modal-handle"></div>
     <div class="ov-page-head" style="padding-bottom:10px;">
       <div>
-        <div class="ov-page-week">Caffeine</div>
+        <div class="ov-page-week">On board</div>
         <div class="ov-page-title" id="caffNowValue">0 mg</div>
+        <div class="ov-page-title caff-bac-value" id="caffBacValue" style="display:none;">0.000 BAC</div>
       </div>
     </div>
     <div class="ov-hero-sub" id="caffNowSub" style="margin-top:0;"></div>
 
     <div class="stats-card" style="margin-top:12px;">
-      <div class="stats-card-title">On board — today</div>
+      <div class="stats-card-title">Today</div>
       <svg viewBox="0 0 320 130" class="stats-chart" id="caffChart" preserveAspectRatio="none"></svg>
       <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+      <div class="caff-legend" id="caffLegend"></div>
     </div>
 
     <div class="config-box" id="caffDrinkListCard" style="margin-top:12px;">
-      <div class="config-title" style="margin-bottom:6px;">Caffeine logged</div>
+      <div class="config-title" style="margin-bottom:6px;">Drinks logged</div>
       <div id="caffDrinkList"></div>
     </div>
 
-    <div class="ov-note">Modelled as instant absorption then a 5-hour half-life, from typical published caffeine figures for each serving — an estimate of the shape, not a measurement of your actual blood level.</div>
+    <div class="ov-note">Caffeine: 5-hour half-life. Alcohol: Widmark estimate from your latest weigh-in, clearing at a flat 0.015%/hour — the two use separate vertical scales since mg and BAC aren't comparable. Both assume the drink absorbs the moment it's logged (real absorption takes 30–60 min, so early peaks read high), and both use typical figures for each serving rather than what was actually in your glass.<br><br><strong>The BAC number is a rough estimate and must not be used to decide whether you're okay to drive.</strong></div>
     <button class="event-modal-close" onclick="closeCaffeineModal(event)" style="margin-top:10px;">Close</button>
   </div>
 </div>
@@ -2269,6 +2285,7 @@ const STORAGE_YEAR_CARRY_KEY = 'WORKOUT_YEAR_CARRY_FORWARD';
 const STORAGE_SETTINGS_KEY = 'WORKOUT_SETTINGS';
 const STORAGE_WATER_LOG_KEY = 'WORKOUT_WATER_LEDGER';
 const STORAGE_WATER_ENTRIES_KEY = 'WORKOUT_WATER_ENTRIES';
+const STORAGE_WATER_SYNCED_DAYS_KEY = 'WORKOUT_WATER_SYNCED_DAYS';
 
 // Each drink logs its real volume, but only an estimated net hydration
 // value counts toward the daily total/ring, and its caffeine feeds the
@@ -2299,21 +2316,43 @@ const WATER_DRINK_TYPES = {
   milk:      { label: 'Milk',              rawOz: 8,  hydrationOz: 8,  caffeineMg: 0 },
   oj:        { label: 'Orange juice',      rawOz: 8,  hydrationOz: 8,  caffeineMg: 0 },
   soda:      { label: 'Soda (cola)',       rawOz: 12, hydrationOz: 11, caffeineMg: 34 },
-  beer:      { label: 'Beer',              rawOz: 12, hydrationOz: 8,  caffeineMg: 0 },
-  wine:      { label: 'Wine',              rawOz: 5,  hydrationOz: 3,  caffeineMg: 0 },
-  cocktail:  { label: 'Mixed drink',       rawOz: 8,  hydrationOz: 4,  caffeineMg: 0 }
+  beer:      { label: 'Beer',              rawOz: 12, hydrationOz: 8,  caffeineMg: 0,  alcoholOz: 0.6 },
+  wine:      { label: 'Wine',              rawOz: 5,  hydrationOz: 3,  caffeineMg: 0,  alcoholOz: 0.6 },
+  cocktail:  { label: 'Mixed drink',       rawOz: 8,  hydrationOz: 4,  caffeineMg: 0,  alcoholOz: 0.6 },
+  cocktail2: { label: 'Mixed drink (double)', rawOz: 9, hydrationOz: 4, caffeineMg: 0, alcoholOz: 1.2 },
+  espmartini:{ label: 'Espresso martini',  rawOz: 5,  hydrationOz: 2,  caffeineMg: 64, alcoholOz: 0.7 },
+  carajillo: { label: 'Carajillo',         rawOz: 4,  hydrationOz: 2,  caffeineMg: 64, alcoholOz: 0.5 },
+  vodkared:  { label: 'Vodka Red Bull',    rawOz: 10, hydrationOz: 5,  caffeineMg: 80, alcoholOz: 0.6 }
 };
 
 // What the widget's drink dropdown offers, in order. Water has its own
 // dedicated button/steppers so it isn't here, and the two legacy keys
 // above are display-only.
-const WATER_DRINK_PICKER = ['coffee', 'latte', 'espresso', 'earlgrey', 'greentea', 'chamomile', 'milk', 'oj', 'soda', 'beer', 'wine', 'cocktail'];
+const WATER_DRINK_PICKER = ['coffee', 'latte', 'espresso', 'earlgrey', 'greentea', 'chamomile', 'milk', 'oj', 'soda', 'beer', 'wine', 'cocktail', 'cocktail2', 'espmartini', 'carajillo', 'vodkared'];
 
 // Caffeine is modelled as instant absorption followed by exponential
 // decay. ~5h is the usual adult half-life (individuals run 3-7h, and
 // real absorption peaks around 45min in rather than instantly), so the
 // curve is a good-enough shape for "can I still sleep", not pharmacology.
 const CAFFEINE_HALF_LIFE_HOURS = 5;
+
+// Alcohol works the opposite way to caffeine: the liver clears it at a
+// roughly CONSTANT ~0.015 %BAC/hour regardless of how much is on board
+// (zero-order), rather than halving over a fixed interval. So it's a
+// straight line down to zero, not a decay curve, and drinks can't be
+// summed as independent curves the way caffeine can - see bacAt_().
+//
+// Peak BAC per drink comes from Widmark: BAC% = grams ethanol /
+// (r x body mass in grams) x 100. r is the volume-of-distribution
+// ratio; 0.68 is the standard male figure (women average ~0.55, which
+// would give a higher BAC for the same drink). Body weight comes from
+// the most recent weigh-in, falling back to the constant below when
+// nothing has been logged yet.
+const BAC_ELIMINATION_PER_HOUR = 0.015;
+const WIDMARK_R = 0.68;
+const BAC_FALLBACK_WEIGHT_LB = 180;
+const ETHANOL_G_PER_FL_OZ = 23.33; // 29.57 mL/oz x 0.789 g/mL - 0.6 oz ends up the usual 14 g standard drink
+const BAC_LEGAL_LIMIT = 0.08;
 let PUSHUP_DAILY_BASELINE = 165;
 let PUSHUP_YEAR_GOAL = 50000;
 let BODY_HEALTH_MAX_HR = 196; // 220 - 24, the standard age-based estimate; editable in Settings
@@ -5793,6 +5832,45 @@ async function loadRemotePushupLedger() {
 // after every remote ledger sync - not just once - so an inflated
 // number from a not-yet-redeployed backend can't silently re-clobber
 // these 21 days on the next load before code.gs is redeployed.
+// One-time, by request: clear today's drink intake back to zero.
+//
+// Guarded by its own flag so it fires once per device and never touches
+// a later day. It also records the wiped date, because today's rows were
+// already pushed to the Sheet by the previous build (which logged each
+// tap instantly) - and loadRemoteWaterLedger max-merges the server's
+// daily totals, so without that record the sheet would simply restore
+// the total on the next sync and the wipe would appear to undo itself.
+// The already-written Sheet rows are left alone; this only corrects what
+// the app counts.
+const STORAGE_WATER_WIPED_DAYS_KEY = 'WORKOUT_WATER_WIPED_DAYS';
+const WATER_WIPE_FLAG_KEY = 'WORKOUT_WATER_WIPE_20260819';
+
+function getWipedWaterDays_() {
+  return JSON.parse(localStorage.getItem(STORAGE_WATER_WIPED_DAYS_KEY) || '[]');
+}
+
+function applyOneTimeWaterWipe20260819_() {
+  if (localStorage.getItem(WATER_WIPE_FLAG_KEY)) return;
+  const todayKey = dateKey(new Date());
+
+  const store = getWaterEntryStore_();
+  delete store.days[todayKey];
+  saveWaterEntryStore_(store);
+
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
+  ledger[todayKey] = 0;
+  localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
+
+  const wiped = getWipedWaterDays_();
+  if (wiped.indexOf(todayKey) === -1) wiped.push(todayKey);
+  localStorage.setItem(STORAGE_WATER_WIPED_DAYS_KEY, JSON.stringify(wiped));
+
+  // Nothing to send: the day is now empty and the new batched flush only
+  // pushes days that still have entries.
+  markWaterDaySynced_(todayKey);
+  localStorage.setItem(WATER_WIPE_FLAG_KEY, '1');
+}
+
 function applyManualPushupLedgerCorrection20260817_() {
   const corrected = {
     // Week of Jul 20 - Jul 26
@@ -6308,7 +6386,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-drink-picker-and-caffeine-decay';
+const APP_BUILD_VERSION = '2026-08-19-alcohol-decay-and-batched-water-log';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6352,7 +6430,11 @@ function renderOverview() {
 // midnight would show the curve jumping to zero every day. Days beyond
 // the window are pruned on write. The older single-day shape
 // ({date, entries}) is migrated on read.
-const WATER_ENTRY_RETENTION_DAYS = 3;
+// Longer than the ~2 days the caffeine curve needs, because a day's
+// entries also have to survive locally until they've been pushed to the
+// Sheet (see flushCompletedWaterDays_) - if the app isn't opened for a
+// few days, pruning must not throw away days that were never sent.
+const WATER_ENTRY_RETENTION_DAYS = 7;
 
 function getWaterEntryStore_() {
   const raw = JSON.parse(localStorage.getItem(STORAGE_WATER_ENTRIES_KEY) || 'null');
@@ -6398,9 +6480,120 @@ function getRecentDrinkEntries_() {
 // Caffeine still on board at `at`, summing each drink's remaining
 // fraction after exponential decay. Entries logged before the caffeine
 // column existed simply have no caffeineMg and contribute nothing.
-function currentCaffeineMg_(at, entries) {
+// A drink sipped over a window enters your system gradually rather than
+// landing all at once, so when an entry carries an optional endAt it's
+// split into evenly spaced micro-doses across that window (each placed
+// at the midpoint of its slice) before any curve maths. Storage still
+// holds ONE entry per drink - one Undo, one row in the list - and the
+// split exists only here. Entries without endAt stay a single dose, so
+// nothing changes for drinks logged the quick way.
+const DRINK_DOSE_STEP_MIN = 10;
+
+function expandDrinkDoses_(entries) {
+  const out = [];
+  (entries || []).forEach(e => {
+    const caffeineMg = Number(e.caffeineMg) || 0;
+    const alcoholOz = Number(e.alcoholOz) || 0;
+    const end = e.endAt ? new Date(e.endAt) : null;
+    const spanMs = (end && !isNaN(end.getTime())) ? (end - e.when) : 0;
+
+    if (spanMs <= 0) {
+      out.push({ when: e.when, caffeineMg: caffeineMg, alcoholOz: alcoholOz });
+      return;
+    }
+    const n = Math.max(1, Math.round(spanMs / 60000 / DRINK_DOSE_STEP_MIN));
+    for (let i = 0; i < n; i++) {
+      out.push({
+        when: new Date(e.when.getTime() + (spanMs * (i + 0.5)) / n),
+        caffeineMg: caffeineMg / n,
+        alcoholOz: alcoholOz / n
+      });
+    }
+  });
+  return out.sort((a, b) => a.when - b.when);
+}
+
+function getRecentDrinkDoses_() {
+  return expandDrinkDoses_(getRecentDrinkEntries_());
+}
+
+/* ---------- Pushing finished days to the Sheet ---------- */
+
+// Drinks used to POST one row per tap. That made the Sheet the live
+// record of a day in progress, which caused trouble: an Undo had to ask
+// the server to delete "the last row" (not necessarily the row you
+// undid), offline taps were dropped silently with no retry, and the
+// entry pull below overwrote today's local list wholesale - which would
+// now also strip the caffeine/alcohol/time-range fields the Sheet
+// doesn't store.
+//
+// Instead the day is owned locally while it's happening and pushed once
+// it's over. A browser can't actually run code at midnight, so "at
+// midnight" really means "the next time the app is open after the day
+// ends" - flushed on load and whenever the tab is brought back.
+function getSyncedWaterDays_() {
+  return JSON.parse(localStorage.getItem(STORAGE_WATER_SYNCED_DAYS_KEY) || 'null');
+}
+
+function markWaterDaySynced_(day) {
+  const synced = getSyncedWaterDays_() || [];
+  if (synced.indexOf(day) === -1) synced.push(day);
+  localStorage.setItem(STORAGE_WATER_SYNCED_DAYS_KEY, JSON.stringify(synced.sort().slice(-60)));
+}
+
+// On upgrade, every day up to and including today was already written
+// row-by-row by the old build, so they're marked synced up front -
+// otherwise the first flush would duplicate them in the Sheet.
+function seedWaterSyncedDays_() {
+  if (getSyncedWaterDays_()) return;
+  const todayKey = dateKey(new Date());
+  const days = Object.keys(getWaterEntryStore_().days).filter(d => d <= todayKey);
+  if (days.indexOf(todayKey) === -1) days.push(todayKey);
+  localStorage.setItem(STORAGE_WATER_SYNCED_DAYS_KEY, JSON.stringify(days.sort()));
+}
+
+async function flushCompletedWaterDays_() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+
+  const todayKey = dateKey(new Date());
+  const store = getWaterEntryStore_();
+  const synced = getSyncedWaterDays_() || [];
+  const pending = Object.keys(store.days).filter(d => d < todayKey && synced.indexOf(d) === -1).sort();
+
+  for (const day of pending) {
+    const entries = store.days[day] || [];
+    try {
+      // Sequential, and only marked synced once every row landed - a
+      // half-sent day stays pending and retries whole next time rather
+      // than leaving the Sheet with part of a day.
+      for (const e of entries) {
+        const res = await fetch(url, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'logWater', date: day, type: e.type,
+            rawOz: e.rawOz, hydrationOz: e.hydrationOz,
+            // Extra fields the current Apps Script ignores; harmless
+            // now, and already correct if it ever stores them.
+            loggedAt: e.loggedAt || '', endAt: e.endAt || '',
+            caffeineMg: e.caffeineMg || 0, alcoholOz: e.alcoholOz || 0
+          })
+        });
+        const data = await res.json().catch(() => null);
+        if (!data || data.status !== 'success') throw new Error('rejected');
+      }
+      markWaterDaySynced_(day);
+    } catch (e) {
+      // Offline or the Sheet rejected it - leave the day pending and
+      // try again on the next load rather than dropping the data.
+      break;
+    }
+  }
+}
+
+function currentCaffeineMg_(at, doses) {
   const now = at || new Date();
-  const list = entries || getRecentDrinkEntries_();
+  const list = doses || getRecentDrinkDoses_();
   let total = 0;
   list.forEach(e => {
     const mg = Number(e.caffeineMg) || 0;
@@ -6410,6 +6603,48 @@ function currentCaffeineMg_(at, entries) {
     total += mg * Math.pow(0.5, hours / CAFFEINE_HALF_LIFE_HOURS);
   });
   return total;
+}
+
+// Most recent logged weigh-in, or the fallback constant. Weight only
+// scales the peak of each drink, so an out-of-date figure skews the
+// curve's height a little, never its shape or timing.
+function bacBodyWeightLb_() {
+  const log = loadWeightLog();
+  for (let i = log.length - 1; i >= 0; i--) {
+    const w = Number(log[i] && log[i].weight);
+    if (w > 0) return w;
+  }
+  return BAC_FALLBACK_WEIGHT_LB;
+}
+
+// Instantaneous BAC bump from one drink, before any elimination.
+function drinkPeakBac_(entry, weightLb) {
+  const oz = Number(entry.alcoholOz) || 0;
+  if (oz <= 0) return 0;
+  const grams = oz * ETHANOL_G_PER_FL_OZ;
+  const bodyGrams = weightLb * 453.592;
+  return (grams / (WIDMARK_R * bodyGrams)) * 100;
+}
+
+// Walked forward drink by drink rather than summed per-drink: because
+// elimination is a flat rate on the whole-body total (not per drink),
+// and BAC floors at zero, the order and spacing of drinks changes the
+// result. Summing independent per-drink lines would keep subtracting
+// from drinks already fully cleared and read far too low.
+function bacAt_(at, doses) {
+  const now = at || new Date();
+  const list = (doses || getRecentDrinkDoses_()).filter(e => (Number(e.alcoholOz) || 0) > 0 && e.when <= now);
+  if (!list.length) return 0;
+
+  const weightLb = bacBodyWeightLb_();
+  let bac = 0;
+  let prev = list[0].when;
+  list.forEach(e => {
+    bac = Math.max(0, bac - BAC_ELIMINATION_PER_HOUR * ((e.when - prev) / 3600000));
+    bac += drinkPeakBac_(e, weightLb);
+    prev = e.when;
+  });
+  return Math.max(0, bac - BAC_ELIMINATION_PER_HOUR * ((now - prev) / 3600000));
 }
 
 // Button text is generated from WATER_DRINK_TYPES rather than hardcoded,
@@ -6459,29 +6694,46 @@ function onDrinkSelectChange_(event) {
 
 function pad2_(n) { return String(n).padStart(2, '0'); }
 
-// The time box defaults to now and is reset back to now after every log,
-// so it only ever differs when you deliberately change it before adding.
+// The start box defaults to now and is reset back to now after every
+// log (clearing the optional end box with it), so it only ever differs
+// when you deliberately change it before adding.
 function resetDrinkTimeToNow_(event) {
   if (event) event.stopPropagation();
   const input = document.getElementById('wtDrinkTime');
+  const endInput = document.getElementById('wtDrinkTimeEnd');
+  if (endInput) endInput.value = '';
   if (!input) return;
   const now = new Date();
   input.value = `${pad2_(now.getHours())}:${pad2_(now.getMinutes())}`;
 }
 
-// Reads the time box back into a real Date on today's date. Falls back
-// to now if it's empty or unparseable, so a log can never land on a
-// bogus timestamp.
-function readDrinkTime_() {
-  const input = document.getElementById('wtDrinkTime');
-  const now = new Date();
-  if (!input || !input.value) return now;
+function clearDrinkEndTime_(event) {
+  if (event) event.stopPropagation();
+  const endInput = document.getElementById('wtDrinkTimeEnd');
+  if (endInput) endInput.value = '';
+}
+
+// Turns an "HH:MM" box into a real Date on today's date, or null when
+// it's empty/unparseable.
+function readTimeInput_(id) {
+  const input = document.getElementById(id);
+  if (!input || !input.value) return null;
   const parts = input.value.split(':');
   const h = Number(parts[0]), m = Number(parts[1]);
-  if (!isFinite(h) || !isFinite(m)) return now;
-  const when = new Date(now);
+  if (!isFinite(h) || !isFinite(m)) return null;
+  const when = new Date();
   when.setHours(h, m, 0, 0);
   return when;
+}
+
+// Start falls back to now, so a log can never land on a bogus
+// timestamp. End is optional and only honoured when it's actually after
+// the start - an end at or before the start (including a mistyped one)
+// just means "logged at a single moment", the default behaviour.
+function readDrinkTimeRange_() {
+  const start = readTimeInput_('wtDrinkTime') || new Date();
+  const end = readTimeInput_('wtDrinkTimeEnd');
+  return { start: start, end: (end && end > start) ? end : null };
 }
 
 // The small +/- next to each button - adjusts that drink's logged (raw)
@@ -6552,10 +6804,17 @@ function renderOverviewWaterWidget() {
 function renderCaffeineLine_() {
   const el = document.getElementById('wtCaffeineLine');
   if (!el) return;
-  const mg = currentCaffeineMg_();
-  if (mg < 1) { el.style.display = 'none'; return; }
+  const doses = getRecentDrinkDoses_();
+  const mg = currentCaffeineMg_(new Date(), doses);
+  const bac = bacAt_(new Date(), doses);
+
+  const parts = [];
+  if (mg >= 1) parts.push(`<span class="wt-caffeine-dot"></span>${Math.round(mg)} mg caffeine`);
+  if (bac >= 0.001) parts.push(`<span class="wt-alcohol-dot"></span>${bac.toFixed(3)} BAC`);
+
+  if (!parts.length) { el.style.display = 'none'; return; }
   el.style.display = '';
-  el.innerHTML = `<span class="wt-caffeine-dot"></span>${Math.round(mg)} mg caffeine on board <span class="wt-caffeine-chev">›</span>`;
+  el.innerHTML = parts.join('<span class="wt-line-sep"></span>') + ' <span class="wt-caffeine-chev">›</span>';
 }
 
 function openCaffeineModal(event) {
@@ -6573,40 +6832,57 @@ function closeCaffeineModal(event) {
   if (overlay) overlay.style.display = 'none';
 }
 
+function fmtClock_(d) {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 function renderCaffeineModal_() {
   const entries = getRecentDrinkEntries_();
+  const doses = expandDrinkDoses_(entries);
   const now = new Date();
-  const mgNow = currentCaffeineMg_(now, entries);
+  const mgNow = currentCaffeineMg_(now, doses);
+  const bacNow = bacAt_(now, doses);
 
   const valueEl = document.getElementById('caffNowValue');
   if (valueEl) valueEl.textContent = Math.round(mgNow) + ' mg';
-
-  // How long until it decays below a level that generally stops
-  // interfering with sleep. Pure arithmetic on the same curve, so it
-  // stays consistent with the chart rather than being a second estimate.
-  const subEl = document.getElementById('caffNowSub');
-  if (subEl) {
-    if (mgNow < 1) {
-      subEl.textContent = 'Nothing on board right now.';
-    } else {
-      const hoursTo50 = Math.log(50 / mgNow) / Math.log(0.5) * CAFFEINE_HALF_LIFE_HOURS;
-      if (hoursTo50 <= 0) {
-        subEl.textContent = 'Already below 50 mg.';
-      } else {
-        const at = new Date(now.getTime() + hoursTo50 * 3600000);
-        subEl.textContent = `Drops below 50 mg around ${at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}.`;
-      }
-    }
+  const bacEl = document.getElementById('caffBacValue');
+  if (bacEl) {
+    bacEl.textContent = bacNow.toFixed(3) + ' BAC';
+    bacEl.style.display = bacNow >= 0.001 ? '' : 'none';
   }
 
-  renderCaffeineChart_(entries, now);
+  // Both "when does this clear" figures are derived from the same curves
+  // the chart draws, so the text can't drift from the picture.
+  const subEl = document.getElementById('caffNowSub');
+  if (subEl) {
+    const bits = [];
+    if (mgNow >= 1) {
+      const hoursTo50 = Math.log(50 / mgNow) / Math.log(0.5) * CAFFEINE_HALF_LIFE_HOURS;
+      bits.push(hoursTo50 <= 0
+        ? 'Caffeine already below 50 mg.'
+        : `Caffeine drops below 50 mg around ${fmtClock_(new Date(now.getTime() + hoursTo50 * 3600000))}.`);
+    }
+    if (bacNow >= 0.001) {
+      // Linear elimination, so time-to-zero is just BAC / rate.
+      const hoursToZero = bacNow / BAC_ELIMINATION_PER_HOUR;
+      bits.push(`Alcohol clears around ${fmtClock_(new Date(now.getTime() + hoursToZero * 3600000))}.`);
+    }
+    subEl.textContent = bits.length ? bits.join(' ') : 'Nothing on board right now.';
+  }
+
+  renderCaffeineChart_(doses, now);
   renderCaffeineDrinkList_(entries);
 }
 
 // 24h of today, sampled every 10 minutes: solid up to now, dashed from
 // now on as a projection. Same 12a-12a window (and label strip) the
 // water hourly chart uses, so the two read as the same day.
-function renderCaffeineChart_(entries, now) {
+// Caffeine and BAC share the x-axis but get INDEPENDENT y-scales - mg
+// and %BAC aren't comparable quantities, so a shared axis would just
+// flatten one of them into the baseline. Each is scaled against its own
+// reference floor (50mg / 0.08 BAC) so a light day still reads as
+// low rather than being stretched to fill the box.
+function renderCaffeineChart_(doses, now) {
   const svg = document.getElementById('caffChart');
   if (!svg) return;
 
@@ -6617,27 +6893,41 @@ function renderCaffeineChart_(entries, now) {
   const pts = [];
   for (let i = 0; i <= steps; i++) {
     const t = new Date(dayStart.getTime() + i * stepMin * 60000);
-    pts.push({ t: t, mg: currentCaffeineMg_(t, entries) });
+    pts.push({ mg: currentCaffeineMg_(t, doses), bac: bacAt_(t, doses) });
   }
 
-  const peak = Math.max(50, ...pts.map(p => p.mg));
+  const caffPeak = Math.max(50, ...pts.map(p => p.mg));
+  const bacPeak = Math.max(BAC_LEGAL_LIMIT, ...pts.map(p => p.bac));
+  const hasBac = pts.some(p => p.bac >= 0.001);
+
   const x = i => PAD + (i / steps) * (W - PAD * 2);
-  const y = mg => H - PAD - (mg / peak) * (H - PAD * 2);
+  const yFor = (v, peak) => H - PAD - (v / peak) * (H - PAD * 2);
 
-  const nowIdx = Math.round((now - dayStart) / (stepMin * 60000));
-  const seg = (from, to) => pts.slice(from, to + 1)
-    .map((p, k) => `${k === 0 ? 'M' : 'L'}${x(from + k).toFixed(1)},${y(p.mg).toFixed(1)}`).join(' ');
+  const nowIdx = Math.max(0, Math.min(steps, Math.round((now - dayStart) / (stepMin * 60000))));
+  const seg = (from, to, pick, peak) => pts.slice(from, to + 1)
+    .map((p, k) => `${k === 0 ? 'M' : 'L'}${x(from + k).toFixed(1)},${yFor(pick(p), peak).toFixed(1)}`).join(' ');
 
-  const solid = seg(0, Math.min(nowIdx, steps));
-  const dashed = nowIdx < steps ? seg(nowIdx, steps) : '';
-  const nowX = x(Math.min(nowIdx, steps)).toFixed(1);
+  const series = (pick, peak, color) => {
+    const solid = seg(0, nowIdx, pick, peak);
+    const dashed = nowIdx < steps ? seg(nowIdx, steps, pick, peak) : '';
+    return (solid ? `<path d="${solid}" fill="none" stroke="${color}" stroke-width="2"></path>` : '')
+      + (dashed ? `<path d="${dashed}" fill="none" stroke="${color}" stroke-width="2" stroke-dasharray="4 4" opacity="0.55"></path>` : '');
+  };
 
+  const nowX = x(nowIdx).toFixed(1);
   svg.innerHTML = `
-    <line x1="${PAD}" y1="${y(50).toFixed(1)}" x2="${W - PAD}" y2="${y(50).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"></line>
-    ${solid ? `<path d="${solid}" fill="none" stroke="var(--amber)" stroke-width="2"></path>` : ''}
-    ${dashed ? `<path d="${dashed}" fill="none" stroke="var(--amber)" stroke-width="2" stroke-dasharray="4 4" opacity="0.55"></path>` : ''}
+    <line x1="${PAD}" y1="${yFor(50, caffPeak).toFixed(1)}" x2="${W - PAD}" y2="${yFor(50, caffPeak).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"></line>
+    ${hasBac ? `<line x1="${PAD}" y1="${yFor(BAC_LEGAL_LIMIT, bacPeak).toFixed(1)}" x2="${W - PAD}" y2="${yFor(BAC_LEGAL_LIMIT, bacPeak).toFixed(1)}" stroke="var(--red)" stroke-width="1" stroke-dasharray="2 4" opacity="0.5"></line>` : ''}
+    ${series(p => p.mg, caffPeak, 'var(--amber)')}
+    ${hasBac ? series(p => p.bac, bacPeak, 'var(--purple)') : ''}
     <line x1="${nowX}" y1="${PAD}" x2="${nowX}" y2="${H - PAD}" stroke="var(--muted)" stroke-width="1" opacity="0.5"></line>
   `;
+
+  const legend = document.getElementById('caffLegend');
+  if (legend) {
+    legend.innerHTML = `<span class="caff-key"><span class="caff-key-dot" style="background:var(--amber)"></span>Caffeine (mg)</span>`
+      + (hasBac ? `<span class="caff-key"><span class="caff-key-dot" style="background:var(--purple)"></span>Alcohol (BAC)</span>` : '');
+  }
 }
 
 function renderCaffeineDrinkList_(entries) {
@@ -6646,14 +6936,20 @@ function renderCaffeineDrinkList_(entries) {
   if (!listEl || !card) return;
 
   const todayKey = dateKey(new Date());
-  const rows = entries.filter(e => (Number(e.caffeineMg) || 0) > 0 && dateKey(e.when) === todayKey);
+  const rows = entries.filter(e =>
+    ((Number(e.caffeineMg) || 0) > 0 || (Number(e.alcoholOz) || 0) > 0) && dateKey(e.when) === todayKey);
   card.style.display = rows.length ? '' : 'none';
   if (!rows.length) return;
 
+  const weightLb = bacBodyWeightLb_();
   listEl.innerHTML = rows.map(e => {
     const label = (WATER_DRINK_TYPES[e.type] || {}).label || e.type;
-    const time = e.when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    return `<div class="bh-week-row"><div class="bh-week-day">${time} · ${escapeText_(label)}</div><div class="bh-week-score">${Math.round(e.caffeineMg)} mg</div></div>`;
+    const end = e.endAt ? new Date(e.endAt) : null;
+    const time = fmtClock_(e.when) + (end && !isNaN(end.getTime()) ? `–${fmtClock_(end)}` : '');
+    const amounts = [];
+    if ((Number(e.caffeineMg) || 0) > 0) amounts.push(`${Math.round(e.caffeineMg)} mg`);
+    if ((Number(e.alcoholOz) || 0) > 0) amounts.push(`+${drinkPeakBac_(e, weightLb).toFixed(3)}`);
+    return `<div class="bh-week-row"><div class="bh-week-day">${time} · ${escapeText_(label)}</div><div class="bh-week-score">${amounts.join(' · ')}</div></div>`;
   }).join('');
 }
 
@@ -6752,36 +7048,32 @@ function logWaterIntake(event, type) {
   const drinkType = type || (sel && sel.value) || 'water';
   const drink = WATER_DRINK_TYPES[drinkType] || WATER_DRINK_TYPES.water;
 
-  const when = readDrinkTime_();
+  const range = readDrinkTimeRange_();
   const todayKey = dateKey(new Date());
-  const loggedAt = when.toISOString();
+  const loggedAt = range.start.toISOString();
 
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
   ledger[todayKey] = (ledger[todayKey] || 0) + drink.hydrationOz;
   localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
 
-  const state = getTodayWaterEntries_();
-  state.entries.push({
+  const entry = {
     type: drinkType,
     rawOz: drink.rawOz,
     hydrationOz: drink.hydrationOz,
     caffeineMg: drink.caffeineMg || 0,
+    alcoholOz: drink.alcoholOz || 0,
     loggedAt: loggedAt
-  });
+  };
+  if (range.end) entry.endAt = range.end.toISOString();
+
+  const state = getTodayWaterEntries_();
+  state.entries.push(entry);
   saveTodayWaterEntries_(state);
 
   resetDrinkTimeToNow_();
   renderOverviewWaterWidget();
-
-  const url = getDeploymentUrl();
-  if (!url || !navigator.onLine) return;
-  // loggedAt/caffeineMg ride along for a future backend that stores
-  // them; the current Apps Script reads only the four fields it knows
-  // and ignores the rest, so this stays compatible without a redeploy.
-  fetch(url, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'logWater', date: todayKey, type: drinkType, rawOz: drink.rawOz, hydrationOz: drink.hydrationOz, loggedAt: loggedAt, caffeineMg: drink.caffeineMg || 0 })
-  }).catch(() => { /* offline/unreachable - local tally stands, reconciles from the Sheet on next load */ });
+  // Deliberately no network call here - the day is pushed to the Sheet
+  // as one batch once it's over. See flushCompletedWaterDays_.
 }
 
 // Undoes the most recent entry - locally that's unambiguous (today's own
@@ -6803,11 +7095,10 @@ function undoLastWaterEntry(event) {
   localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
 
   renderOverviewWaterWidget();
-
-  const url = getDeploymentUrl();
-  if (!url || !navigator.onLine) return;
-  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'undoLastWater' }) })
-    .catch(() => { /* offline/unreachable - local tally stands */ });
+  // No server call either: today hasn't been sent yet, so undoing is
+  // purely local. This also retires the old 'undoLastWater' round trip,
+  // which deleted whatever row happened to be last in the sheet - not
+  // necessarily the one just undone, if another device had logged since.
 }
 
 async function loadRemoteWaterLedger() {
@@ -6820,7 +7111,12 @@ async function loadRemoteWaterLedger() {
     const data = await res.json();
     if (data.status === 'success' && data.ledger) {
       const local = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
+      const wiped = getWipedWaterDays_();
       Object.keys(data.ledger).forEach(date => {
+        // A deliberately wiped day keeps the local value: the sheet still
+        // holds the rows the old instant-logging build wrote, and
+        // max-merging them back would silently undo the wipe.
+        if (wiped.indexOf(date) !== -1) return;
         local[date] = Math.max(local[date] || 0, data.ledger[date]);
       });
       localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(local));
@@ -6829,16 +7125,20 @@ async function loadRemoteWaterLedger() {
     // Offline/unreachable - whatever's cached locally stands.
   }
 
-  // Today's individual entries (for the hourly chart) are pulled
-  // separately and taken wholesale from the server rather than merged,
-  // since the server is the authoritative record of every device's taps
-  // for today - any taps made on THIS device later in the same session
-  // just append on top locally afterward.
+  // Today's individual entries are now owned locally until the day is
+  // flushed, so this pull only seeds a device that has nothing for today
+  // yet (a fresh install, or one that missed the day entirely). It must
+  // NOT overwrite a local list that already has entries: the Sheet
+  // doesn't carry caffeine, alcohol or the drink's time range, so
+  // taking the server copy wholesale would silently strip them.
   try {
-    const res2 = await fetch(url + '?action=loadWaterEntries&date=' + encodeURIComponent(todayKey));
-    const data2 = await res2.json();
-    if (data2.status === 'success' && Array.isArray(data2.entries)) {
-      saveTodayWaterEntries_({ date: todayKey, entries: data2.entries });
+    if (!getTodayWaterEntries_().entries.length) {
+      const res2 = await fetch(url + '?action=loadWaterEntries&date=' + encodeURIComponent(todayKey));
+      const data2 = await res2.json();
+      if (data2.status === 'success' && Array.isArray(data2.entries) && data2.entries.length) {
+        saveTodayWaterEntries_({ date: todayKey, entries: data2.entries });
+        markWaterDaySynced_(todayKey);
+      }
     }
   } catch (e) {
     // Offline/unreachable - whatever's cached locally stands.
@@ -10049,7 +10349,12 @@ setInterval(checkForWeekRollover_, 5 * 60 * 1000);
 // closes that gap the same way the week-rollover check above already
 // does, without needing a constant background poll.
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') loadRemoteWaterLedger();
+  if (document.visibilityState === 'visible') {
+    // Coming back to the tab is also the moment a day may have rolled
+    // over, so this is where a finished day gets pushed to the Sheet.
+    flushCompletedWaterDays_();
+    loadRemoteWaterLedger();
+  }
 });
 fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
@@ -10060,6 +10365,9 @@ loadRemotePushupLedger();
 loadRemoteExerciseHistory();
 loadRemoteSettingsState();
 loadRemoteOverviewLayoutState();
+seedWaterSyncedDays_();
+applyOneTimeWaterWipe20260819_();
+flushCompletedWaterDays_();
 loadRemoteWaterLedger();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
