@@ -425,10 +425,17 @@
     background-size: 4px 4px, 4px 4px;
     background-repeat: no-repeat;
   }
-  .wt-drink-add { flex-shrink: 0; width: 46px; }
+  /* Needs .wt-btn-row to outrank the generic `.wt-btn-row .wt-add-btn
+     { flex: 1 }` above - otherwise Add absorbs all the spare width and
+     the drink name is truncated for no reason. */
+  .wt-btn-row .wt-drink-add { flex: 0 0 46px; padding-left: 0; padding-right: 0; }
   .wt-amt-row { align-items: center; gap: 4px; }
+  /* The drink row carries four controls now, so the select is the only
+     flexible one - everything else is fixed width and the drink name
+     truncates instead of pushing the size box or Add off the row. */
+  .wt-drink-select { flex: 1 1 0; }
   .wt-amt-input {
-    flex: 0 0 46px; min-width: 0; font-family: var(--font); font-size: 11.5px; font-weight: 600;
+    flex: 0 0 38px; min-width: 0; font-family: var(--font); font-size: 11.5px; font-weight: 600;
     color: var(--text); background: var(--surface2); border: none; border-radius: 9px;
     padding: 5px 6px; outline: none; text-align: right; -moz-appearance: textfield;
   }
@@ -1158,15 +1165,17 @@
         </div>
         <div class="wt-btn-row">
           <select class="wt-drink-select" id="wtDrinkSelect" onclick="event.stopPropagation()" onchange="onDrinkSelectChange_(event)"></select>
+          <input type="number" class="wt-amt-input" id="wtDrinkOz" min="0" step="0.5" inputmode="decimal"
+                 onclick="event.stopPropagation()" oninput="onDrinkAmountChange_(event)" title="Size in ounces">
+          <span class="wt-amt-label">oz</span>
           <button class="wt-add-btn wt-add-btn-secondary wt-drink-add" id="wtBtnDrink" onclick="logWaterIntake(event)">Add</button>
         </div>
-        <!-- Size always applies; the shot picker only shows for drinks
-             where caffeine or alcohol comes from a pour rather than the
-             volume. Both are remembered per drink type. -->
-        <div class="wt-btn-row wt-amt-row">
-          <input type="number" class="wt-amt-input" id="wtDrinkOz" min="0" step="0.5" inputmode="decimal"
-                 onclick="event.stopPropagation()" oninput="onDrinkAmountChange_(event)" title="Size">
-          <span class="wt-amt-label">oz</span>
+        <!-- Only the shot picker and the live readout are left on their
+             own row, and it hides entirely when neither applies (juice,
+             milk) rather than sitting there empty. The shot picker shows
+             only for drinks where caffeine or alcohol comes from a pour
+             rather than the volume. -->
+        <div class="wt-btn-row wt-amt-row" id="wtAmtRow">
           <select class="wt-shot-select" id="wtDrinkShots" onclick="event.stopPropagation()" onchange="onDrinkAmountChange_(event)"></select>
           <span class="wt-drink-preview" id="wtDrinkPreview"></span>
         </div>
@@ -6456,7 +6465,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-19-custom-sizes-and-shots';
+const APP_BUILD_VERSION = '2026-08-19-condensed-drink-row';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6785,9 +6794,8 @@ function syncDrinkAmountFields_() {
   ozInput.value = prefs.oz;
   shotSel.style.display = usesShots ? '' : 'none';
   if (usesShots) {
-    const noun = (d.alcoholPerShot || 0) > 0 ? 'shot' : 'shot';
     shotSel.innerHTML = [1, 2, 3, 4].map(n =>
-      `<option value="${n}">${n} ${noun}${n > 1 ? 's' : ''}</option>`).join('');
+      `<option value="${n}">${n} shot${n > 1 ? 's' : ''}</option>`).join('');
     shotSel.value = String(Math.min(4, Math.max(1, prefs.shots || 1)));
   }
   renderDrinkPreview_();
@@ -6806,6 +6814,16 @@ function renderDrinkPreview_() {
   if (a.caffeineMg > 0) bits.push(`${Math.round(a.caffeineMg)} mg`);
   if (a.alcoholOz > 0) bits.push(`${(a.alcoholOz / 0.6).toFixed(1)} std drinks`);
   el.textContent = bits.join(' · ');
+
+  // With the size box moved up to the drink row, this row can end up
+  // holding nothing at all (milk, juice) - collapse it rather than
+  // leaving a blank gap in the card.
+  const row = document.getElementById('wtAmtRow');
+  const shotSel = document.getElementById('wtDrinkShots');
+  if (row) {
+    const shotsVisible = shotSel && shotSel.style.display !== 'none';
+    row.style.display = (shotsVisible || bits.length) ? '' : 'none';
+  }
 }
 
 function readDrinkAmountFields_() {
