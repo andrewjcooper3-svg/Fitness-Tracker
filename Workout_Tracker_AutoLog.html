@@ -426,6 +426,24 @@
     background-repeat: no-repeat;
   }
   .wt-drink-add { flex-shrink: 0; width: 46px; }
+  .wt-amt-row { align-items: center; gap: 4px; }
+  .wt-amt-input {
+    flex: 0 0 46px; min-width: 0; font-family: var(--font); font-size: 11.5px; font-weight: 600;
+    color: var(--text); background: var(--surface2); border: none; border-radius: 9px;
+    padding: 5px 6px; outline: none; text-align: right; -moz-appearance: textfield;
+  }
+  .wt-amt-input::-webkit-outer-spin-button,
+  .wt-amt-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .wt-amt-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); flex-shrink: 0; }
+  .wt-shot-select {
+    flex: 0 0 auto; font-family: var(--font); font-size: 10.5px; font-weight: 600;
+    color: var(--text); background: var(--surface2); border: none; border-radius: 9px;
+    padding: 5px 4px; outline: none; cursor: pointer;
+  }
+  .wt-drink-preview {
+    flex: 1 1 0; min-width: 0; text-align: right; font-family: var(--font); font-size: 10px;
+    font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .wt-time-row { align-items: center; gap: 4px; }
   .wt-time-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); flex-shrink: 0; }
   .wt-time-dash { font-family: var(--font); font-size: 11px; color: var(--muted); flex-shrink: 0; }
@@ -1141,6 +1159,16 @@
         <div class="wt-btn-row">
           <select class="wt-drink-select" id="wtDrinkSelect" onclick="event.stopPropagation()" onchange="onDrinkSelectChange_(event)"></select>
           <button class="wt-add-btn wt-add-btn-secondary wt-drink-add" id="wtBtnDrink" onclick="logWaterIntake(event)">Add</button>
+        </div>
+        <!-- Size always applies; the shot picker only shows for drinks
+             where caffeine or alcohol comes from a pour rather than the
+             volume. Both are remembered per drink type. -->
+        <div class="wt-btn-row wt-amt-row">
+          <input type="number" class="wt-amt-input" id="wtDrinkOz" min="0" step="0.5" inputmode="decimal"
+                 onclick="event.stopPropagation()" oninput="onDrinkAmountChange_(event)" title="Size">
+          <span class="wt-amt-label">oz</span>
+          <select class="wt-shot-select" id="wtDrinkShots" onclick="event.stopPropagation()" onchange="onDrinkAmountChange_(event)"></select>
+          <span class="wt-drink-preview" id="wtDrinkPreview"></span>
         </div>
         <!-- Start on the left, optional end on the right. Leaving the
              end blank logs the drink at a single moment; filling it in
@@ -2306,31 +2334,68 @@ const STORAGE_WATER_SYNCED_DAYS_KEY = 'WORKOUT_WATER_SYNCED_DAYS';
 // 'coffee' and 'tea' predate the drink picker and are kept (same keys,
 // same defaults) so entries already logged under them still resolve to
 // a label - they're just no longer what the UI offers.
+// Drinks are described as RATES, not fixed servings, so a size can be
+// typed in per log. Two different rates, because the two ways a drink
+// carries caffeine/alcohol behave differently:
+//
+//   *PerOz   - brewed or premixed straight through, so it scales with
+//              volume (drip coffee, tea, cola, beer, wine).
+//   *PerShot - comes from a discrete pour, so volume is irrelevant: a
+//              20oz latte pulled on one shot has exactly the same
+//              caffeine as a 12oz one, and a taller mixed drink with
+//              one pour has the same alcohol as a short one.
+//
+// Hydration always scales with volume (hydrationRatio x oz). Note the
+// ratio is per drink rather than derived from alcohol content, so a
+// double counts the same hydration as a single of the same size - the
+// ratios are rough estimates anyway.
+//
+// shots > 0 in a drink's default is also what makes the shot control
+// appear for it; drinks without one show just a size box.
 const WATER_DRINK_TYPES = {
-  water:     { label: 'Water',             rawOz: 32, hydrationOz: 32, caffeineMg: 0 },
-  coffee:    { label: 'Coffee (drip)',     rawOz: 11, hydrationOz: 10, caffeineMg: 140 },
-  tea:       { label: 'Tea',               rawOz: 9,  hydrationOz: 9,  caffeineMg: 45 },
-  latte:     { label: 'Latte (1 shot)',    rawOz: 12, hydrationOz: 12, caffeineMg: 64 },
-  espresso:  { label: 'Espresso (1 shot)', rawOz: 1,  hydrationOz: 1,  caffeineMg: 64 },
-  earlgrey:  { label: 'Earl Grey tea',     rawOz: 8,  hydrationOz: 8,  caffeineMg: 45 },
-  greentea:  { label: 'Green tea',         rawOz: 8,  hydrationOz: 8,  caffeineMg: 28 },
-  chamomile: { label: 'Chamomile tea',     rawOz: 8,  hydrationOz: 8,  caffeineMg: 0 },
-  milk:      { label: 'Milk',              rawOz: 8,  hydrationOz: 8,  caffeineMg: 0 },
-  oj:        { label: 'Orange juice',      rawOz: 8,  hydrationOz: 8,  caffeineMg: 0 },
-  soda:      { label: 'Soda (cola)',       rawOz: 12, hydrationOz: 11, caffeineMg: 34 },
-  beer:      { label: 'Beer',              rawOz: 12, hydrationOz: 8,  caffeineMg: 0,  alcoholOz: 0.6 },
-  wine:      { label: 'Wine',              rawOz: 5,  hydrationOz: 3,  caffeineMg: 0,  alcoholOz: 0.6 },
-  cocktail:  { label: 'Mixed drink',       rawOz: 8,  hydrationOz: 4,  caffeineMg: 0,  alcoholOz: 0.6 },
-  cocktail2: { label: 'Mixed drink (double)', rawOz: 9, hydrationOz: 4, caffeineMg: 0, alcoholOz: 1.2 },
-  espmartini:{ label: 'Espresso martini',  rawOz: 5,  hydrationOz: 2,  caffeineMg: 64, alcoholOz: 0.7 },
-  carajillo: { label: 'Carajillo',         rawOz: 4,  hydrationOz: 2,  caffeineMg: 64, alcoholOz: 0.5 },
-  vodkared:  { label: 'Vodka Red Bull',    rawOz: 10, hydrationOz: 5,  caffeineMg: 80, alcoholOz: 0.6 }
+  water:     { label: 'Water',            defaultOz: 32, hydrationRatio: 1 },
+  coffee:    { label: 'Coffee (drip)',    defaultOz: 11, hydrationRatio: 0.91, caffeinePerOz: 12.7 },
+  tea:       { label: 'Tea',              defaultOz: 9,  hydrationRatio: 1,    caffeinePerOz: 5 },
+  latte:     { label: 'Latte',            defaultOz: 12, hydrationRatio: 1,    caffeinePerShot: 64,  defaultShots: 1 },
+  espresso:  { label: 'Espresso',         defaultOz: 1,  hydrationRatio: 1,    caffeinePerShot: 64,  defaultShots: 1 },
+  earlgrey:  { label: 'Earl Grey tea',    defaultOz: 8,  hydrationRatio: 1,    caffeinePerOz: 5.6 },
+  greentea:  { label: 'Green tea',        defaultOz: 8,  hydrationRatio: 1,    caffeinePerOz: 3.5 },
+  chamomile: { label: 'Chamomile tea',    defaultOz: 8,  hydrationRatio: 1 },
+  milk:      { label: 'Milk',             defaultOz: 8,  hydrationRatio: 1 },
+  oj:        { label: 'Orange juice',     defaultOz: 8,  hydrationRatio: 1 },
+  soda:      { label: 'Soda (cola)',      defaultOz: 12, hydrationRatio: 0.92, caffeinePerOz: 2.83 },
+  beer:      { label: 'Beer',             defaultOz: 12, hydrationRatio: 0.67, alcoholPerOz: 0.05 },
+  wine:      { label: 'Wine',             defaultOz: 5,  hydrationRatio: 0.6,  alcoholPerOz: 0.12 },
+  cocktail:  { label: 'Mixed drink',      defaultOz: 8,  hydrationRatio: 0.5,  alcoholPerShot: 0.6, defaultShots: 1 },
+  espmartini:{ label: 'Espresso martini', defaultOz: 5,  hydrationRatio: 0.4,  caffeinePerShot: 64, alcoholPerShot: 0.7, defaultShots: 1 },
+  carajillo: { label: 'Carajillo',        defaultOz: 4,  hydrationRatio: 0.5,  caffeinePerShot: 64, alcoholPerShot: 0.5, defaultShots: 1 },
+  // Caffeine comes from the mixer here, so it scales with size (a
+  // taller one holds more Red Bull) while the vodka stays a pour.
+  vodkared:  { label: 'Vodka Red Bull',   defaultOz: 10, hydrationRatio: 0.5,  caffeinePerOz: 8, alcoholPerShot: 0.6, defaultShots: 1 },
+  // Superseded by Mixed drink at 2 shots; kept so entries already
+  // logged under it still resolve to a label.
+  cocktail2: { label: 'Mixed drink (double)', defaultOz: 9, hydrationRatio: 0.44, alcoholPerShot: 1.2, defaultShots: 1 }
 };
 
 // What the widget's drink dropdown offers, in order. Water has its own
-// dedicated button/steppers so it isn't here, and the two legacy keys
-// above are display-only.
-const WATER_DRINK_PICKER = ['coffee', 'latte', 'espresso', 'earlgrey', 'greentea', 'chamomile', 'milk', 'oj', 'soda', 'beer', 'wine', 'cocktail', 'cocktail2', 'espmartini', 'carajillo', 'vodkared'];
+// dedicated button/steppers so it isn't here, and the legacy keys above
+// (tea, cocktail2) are display-only.
+const WATER_DRINK_PICKER = ['coffee', 'latte', 'espresso', 'earlgrey', 'greentea', 'chamomile', 'milk', 'oj', 'soda', 'beer', 'wine', 'cocktail', 'espmartini', 'carajillo', 'vodkared'];
+
+// Resolves a drink plus a chosen size/shots into the concrete amounts
+// an entry stores. Kept as the single place the rates turn into
+// numbers, so the picker labels, the log and any preview can't drift.
+function computeDrinkAmounts_(type, oz, shots) {
+  const d = WATER_DRINK_TYPES[type] || WATER_DRINK_TYPES.water;
+  const volume = oz > 0 ? oz : (d.defaultOz || 0);
+  const pours = shots > 0 ? shots : (d.defaultShots || 0);
+  return {
+    rawOz: volume,
+    hydrationOz: volume * (d.hydrationRatio != null ? d.hydrationRatio : 1),
+    caffeineMg: (d.caffeinePerOz || 0) * volume + (d.caffeinePerShot || 0) * pours,
+    alcoholOz: (d.alcoholPerOz || 0) * volume + (d.alcoholPerShot || 0) * pours
+  };
+}
 
 // Caffeine is modelled as instant absorption followed by exponential
 // decay. ~5h is the usual adult half-life (individuals run 3-7h, and
@@ -2368,12 +2433,15 @@ function loadSettingsIntoState() {
   if (saved.yearGoal > 0) PUSHUP_YEAR_GOAL = saved.yearGoal;
   if (saved.maxHR > 0) BODY_HEALTH_MAX_HR = saved.maxHR;
   if (saved.waterGoal > 0) WATER_DAILY_GOAL = saved.waterGoal;
+  // Saved overrides predate the rate-based catalog and still store a
+  // {rawOz, hydrationOz} pair (that's what the Water steppers write), so
+  // they're translated back into a size plus a ratio here.
   if (saved.drinkAmounts) {
     Object.keys(WATER_DRINK_TYPES).forEach(type => {
       const override = saved.drinkAmounts[type];
       if (override && override.rawOz > 0 && override.hydrationOz >= 0) {
-        WATER_DRINK_TYPES[type].rawOz = override.rawOz;
-        WATER_DRINK_TYPES[type].hydrationOz = override.hydrationOz;
+        WATER_DRINK_TYPES[type].defaultOz = override.rawOz;
+        WATER_DRINK_TYPES[type].hydrationRatio = override.hydrationOz / override.rawOz;
       }
     });
   }
@@ -6388,7 +6456,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-19-time-range-row-and-spread-bars';
+const APP_BUILD_VERSION = '2026-08-19-custom-sizes-and-shots';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6657,15 +6725,15 @@ function renderWaterButtons() {
   const btn = document.getElementById('wtBtnWater');
   if (btn) {
     const d = WATER_DRINK_TYPES.water;
-    btn.innerHTML = `+${d.rawOz} oz ${d.label}` + (d.hydrationOz !== d.rawOz ? ` <span class="wt-btn-net">(${d.hydrationOz} net)</span>` : '');
+    const a = computeDrinkAmounts_('water', d.defaultOz, 0);
+    const net = Math.round(a.hydrationOz);
+    btn.innerHTML = `+${d.defaultOz} oz ${d.label}` + (net !== d.defaultOz ? ` <span class="wt-btn-net">(${net} net)</span>` : '');
   }
   renderDrinkSelect_();
 }
 
-// Everything other than water goes through one dropdown rather than a
-// button apiece - each option carries its own serving size, so the
-// label spells out what's actually being logged (volume, net hydration
-// when it differs, and caffeine when there is any).
+// The dropdown is just names now - size and shots are their own
+// controls, since the same drink gets logged at different sizes.
 function renderDrinkSelect_() {
   const sel = document.getElementById('wtDrinkSelect');
   if (!sel) return;
@@ -6674,14 +6742,87 @@ function renderDrinkSelect_() {
 
   sel.innerHTML = WATER_DRINK_PICKER.map(type => {
     const d = WATER_DRINK_TYPES[type];
-    if (!d) return '';
-    const bits = [`${d.rawOz} oz`];
-    if (d.hydrationOz !== d.rawOz) bits.push(`${d.hydrationOz} net`);
-    if (d.caffeineMg > 0) bits.push(`${d.caffeineMg} mg`);
-    return `<option value="${type}">${escapeText_(d.label)} · ${bits.join(' · ')}</option>`;
+    return d ? `<option value="${type}">${escapeText_(d.label)}</option>` : '';
   }).join('');
 
   if (WATER_DRINK_PICKER.indexOf(preferred) !== -1) sel.value = preferred;
+  syncDrinkAmountFields_();
+}
+
+// Per-drink sizes are remembered separately, so "the way I usually take
+// it" survives switching drinks and back - picking latte restores your
+// latte size, not whatever the last drink happened to be.
+function getDrinkPrefs_(type) {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+  const d = WATER_DRINK_TYPES[type] || {};
+  const pref = (saved.drinkPrefs || {})[type] || {};
+  return {
+    oz: pref.oz > 0 ? pref.oz : (d.defaultOz || 0),
+    shots: pref.shots > 0 ? pref.shots : (d.defaultShots || 0)
+  };
+}
+
+function saveDrinkPrefs_(type, oz, shots) {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+  saved.drinkPrefs = saved.drinkPrefs || {};
+  saved.drinkPrefs[type] = { oz: oz, shots: shots };
+  localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
+}
+
+// Points the size/shots controls at the selected drink and hides the
+// shot picker for drinks where a pour isn't a thing (beer, juice...).
+function syncDrinkAmountFields_() {
+  const sel = document.getElementById('wtDrinkSelect');
+  const ozInput = document.getElementById('wtDrinkOz');
+  const shotSel = document.getElementById('wtDrinkShots');
+  if (!sel || !ozInput || !shotSel) return;
+
+  const type = sel.value;
+  const d = WATER_DRINK_TYPES[type] || {};
+  const prefs = getDrinkPrefs_(type);
+  const usesShots = (d.caffeinePerShot || 0) > 0 || (d.alcoholPerShot || 0) > 0;
+
+  ozInput.value = prefs.oz;
+  shotSel.style.display = usesShots ? '' : 'none';
+  if (usesShots) {
+    const noun = (d.alcoholPerShot || 0) > 0 ? 'shot' : 'shot';
+    shotSel.innerHTML = [1, 2, 3, 4].map(n =>
+      `<option value="${n}">${n} ${noun}${n > 1 ? 's' : ''}</option>`).join('');
+    shotSel.value = String(Math.min(4, Math.max(1, prefs.shots || 1)));
+  }
+  renderDrinkPreview_();
+}
+
+// Live readout of what pressing Add will actually record, so the rates
+// aren't invisible once the fixed sizes left the dropdown labels.
+function renderDrinkPreview_() {
+  const el = document.getElementById('wtDrinkPreview');
+  const sel = document.getElementById('wtDrinkSelect');
+  if (!el || !sel) return;
+  const { oz, shots } = readDrinkAmountFields_();
+  const a = computeDrinkAmounts_(sel.value, oz, shots);
+  const bits = [];
+  if (Math.round(a.hydrationOz) !== Math.round(a.rawOz)) bits.push(`${Math.round(a.hydrationOz)} oz net`);
+  if (a.caffeineMg > 0) bits.push(`${Math.round(a.caffeineMg)} mg`);
+  if (a.alcoholOz > 0) bits.push(`${(a.alcoholOz / 0.6).toFixed(1)} std drinks`);
+  el.textContent = bits.join(' · ');
+}
+
+function readDrinkAmountFields_() {
+  const ozInput = document.getElementById('wtDrinkOz');
+  const shotSel = document.getElementById('wtDrinkShots');
+  const oz = ozInput ? parseFloat(ozInput.value) : NaN;
+  const shots = (shotSel && shotSel.style.display !== 'none') ? parseInt(shotSel.value, 10) : 0;
+  return { oz: oz > 0 ? oz : 0, shots: shots > 0 ? shots : 0 };
+}
+
+function onDrinkAmountChange_(event) {
+  if (event) event.stopPropagation();
+  const sel = document.getElementById('wtDrinkSelect');
+  if (!sel) return;
+  const { oz, shots } = readDrinkAmountFields_();
+  if (oz > 0) saveDrinkPrefs_(sel.value, oz, shots);
+  renderDrinkPreview_();
 }
 
 // Remembered so the drink you log every morning is already selected.
@@ -6692,6 +6833,7 @@ function onDrinkSelectChange_(event) {
   const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
   saved.lastDrinkType = sel.value;
   localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
+  syncDrinkAmountFields_();
 }
 
 function pad2_(n) { return String(n).padStart(2, '0'); }
@@ -6744,12 +6886,14 @@ function adjustDrinkAmount(event, type, direction) {
   const d = WATER_DRINK_TYPES[type];
   if (!d) return;
 
-  const ratio = d.rawOz > 0 ? d.hydrationOz / d.rawOz : 1;
-  const newRaw = Math.max(1, d.rawOz + direction);
+  const ratio = d.hydrationRatio != null ? d.hydrationRatio : 1;
+  const newRaw = Math.max(1, (d.defaultOz || 0) + direction);
   const newHydration = Math.max(0, Math.round(newRaw * ratio));
-  d.rawOz = newRaw;
-  d.hydrationOz = newHydration;
+  d.defaultOz = newRaw;
 
+  // Still written as the old {rawOz, hydrationOz} pair - that's the
+  // shape already synced to the backend and read back by
+  // loadSettingsIntoState, which translates it into a size and ratio.
   const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
   saved.drinkAmounts = saved.drinkAmounts || {};
   saved.drinkAmounts[type] = { rawOz: newRaw, hydrationOz: newHydration };
@@ -6781,7 +6925,10 @@ function renderOverviewWaterWidget() {
   const pct = WATER_DAILY_GOAL ? Math.min(100, Math.round(todayOz / WATER_DAILY_GOAL * 100)) : 0;
 
   ringEl.style.setProperty('--pct', pct);
-  document.getElementById('wtRingNum').textContent = todayOz;
+  // Rounded for display only - custom sizes make net hydration
+  // fractional (12oz beer at 0.67 = 8.04), and the ledger keeps the
+  // exact value so a day's sum doesn't drift from repeated rounding.
+  document.getElementById('wtRingNum').textContent = Math.round(todayOz);
   document.getElementById('wtRingTarget').textContent = 'of ' + WATER_DAILY_GOAL + ' oz';
 
   renderWaterButtons();
@@ -7079,22 +7226,27 @@ function logWaterIntake(event, type) {
 
   const sel = document.getElementById('wtDrinkSelect');
   const drinkType = type || (sel && sel.value) || 'water';
-  const drink = WATER_DRINK_TYPES[drinkType] || WATER_DRINK_TYPES.water;
+
+  // The Water button logs its own fixed size (set by its steppers); the
+  // picker uses whatever size/shots the amount fields are showing.
+  const amounts = type === 'water'
+    ? computeDrinkAmounts_('water', WATER_DRINK_TYPES.water.defaultOz, 0)
+    : (() => { const f = readDrinkAmountFields_(); return computeDrinkAmounts_(drinkType, f.oz, f.shots); })();
 
   const range = readDrinkTimeRange_();
   const todayKey = dateKey(new Date());
   const loggedAt = range.start.toISOString();
 
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
-  ledger[todayKey] = (ledger[todayKey] || 0) + drink.hydrationOz;
+  ledger[todayKey] = (ledger[todayKey] || 0) + amounts.hydrationOz;
   localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
 
   const entry = {
     type: drinkType,
-    rawOz: drink.rawOz,
-    hydrationOz: drink.hydrationOz,
-    caffeineMg: drink.caffeineMg || 0,
-    alcoholOz: drink.alcoholOz || 0,
+    rawOz: amounts.rawOz,
+    hydrationOz: amounts.hydrationOz,
+    caffeineMg: amounts.caffeineMg,
+    alcoholOz: amounts.alcoholOz,
     loggedAt: loggedAt
   };
   if (range.end) entry.endAt = range.end.toISOString();
