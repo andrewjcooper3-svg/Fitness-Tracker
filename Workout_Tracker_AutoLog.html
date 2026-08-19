@@ -411,6 +411,38 @@
   .wt-btn-row .wt-add-btn { flex: 1; }
   .wt-stepper { flex-shrink: 0; width: 30px; font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--muted); background: var(--surface2); border: none; border-radius: 9px; cursor: pointer; }
   .wt-stepper:active { color: var(--teal); }
+
+  /* Drink picker + "drank it at" time box. The select gets appearance:
+     none and its own caret so it matches the widget's other controls
+     instead of rendering as a platform dropdown. min-width:0 lets it
+     shrink inside the flex row rather than forcing the card wider. */
+  .wt-drink-select {
+    flex: 1; min-width: 0; font-family: var(--font); font-size: 11.5px; font-weight: 600;
+    color: var(--teal); background: rgba(51,194,194,0.14); border: none; border-radius: 10px;
+    padding: 6px 20px 6px 8px; cursor: pointer; appearance: none; -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--teal) 50%), linear-gradient(135deg, var(--teal) 50%, transparent 50%);
+    background-position: right 9px center, right 5px center;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+  }
+  .wt-drink-add { flex-shrink: 0; width: 46px; }
+  .wt-time-row { align-items: center; }
+  .wt-time-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); flex-shrink: 0; }
+  .wt-time-input {
+    flex: 1; min-width: 0; font-family: var(--font); font-size: 11.5px; font-weight: 600;
+    color: var(--text); background: var(--surface2); border: none; border-radius: 9px;
+    padding: 5px 8px; outline: none;
+  }
+  .wt-time-now { flex-shrink: 0; font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); background: var(--surface2); border: none; border-radius: 9px; padding: 5px 8px; cursor: pointer; }
+  .wt-time-now:active { color: var(--teal); }
+
+  .wt-caffeine-line {
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted);
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+  }
+  .wt-caffeine-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+  .wt-caffeine-chev { margin-left: auto; opacity: 0.7; }
   .ov-widget[data-size="small"] .wt-body { flex-direction: column; gap: 10px; }
   .ov-widget[data-size="small"] .wt-ring { width: 64px; height: 64px; }
   .ov-widget[data-size="small"] .wt-ring-num { font-size: 15px; }
@@ -1096,17 +1128,17 @@
           <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'water', 1)">+</button>
         </div>
         <div class="wt-btn-row">
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', -1)">−</button>
-          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnCoffee" onclick="logWaterIntake(event, 'coffee')"></button>
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'coffee', 1)">+</button>
+          <select class="wt-drink-select" id="wtDrinkSelect" onclick="event.stopPropagation()" onchange="onDrinkSelectChange_(event)"></select>
+          <button class="wt-add-btn wt-add-btn-secondary wt-drink-add" id="wtBtnDrink" onclick="logWaterIntake(event)">Add</button>
         </div>
-        <div class="wt-btn-row">
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', -1)">−</button>
-          <button class="wt-add-btn wt-add-btn-secondary" id="wtBtnTea" onclick="logWaterIntake(event, 'tea')"></button>
-          <button class="wt-stepper" onclick="adjustDrinkAmount(event, 'tea', 1)">+</button>
+        <div class="wt-btn-row wt-time-row">
+          <span class="wt-time-label">at</span>
+          <input type="time" class="wt-time-input" id="wtDrinkTime" onclick="event.stopPropagation()">
+          <button class="wt-time-now" id="wtTimeNow" onclick="resetDrinkTimeToNow_(event)" title="Reset to now">now</button>
         </div>
       </div>
     </div>
+    <div class="wt-caffeine-line" id="wtCaffeineLine" onclick="openCaffeineModal(event)"></div>
     <div class="wt-chart-wrap" id="wtChartWrap">
       <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
       <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
@@ -1909,6 +1941,33 @@
   </div>
 </div>
 
+<div class="event-modal-overlay" id="caffeineModalOverlay" onclick="closeCaffeineModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-head" style="padding-bottom:10px;">
+      <div>
+        <div class="ov-page-week">Caffeine</div>
+        <div class="ov-page-title" id="caffNowValue">0 mg</div>
+      </div>
+    </div>
+    <div class="ov-hero-sub" id="caffNowSub" style="margin-top:0;"></div>
+
+    <div class="stats-card" style="margin-top:12px;">
+      <div class="stats-card-title">On board — today</div>
+      <svg viewBox="0 0 320 130" class="stats-chart" id="caffChart" preserveAspectRatio="none"></svg>
+      <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+    </div>
+
+    <div class="config-box" id="caffDrinkListCard" style="margin-top:12px;">
+      <div class="config-title" style="margin-bottom:6px;">Caffeine logged</div>
+      <div id="caffDrinkList"></div>
+    </div>
+
+    <div class="ov-note">Modelled as instant absorption then a 5-hour half-life, from typical published caffeine figures for each serving — an estimate of the shape, not a measurement of your actual blood level.</div>
+    <button class="event-modal-close" onclick="closeCaffeineModal(event)" style="margin-top:10px;">Close</button>
+  </div>
+</div>
+
 <div class="event-modal-overlay" id="djTopModalOverlay" onclick="closeDjTopModal(event)">
   <div class="event-modal-sheet" onclick="event.stopPropagation()">
     <div class="event-modal-handle"></div>
@@ -2211,16 +2270,50 @@ const STORAGE_SETTINGS_KEY = 'WORKOUT_SETTINGS';
 const STORAGE_WATER_LOG_KEY = 'WORKOUT_WATER_LEDGER';
 const STORAGE_WATER_ENTRIES_KEY = 'WORKOUT_WATER_ENTRIES';
 
-// Each button logs its real volume, but only an estimated net hydration
-// value counts toward the daily total/ring. Coffee counts at 95% (a
-// mild diuretic discount); tea counts fully 1:1, same as water. Both
-// numbers are still editable via the +/- steppers on the widget, which
-// get overwritten in place by loadSettingsIntoState (label never does).
+// Each drink logs its real volume, but only an estimated net hydration
+// value counts toward the daily total/ring, and its caffeine feeds the
+// decay curve (see currentCaffeineMg_). rawOz/hydrationOz stay editable
+// via the +/- steppers on the widget, which get overwritten in place by
+// loadSettingsIntoState (label/caffeineMg never do).
+//
+// Hydration discounts are roughest for alcohol, which is a genuine
+// diuretic - beer keeps about two thirds, wine and spirits about half,
+// scaled by how much alcohol rides along per ounce. Milk and juice
+// hydrate about as well as water, so they count 1:1. Caffeine figures
+// are typical published averages for the serving size shown; real cups
+// vary a lot with beans, steep time and pour, so treat the curve as an
+// estimate rather than a measurement.
+//
+// 'coffee' and 'tea' predate the drink picker and are kept (same keys,
+// same defaults) so entries already logged under them still resolve to
+// a label - they're just no longer what the UI offers.
 const WATER_DRINK_TYPES = {
-  water:  { label: 'Water',  rawOz: 32, hydrationOz: 32 },
-  coffee: { label: 'Coffee', rawOz: 11, hydrationOz: 10 },
-  tea:    { label: 'Tea',    rawOz: 9,  hydrationOz: 9 }
+  water:     { label: 'Water',             rawOz: 32, hydrationOz: 32, caffeineMg: 0 },
+  coffee:    { label: 'Coffee (drip)',     rawOz: 11, hydrationOz: 10, caffeineMg: 140 },
+  tea:       { label: 'Tea',               rawOz: 9,  hydrationOz: 9,  caffeineMg: 45 },
+  latte:     { label: 'Latte (1 shot)',    rawOz: 12, hydrationOz: 12, caffeineMg: 64 },
+  espresso:  { label: 'Espresso (1 shot)', rawOz: 1,  hydrationOz: 1,  caffeineMg: 64 },
+  earlgrey:  { label: 'Earl Grey tea',     rawOz: 8,  hydrationOz: 8,  caffeineMg: 45 },
+  greentea:  { label: 'Green tea',         rawOz: 8,  hydrationOz: 8,  caffeineMg: 28 },
+  chamomile: { label: 'Chamomile tea',     rawOz: 8,  hydrationOz: 8,  caffeineMg: 0 },
+  milk:      { label: 'Milk',              rawOz: 8,  hydrationOz: 8,  caffeineMg: 0 },
+  oj:        { label: 'Orange juice',      rawOz: 8,  hydrationOz: 8,  caffeineMg: 0 },
+  soda:      { label: 'Soda (cola)',       rawOz: 12, hydrationOz: 11, caffeineMg: 34 },
+  beer:      { label: 'Beer',              rawOz: 12, hydrationOz: 8,  caffeineMg: 0 },
+  wine:      { label: 'Wine',              rawOz: 5,  hydrationOz: 3,  caffeineMg: 0 },
+  cocktail:  { label: 'Mixed drink',       rawOz: 8,  hydrationOz: 4,  caffeineMg: 0 }
 };
+
+// What the widget's drink dropdown offers, in order. Water has its own
+// dedicated button/steppers so it isn't here, and the two legacy keys
+// above are display-only.
+const WATER_DRINK_PICKER = ['coffee', 'latte', 'espresso', 'earlgrey', 'greentea', 'chamomile', 'milk', 'oj', 'soda', 'beer', 'wine', 'cocktail'];
+
+// Caffeine is modelled as instant absorption followed by exponential
+// decay. ~5h is the usual adult half-life (individuals run 3-7h, and
+// real absorption peaks around 45min in rather than instantly), so the
+// curve is a good-enough shape for "can I still sleep", not pharmacology.
+const CAFFEINE_HALF_LIFE_HOURS = 5;
 let PUSHUP_DAILY_BASELINE = 165;
 let PUSHUP_YEAR_GOAL = 50000;
 let BODY_HEALTH_MAX_HR = 196; // 220 - 24, the standard age-based estimate; editable in Settings
@@ -6215,7 +6308,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-17-all-headers-into-top-bar';
+const APP_BUILD_VERSION = '2026-08-17-drink-picker-and-caffeine-decay';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6248,22 +6341,75 @@ function renderOverview() {
 // tally never gets overwritten by a smaller number but a wiped/reset
 // device still recovers the real total.
 //
-// Alongside that day-total ledger, today's individual entries (type,
-// volume, and timestamp) are kept separately so the hourly chart and
-// Undo have something to work with - the day-total ledger alone only
-// knows "how much today," not "when" or "what was the last thing
-// logged." getTodayWaterEntries_ resets that list itself once the
-// calendar date moves on, the same way the day-total ledger implicitly
-// does by keying off dateKey().
+// Alongside that day-total ledger, individual entries (type, volume,
+// caffeine, and the time you actually drank it) are kept separately so
+// the hourly chart, the caffeine curve and Undo have something to work
+// with - the day-total ledger alone only knows "how much today," not
+// "when" or "what was the last thing logged."
+//
+// A few days are retained rather than just today: caffeine from last
+// night is still in you this morning, so a store that resets at
+// midnight would show the curve jumping to zero every day. Days beyond
+// the window are pruned on write. The older single-day shape
+// ({date, entries}) is migrated on read.
+const WATER_ENTRY_RETENTION_DAYS = 3;
+
+function getWaterEntryStore_() {
+  const raw = JSON.parse(localStorage.getItem(STORAGE_WATER_ENTRIES_KEY) || 'null');
+  if (!raw) return { days: {} };
+  if (raw.days) return raw;
+  if (raw.date && Array.isArray(raw.entries)) return { days: { [raw.date]: raw.entries } };
+  return { days: {} };
+}
+
+function saveWaterEntryStore_(store) {
+  const keep = Object.keys(store.days).sort().slice(-WATER_ENTRY_RETENTION_DAYS);
+  const pruned = {};
+  keep.forEach(k => { pruned[k] = store.days[k]; });
+  localStorage.setItem(STORAGE_WATER_ENTRIES_KEY, JSON.stringify({ days: pruned }));
+}
+
 function getTodayWaterEntries_() {
   const todayKey = dateKey(new Date());
-  const stored = JSON.parse(localStorage.getItem(STORAGE_WATER_ENTRIES_KEY) || 'null');
-  if (!stored || stored.date !== todayKey) return { date: todayKey, entries: [] };
-  return stored;
+  return { date: todayKey, entries: getWaterEntryStore_().days[todayKey] || [] };
 }
 
 function saveTodayWaterEntries_(state) {
-  localStorage.setItem(STORAGE_WATER_ENTRIES_KEY, JSON.stringify(state));
+  const store = getWaterEntryStore_();
+  store.days[state.date] = state.entries;
+  saveWaterEntryStore_(store);
+}
+
+// Every retained entry, oldest first, as {when: Date, ...entry} - the
+// caffeine curve needs to reach back across midnight, unlike the water
+// ring/hourly chart which are strictly today's.
+function getRecentDrinkEntries_() {
+  const store = getWaterEntryStore_();
+  const out = [];
+  Object.keys(store.days).sort().forEach(day => {
+    (store.days[day] || []).forEach(e => {
+      const when = new Date(e.loggedAt);
+      if (!isNaN(when.getTime())) out.push(Object.assign({}, e, { when: when }));
+    });
+  });
+  return out.sort((a, b) => a.when - b.when);
+}
+
+// Caffeine still on board at `at`, summing each drink's remaining
+// fraction after exponential decay. Entries logged before the caffeine
+// column existed simply have no caffeineMg and contribute nothing.
+function currentCaffeineMg_(at, entries) {
+  const now = at || new Date();
+  const list = entries || getRecentDrinkEntries_();
+  let total = 0;
+  list.forEach(e => {
+    const mg = Number(e.caffeineMg) || 0;
+    if (mg <= 0) return;
+    const hours = (now - e.when) / 3600000;
+    if (hours < 0) return;
+    total += mg * Math.pow(0.5, hours / CAFFEINE_HALF_LIFE_HOURS);
+  });
+  return total;
 }
 
 // Button text is generated from WATER_DRINK_TYPES rather than hardcoded,
@@ -6271,12 +6417,71 @@ function saveTodayWaterEntries_(state) {
 // net)" qualifier only shows up when it'd actually tell you something
 // (i.e. the drink doesn't count 1:1 toward the goal).
 function renderWaterButtons() {
-  ['water', 'coffee', 'tea'].forEach(type => {
-    const btn = document.getElementById('wtBtn' + type.charAt(0).toUpperCase() + type.slice(1));
-    if (!btn) return;
-    const d = WATER_DRINK_TYPES[type];
+  const btn = document.getElementById('wtBtnWater');
+  if (btn) {
+    const d = WATER_DRINK_TYPES.water;
     btn.innerHTML = `+${d.rawOz} oz ${d.label}` + (d.hydrationOz !== d.rawOz ? ` <span class="wt-btn-net">(${d.hydrationOz} net)</span>` : '');
-  });
+  }
+  renderDrinkSelect_();
+}
+
+// Everything other than water goes through one dropdown rather than a
+// button apiece - each option carries its own serving size, so the
+// label spells out what's actually being logged (volume, net hydration
+// when it differs, and caffeine when there is any).
+function renderDrinkSelect_() {
+  const sel = document.getElementById('wtDrinkSelect');
+  if (!sel) return;
+  const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+  const preferred = sel.value || saved.lastDrinkType || 'coffee';
+
+  sel.innerHTML = WATER_DRINK_PICKER.map(type => {
+    const d = WATER_DRINK_TYPES[type];
+    if (!d) return '';
+    const bits = [`${d.rawOz} oz`];
+    if (d.hydrationOz !== d.rawOz) bits.push(`${d.hydrationOz} net`);
+    if (d.caffeineMg > 0) bits.push(`${d.caffeineMg} mg`);
+    return `<option value="${type}">${escapeText_(d.label)} · ${bits.join(' · ')}</option>`;
+  }).join('');
+
+  if (WATER_DRINK_PICKER.indexOf(preferred) !== -1) sel.value = preferred;
+}
+
+// Remembered so the drink you log every morning is already selected.
+function onDrinkSelectChange_(event) {
+  event.stopPropagation();
+  const sel = document.getElementById('wtDrinkSelect');
+  if (!sel) return;
+  const saved = JSON.parse(localStorage.getItem(STORAGE_SETTINGS_KEY) || '{}');
+  saved.lastDrinkType = sel.value;
+  localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(saved));
+}
+
+function pad2_(n) { return String(n).padStart(2, '0'); }
+
+// The time box defaults to now and is reset back to now after every log,
+// so it only ever differs when you deliberately change it before adding.
+function resetDrinkTimeToNow_(event) {
+  if (event) event.stopPropagation();
+  const input = document.getElementById('wtDrinkTime');
+  if (!input) return;
+  const now = new Date();
+  input.value = `${pad2_(now.getHours())}:${pad2_(now.getMinutes())}`;
+}
+
+// Reads the time box back into a real Date on today's date. Falls back
+// to now if it's empty or unparseable, so a log can never land on a
+// bogus timestamp.
+function readDrinkTime_() {
+  const input = document.getElementById('wtDrinkTime');
+  const now = new Date();
+  if (!input || !input.value) return now;
+  const parts = input.value.split(':');
+  const h = Number(parts[0]), m = Number(parts[1]);
+  if (!isFinite(h) || !isFinite(m)) return now;
+  const when = new Date(now);
+  when.setHours(h, m, 0, 0);
+  return when;
 }
 
 // The small +/- next to each button - adjusts that drink's logged (raw)
@@ -6338,6 +6543,118 @@ function renderOverviewWaterWidget() {
   if (undoBtn) undoBtn.style.display = state.entries.length ? '' : 'none';
 
   renderWaterHourlyChart(state.entries);
+  renderCaffeineLine_();
+}
+
+// One-line caffeine readout under the widget - hidden entirely when
+// there's nothing on board, so the card stays as quiet as before for
+// anyone only logging water.
+function renderCaffeineLine_() {
+  const el = document.getElementById('wtCaffeineLine');
+  if (!el) return;
+  const mg = currentCaffeineMg_();
+  if (mg < 1) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `<span class="wt-caffeine-dot"></span>${Math.round(mg)} mg caffeine on board <span class="wt-caffeine-chev">›</span>`;
+}
+
+function openCaffeineModal(event) {
+  if (event) event.stopPropagation();
+  if (overviewEditing) return;
+  const overlay = document.getElementById('caffeineModalOverlay');
+  if (!overlay) return;
+  renderCaffeineModal_();
+  overlay.style.display = 'flex';
+}
+
+function closeCaffeineModal(event) {
+  if (event) event.stopPropagation();
+  const overlay = document.getElementById('caffeineModalOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function renderCaffeineModal_() {
+  const entries = getRecentDrinkEntries_();
+  const now = new Date();
+  const mgNow = currentCaffeineMg_(now, entries);
+
+  const valueEl = document.getElementById('caffNowValue');
+  if (valueEl) valueEl.textContent = Math.round(mgNow) + ' mg';
+
+  // How long until it decays below a level that generally stops
+  // interfering with sleep. Pure arithmetic on the same curve, so it
+  // stays consistent with the chart rather than being a second estimate.
+  const subEl = document.getElementById('caffNowSub');
+  if (subEl) {
+    if (mgNow < 1) {
+      subEl.textContent = 'Nothing on board right now.';
+    } else {
+      const hoursTo50 = Math.log(50 / mgNow) / Math.log(0.5) * CAFFEINE_HALF_LIFE_HOURS;
+      if (hoursTo50 <= 0) {
+        subEl.textContent = 'Already below 50 mg.';
+      } else {
+        const at = new Date(now.getTime() + hoursTo50 * 3600000);
+        subEl.textContent = `Drops below 50 mg around ${at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}.`;
+      }
+    }
+  }
+
+  renderCaffeineChart_(entries, now);
+  renderCaffeineDrinkList_(entries);
+}
+
+// 24h of today, sampled every 10 minutes: solid up to now, dashed from
+// now on as a projection. Same 12a-12a window (and label strip) the
+// water hourly chart uses, so the two read as the same day.
+function renderCaffeineChart_(entries, now) {
+  const svg = document.getElementById('caffChart');
+  if (!svg) return;
+
+  const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+  const W = 320, H = 130, PAD = 6;
+  const stepMin = 10, steps = (24 * 60) / stepMin;
+
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = new Date(dayStart.getTime() + i * stepMin * 60000);
+    pts.push({ t: t, mg: currentCaffeineMg_(t, entries) });
+  }
+
+  const peak = Math.max(50, ...pts.map(p => p.mg));
+  const x = i => PAD + (i / steps) * (W - PAD * 2);
+  const y = mg => H - PAD - (mg / peak) * (H - PAD * 2);
+
+  const nowIdx = Math.round((now - dayStart) / (stepMin * 60000));
+  const seg = (from, to) => pts.slice(from, to + 1)
+    .map((p, k) => `${k === 0 ? 'M' : 'L'}${x(from + k).toFixed(1)},${y(p.mg).toFixed(1)}`).join(' ');
+
+  const solid = seg(0, Math.min(nowIdx, steps));
+  const dashed = nowIdx < steps ? seg(nowIdx, steps) : '';
+  const nowX = x(Math.min(nowIdx, steps)).toFixed(1);
+
+  svg.innerHTML = `
+    <line x1="${PAD}" y1="${y(50).toFixed(1)}" x2="${W - PAD}" y2="${y(50).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"></line>
+    ${solid ? `<path d="${solid}" fill="none" stroke="var(--amber)" stroke-width="2"></path>` : ''}
+    ${dashed ? `<path d="${dashed}" fill="none" stroke="var(--amber)" stroke-width="2" stroke-dasharray="4 4" opacity="0.55"></path>` : ''}
+    <line x1="${nowX}" y1="${PAD}" x2="${nowX}" y2="${H - PAD}" stroke="var(--muted)" stroke-width="1" opacity="0.5"></line>
+  `;
+}
+
+function renderCaffeineDrinkList_(entries) {
+  const listEl = document.getElementById('caffDrinkList');
+  const card = document.getElementById('caffDrinkListCard');
+  if (!listEl || !card) return;
+
+  const todayKey = dateKey(new Date());
+  const rows = entries.filter(e => (Number(e.caffeineMg) || 0) > 0 && dateKey(e.when) === todayKey);
+  card.style.display = rows.length ? '' : 'none';
+  if (!rows.length) return;
+
+  listEl.innerHTML = rows.map(e => {
+    const label = (WATER_DRINK_TYPES[e.type] || {}).label || e.type;
+    const time = e.when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `<div class="bh-week-row"><div class="bh-week-day">${time} · ${escapeText_(label)}</div><div class="bh-week-score">${Math.round(e.caffeineMg)} mg</div></div>`;
+  }).join('');
 }
 
 // Which entries landed in each hour, rebuilt on every chart render -
@@ -6421,28 +6738,49 @@ function showWaterHourDetail(hour) {
   detailEl.textContent = `${label} — ${total}oz: ${parts.join(', ')}`;
 }
 
+// `type` omitted means "whatever the drink dropdown is showing" - the
+// Water button still passes 'water' explicitly. Either way the entry is
+// stamped with the time box's value (defaulting to now) rather than the
+// moment of the tap, so a drink can be logged after the fact and still
+// land in the right hour on the chart and the right point on the
+// caffeine curve.
 function logWaterIntake(event, type) {
   event.stopPropagation();
   if (overviewEditing) return;
-  const drink = WATER_DRINK_TYPES[type] || WATER_DRINK_TYPES.water;
+
+  const sel = document.getElementById('wtDrinkSelect');
+  const drinkType = type || (sel && sel.value) || 'water';
+  const drink = WATER_DRINK_TYPES[drinkType] || WATER_DRINK_TYPES.water;
+
+  const when = readDrinkTime_();
   const todayKey = dateKey(new Date());
-  const loggedAt = new Date().toISOString();
+  const loggedAt = when.toISOString();
 
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
   ledger[todayKey] = (ledger[todayKey] || 0) + drink.hydrationOz;
   localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
 
   const state = getTodayWaterEntries_();
-  state.entries.push({ type: type, rawOz: drink.rawOz, hydrationOz: drink.hydrationOz, loggedAt: loggedAt });
+  state.entries.push({
+    type: drinkType,
+    rawOz: drink.rawOz,
+    hydrationOz: drink.hydrationOz,
+    caffeineMg: drink.caffeineMg || 0,
+    loggedAt: loggedAt
+  });
   saveTodayWaterEntries_(state);
 
+  resetDrinkTimeToNow_();
   renderOverviewWaterWidget();
 
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
+  // loggedAt/caffeineMg ride along for a future backend that stores
+  // them; the current Apps Script reads only the four fields it knows
+  // and ignores the rest, so this stays compatible without a redeploy.
   fetch(url, {
     method: 'POST',
-    body: JSON.stringify({ action: 'logWater', date: todayKey, type: type, rawOz: drink.rawOz, hydrationOz: drink.hydrationOz })
+    body: JSON.stringify({ action: 'logWater', date: todayKey, type: drinkType, rawOz: drink.rawOz, hydrationOz: drink.hydrationOz, loggedAt: loggedAt, caffeineMg: drink.caffeineMg || 0 })
   }).catch(() => { /* offline/unreachable - local tally stands, reconciles from the Sheet on next load */ });
 }
 
@@ -9687,6 +10025,10 @@ document.querySelectorAll('.exercise-card').forEach(initExerciseSets);
 initAddExerciseButtons();
 tagExerciseIds();
 loadSettingsIntoState();
+// Once at load only - renderOverviewWaterWidget() runs on every render
+// and would otherwise wipe a time you'd just typed. Re-seeded after
+// each log inside logWaterIntake() instead.
+resetDrinkTimeToNow_();
 seedHistoricalPushupLedger();
 applyManualPushupLedgerCorrection20260817_();
 seedYearCarryForward();
