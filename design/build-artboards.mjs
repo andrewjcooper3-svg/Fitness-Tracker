@@ -262,7 +262,7 @@ for (const ff of FORM_FACTORS) {
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: ff.insets });
   await page.goto('file://' + APP);
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(2200); // past the launch splash
 
   const appCss = await page.evaluate(() =>
     [...document.querySelectorAll('style')].map(s => s.textContent).join('\n'));

@@ -173,6 +173,64 @@
   .log-retry-btn { font-family: var(--font); font-size: 12px; font-weight: 600; background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 8px; padding: 5px 10px; cursor: pointer; flex-shrink: 0; }
   .header-week { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--accent); margin-top: 3px; }
 
+  /* ===== Launch splash: the logo draws itself on ============================
+     Line-drawing works by dashing the stroke with one dash exactly as long
+     as the path, then sliding that dash into view: at offset 1 the whole
+     path sits in the gap (invisible), at offset 0 it's fully covered by
+     the dash (drawn). Animating between the two reads as a pen tracing it.
+
+     pathLength="1" on each <path> is what makes this portable. It tells
+     the browser to pretend every path is 1 unit long no matter its real
+     geometry, so dasharray/dashoffset of 1 works for ANY shape - swapping
+     in a different logo needs no re-measuring and no JavaScript.
+
+     The animation is pure CSS and runs off the markup at the top of
+     <body>, so it starts at first paint rather than waiting on the ~380KB
+     of script below it. It also FADES ITSELF OUT on its own timeline
+     (animation-fill-mode: forwards), which means a slow or broken script
+     can never leave the splash stuck over the app - the JS below only
+     removes the already-invisible node. */
+  .splash {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    animation: splash-out 300ms ease 1250ms forwards;
+  }
+  @keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+  .splash-mark { width: 132px; height: 132px; overflow: visible; }
+
+  .splash-mark .sp-draw {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: sp-draw 820ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  }
+  @keyframes sp-draw { to { stroke-dashoffset: 0; } }
+
+  /* Staggered so the strokes land in a deliberate order instead of all
+     racing each other. Delays are cumulative with the 820ms draw, so the
+     last stroke finishes around 1150ms - just before the fade begins. */
+  .splash-mark .sp-draw:nth-of-type(2) { animation-delay: 180ms; animation-duration: 620ms; }
+  .splash-mark .sp-draw:nth-of-type(3) { animation-delay: 620ms; animation-duration: 320ms; }
+
+  /* Anything meant to be a solid shape rather than a traced line fades in
+     once the strokes are down. */
+  .splash-mark .sp-fill { opacity: 0; animation: sp-fill 300ms ease 900ms forwards; }
+  @keyframes sp-fill { to { opacity: 1; } }
+
+  /* Reduced motion: no tracing, no stagger. The mark is simply there and
+     the splash clears almost immediately - the information ("the app is
+     starting") survives, the movement doesn't. */
+  @media (prefers-reduced-motion: reduce) {
+    .splash { animation: splash-out 200ms ease 260ms forwards; }
+    .splash-mark .sp-draw { animation: none; stroke-dashoffset: 0; }
+    .splash-mark .sp-fill { animation: none; opacity: 1; }
+  }
+
   .app-tabs {
     position: fixed; left: 0; right: 0; top: 0; margin: 0 auto; max-width: 480px;
     display: flex; align-items: center; justify-content: center; gap: 2px; z-index: 50;
@@ -1203,6 +1261,30 @@
 </script>
 </head>
 <body>
+
+<!-- ===== Launch splash =====================================================
+     Deliberately the FIRST thing in <body> so it paints before anything
+     else is parsed. See the .splash rules in the stylesheet for how the
+     draw-on effect works.
+
+     >>> TO SWAP IN THE REAL LOGO: replace the paths below and the viewBox
+     to match, and nothing else needs to change. Two rules:
+       1. Keep pathLength="1" on every path you want traced. That's what
+          lets the same CSS drive any shape without measuring it.
+       2. The draw effect strokes an OUTLINE, so it needs paths that are
+          lines - a logo exported as filled shapes has no line to trace
+          and will just pop in. If yours is filled artwork, either export
+          a stroked "skeleton" version for the draw and cross-fade to the
+          filled one (put that on .sp-fill), or say so and I'll set up the
+          mask-based alternative.
+     The mark here is a stand-in: a ring, a trend line and its arrowhead. -->
+<div class="splash" id="appSplash" aria-hidden="true">
+  <svg class="splash-mark" viewBox="0 0 120 120" role="img" aria-label="Loading">
+    <path class="sp-draw" pathLength="1" d="M60 10 a50 50 0 1 1 -0.05 0"></path>
+    <path class="sp-draw" pathLength="1" d="M34 76 L52 56 L66 68 L88 40"></path>
+    <path class="sp-draw" pathLength="1" d="M74 40 L88 40 L88 54"></path>
+  </svg>
+</div>
 
 <div class="app-views-viewport" id="appViewsViewport">
 <div class="app-views-track" id="appViewsTrack">
@@ -6570,7 +6652,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-20-weight-scaled-caffeine';
+const APP_BUILD_VERSION = '2026-08-20-launch-splash';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -10881,6 +10963,21 @@ initTabBarViewportPin();
 loadWidgetOrder();
 loadWidgetSizes();
 goToView('overview', false);
+
+// The splash has already faded itself out on a CSS timeline by the time
+// this runs - this only takes the invisible node out of the DOM so it
+// can't intercept taps or turn up in a screenshot. Nothing here is
+// load-bearing for the visual; if this never ran the splash would still
+// disappear on its own.
+(function clearSplash() {
+  const el = document.getElementById('appSplash');
+  if (!el) return;
+  const remove = () => el.remove();
+  // animationend fires on the fade-out; the timeout is the belt for a
+  // backgrounded tab, where animations can be throttled or never fire.
+  el.addEventListener('animationend', e => { if (e.animationName === 'splash-out') remove(); });
+  setTimeout(remove, 3000);
+})();
 
 (async function initApiKeys() {
   await loadRemoteApiKeysState();
