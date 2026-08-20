@@ -966,7 +966,11 @@
      deficit/rings card above it. The day's Est. time/Focus note gets
      folded onto the day-title row for the same reason. */
   @media (min-width: 768px) and (max-width: 1099.98px) {
-    body { max-width: 1080px; }
+    /* No bottom safe-area reservation in landscape - the home indicator
+       band is given back to content, which is ~21px of a 430px-tall
+       screen. Everything below that would otherwise offset off
+       env(safe-area-inset-bottom) uses this flat gutter instead. */
+    body { max-width: 1080px; padding-bottom: 10px; }
     .app-tabs { max-width: 1080px; }
 
     .day-title { font-size: 17px; }
@@ -1023,11 +1027,11 @@
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* Small round icon button in the bottom-left corner, anchored off
-       the bottom so it lands above the home indicator rather than
-       under it, and held a few px off the physical left edge (that's
-       where the rounded corner and, in one rotation, the Dynamic
-       Island gutter are). position:fixed here is a
+    /* Small round icon button in the bottom-left corner. The 14px
+       diagonal inset isn't decorative: the screen's own corner radius
+       is ~54px, so anything sitting flush in a corner gets clipped by
+       the glass even though nothing else on that edge does. 14/14 puts
+       the whole 38px circle inside the arc. position:fixed here is a
        body-level element (a sibling of .app-tabs/.app-sidebar, not
        nested inside .app-views-track, the swipe carousel's transformed
        wrapper) specifically so top/left resolve against the true
@@ -1041,8 +1045,8 @@
     body.view-is-tracker .sp-shuffle-fab {
       display: flex; align-items: center; justify-content: center;
       position: fixed;
-      left: 6px;
-      bottom: calc(30px + env(safe-area-inset-bottom, 0px));
+      left: 14px;
+      bottom: 14px;
       transform: none;
       width: 38px; height: 38px; border-radius: 50%;
       background: linear-gradient(135deg, #1db954, #169c46);
@@ -1058,7 +1062,7 @@
 
     #view-tracker > .tracker-main-col,
     #view-tracker > .tracker-side-rail {
-      max-height: calc(100vh - (56px + env(safe-area-inset-top, 0px)) - (24px + env(safe-area-inset-bottom, 0px)));
+      max-height: calc(100vh - (56px + env(safe-area-inset-top, 0px)) - 10px);
       overflow-y: auto;
       /* Nested overflow:auto inside an ancestor with a transform
          (.app-views-track, transform:translateX() for the swipe
@@ -1098,16 +1102,16 @@
        portrait/desktop); per-exercise rep totals are already on each
        exercise's own bar, so it's the one of the three with a
        redundant readout nearby. The strip clears the physical screen
-       edge by a few px rather than sitting flush on it, which on a
-       landscape iPhone is where the rounded corner and the
-       Dynamic Island gutter are. */
+       edge, and the bottom pill clears it by more, for the same reason
+       the shuffle button does: the ~54px corner radius clips anything
+       flush in a corner. */
     .ov-grid { display: none; }
     body.view-is-tracker .ov-grid {
       display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end;
       position: fixed;
-      right: 6px;
+      right: 14px;
       top: calc(56px + env(safe-area-inset-top, 0px));
-      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      bottom: 22px;
       width: auto; height: auto;
       background: none; border: none; border-radius: 0;
       box-shadow: none;
@@ -6511,7 +6515,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-20-trainer-landscape-canvas-edits';
+const APP_BUILD_VERSION = '2026-08-20-landscape-no-bottom-inset';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

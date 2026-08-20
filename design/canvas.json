@@ -1,21 +1,21 @@
 {
   "artboards": [
-    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 932, "h": 430, "title": "Trainer — iPhone landscape" }
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 972, "h": 470, "title": "Trainer — iPhone 17 Pro Max, landscape" }
   ],
   "annotations": [
     {
       "id": "safe-area-note",
       "x": 0,
-      "y": -140,
-      "w": 560,
-      "text": "Drawn at 932x430 — the real logical size of your iPhone in landscape.\n\nThe hatched bands are the parts the phone takes back: the Dynamic Island gutter down the sides and the home indicator along the bottom. My earlier screenshots left these out, which is why previews looked roomier than the device.\n\nDrag the Safe area sliders above the artboard if the real gutters look wider or narrower than this."
+      "y": -170,
+      "w": 600,
+      "text": "Drawn as the actual phone: 932x430 of display inside the bezel, clipped to the real corner radius, with the Dynamic Island sitting on the left edge in this rotation.\n\nThe hatched bands are still the safe area the sides give up. The bottom band is gone — the home indicator strip is now content, in the preview and in the app.\n\nThe Device and Safe area sliders above the artboard adjust the corner radii and the gutter width."
     },
     {
       "id": "floating-note",
-      "x": 992,
+      "x": 1032,
       "y": 40,
       "w": 300,
-      "text": "Updated to match your saved edits, now live in the app:\n\n• The tall stats pill is gone — Sets and Days Active are separate small pills at the top and bottom of the right edge, so the middle of that edge (where the Dynamic Island lands in one rotation) stays clear. Total Reps is dropped in landscape only.\n• Est. time / Focus rides the MONDAY + GYM row instead of costing a line.\n• Shuffle and both pills clear the physical edge by 6px, and Shuffle is anchored above the home indicator."
+      "text": "Matching what's now live in the app:\n\n• Sets and Days Active are separate pills at the top and bottom of the right edge, so the middle of that edge stays clear.\n• Est. time / Focus rides the MONDAY + GYM row.\n• Shuffle and both pills clear the physical edge by 6px; nothing reserves space for the home indicator any more."
     }
   ],
   "launch": { "view": "canvas" }

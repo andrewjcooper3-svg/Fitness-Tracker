@@ -14,7 +14,12 @@
   </style>
 </helmet>
 
-<div style="position: relative; width: 932px; height: 430px; background: #10141f; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #eef2fb;">
+<!-- ===== The phone itself. The outer div is the titanium band and
+     bezel; the inner one is the 932x430 display, rounded and clipping
+     to the real corner radius so you can see exactly what the corners
+     eat. ===== -->
+<div style="position: relative; width: 972px; height: 470px; box-sizing: border-box; padding: 20px; border-radius: {{cornerRadius}}px; background: linear-gradient(145deg, #6b6f76 0%, #2b2e33 22%, #45484e 50%, #2b2e33 78%, #6b6f76 100%); box-shadow: 0 18px 50px rgba(0,0,0,0.55); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+<div style="position: relative; width: 932px; height: 430px; background: #10141f; overflow: hidden; border-radius: {{screenRadius}}px; color: #eef2fb;">
 
   <!-- ===== Safe-area gutters: the parts of the screen the phone
        physically takes back in landscape. Everything the app draws has
@@ -22,13 +27,10 @@
        indicator. ===== -->
   <sc-if value="{{showSafeArea}}" hint-placeholder-val="{{ true }}">
     <div style="position: absolute; left: 0; top: 0; bottom: 0; width: {{sideInset}}px; background: repeating-linear-gradient(45deg, rgba(239,91,107,0.13) 0px, rgba(239,91,107,0.13) 6px, transparent 6px, transparent 12px); border-right: 1px dashed rgba(239,91,107,0.45); z-index: 40; display: flex; align-items: center; justify-content: center;">
-      <div style="transform: rotate(-90deg); white-space: nowrap; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: rgba(239,91,107,0.85);">DYNAMIC ISLAND</div>
+      <div style="position: absolute; left: 50%; top: 44px; transform: translateX(-50%) rotate(-90deg); white-space: nowrap; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: rgba(239,91,107,0.85);">SAFE AREA</div>
     </div>
     <div style="position: absolute; right: 0; top: 0; bottom: 0; width: {{sideInset}}px; background: repeating-linear-gradient(45deg, rgba(239,91,107,0.13) 0px, rgba(239,91,107,0.13) 6px, transparent 6px, transparent 12px); border-left: 1px dashed rgba(239,91,107,0.45); z-index: 40; display: flex; align-items: center; justify-content: center;">
       <div style="transform: rotate(90deg); white-space: nowrap; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: rgba(239,91,107,0.85);">SAFE AREA</div>
-    </div>
-    <div style="position: absolute; left: 0; right: 0; bottom: 0; height: {{bottomInset}}px; background: repeating-linear-gradient(45deg, rgba(239,91,107,0.13) 0px, rgba(239,91,107,0.13) 6px, transparent 6px, transparent 12px); border-top: 1px dashed rgba(239,91,107,0.45); z-index: 41; display: flex; align-items: center; justify-content: center;">
-      <div style="font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: rgba(239,91,107,0.85);">HOME INDICATOR</div>
     </div>
   </sc-if>
 
@@ -50,7 +52,7 @@
   </div>
 
   <!-- ===== Body: two columns, exercises left, pushup rail right ===== -->
-  <div style="position: absolute; top: 44px; bottom: {{bottomInset}}px; left: {{sideInset}}px; right: {{sideInset}}px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; padding: 10px 14px 0; box-sizing: border-box; overflow: hidden;">
+  <div style="position: absolute; top: 44px; bottom: 0; left: {{sideInset}}px; right: {{sideInset}}px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; padding: 10px 14px 0; box-sizing: border-box; overflow: hidden;">
 
     <!-- ---- Left column: day tabs + the day's workout ---- -->
     <div style="display: flex; flex-direction: column; min-width: 0; overflow: hidden;">
@@ -239,35 +241,45 @@
        Dynamic Island sits in one rotation), and the Shuffle button in
        the bottom-left corner above the home indicator. All three clear
        the literal screen edge by 6px. ===== -->
-  <div style="position: absolute; right: 6px; top: 56px; width: 40px; border-radius: 14px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; box-sizing: border-box;">
+  <div style="position: absolute; right: 14px; top: 56px; width: 40px; border-radius: 14px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; box-sizing: border-box;">
     <div style="font-size: 6px; font-weight: 600; color: #8b96ad; text-transform: uppercase; margin-bottom: 1px;">Sets</div>
     <div style="font-size: 10px; font-weight: 800; white-space: nowrap;">27/88</div>
   </div>
 
-  <div style="position: absolute; right: 6px; bottom: calc({{bottomInset}}px + 24px); width: 40px; border-radius: 14px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; box-sizing: border-box;">
+  <div style="position: absolute; right: 14px; bottom: 22px; width: 40px; border-radius: 14px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; box-sizing: border-box;">
     <div style="font-size: 6px; font-weight: 600; color: #8b96ad; text-transform: uppercase; margin-bottom: 1px;">Days Active</div>
     <div style="font-size: 10px; font-weight: 800; white-space: nowrap;">1/7</div>
   </div>
 
-  <div style="position: absolute; left: 6px; bottom: calc({{bottomInset}}px + 30px); width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #1db954, #169c46); box-shadow: 0 3px 10px rgba(0,0,0,0.3); z-index: 46; display: flex; align-items: center; justify-content: center;">
+  <div style="position: absolute; left: 14px; bottom: 14px; width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #1db954, #169c46); box-shadow: 0 3px 10px rgba(0,0,0,0.3); z-index: 46; display: flex; align-items: center; justify-content: center;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
   </div>
 
+  <!-- ===== Physical device chrome, drawn over everything: the
+       Dynamic Island (a vertical pill on the left edge in this
+       rotation) and the home indicator line. Neither reserves any
+       layout space - they just show you what physically overlaps. ===== -->
+  <div style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 32px; height: 122px; border-radius: 16px; background: #000; z-index: 90;"></div>
+  <div style="position: absolute; left: 50%; transform: translateX(-50%); bottom: 6px; width: 148px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.55); z-index: 90;"></div>
+
+</div>
 </div>
 </x-dc>
 
 <script data-dc-script data-props='{
   "sideInset": {"editor": "range", "default": 59, "min": 0, "max": 90, "step": 1, "unit": "px", "section": "Safe area"},
-  "bottomInset": {"editor": "range", "default": 21, "min": 0, "max": 40, "step": 1, "unit": "px", "section": "Safe area"},
   "showSafeArea": {"editor": "boolean", "default": true, "section": "Safe area"},
-  "$preview": {"width": 932, "height": 430}
+  "screenRadius": {"editor": "range", "default": 54, "min": 0, "max": 80, "step": 1, "unit": "px", "section": "Device"},
+  "cornerRadius": {"editor": "range", "default": 72, "min": 0, "max": 100, "step": 1, "unit": "px", "section": "Device"},
+  "$preview": {"width": 972, "height": 470}
 }'>
 class Component extends DCLogic {
   renderVals() {
     return {
       sideInset: this.props.sideInset ?? 59,
-      bottomInset: this.props.bottomInset ?? 21,
-      showSafeArea: this.props.showSafeArea ?? true
+      showSafeArea: this.props.showSafeArea ?? true,
+      screenRadius: this.props.screenRadius ?? 54,
+      cornerRadius: this.props.cornerRadius ?? 72
     };
   }
 }
