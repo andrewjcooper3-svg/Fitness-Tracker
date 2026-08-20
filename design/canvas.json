@@ -1,0 +1,22 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 932, "h": 430, "title": "Trainer — iPhone landscape" }
+  ],
+  "annotations": [
+    {
+      "id": "safe-area-note",
+      "x": 0,
+      "y": -140,
+      "w": 560,
+      "text": "Drawn at 932x430 — the real logical size of your iPhone in landscape.\n\nThe hatched bands are the parts the phone takes back: the Dynamic Island gutter down the sides and the home indicator along the bottom. My earlier screenshots left these out, which is why previews looked roomier than the device.\n\nDrag the Safe area sliders above the artboard if the real gutters look wider or narrower than this."
+    },
+    {
+      "id": "floating-note",
+      "x": 992,
+      "y": 40,
+      "w": 300,
+      "text": "Both floating controls sit on the literal screen edge rather than the safe area, so they land inside the hatched zones — the stats pill on the right, the Shuffle button in the bottom-left corner.\n\nWorth deciding whether they should inset to clear it."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

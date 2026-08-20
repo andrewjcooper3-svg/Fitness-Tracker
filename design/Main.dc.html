@@ -1,0 +1,278 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; }
+    a { color: #5b8cff; } a:hover { color: #8fb0ff; }
+    .lbl { font-size: 12px; font-weight: 600; color: #8b96ad; text-transform: uppercase; letter-spacing: 0.4px; }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 932px; height: 430px; background: #10141f; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #eef2fb;">
+
+  <!-- ===== Safe-area gutters: the parts of the screen the phone
+       physically takes back in landscape. Everything the app draws has
+       to live inside these, or it sits under the Dynamic Island / home
+       indicator. ===== -->
+  <sc-if value="{{showSafeArea}}" hint-placeholder-val="{{ true }}">
+    <div style="position: absolute; left: 0; top: 0; bottom: 0; width: {{sideInset}}px; background: repeating-linear-gradient(45deg, rgba(239,91,107,0.13) 0px, rgba(239,91,107,0.13) 6px, transparent 6px, transparent 12px); border-right: 1px dashed rgba(239,91,107,0.45); z-index: 40; display: flex; align-items: center; justify-content: center;">
+      <div style="transform: rotate(-90deg); white-space: nowrap; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: rgba(239,91,107,0.85);">DYNAMIC ISLAND</div>
+    </div>
+    <div style="position: absolute; right: 0; top: 0; bottom: 0; width: {{sideInset}}px; background: repeating-linear-gradient(45deg, rgba(239,91,107,0.13) 0px, rgba(239,91,107,0.13) 6px, transparent 6px, transparent 12px); border-left: 1px dashed rgba(239,91,107,0.45); z-index: 40; display: flex; align-items: center; justify-content: center;">
+      <div style="transform: rotate(90deg); white-space: nowrap; font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: rgba(239,91,107,0.85);">SAFE AREA</div>
+    </div>
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; height: {{bottomInset}}px; background: repeating-linear-gradient(45deg, rgba(239,91,107,0.13) 0px, rgba(239,91,107,0.13) 6px, transparent 6px, transparent 12px); border-top: 1px dashed rgba(239,91,107,0.45); z-index: 41; display: flex; align-items: center; justify-content: center;">
+      <div style="font-size: 9px; font-weight: 700; letter-spacing: 0.8px; color: rgba(239,91,107,0.85);">HOME INDICATOR</div>
+    </div>
+  </sc-if>
+
+  <!-- ===== Top bar (.app-tabs): 44px, spans the full width but insets
+       its contents. Title left, tabs centred, week range right. ===== -->
+  <div style="position: absolute; left: 0; right: 0; top: 0; height: 44px; background: rgba(16,20,31,0.82); border-bottom: 1px solid rgba(210,225,255,0.09); display: flex; align-items: center; padding-left: {{sideInset}}px; padding-right: {{sideInset}}px; box-sizing: border-box; z-index: 30;">
+    <div style="display: flex; align-items: center; width: 100%; padding: 0 14px; box-sizing: border-box;">
+      <div style="font-size: 15px; font-weight: 800; letter-spacing: -0.3px; white-space: nowrap;">TRAINER</div>
+      <div style="display: flex; align-items: center; gap: 2px; margin: 0 auto;">
+        <div style="padding: 0 10px; height: 36px; display: flex; align-items: center; border-radius: 12px;"><span style="font-size: 13px; font-weight: 600; color: #8b96ad;">Overview</span></div>
+        <div style="padding: 0 10px; height: 36px; display: flex; align-items: center; border-radius: 12px; background: #232d42;"><span style="font-size: 13px; font-weight: 700; color: #5b8cff;">Trainer</span></div>
+        <div style="padding: 0 10px; height: 36px; display: flex; align-items: center; border-radius: 12px;"><span style="font-size: 13px; font-weight: 600; color: #8b96ad;">Kitchen</span></div>
+        <div style="padding: 0 10px; height: 36px; display: flex; align-items: center; border-radius: 12px;"><span style="font-size: 13px; font-weight: 600; color: #8b96ad;">Music</span></div>
+        <div style="padding: 0 10px; height: 36px; display: flex; align-items: center; border-radius: 12px;"><span style="font-size: 13px; font-weight: 600; color: #8b96ad;">Calendar</span></div>
+        <div style="padding: 0 10px; height: 36px; display: flex; align-items: center; border-radius: 12px;"><span style="font-size: 13px; font-weight: 600; color: #8b96ad;">Stats</span></div>
+      </div>
+      <div style="font-size: 10px; font-weight: 500; color: #8b96ad; white-space: nowrap;">Aug 17 - Aug 23</div>
+    </div>
+  </div>
+
+  <!-- ===== Body: two columns, exercises left, pushup rail right ===== -->
+  <div style="position: absolute; top: 44px; bottom: {{bottomInset}}px; left: {{sideInset}}px; right: {{sideInset}}px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; padding: 10px 14px 0; box-sizing: border-box; overflow: hidden;">
+
+    <!-- ---- Left column: day tabs + the day's workout ---- -->
+    <div style="display: flex; flex-direction: column; min-width: 0; overflow: hidden;">
+
+      <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; background: #1a2233; border-radius: 14px; padding: 4px; margin-bottom: 14px;">
+        <div style="border-radius: 11px; padding: 8px 3px; text-align: center; background: rgba(240,180,41,0.14);">
+          <div style="font-size: 11px; font-weight: 700; color: #f0b429;">MON</div>
+          <div style="width: 5px; height: 5px; border-radius: 50%; background: #f0b429; margin: 3px auto;"></div>
+          <div style="font-size: 10px; color: #f0b429;">Gym</div>
+        </div>
+        <div style="border-radius: 11px; padding: 8px 3px; text-align: center;">
+          <div style="font-size: 11px; font-weight: 700; color: #34c795;">TUE</div>
+          <div style="width: 5px; height: 5px; border-radius: 50%; background: #34c795; margin: 3px auto;"></div>
+          <div style="font-size: 10px; color: #34c795;">PU</div>
+        </div>
+        <div style="border-radius: 11px; padding: 8px 3px; text-align: center;">
+          <div style="font-size: 11px; font-weight: 700; color: #f0b429;">WED</div>
+          <div style="width: 5px; height: 5px; border-radius: 50%; background: #f0b429; margin: 3px auto;"></div>
+          <div style="font-size: 10px; color: #f0b429;">Gym</div>
+        </div>
+        <div style="border-radius: 11px; padding: 8px 3px; text-align: center;">
+          <div style="font-size: 11px; font-weight: 700; color: #34c795;">THU</div>
+          <div style="width: 5px; height: 5px; border-radius: 50%; background: #34c795; margin: 3px auto;"></div>
+          <div style="font-size: 10px; color: #34c795;">PU</div>
+        </div>
+        <div style="border-radius: 11px; padding: 8px 3px; text-align: center;">
+          <div style="font-size: 11px; font-weight: 700; color: #34c795;">FRI</div>
+          <div style="width: 5px; height: 5px; border-radius: 50%; background: #34c795; margin: 3px auto;"></div>
+          <div style="font-size: 10px; color: #34c795;">PU</div>
+        </div>
+        <div style="border-radius: 11px; padding: 8px 3px; text-align: center;">
+          <div style="font-size: 11px; font-weight: 700; color: #33c2c2;">SAT</div>
+          <div style="width: 5px; height: 5px; border-radius: 50%; background: #33c2c2; margin: 3px auto;"></div>
+          <div style="font-size: 10px; color: #33c2c2;">Mob</div>
+        </div>
+        <div style="border-radius: 11px; padding: 8px 3px; text-align: center;">
+          <div style="font-size: 11px; font-weight: 700; color: #9c8cf5;">SUN</div>
+          <div style="width: 5px; height: 5px; border-radius: 50%; background: #9c8cf5; margin: 3px auto;"></div>
+          <div style="font-size: 10px; color: #9c8cf5;">Rest</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+        <div style="font-size: 17px; font-weight: 800; letter-spacing: -0.3px;">MONDAY</div>
+        <div style="display: flex; align-items: center; gap: 6px; background: rgba(240,180,41,0.14); border-radius: 10px; padding: 5px 10px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f0b429" stroke-width="2" stroke-linecap="round"><path d="M4 9v6M8 7v10M16 7v10M20 9v6M8 12h8"></path></svg>
+          <span style="font-size: 12px; font-weight: 700; color: #f0b429;">GYM</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b96ad" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2 2M9 2h6"></path></svg>
+        <span style="font-size: 13px; color: #eef2fb;">Est. time: 40-50 min. Focus: Legs + Arms + Core.</span>
+      </div>
+
+      <div class="lbl" style="margin-bottom: 8px;">Day Notes</div>
+      <div style="background: #1a2233; border-radius: 14px; padding: 12px 14px; font-size: 14px; color: #8b96ad; min-height: 44px; box-sizing: border-box; margin-bottom: 14px;">General notes for the day - energy, sleep, soreness...</div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <div class="lbl">Workouts</div>
+        <div style="background: #232d42; border-radius: 10px; padding: 5px 10px; font-size: 11px; font-weight: 600; color: #8b96ad;">Collapse All</div>
+      </div>
+
+      <!-- expanded card -->
+      <div style="background: #1a2233; border-radius: 16px; overflow: hidden; margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 13px 14px; border-bottom: 1px solid rgba(210,225,255,0.09);">
+          <div style="font-size: 15px; color: #8b96ad;">☰</div>
+          <div style="font-size: 12px; color: #8b96ad;">▾</div>
+          <div style="font-size: 15px; font-weight: 600; flex-grow: 1;">Leg Press</div>
+          <div style="font-size: 13px; color: #8b96ad;">245 lb · 3 × 10</div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 14px; background: rgba(0,0,0,0.14); border-bottom: 1px solid rgba(210,225,255,0.09); font-size: 11px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="color: #34c795; font-weight: 600;">▲20 lb</span>
+            <span style="color: #34c795; font-weight: 600;">▲2 reps</span>
+          </div>
+          <div style="color: #8b96ad; font-weight: 500;">Total: 30 reps</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 70px; gap: 8px; align-items: center; padding: 11px 14px; border-bottom: 1px solid rgba(210,225,255,0.09);">
+          <div style="font-size: 13px; font-weight: 600; color: #8b96ad; text-align: center;">1</div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 9px; font-weight: 600; color: #8b96ad; text-transform: uppercase; letter-spacing: 0.3px;">Weight</div>
+            <div style="font-size: 14px; border-bottom: 1px solid rgba(210,225,255,0.09); padding: 4px 2px;">245 lb</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 9px; font-weight: 600; color: #8b96ad; text-transform: uppercase; letter-spacing: 0.3px;">Reps</div>
+            <div style="font-size: 14px; border-bottom: 1px solid rgba(210,225,255,0.09); padding: 4px 2px;">10</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 9px; font-weight: 600; color: #8b96ad; text-transform: uppercase; letter-spacing: 0.3px;">Notes</div>
+            <div style="font-size: 14px; border-bottom: 1px solid rgba(210,225,255,0.09); padding: 4px 2px;">&nbsp;</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+            <div style="width: 20px; height: 20px; border-radius: 6px; border: 2px solid #34c795; box-sizing: border-box;"></div>
+            <div style="width: 20px; height: 20px; border-radius: 6px; border: 2px solid #f0b429; box-sizing: border-box;"></div>
+            <div style="width: 20px; height: 20px; border-radius: 6px; border: 2px solid #ef5b6b; box-sizing: border-box;"></div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 70px; gap: 8px; align-items: center; padding: 11px 14px;">
+          <div style="font-size: 13px; font-weight: 600; color: #8b96ad; text-align: center;">2</div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 9px; font-weight: 600; color: #8b96ad; text-transform: uppercase; letter-spacing: 0.3px;">Weight</div>
+            <div style="font-size: 14px; border-bottom: 1px solid rgba(210,225,255,0.09); padding: 4px 2px;">245 lb</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 9px; font-weight: 600; color: #8b96ad; text-transform: uppercase; letter-spacing: 0.3px;">Reps</div>
+            <div style="font-size: 14px; border-bottom: 1px solid rgba(210,225,255,0.09); padding: 4px 2px;">10</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 9px; font-weight: 600; color: #8b96ad; text-transform: uppercase; letter-spacing: 0.3px;">Notes</div>
+            <div style="font-size: 14px; border-bottom: 1px solid rgba(210,225,255,0.09); padding: 4px 2px;">&nbsp;</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+            <div style="width: 20px; height: 20px; border-radius: 6px; border: 2px solid #34c795; box-sizing: border-box;"></div>
+            <div style="width: 20px; height: 20px; border-radius: 6px; border: 2px solid #f0b429; box-sizing: border-box;"></div>
+            <div style="width: 20px; height: 20px; border-radius: 6px; border: 2px solid #ef5b6b; box-sizing: border-box;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- collapsed cards -->
+      <div style="background: #1a2233; border-radius: 16px; display: flex; align-items: center; gap: 10px; padding: 13px 14px; margin-bottom: 10px;">
+        <div style="font-size: 15px; color: #8b96ad;">☰</div>
+        <div style="font-size: 12px; color: #8b96ad;">▸</div>
+        <div style="font-size: 15px; font-weight: 600; flex-grow: 1;">Leg Extension</div>
+        <div style="font-size: 13px; color: #8b96ad;">110 lb · 3 × 12</div>
+      </div>
+      <div style="background: #1a2233; border-radius: 16px; display: flex; align-items: center; gap: 10px; padding: 13px 14px; margin-bottom: 10px;">
+        <div style="font-size: 15px; color: #8b96ad;">☰</div>
+        <div style="font-size: 12px; color: #8b96ad;">▸</div>
+        <div style="font-size: 15px; font-weight: 600; flex-grow: 1;">Leg Curl</div>
+        <div style="font-size: 13px; color: #8b96ad;">75 lb · 3 × 12</div>
+      </div>
+    </div>
+
+    <!-- ---- Right rail: pushup deficit + rings ---- -->
+    <div style="display: flex; flex-direction: column; min-width: 0; overflow: hidden;">
+      <div style="background: linear-gradient(160deg, #1a2233 0%, #232d42 100%); border-radius: 26px; padding: 20px; border: 1px solid rgba(210,225,255,0.09); margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <div style="font-size: 13px; font-weight: 600; color: #8b96ad;">Pushup Deficit</div>
+          <div style="background: rgba(239,91,107,0.18); color: #ef5b6b; font-size: 11px; font-weight: 700; border-radius: 8px; padding: 3px 9px;">Behind</div>
+        </div>
+        <div style="font-size: 13px; color: #5b8cff; margin-bottom: 8px;">61% of goal vs. 63% of year done</div>
+        <div style="font-size: 48px; font-weight: 800; color: #ef5b6b; letter-spacing: -1.5px; line-height: 1;">−1,201</div>
+        <div style="font-size: 13px; color: #8b96ad; margin-top: 6px;">reps behind pace</div>
+      </div>
+
+      <div style="background: #1a2233; border-radius: 20px; padding: 22px 12px 18px; display: flex; justify-content: space-around;">
+        <div style="text-align: center;">
+          <div style="width: 76px; height: 76px; border-radius: 50%; background: conic-gradient(#5b8cff 0deg, #232d42 0deg); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 58px; height: 58px; border-radius: 50%; background: #1a2233; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <div style="font-size: 15px; font-weight: 800;">0%</div>
+              <div style="font-size: 9px; color: #8b96ad;">of 32%</div>
+            </div>
+          </div>
+          <div style="font-size: 12px; font-weight: 700; margin-top: 8px;">Week</div>
+          <div style="font-size: 10px; color: #8b96ad;">0 / 1,045</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="width: 76px; height: 76px; border-radius: 50%; background: conic-gradient(#9c8cf5 198deg, #232d42 0deg); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 58px; height: 58px; border-radius: 50%; background: #1a2233; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <div style="font-size: 15px; font-weight: 800;">55%</div>
+              <div style="font-size: 9px; color: #8b96ad;">of 58%</div>
+            </div>
+          </div>
+          <div style="font-size: 12px; font-weight: 700; margin-top: 8px;">Month</div>
+          <div style="font-size: 10px; color: #8b96ad;">2,345 / 4,290</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="width: 76px; height: 76px; border-radius: 50%; background: conic-gradient(#33c2c2 220deg, #232d42 0deg); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 58px; height: 58px; border-radius: 50%; background: #1a2233; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <div style="font-size: 15px; font-weight: 800;">61%</div>
+              <div style="font-size: 9px; color: #8b96ad;">of 63%</div>
+            </div>
+          </div>
+          <div style="font-size: 12px; font-weight: 700; margin-top: 8px;">Year</div>
+          <div style="font-size: 10px; color: #8b96ad;">30,306 / 50,000</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Floating controls. Both are pinned to the literal screen
+       edge in the app right now, NOT to the safe area - which is why
+       they land inside the hatched zones above. ===== -->
+  <div style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 34px; height: 280px; border-radius: 17px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; justify-content: space-around; align-items: center; padding: 6px 1px; box-sizing: border-box;">
+    <div style="text-align: center;">
+      <div style="font-size: 8px; font-weight: 600; color: #8b96ad; text-transform: uppercase;">Sets</div>
+      <div style="font-size: 14px; font-weight: 800;">27/88</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 8px; font-weight: 600; color: #8b96ad; text-transform: uppercase;">Total Reps</div>
+      <div style="font-size: 14px; font-weight: 800;">300</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 8px; font-weight: 600; color: #8b96ad; text-transform: uppercase;">Days Active</div>
+      <div style="font-size: 14px; font-weight: 800;">1/7</div>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 0; bottom: 0; width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #1db954, #169c46); box-shadow: 0 3px 10px rgba(0,0,0,0.3); z-index: 46; display: flex; align-items: center; justify-content: center;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{
+  "sideInset": {"editor": "range", "default": 59, "min": 0, "max": 90, "step": 1, "unit": "px", "section": "Safe area"},
+  "bottomInset": {"editor": "range", "default": 21, "min": 0, "max": 40, "step": 1, "unit": "px", "section": "Safe area"},
+  "showSafeArea": {"editor": "boolean", "default": true, "section": "Safe area"},
+  "$preview": {"width": 932, "height": 430}
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      sideInset: this.props.sideInset ?? 59,
+      bottomInset: this.props.bottomInset ?? 21,
+      showSafeArea: this.props.showSafeArea ?? true
+    };
+  }
+}
+</script>
+</body>
+</html>
