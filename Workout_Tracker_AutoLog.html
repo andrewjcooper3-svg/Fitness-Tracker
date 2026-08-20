@@ -558,6 +558,14 @@
   .wt-time-input-optional { color: var(--muted); }
   .caff-bac-value { color: var(--purple); }
   .caff-conc-value { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 1px; }
+  .caff-clear-row { display: flex; gap: 8px; margin-top: 12px; }
+  .caff-clear { flex: 1 1 0; min-width: 0; background: var(--surface2); border-radius: 12px; padding: 10px 12px; }
+  .caff-clear-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  /* Each tile takes the colour of its own line on the chart below, so a
+     glance ties the number to the curve it came from. */
+  .caff-clear-time { font-family: var(--font); font-size: 17px; font-weight: 800; letter-spacing: -0.3px; margin-top: 3px; color: var(--amber); white-space: nowrap; }
+  .caff-clear-in { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .caff-clear-alc .caff-clear-time { color: var(--purple); }
   .caff-legend { display: flex; gap: 14px; margin-top: 8px; }
   .caff-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); }
   .caff-key-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -2207,6 +2215,22 @@
       </div>
     </div>
     <div class="ov-hero-sub" id="caffNowSub" style="margin-top:0;"></div>
+
+    <!-- Predicted clear times. Two tiles rather than another clause on the
+         line above: these are the numbers actually worth glancing at, and
+         a time plus a countdown side by side reads faster than a sentence. -->
+    <div class="caff-clear-row" id="caffClearRow" style="display:none;">
+      <div class="caff-clear" id="caffClearCaffeine">
+        <div class="caff-clear-label">Caffeine gone</div>
+        <div class="caff-clear-time">--</div>
+        <div class="caff-clear-in">--</div>
+      </div>
+      <div class="caff-clear caff-clear-alc" id="caffClearAlcohol">
+        <div class="caff-clear-label">Alcohol gone</div>
+        <div class="caff-clear-time">--</div>
+        <div class="caff-clear-in">--</div>
+      </div>
+    </div>
 
     <div class="stats-card" style="margin-top:12px;">
       <div class="stats-card-title">Today</div>
@@ -6686,7 +6710,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-20-monogram-splash';
+const APP_BUILD_VERSION = '2026-08-20-predicted-clear-times';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7092,6 +7116,70 @@ function bacAt_(at, doses) {
   return Math.max(0, bac - BAC_ELIMINATION_PER_HOUR * ((now - prev) / 3600000));
 }
 
+// ===== Predicted clear times ==============================================
+// "Zero" means different things for the two curves, so each gets its own
+// honest floor rather than one shared number:
+//
+//   Alcohol really does reach zero. Elimination is a flat rate on the
+//   whole-body total, so the curve is a straight line into the axis and
+//   the crossing is exact.
+//
+//   Caffeine never does. Exponential decay halves forever and only
+//   approaches zero, so a literal zero time doesn't exist. The floor
+//   below is 1 mg - small enough to be nothing in practice, and the
+//   readout says "under 1 mg" rather than pretending it hit zero.
+//
+// Both are found by walking the same curves the chart draws rather than
+// solving for them, because a drink logged over a window is still being
+// absorbed in the future: its micro-doses can push the level back UP
+// after now, and a closed-form answer from the current level would miss
+// that entirely and read early.
+const CAFFEINE_ZERO_FLOOR_MG = 1;
+const CLEAR_SEARCH_HOURS = 72;
+const CLEAR_STEP_MIN = 5;
+
+function predictClearTimes_(now, doses) {
+  const out = { caffeine: null, alcohol: null };
+  const mgNow = currentCaffeineMg_(now, doses);
+  const bacNow = bacAt_(now, doses);
+  if (mgNow < CAFFEINE_ZERO_FLOOR_MG && bacNow < 0.0005) return out;
+
+  const steps = (CLEAR_SEARCH_HOURS * 60) / CLEAR_STEP_MIN;
+  let caffDone = mgNow < CAFFEINE_ZERO_FLOOR_MG;
+  let bacDone = bacNow < 0.0005;
+
+  for (let i = 1; i <= steps && (!caffDone || !bacDone); i++) {
+    const t = new Date(now.getTime() + i * CLEAR_STEP_MIN * 60000);
+    if (!caffDone && currentCaffeineMg_(t, doses) < CAFFEINE_ZERO_FLOOR_MG) {
+      out.caffeine = t; caffDone = true;
+    }
+    if (!bacDone && bacAt_(t, doses) < 0.0005) {
+      out.alcohol = t; bacDone = true;
+    }
+  }
+  return out;
+}
+
+// "4:12 AM" for later today, "4:12 AM Sat" once it crosses midnight - the
+// day matters, because caffeine routinely clears the following morning.
+function fmtClearClock_(at, now) {
+  const clock = fmtClock_(at);
+  const a = new Date(at); a.setHours(0, 0, 0, 0);
+  const b = new Date(now); b.setHours(0, 0, 0, 0);
+  const days = Math.round((a - b) / 86400000);
+  if (days <= 0) return clock;
+  if (days === 1) return clock + ' tomorrow';
+  return clock + ' ' + at.toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+function fmtCountdown_(at, now) {
+  const mins = Math.max(0, Math.round((at - now) / 60000));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (h === 0) return `in ${m}m`;
+  if (h >= 24) return `in ${Math.floor(h / 24)}d ${h % 24}h`;
+  return m ? `in ${h}h ${m}m` : `in ${h}h`;
+}
+
 // Button text is generated from WATER_DRINK_TYPES rather than hardcoded,
 // since both numbers are now editable right on the widget - the "(N
 // net)" qualifier only shows up when it'd actually tell you something
@@ -7414,6 +7502,26 @@ function renderCaffeineModal_() {
       ? `Scaled to your last weigh-in (${lb} lb).`
       : `Scaled to ${lb} lb — log a weigh-in for a closer estimate.`);
     subEl.textContent = bits.join(' ');
+  }
+
+  // Predicted clear times. A tile only appears when there is actually
+  // something on board to clear - an empty "--" would read as a broken
+  // number rather than as nothing to report.
+  const clearRow = document.getElementById('caffClearRow');
+  if (clearRow) {
+    const clear = predictClearTimes_(now, doses);
+    const fill = (id, at, floorNote) => {
+      const el = document.getElementById(id);
+      if (!el) return false;
+      if (!at) { el.style.display = 'none'; return false; }
+      el.style.display = '';
+      el.querySelector('.caff-clear-time').textContent = fmtClearClock_(at, now);
+      el.querySelector('.caff-clear-in').textContent = fmtCountdown_(at, now) + floorNote;
+      return true;
+    };
+    const anyCaff = fill('caffClearCaffeine', clear.caffeine, ' · under 1 mg');
+    const anyAlc = fill('caffClearAlcohol', clear.alcohol, ' · 0.000');
+    clearRow.style.display = (anyCaff || anyAlc) ? '' : 'none';
   }
 
   // Concentration is the part body weight actually changes; the mg above
