@@ -905,6 +905,83 @@
     .kitchen-subtabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); border-radius: 14px; padding: 4px; }
     .kitchen-subtab { flex: 1; min-height: 44px; background: none; border: none; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 13px 0; border-radius: 11px; cursor: pointer; }
     .kitchen-subtab.active { background: var(--surface2); color: var(--accent); }
+    /* Five subtabs is the point where "Inventory" stops fitting on a 390px
+       phone, so the type steps down rather than the labels truncating. */
+    .kitchen-subtab { font-size: 12px; padding: 13px 2px; }
+  
+    /* ===== Sourdough starter ===== */
+    /* The nag dot. Deliberately on the nav tab and the subtab, not just
+       inside the section - a starter is the one thing in here with a real
+       deadline, and a reminder you only see once you've already navigated
+       to the page is not a reminder. */
+    .nag-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin-left: 5px; flex-shrink: 0; }
+    .nag-dot.on { display: inline-block; }
+    .app-tab, .app-sidebar-item, .kitchen-subtab { position: relative; }
+    .app-tab .nag-dot { position: absolute; top: 6px; right: 6px; margin: 0; }
+    .app-sidebar-item .nag-dot { margin-left: auto; }
+  
+    .sd-status { border-radius: 18px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); background: var(--surface); }
+    .sd-status.ok       { background: radial-gradient(circle at 100% 0%, rgba(52,199,149,0.16), var(--surface) 70%); }
+    .sd-status.soon     { background: radial-gradient(circle at 100% 0%, rgba(240,180,41,0.16), var(--surface) 70%); }
+    .sd-status.due      { background: radial-gradient(circle at 100% 0%, rgba(240,180,41,0.28), var(--surface) 70%); }
+    .sd-status.overdue  { background: radial-gradient(circle at 100% 0%, rgba(239,91,107,0.22), var(--surface) 70%); }
+    .sd-status-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .sd-status-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sd-badge { font-family: var(--font); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; white-space: nowrap; }
+    .sd-badge.ok { background: rgba(52,199,149,0.16); color: var(--green); }
+    .sd-badge.soon, .sd-badge.due { background: rgba(240,180,41,0.18); color: var(--amber); }
+    .sd-badge.overdue { background: rgba(239,91,107,0.18); color: var(--red); }
+    .sd-status-headline { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; margin-top: 6px; }
+    .sd-status-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+    .sd-status-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .sd-btn { flex: 1 1 auto; min-height: 44px; font-family: var(--font); font-size: 14px; font-weight: 700; border: none; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer; padding: 0 14px; }
+    .sd-btn.secondary { background: var(--surface2); color: var(--text); }
+    .sd-btn:active { transform: translateY(1px); }
+  
+    .sd-meta-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .sd-meta { flex: 1 1 0; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
+    .sd-meta-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sd-meta-value { font-family: var(--font); font-size: 17px; font-weight: 800; letter-spacing: -0.3px; margin-top: 2px; }
+    .sd-meta-sub { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 1px; }
+  
+    .sd-seg { display: flex; gap: 4px; background: var(--surface2); border-radius: 12px; padding: 4px; }
+    .sd-seg button { flex: 1; min-height: 40px; border: none; background: none; border-radius: 9px; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
+    .sd-seg button.active { background: var(--surface); color: var(--accent); }
+  
+    .sd-field-row { display: flex; gap: 8px; margin-top: 8px; }
+    .sd-field { flex: 1 1 0; min-width: 0; }
+    .sd-field-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+  
+    .sd-day { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+    .sd-day:last-child { border-bottom: none; }
+    .sd-day-check { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--border); background: none; color: var(--muted); font-family: var(--font); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .sd-day.done .sd-day-check { background: var(--green); border-color: var(--green); color: #fff; }
+    .sd-day.today .sd-day-check { border-color: var(--accent); color: var(--accent); }
+    .sd-day-.app-body { flex: 1; min-width: 0; }
+    .sd-day-title { font-family: var(--font); font-size: 14px; font-weight: 700; }
+    .sd-day.done .sd-day-title { color: var(--muted); text-decoration: line-through; }
+    .sd-day-do { font-family: var(--font); font-size: 13px; color: var(--text); margin-top: 3px; line-height: 1.45; }
+    .sd-day-why { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+  
+    .sd-buy { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; }
+    .sd-buy-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 7px; flex-shrink: 0; }
+    .sd-buy-name { font-family: var(--font); font-size: 13.5px; font-weight: 600; }
+    .sd-buy-note { font-family: var(--font); font-size: 12px; color: var(--muted); line-height: 1.4; }
+  
+    .sd-feed-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .sd-feed-row:last-child { border-bottom: none; }
+    .sd-feed-when { font-family: var(--font); font-size: 13px; font-weight: 600; flex: 1; min-width: 0; }
+    .sd-feed-detail { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .sd-feed-rise { font-family: var(--font); font-size: 14px; font-weight: 800; white-space: nowrap; }
+    .sd-feed-rise.strong { color: var(--green); }
+    .sd-feed-rise.weak { color: var(--amber); }
+  
+    .sd-plan-step { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .sd-plan-step:last-child { border-bottom: none; }
+    .sd-plan-when { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); width: 92px; flex-shrink: 0; line-height: 1.35; }
+    .sd-plan-what { font-family: var(--font); font-size: 13px; line-height: 1.45; flex: 1; }
+    .sd-plan-what small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  
     .kitchen-badge { display: inline-block; font-family: var(--font); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px; vertical-align: middle; }
     .kitchen-badge-red { background: rgba(239,91,107,0.18); color: var(--red); }
     .kitchen-badge-amber { background: rgba(240,180,41,0.18); color: var(--amber); }
@@ -1342,6 +1419,7 @@
         <div class="app-sidebar-item" data-view="kitchen">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a3 3 0 0 0 3 3v8"></path><path d="M4 3v10"></path><path d="M8 3v7"></path><path d="M18 3c-2 1-3 3-3 6s1 5 3 6v6"></path></svg>
           <div class="app-sidebar-item-label">Kitchen</div>
+          <span class="nag-dot" id="sdSidebarDot"></span>
         </div>
         <div class="app-sidebar-item" data-view="music">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l11-2v12"></path><circle cx="6" cy="18" r="3"></circle><circle cx="17" cy="16" r="3"></circle></svg>
@@ -1381,7 +1459,7 @@
             <button class="ov-gear-btn" aria-label="Settings">⚙</button>
           </div>
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-20-predicted-clear-times</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-21-sourdough-starter</div>
       
         <!-- v3: two bold gradient hero cards (the two things you actually log
              throughout the day) plus a colorful icon-tile grid below for

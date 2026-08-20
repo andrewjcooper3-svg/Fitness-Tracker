@@ -905,6 +905,83 @@
     .kitchen-subtabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); border-radius: 14px; padding: 4px; }
     .kitchen-subtab { flex: 1; min-height: 44px; background: none; border: none; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 13px 0; border-radius: 11px; cursor: pointer; }
     .kitchen-subtab.active { background: var(--surface2); color: var(--accent); }
+    /* Five subtabs is the point where "Inventory" stops fitting on a 390px
+       phone, so the type steps down rather than the labels truncating. */
+    .kitchen-subtab { font-size: 12px; padding: 13px 2px; }
+  
+    /* ===== Sourdough starter ===== */
+    /* The nag dot. Deliberately on the nav tab and the subtab, not just
+       inside the section - a starter is the one thing in here with a real
+       deadline, and a reminder you only see once you've already navigated
+       to the page is not a reminder. */
+    .nag-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin-left: 5px; flex-shrink: 0; }
+    .nag-dot.on { display: inline-block; }
+    .app-tab, .app-sidebar-item, .kitchen-subtab { position: relative; }
+    .app-tab .nag-dot { position: absolute; top: 6px; right: 6px; margin: 0; }
+    .app-sidebar-item .nag-dot { margin-left: auto; }
+  
+    .sd-status { border-radius: 18px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); background: var(--surface); }
+    .sd-status.ok       { background: radial-gradient(circle at 100% 0%, rgba(52,199,149,0.16), var(--surface) 70%); }
+    .sd-status.soon     { background: radial-gradient(circle at 100% 0%, rgba(240,180,41,0.16), var(--surface) 70%); }
+    .sd-status.due      { background: radial-gradient(circle at 100% 0%, rgba(240,180,41,0.28), var(--surface) 70%); }
+    .sd-status.overdue  { background: radial-gradient(circle at 100% 0%, rgba(239,91,107,0.22), var(--surface) 70%); }
+    .sd-status-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .sd-status-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sd-badge { font-family: var(--font); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; white-space: nowrap; }
+    .sd-badge.ok { background: rgba(52,199,149,0.16); color: var(--green); }
+    .sd-badge.soon, .sd-badge.due { background: rgba(240,180,41,0.18); color: var(--amber); }
+    .sd-badge.overdue { background: rgba(239,91,107,0.18); color: var(--red); }
+    .sd-status-headline { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; margin-top: 6px; }
+    .sd-status-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+    .sd-status-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .sd-btn { flex: 1 1 auto; min-height: 44px; font-family: var(--font); font-size: 14px; font-weight: 700; border: none; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer; padding: 0 14px; }
+    .sd-btn.secondary { background: var(--surface2); color: var(--text); }
+    .sd-btn:active { transform: translateY(1px); }
+  
+    .sd-meta-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .sd-meta { flex: 1 1 0; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
+    .sd-meta-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sd-meta-value { font-family: var(--font); font-size: 17px; font-weight: 800; letter-spacing: -0.3px; margin-top: 2px; }
+    .sd-meta-sub { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 1px; }
+  
+    .sd-seg { display: flex; gap: 4px; background: var(--surface2); border-radius: 12px; padding: 4px; }
+    .sd-seg button { flex: 1; min-height: 40px; border: none; background: none; border-radius: 9px; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
+    .sd-seg button.active { background: var(--surface); color: var(--accent); }
+  
+    .sd-field-row { display: flex; gap: 8px; margin-top: 8px; }
+    .sd-field { flex: 1 1 0; min-width: 0; }
+    .sd-field-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+  
+    .sd-day { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+    .sd-day:last-child { border-bottom: none; }
+    .sd-day-check { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--border); background: none; color: var(--muted); font-family: var(--font); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .sd-day.done .sd-day-check { background: var(--green); border-color: var(--green); color: #fff; }
+    .sd-day.today .sd-day-check { border-color: var(--accent); color: var(--accent); }
+    .sd-day-.app-body { flex: 1; min-width: 0; }
+    .sd-day-title { font-family: var(--font); font-size: 14px; font-weight: 700; }
+    .sd-day.done .sd-day-title { color: var(--muted); text-decoration: line-through; }
+    .sd-day-do { font-family: var(--font); font-size: 13px; color: var(--text); margin-top: 3px; line-height: 1.45; }
+    .sd-day-why { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+  
+    .sd-buy { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; }
+    .sd-buy-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 7px; flex-shrink: 0; }
+    .sd-buy-name { font-family: var(--font); font-size: 13.5px; font-weight: 600; }
+    .sd-buy-note { font-family: var(--font); font-size: 12px; color: var(--muted); line-height: 1.4; }
+  
+    .sd-feed-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .sd-feed-row:last-child { border-bottom: none; }
+    .sd-feed-when { font-family: var(--font); font-size: 13px; font-weight: 600; flex: 1; min-width: 0; }
+    .sd-feed-detail { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .sd-feed-rise { font-family: var(--font); font-size: 14px; font-weight: 800; white-space: nowrap; }
+    .sd-feed-rise.strong { color: var(--green); }
+    .sd-feed-rise.weak { color: var(--amber); }
+  
+    .sd-plan-step { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .sd-plan-step:last-child { border-bottom: none; }
+    .sd-plan-when { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); width: 92px; flex-shrink: 0; line-height: 1.35; }
+    .sd-plan-what { font-family: var(--font); font-size: 13px; line-height: 1.45; flex: 1; }
+    .sd-plan-what small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  
     .kitchen-badge { display: inline-block; font-family: var(--font); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px; vertical-align: middle; }
     .kitchen-badge-red { background: rgba(239,91,107,0.18); color: var(--red); }
     .kitchen-badge-amber { background: rgba(240,180,41,0.18); color: var(--amber); }
@@ -1331,6 +1408,7 @@
         </div>
         <div class="app-tab active" data-view="kitchen">
           <div class="app-tab-label">Kitchen</div>
+          <span class="nag-dot" id="sdTabDot"></span>
         </div>
         <!-- Hidden for now (still fully intact - just remove this comment and
              the style attribute below, add 'bodyhealth' back into viewOrder,
@@ -1386,6 +1464,7 @@
           <button class="kitchen-subtab" data-section="recipes">Recipes</button>
           <button class="kitchen-subtab" data-section="grocery">Grocery</button>
           <button class="kitchen-subtab" data-section="shopping">Shopping</button>
+          <button class="kitchen-subtab" data-section="starter">Starter<span class="nag-dot" id="sdSubtabDot"></span></button>
         </div>
       
         <div class="kitchen-section" id="kitchenSectionInventory">
@@ -1532,6 +1611,148 @@
           <div class="config-box">
             <div class="config-title" style="margin-bottom:6px;">Shopping List</div>
             <div id="shoppingList"><div class="ov-mini-empty">Nothing on your shopping list.</div></div>
+          </div>
+        </div>
+      
+        <div class="kitchen-section" id="kitchenSectionStarter" style="display:none;">
+      
+          <!-- Everything below is rendered from one saved object, so the section
+               has three faces: nothing yet (start one), a 14-day build, and
+               ongoing maintenance. renderStarter() decides which. -->
+          <div id="sdStatusHost"><div class="sd-status">
+            <div class="sd-status-label">Sourdough starter</div>
+            <div class="sd-status-headline">Nothing going yet</div>
+            <div class="sd-status-sub">Two weeks of flour and water and you have a starter that lasts for years. Everything you need is below.</div>
+          </div></div>
+      
+          <!-- ---- No starter yet: what to buy, then begin ---- -->
+          <div id="sdSetup" style="">
+            <div class="config-box">
+              <div class="config-title" style="margin-bottom:4px;">What you need</div>
+              <div class="ov-mini-empty" style="margin:0 0 8px;">A starter is flour and water left to catch wild yeast. The only things that really matter are a scale, unchlorinated water, and whole-grain flour to get it going.</div>
+              <div id="sdBuyList"><div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">Whole rye flour (small bag)</div><div class="sd-buy-note">Days 1-3 only. The wild yeast and bacteria live on the bran, so a whole grain starts far more reliably than white flour. Whole wheat works if rye is hard to find.</div></div></div><div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">Unbleached bread flour</div><div class="sd-buy-note">Everything from day 4 on. Bleached flour is chemically treated and starts sluggishly - the label has to say unbleached.</div></div></div><div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">Filtered or bottled water</div><div class="sd-buy-note">Chlorine in tap water suppresses exactly what you are trying to grow. Filtered is easiest; tap left uncovered overnight also works.</div></div></div><div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">Digital scale (grams)</div><div class="sd-buy-note">Not optional. A cup of flour varies by 20% depending on how you scoop it, and the whole thing is a ratio.</div></div></div><div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">Clear straight-sided jar, ~1 quart</div><div class="sd-buy-note">Straight sides so a rise is actually measurable. A wide-mouth mason jar or a big Weck is ideal. Never seal it tight - it needs to vent.</div></div></div><div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">Rubber band or dry-erase marker</div><div class="sd-buy-note">Mark the level at every feed. This is how you know whether it doubled, and it costs nothing.</div></div></div><div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">Instant-read thermometer (optional)</div><div class="sd-buy-note">For the water and the room. Temperature is the single biggest lever on timing, so it is worth knowing.</div></div></div></div>
+              <button class="sd-btn secondary" style="width:100%; margin-top:10px;">Add these to my Shopping list</button>
+            </div>
+      
+            <div class="config-box">
+              <div class="config-title" style="margin-bottom:10px;">Name it</div>
+              <input type="text" id="sdNameInput" class="config-input" placeholder="Give it a name (optional)" style="width:100%; box-sizing:border-box;">
+              <button class="sd-btn" style="width:100%; margin-top:10px;">Start day 1</button>
+              <div class="ov-mini-empty" style="margin:8px 0 0;">Day 1 is 50g whole rye flour and 50g water. Tap this once you have mixed it.</div>
+            </div>
+          </div>
+      
+          <!-- ---- Building: the 14-day schedule ---- -->
+          <div id="sdBuild" style="display:none;">
+            <div class="config-box">
+              <div class="config-title" style="margin-bottom:2px;">Getting it going</div>
+              <div class="ov-mini-empty" style="margin:0 0 4px;">Tick each day as you do it. Days can slip - a late feed sets it back, it does not ruin it.</div>
+              <div id="sdBuildDays"></div>
+            </div>
+            <div class="config-box">
+              <div class="config-title" style="margin-bottom:8px;">If something looks wrong</div>
+              <div id="sdTrouble"></div>
+            </div>
+            <button class="sd-btn secondary" style="width:100%;">It is doubling reliably - switch to maintenance</button>
+          </div>
+      
+          <!-- ---- Active: maintenance ---- -->
+          <div id="sdActive" style="display:none;">
+            <div class="sd-meta-row" id="sdMetaRow"></div>
+      
+            <div class="config-box">
+              <div class="config-title" style="margin-bottom:8px;">Where is it right now</div>
+              <div class="sd-seg" id="sdLocationSeg">
+                <button data-loc="counter">Counter</button>
+                <button data-loc="fridge">Fridge</button>
+              </div>
+              <div class="ov-mini-empty" style="margin:8px 0 0;" id="sdLocationNote"></div>
+            </div>
+      
+            <div class="config-box">
+              <div class="config-toggle">
+                <div class="config-title">Log a feed</div>
+                <div class="config-chevron" id="sdFeedChevron">▸</div>
+              </div>
+              <div class="config-body" id="sdFeedBody">
+                <div class="sd-field-row">
+                  <div class="sd-field">
+                    <div class="sd-field-label">Ratio</div>
+                    <select id="sdFeedRatio" class="config-input" style="width:100%;"></select>
+                  </div>
+                  <div class="sd-field">
+                    <div class="sd-field-label">Flour</div>
+                    <select id="sdFeedFlour" class="config-input" style="width:100%;"></select>
+                  </div>
+                </div>
+                <div class="sd-field-row">
+                  <div class="sd-field">
+                    <div class="sd-field-label">Temp °F</div>
+                    <input type="number" id="sdFeedTemp" class="config-input" style="width:100%;" min="50" max="100" step="1">
+                  </div>
+                  <div class="sd-field">
+                    <div class="sd-field-label">Fed at</div>
+                    <input type="time" id="sdFeedTime" class="config-input" style="width:100%;">
+                  </div>
+                </div>
+                <div class="ov-mini-empty" style="margin:8px 0 0;" id="sdFeedGrams"></div>
+                <button class="sd-btn" style="width:100%; margin-top:10px;">Log feed</button>
+              </div>
+            </div>
+      
+            <div class="config-box" id="sdRiseBox">
+              <div class="config-title" style="margin-bottom:6px;">How did the last feed go</div>
+              <div class="ov-mini-empty" style="margin:0 0 8px;">Mark the jar at feed time, then record the high point. The rise number is the honest health check - a starter that used to triple and now barely doubles is telling you something.</div>
+              <div class="sd-field-row">
+                <div class="sd-field">
+                  <div class="sd-field-label">It rose</div>
+                  <select id="sdRiseX" class="config-input" style="width:100%;"></select>
+                </div>
+                <div class="sd-field">
+                  <div class="sd-field-label">Peaked at</div>
+                  <input type="time" id="sdPeakTime" class="config-input" style="width:100%;">
+                </div>
+              </div>
+              <div class="sd-field-row">
+                <div class="sd-field">
+                  <div class="sd-field-label">Smell</div>
+                  <select id="sdSmell" class="config-input" style="width:100%;"></select>
+                </div>
+                <div class="sd-field">
+                  <div class="sd-field-label">Hooch on top</div>
+                  <select id="sdHooch" class="config-input" style="width:100%;">
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+              </div>
+              <button class="sd-btn secondary" style="width:100%; margin-top:10px;">Save</button>
+              <div id="sdRiseAdvice"></div>
+            </div>
+      
+            <div class="config-box">
+              <div class="config-title" style="margin-bottom:8px;">Plan a bake</div>
+              <div class="weight-entry-row">
+                <input type="datetime-local" id="sdBakeAt" class="config-input" style="flex:1;">
+                <button class="config-save">Plan</button>
+              </div>
+              <div id="sdPlan"></div>
+            </div>
+      
+            <div class="config-box">
+              <div class="config-title" style="margin-bottom:4px;">Feed history</div>
+              <div id="sdFeedList"></div>
+            </div>
+      
+            <div class="config-box">
+              <div class="config-toggle">
+                <div class="config-title">Quick reference</div>
+                <div class="config-chevron" id="sdRefChevron">▸</div>
+              </div>
+              <div class="config-body" id="sdRefBody">
+                <div id="sdReference"></div>
+              </div>
+            </div>
           </div>
         </div>
       

@@ -906,6 +906,83 @@
   .kitchen-subtabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); border-radius: 14px; padding: 4px; }
   .kitchen-subtab { flex: 1; min-height: 44px; background: none; border: none; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 600; padding: 13px 0; border-radius: 11px; cursor: pointer; }
   .kitchen-subtab.active { background: var(--surface2); color: var(--accent); }
+  /* Five subtabs is the point where "Inventory" stops fitting on a 390px
+     phone, so the type steps down rather than the labels truncating. */
+  .kitchen-subtab { font-size: 12px; padding: 13px 2px; }
+
+  /* ===== Sourdough starter ===== */
+  /* The nag dot. Deliberately on the nav tab and the subtab, not just
+     inside the section - a starter is the one thing in here with a real
+     deadline, and a reminder you only see once you've already navigated
+     to the page is not a reminder. */
+  .nag-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin-left: 5px; flex-shrink: 0; }
+  .nag-dot.on { display: inline-block; }
+  .app-tab, .app-sidebar-item, .kitchen-subtab { position: relative; }
+  .app-tab .nag-dot { position: absolute; top: 6px; right: 6px; margin: 0; }
+  .app-sidebar-item .nag-dot { margin-left: auto; }
+
+  .sd-status { border-radius: 18px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); background: var(--surface); }
+  .sd-status.ok       { background: radial-gradient(circle at 100% 0%, rgba(52,199,149,0.16), var(--surface) 70%); }
+  .sd-status.soon     { background: radial-gradient(circle at 100% 0%, rgba(240,180,41,0.16), var(--surface) 70%); }
+  .sd-status.due      { background: radial-gradient(circle at 100% 0%, rgba(240,180,41,0.28), var(--surface) 70%); }
+  .sd-status.overdue  { background: radial-gradient(circle at 100% 0%, rgba(239,91,107,0.22), var(--surface) 70%); }
+  .sd-status-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .sd-status-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .sd-badge { font-family: var(--font); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; white-space: nowrap; }
+  .sd-badge.ok { background: rgba(52,199,149,0.16); color: var(--green); }
+  .sd-badge.soon, .sd-badge.due { background: rgba(240,180,41,0.18); color: var(--amber); }
+  .sd-badge.overdue { background: rgba(239,91,107,0.18); color: var(--red); }
+  .sd-status-headline { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; margin-top: 6px; }
+  .sd-status-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+  .sd-status-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .sd-btn { flex: 1 1 auto; min-height: 44px; font-family: var(--font); font-size: 14px; font-weight: 700; border: none; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer; padding: 0 14px; }
+  .sd-btn.secondary { background: var(--surface2); color: var(--text); }
+  .sd-btn:active { transform: translateY(1px); }
+
+  .sd-meta-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .sd-meta { flex: 1 1 0; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; }
+  .sd-meta-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .sd-meta-value { font-family: var(--font); font-size: 17px; font-weight: 800; letter-spacing: -0.3px; margin-top: 2px; }
+  .sd-meta-sub { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  .sd-seg { display: flex; gap: 4px; background: var(--surface2); border-radius: 12px; padding: 4px; }
+  .sd-seg button { flex: 1; min-height: 40px; border: none; background: none; border-radius: 9px; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .sd-seg button.active { background: var(--surface); color: var(--accent); }
+
+  .sd-field-row { display: flex; gap: 8px; margin-top: 8px; }
+  .sd-field { flex: 1 1 0; min-width: 0; }
+  .sd-field-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+
+  .sd-day { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+  .sd-day:last-child { border-bottom: none; }
+  .sd-day-check { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--border); background: none; color: var(--muted); font-family: var(--font); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .sd-day.done .sd-day-check { background: var(--green); border-color: var(--green); color: #fff; }
+  .sd-day.today .sd-day-check { border-color: var(--accent); color: var(--accent); }
+  .sd-day-body { flex: 1; min-width: 0; }
+  .sd-day-title { font-family: var(--font); font-size: 14px; font-weight: 700; }
+  .sd-day.done .sd-day-title { color: var(--muted); text-decoration: line-through; }
+  .sd-day-do { font-family: var(--font); font-size: 13px; color: var(--text); margin-top: 3px; line-height: 1.45; }
+  .sd-day-why { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+
+  .sd-buy { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; }
+  .sd-buy-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 7px; flex-shrink: 0; }
+  .sd-buy-name { font-family: var(--font); font-size: 13.5px; font-weight: 600; }
+  .sd-buy-note { font-family: var(--font); font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  .sd-feed-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .sd-feed-row:last-child { border-bottom: none; }
+  .sd-feed-when { font-family: var(--font); font-size: 13px; font-weight: 600; flex: 1; min-width: 0; }
+  .sd-feed-detail { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .sd-feed-rise { font-family: var(--font); font-size: 14px; font-weight: 800; white-space: nowrap; }
+  .sd-feed-rise.strong { color: var(--green); }
+  .sd-feed-rise.weak { color: var(--amber); }
+
+  .sd-plan-step { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .sd-plan-step:last-child { border-bottom: none; }
+  .sd-plan-when { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); width: 92px; flex-shrink: 0; line-height: 1.35; }
+  .sd-plan-what { font-family: var(--font); font-size: 13px; line-height: 1.45; flex: 1; }
+  .sd-plan-what small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+
   .kitchen-badge { display: inline-block; font-family: var(--font); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.3px; vertical-align: middle; }
   .kitchen-badge-red { background: rgba(239,91,107,0.18); color: var(--red); }
   .kitchen-badge-amber { background: rgba(240,180,41,0.18); color: var(--amber); }
@@ -1863,6 +1940,7 @@
     <button class="kitchen-subtab" data-section="recipes" onclick="showKitchenSection('recipes')">Recipes</button>
     <button class="kitchen-subtab" data-section="grocery" onclick="showKitchenSection('grocery')">Grocery</button>
     <button class="kitchen-subtab" data-section="shopping" onclick="showKitchenSection('shopping')">Shopping</button>
+    <button class="kitchen-subtab" data-section="starter" onclick="showKitchenSection('starter')">Starter<span class="nag-dot" id="sdSubtabDot"></span></button>
   </div>
 
   <div class="kitchen-section" id="kitchenSectionInventory">
@@ -1983,6 +2061,144 @@
     <div class="config-box">
       <div class="config-title" style="margin-bottom:6px;">Shopping List</div>
       <div id="shoppingList"></div>
+    </div>
+  </div>
+
+  <div class="kitchen-section" id="kitchenSectionStarter" style="display:none;">
+
+    <!-- Everything below is rendered from one saved object, so the section
+         has three faces: nothing yet (start one), a 14-day build, and
+         ongoing maintenance. renderStarter() decides which. -->
+    <div id="sdStatusHost"></div>
+
+    <!-- ---- No starter yet: what to buy, then begin ---- -->
+    <div id="sdSetup" style="display:none;">
+      <div class="config-box">
+        <div class="config-title" style="margin-bottom:4px;">What you need</div>
+        <div class="ov-mini-empty" style="margin:0 0 8px;">A starter is flour and water left to catch wild yeast. The only things that really matter are a scale, unchlorinated water, and whole-grain flour to get it going.</div>
+        <div id="sdBuyList"></div>
+        <button class="sd-btn secondary" style="width:100%; margin-top:10px;" onclick="addStarterSuppliesToShopping()">Add these to my Shopping list</button>
+      </div>
+
+      <div class="config-box">
+        <div class="config-title" style="margin-bottom:10px;">Name it</div>
+        <input type="text" id="sdNameInput" class="config-input" placeholder="Give it a name (optional)" style="width:100%; box-sizing:border-box;">
+        <button class="sd-btn" style="width:100%; margin-top:10px;" onclick="beginStarter()">Start day 1</button>
+        <div class="ov-mini-empty" style="margin:8px 0 0;">Day 1 is 50g whole rye flour and 50g water. Tap this once you have mixed it.</div>
+      </div>
+    </div>
+
+    <!-- ---- Building: the 14-day schedule ---- -->
+    <div id="sdBuild" style="display:none;">
+      <div class="config-box">
+        <div class="config-title" style="margin-bottom:2px;">Getting it going</div>
+        <div class="ov-mini-empty" style="margin:0 0 4px;">Tick each day as you do it. Days can slip - a late feed sets it back, it does not ruin it.</div>
+        <div id="sdBuildDays"></div>
+      </div>
+      <div class="config-box">
+        <div class="config-title" style="margin-bottom:8px;">If something looks wrong</div>
+        <div id="sdTrouble"></div>
+      </div>
+      <button class="sd-btn secondary" style="width:100%;" onclick="promoteStarter()">It is doubling reliably - switch to maintenance</button>
+    </div>
+
+    <!-- ---- Active: maintenance ---- -->
+    <div id="sdActive" style="display:none;">
+      <div class="sd-meta-row" id="sdMetaRow"></div>
+
+      <div class="config-box">
+        <div class="config-title" style="margin-bottom:8px;">Where is it right now</div>
+        <div class="sd-seg" id="sdLocationSeg">
+          <button data-loc="counter" onclick="setStarterLocation('counter')">Counter</button>
+          <button data-loc="fridge" onclick="setStarterLocation('fridge')">Fridge</button>
+        </div>
+        <div class="ov-mini-empty" style="margin:8px 0 0;" id="sdLocationNote"></div>
+      </div>
+
+      <div class="config-box">
+        <div class="config-toggle" onclick="toggleKitchenCollapse_('sdFeedBody','sdFeedChevron')">
+          <div class="config-title">Log a feed</div>
+          <div class="config-chevron" id="sdFeedChevron">▸</div>
+        </div>
+        <div class="config-body" id="sdFeedBody">
+          <div class="sd-field-row">
+            <div class="sd-field">
+              <div class="sd-field-label">Ratio</div>
+              <select id="sdFeedRatio" class="config-input" style="width:100%;"></select>
+            </div>
+            <div class="sd-field">
+              <div class="sd-field-label">Flour</div>
+              <select id="sdFeedFlour" class="config-input" style="width:100%;"></select>
+            </div>
+          </div>
+          <div class="sd-field-row">
+            <div class="sd-field">
+              <div class="sd-field-label">Temp °F</div>
+              <input type="number" id="sdFeedTemp" class="config-input" style="width:100%;" min="50" max="100" step="1">
+            </div>
+            <div class="sd-field">
+              <div class="sd-field-label">Fed at</div>
+              <input type="time" id="sdFeedTime" class="config-input" style="width:100%;">
+            </div>
+          </div>
+          <div class="ov-mini-empty" style="margin:8px 0 0;" id="sdFeedGrams"></div>
+          <button class="sd-btn" style="width:100%; margin-top:10px;" onclick="logStarterFeed()">Log feed</button>
+        </div>
+      </div>
+
+      <div class="config-box" id="sdRiseBox">
+        <div class="config-title" style="margin-bottom:6px;">How did the last feed go</div>
+        <div class="ov-mini-empty" style="margin:0 0 8px;">Mark the jar at feed time, then record the high point. The rise number is the honest health check - a starter that used to triple and now barely doubles is telling you something.</div>
+        <div class="sd-field-row">
+          <div class="sd-field">
+            <div class="sd-field-label">It rose</div>
+            <select id="sdRiseX" class="config-input" style="width:100%;"></select>
+          </div>
+          <div class="sd-field">
+            <div class="sd-field-label">Peaked at</div>
+            <input type="time" id="sdPeakTime" class="config-input" style="width:100%;">
+          </div>
+        </div>
+        <div class="sd-field-row">
+          <div class="sd-field">
+            <div class="sd-field-label">Smell</div>
+            <select id="sdSmell" class="config-input" style="width:100%;"></select>
+          </div>
+          <div class="sd-field">
+            <div class="sd-field-label">Hooch on top</div>
+            <select id="sdHooch" class="config-input" style="width:100%;">
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+        </div>
+        <button class="sd-btn secondary" style="width:100%; margin-top:10px;" onclick="logStarterRise()">Save</button>
+        <div id="sdRiseAdvice"></div>
+      </div>
+
+      <div class="config-box">
+        <div class="config-title" style="margin-bottom:8px;">Plan a bake</div>
+        <div class="weight-entry-row">
+          <input type="datetime-local" id="sdBakeAt" class="config-input" style="flex:1;">
+          <button class="config-save" onclick="planStarterBake()">Plan</button>
+        </div>
+        <div id="sdPlan"></div>
+      </div>
+
+      <div class="config-box">
+        <div class="config-title" style="margin-bottom:4px;">Feed history</div>
+        <div id="sdFeedList"></div>
+      </div>
+
+      <div class="config-box">
+        <div class="config-toggle" onclick="toggleKitchenCollapse_('sdRefBody','sdRefChevron')">
+          <div class="config-title">Quick reference</div>
+          <div class="config-chevron" id="sdRefChevron">▸</div>
+        </div>
+        <div class="config-body" id="sdRefBody">
+          <div id="sdReference"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2414,6 +2630,7 @@
   </div>
   <div class="app-tab" data-view="kitchen" onclick="showAppView('kitchen')">
     <div class="app-tab-label">Kitchen</div>
+    <span class="nag-dot" id="sdTabDot"></span>
   </div>
   <!-- Hidden for now (still fully intact - just remove this comment and
        the style attribute below, add 'bodyhealth' back into viewOrder,
@@ -2465,6 +2682,7 @@
   <div class="app-sidebar-item" data-view="kitchen" onclick="showAppView('kitchen')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a3 3 0 0 0 3 3v8"></path><path d="M4 3v10"></path><path d="M8 3v7"></path><path d="M18 3c-2 1-3 3-3 6s1 5 3 6v6"></path></svg>
     <div class="app-sidebar-item-label">Kitchen</div>
+    <span class="nag-dot" id="sdSidebarDot"></span>
   </div>
   <div class="app-sidebar-item" data-view="music" onclick="showAppView('music')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l11-2v12"></path><circle cx="6" cy="18" r="3"></circle><circle cx="17" cy="16" r="3"></circle></svg>
@@ -3383,6 +3601,638 @@ async function loadRemoteRecipes() {
 // online, so an offline load retries on the next one instead of
 // silently giving up.
 const STORAGE_RECIPE_SEEDS_APPLIED_KEY = 'WORKOUT_RECIPE_SEEDS_APPLIED';
+
+/* ==========================================================================
+   SOURDOUGH STARTER
+   A starter is the one thing in this app with a real deadline - miss it
+   long enough and it actually dies - so this section is built around
+   "what do I owe it and when", not around a record of what happened.
+
+   It has three faces, chosen by state.stage:
+     none      - nothing yet: what to buy, and a button that starts day 1
+     building  - the 14-day schedule that turns flour and water into a
+                 starter, one tickable day at a time
+     active    - maintenance: feed log, rise tracking, next-feed clock,
+                 and a back-planner for a bake on a given day
+   ========================================================================== */
+
+const STORAGE_STARTER_KEY = 'WORKOUT_KITCHEN_STARTER';
+
+// Peak timing model. A starter rises, peaks, and falls; the useful
+// question is when the peak lands. Three things move it, in this order of
+// influence:
+//
+//   Temperature dominates everything. Fermentation rate roughly doubles
+//   per ~9F, which is why the same starter peaks in 4h at 78F and closer
+//   to 10h at 62F. This is the variable people forget to record and then
+//   wonder why their timings never repeat.
+//
+//   Ratio is next: more fresh flour per gram of starter means more to get
+//   through before the peak.
+//
+//   Flour type is a smaller effect - whole grains carry more of what the
+//   culture eats, so they run faster than white.
+//
+// The constants below are a starting point, not gospel. Once there are a
+// few feeds with a real recorded peak, starterCalibration_() measures how
+// wrong the model has been for THIS starter and scales it, so the
+// predictions converge on the jar on your counter rather than an average
+// of everyone's.
+const SD_PEAK_BASE_HOURS = 4;      // 1:1:1, bread flour, 78F
+const SD_PEAK_REF_F = 78;
+const SD_TEMP_DOUBLING_F = 9;
+const SD_RATIO_FACTOR = { '1:1:1': 1.0, '1:2:2': 1.35, '1:3:3': 1.6, '1:5:5': 1.95 };
+const SD_FLOUR_FACTOR = { rye: 0.8, whole: 0.85, bread: 1.0, ap: 1.05 };
+const SD_RATIO_GRAMS = { '1:1:1': [50, 50, 50], '1:2:2': [30, 60, 60], '1:3:3': [25, 75, 75], '1:5:5': [20, 100, 100] };
+const SD_FLOUR_LABEL = { rye: 'Whole rye', whole: 'Whole wheat', bread: 'Bread flour', ap: 'All-purpose' };
+const SD_DEFAULT_TEMP_F = 72;
+
+// A fridge starter is dormant, not dead - cold slows it to the point where
+// once a week is plenty. On the counter it has to be fed before it has
+// fully collapsed, which is roughly 1.6x its peak time.
+const SD_FRIDGE_DAYS = 7;
+const SD_FRIDGE_CONCERN_DAYS = 14;
+const SD_COUNTER_MULT = 1.6;
+
+const SD_SUPPLIES = [
+  { name: 'Whole rye flour (small bag)', note: 'Days 1-3 only. The wild yeast and bacteria live on the bran, so a whole grain starts far more reliably than white flour. Whole wheat works if rye is hard to find.' },
+  { name: 'Unbleached bread flour', note: 'Everything from day 4 on. Bleached flour is chemically treated and starts sluggishly - the label has to say unbleached.' },
+  { name: 'Filtered or bottled water', note: 'Chlorine in tap water suppresses exactly what you are trying to grow. Filtered is easiest; tap left uncovered overnight also works.' },
+  { name: 'Digital scale (grams)', note: 'Not optional. A cup of flour varies by 20% depending on how you scoop it, and the whole thing is a ratio.' },
+  { name: 'Clear straight-sided jar, ~1 quart', note: 'Straight sides so a rise is actually measurable. A wide-mouth mason jar or a big Weck is ideal. Never seal it tight - it needs to vent.' },
+  { name: 'Rubber band or dry-erase marker', note: 'Mark the level at every feed. This is how you know whether it doubled, and it costs nothing.' },
+  { name: 'Instant-read thermometer (optional)', note: 'For the water and the room. Temperature is the single biggest lever on timing, so it is worth knowing.' }
+];
+
+// The 14-day build. Written as what to DO and why, because the why is what
+// stops you binning a perfectly healthy starter on day 5.
+const SD_BUILD_DAYS = [
+  { day: 1, title: 'Mix it', do: '50g whole rye flour + 50g water at about 80°F. Stir to a thick paste, scrape the sides down, lid resting on top - not sealed.', why: 'Somewhere warm, 75-80°F. On top of the fridge or in the oven with just the light on both work.' },
+  { day: 2, title: 'Leave it alone', do: 'No feed today. Just look at it.', why: 'You may see a burst of bubbles and a big rise. That is usually not yeast - it is leuconostoc, a bacterium that shows up early and then dies off. Exciting, misleading, harmless.' },
+  { day: 3, title: 'First discard and feed', do: 'Keep 50g, discard the rest. Add 25g rye + 25g bread flour + 50g water.', why: 'Discarding feels wasteful and is essential - without it the acid builds up faster than the yeast can cope.' },
+  { day: 4, title: 'Feed again', do: 'Keep 50g. Add 50g bread flour + 50g water.', why: 'Activity often stalls now and stays flat for a couple of days. This is the normal slump, not a failure. Keep feeding.' },
+  { day: 5, title: 'Feed again', do: 'Keep 50g. Add 50g bread flour + 50g water.', why: 'Smell it each day. Sour and sharp is good progress. Cheesy or slightly off is also normal at this stage.' },
+  { day: 6, title: 'Twice today', do: 'Same feed, morning and evening. Keep 50g each time.', why: 'Twice daily from here if the room is above 72°F. Two feeds push the yeast population up faster than one.' },
+  { day: 7, title: 'Twice today', do: 'Same feed, morning and evening.', why: 'Start marking the jar at each feed. You are looking for a rise you can see, not just bubbles.' },
+  { day: 8, title: 'Twice today', do: 'Same feed. Note how high it gets and how long it takes.', why: 'A predictable rise matters more than a big one. Doubling in 6 hours, twice in a row, beats tripling once.' },
+  { day: 9, title: 'Twice today', do: 'Same feed.', why: 'The smell should be turning yeasty and pleasantly sour - like beer or yoghurt rather than glue.' },
+  { day: 10, title: 'Check if it is ready', do: 'Same feed. Time it from feed to high point.', why: 'Ready means: doubles within 4-8 hours, domes on top, smells tangy, and does it again the next day. Not one good day.' },
+  { day: 11, title: 'Keep going if not', do: 'Same feed, twice daily.', why: 'Plenty of starters need 2-3 weeks, especially in a cool kitchen. Slow is not broken.' },
+  { day: 12, title: 'Keep going', do: 'Same feed, twice daily.', why: 'If it has stalled completely, try one feed with 25g rye mixed in - the extra bran usually restarts it.' },
+  { day: 13, title: 'Keep going', do: 'Same feed, twice daily.', why: 'Warmth is the other lever. Moving the jar somewhere 5°F warmer often does more than anything else.' },
+  { day: 14, title: 'Should be there', do: 'Same feed. Do the float test: a spoonful of peaked starter dropped in water should float.', why: 'Once it doubles predictably, switch to maintenance below. The float test is a nice confirmation but the reliable rise is the real signal.' }
+];
+
+const SD_TROUBLE = [
+  { name: 'Grey liquid on top (hooch)', note: 'It is hungry. Pour it off or stir it in, then feed more often or use a leaner ratio like 1:5:5.' },
+  { name: 'Smells like nail polish or acetone', note: 'Badly underfed. Feed it twice a day at 1:5:5 for a few days and it recovers.' },
+  { name: 'Nothing at all by day 7', note: 'Almost always too cold, or chlorinated water. Move it somewhere warmer and switch to filtered water.' },
+  { name: 'Big rise on day 2, then nothing', note: 'Completely normal. That first burst is bacteria, not yeast. Carry on.' },
+  { name: 'Pink or orange streaks, or fuzzy mould', note: 'This is the only real throw-it-out signal. Discard it, wash the jar properly, start again.' }
+];
+
+const SD_REFERENCE = [
+  { name: 'Ratios', note: '1:1:1 is 50g starter, 50g flour, 50g water - fast, peaks soonest, needs feeding soonest. 1:5:5 is 20g starter to 100g each - slower, milder, and buys you far more time before the next feed.' },
+  { name: 'Discard is not waste', note: 'Unfed discard keeps in a jar in the fridge for a week or two and goes straight into pancakes, crackers or waffles.' },
+  { name: 'Use it at the peak', note: 'Domed and full of bubbles, just before it starts to sink. Past the peak it still works but rises more slowly and tastes sourer.' },
+  { name: 'Going away', note: 'A well-fed starter survives a month in the fridge without attention, and longer than that with a couple of feeds to bring it back.' },
+  { name: 'Reviving a neglected one', note: 'Pour off any hooch, keep a spoonful, feed 1:5:5 twice a day at room temperature. Most come back within three days.' }
+];
+
+function loadStarter_() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_STARTER_KEY) || 'null');
+    if (raw && typeof raw === 'object') return raw;
+  } catch (e) { /* fall through to a fresh one */ }
+  return { stage: 'none', name: '', bornOn: null, build: {}, feeds: [],
+           location: 'counter', ratio: '1:2:2', flour: 'bread', tempF: SD_DEFAULT_TEMP_F, bakeAt: null };
+}
+
+function saveStarter_(st) {
+  localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(st));
+}
+
+function sdLastFeed_(st) {
+  const feeds = st.feeds || [];
+  return feeds.length ? feeds[feeds.length - 1] : null;
+}
+
+// How wrong the model has been for this particular starter, averaged over
+// the last few feeds that recorded an actual peak. Clamped hard so one
+// mistyped time cannot send every future prediction sideways.
+function starterCalibration_(st) {
+  const withPeak = (st.feeds || []).filter(f => f.peakAt && f.at);
+  if (withPeak.length < 2) return 1;
+  const recent = withPeak.slice(-5);
+  let sum = 0, n = 0;
+  recent.forEach(f => {
+    const observed = (new Date(f.peakAt) - new Date(f.at)) / 3600000;
+    const modelled = sdModelPeakHours_(f.tempF, f.ratio, f.flour);
+    if (observed > 0.5 && observed < 36 && modelled > 0) { sum += observed / modelled; n++; }
+  });
+  if (!n) return 1;
+  return Math.max(0.5, Math.min(2, sum / n));
+}
+
+function sdModelPeakHours_(tempF, ratio, flour) {
+  const t = Number(tempF) || SD_DEFAULT_TEMP_F;
+  const r = SD_RATIO_FACTOR[ratio] || 1;
+  const f = SD_FLOUR_FACTOR[flour] || 1;
+  return SD_PEAK_BASE_HOURS * r * f * Math.pow(2, (SD_PEAK_REF_F - t) / SD_TEMP_DOUBLING_F);
+}
+
+function starterPeakHours_(st, tempF, ratio, flour) {
+  return sdModelPeakHours_(tempF, ratio, flour) * starterCalibration_(st);
+}
+
+// What the starter is owed, and how late you are. One function so the
+// badge, the headline and the nag dot can never disagree with each other.
+function starterStatus_(st, now) {
+  now = now || new Date();
+  const last = sdLastFeed_(st);
+  if (!last) return { level: 'none', label: 'No feeds yet' };
+
+  const fedAt = new Date(last.at);
+  const hoursSince = (now - fedAt) / 3600000;
+
+  if (st.location === 'fridge') {
+    const days = hoursSince / 24;
+    const dueAt = new Date(fedAt.getTime() + SD_FRIDGE_DAYS * 86400000);
+    let level = 'ok';
+    if (days >= SD_FRIDGE_CONCERN_DAYS) level = 'overdue';
+    else if (days >= SD_FRIDGE_DAYS) level = 'due';
+    else if (days >= SD_FRIDGE_DAYS - 1) level = 'soon';
+    return { level, fedAt, dueAt, hoursSince, intervalH: SD_FRIDGE_DAYS * 24, peakH: null };
+  }
+
+  const peakH = starterPeakHours_(st, last.tempF, last.ratio, last.flour);
+  const intervalH = Math.max(6, Math.min(24, peakH * SD_COUNTER_MULT));
+  const dueAt = new Date(fedAt.getTime() + intervalH * 3600000);
+  const peakAt = new Date(fedAt.getTime() + peakH * 3600000);
+  let level = 'ok';
+  if (hoursSince >= intervalH * 1.5) level = 'overdue';
+  else if (hoursSince >= intervalH) level = 'due';
+  else if (hoursSince >= intervalH - 2) level = 'soon';
+  return { level, fedAt, dueAt, peakAt, hoursSince, intervalH, peakH };
+}
+
+function sdRel_(target, now) {
+  const mins = Math.round((target - now) / 60000);
+  const past = mins < 0;
+  const a = Math.abs(mins);
+  const h = Math.floor(a / 60), m = a % 60;
+  let str;
+  if (a < 60) str = a + 'm';
+  else if (h < 24) str = m ? h + 'h ' + m + 'm' : h + 'h';
+  else str = Math.floor(h / 24) + 'd ' + (h % 24) + 'h';
+  return past ? str + ' ago' : 'in ' + str;
+}
+
+function sdClock_(d) {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function sdDayClock_(d, now) {
+  const a = new Date(d); a.setHours(0, 0, 0, 0);
+  const b = new Date(now); b.setHours(0, 0, 0, 0);
+  const days = Math.round((a - b) / 86400000);
+  const t = sdClock_(d);
+  if (days === 0) return t;
+  if (days === 1) return t + ' tomorrow';
+  if (days === -1) return t + ' yesterday';
+  return t + ' ' + d.toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+/* ---- Rendering ---- */
+
+function renderStarter() {
+  const st = loadStarter_();
+  const stage = st.stage || 'none';
+  document.getElementById('sdSetup').style.display = stage === 'none' ? '' : 'none';
+  document.getElementById('sdBuild').style.display = stage === 'building' ? '' : 'none';
+  document.getElementById('sdActive').style.display = stage === 'active' ? '' : 'none';
+
+  renderStarterStatus_(st);
+  if (stage === 'none') renderStarterSupplies_();
+  if (stage === 'building') renderStarterBuild_(st);
+  if (stage === 'active') renderStarterActive_(st);
+  updateStarterNag_();
+}
+
+function renderStarterSupplies_() {
+  const el = document.getElementById('sdBuyList');
+  if (!el) return;
+  el.innerHTML = SD_SUPPLIES.map(x =>
+    `<div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">${escapeHtml_(x.name)}</div><div class="sd-buy-note">${escapeHtml_(x.note)}</div></div></div>`
+  ).join('');
+}
+
+function renderStarterStatus_(st) {
+  const host = document.getElementById('sdStatusHost');
+  if (!host) return;
+  const now = new Date();
+  const stage = st.stage || 'none';
+
+  if (stage === 'none') {
+    host.innerHTML = `<div class="sd-status">
+      <div class="sd-status-label">Sourdough starter</div>
+      <div class="sd-status-headline">Nothing going yet</div>
+      <div class="sd-status-sub">Two weeks of flour and water and you have a starter that lasts for years. Everything you need is below.</div>
+    </div>`;
+    return;
+  }
+
+  if (stage === 'building') {
+    const dayNum = starterBuildDay_(st);
+    const done = Object.keys(st.build || {}).length;
+    host.innerHTML = `<div class="sd-status soon">
+      <div class="sd-status-top">
+        <div class="sd-status-label">${escapeHtml_(st.name || 'Your starter')} · building</div>
+        <div class="sd-badge soon">Day ${dayNum} of 14</div>
+      </div>
+      <div class="sd-status-headline">${escapeHtml_(SD_BUILD_DAYS[Math.min(dayNum, 14) - 1].title)}</div>
+      <div class="sd-status-sub">${escapeHtml_(SD_BUILD_DAYS[Math.min(dayNum, 14) - 1].do)}</div>
+      <div class="sd-status-sub">${done} of 14 days ticked off.</div>
+    </div>`;
+    return;
+  }
+
+  const status = starterStatus_(st, now);
+  if (status.level === 'none') {
+    host.innerHTML = `<div class="sd-status soon">
+      <div class="sd-status-label">${escapeHtml_(st.name || 'Your starter')}</div>
+      <div class="sd-status-headline">Log its first feed</div>
+      <div class="sd-status-sub">Once there is a feed on record this becomes a clock: when it peaks, and when it is next owed.</div>
+    </div>`;
+    return;
+  }
+
+  const badge = { ok: 'Fed', soon: 'Due soon', due: 'Feed it', overdue: 'Overdue' }[status.level];
+  let headline, sub;
+  if (status.level === 'overdue') {
+    headline = 'Feed it now';
+    sub = st.location === 'fridge'
+      ? `Last fed ${sdRel_(status.fedAt, now)}. Past two weeks in the fridge it gets sluggish and sour - pour off any hooch and give it two feeds a day until it bounces back.`
+      : `Last fed ${sdRel_(status.fedAt, now)}, which is well past collapse. It is not dead, it is starving - feed it now and again in 12 hours.`;
+  } else if (status.level === 'due') {
+    headline = 'Ready for a feed';
+    sub = `Last fed ${sdRel_(status.fedAt, now)}.`;
+  } else if (st.location === 'fridge') {
+    headline = 'Resting';
+    sub = `Fed ${sdRel_(status.fedAt, now)}. Next feed due ${sdDayClock_(status.dueAt, now)}.`;
+  } else {
+    const peaking = status.peakAt > now;
+    headline = peaking ? `Peaks around ${sdClock_(status.peakAt)}` : 'Past its peak';
+    sub = peaking
+      ? `That is ${sdRel_(status.peakAt, now)}. Use it at the dome, just before it sinks. Next feed due ${sdDayClock_(status.dueAt, now)}.`
+      : `It peaked around ${sdClock_(status.peakAt)} and is on its way down. Still usable, just slower and sourer. Next feed ${sdRel_(status.dueAt, now)}.`;
+  }
+
+  host.innerHTML = `<div class="sd-status ${status.level}">
+    <div class="sd-status-top">
+      <div class="sd-status-label">${escapeHtml_(st.name || 'Your starter')} · ${st.location === 'fridge' ? 'fridge' : 'counter'}</div>
+      <div class="sd-badge ${status.level}">${badge}</div>
+    </div>
+    <div class="sd-status-headline">${escapeHtml_(headline)}</div>
+    <div class="sd-status-sub">${escapeHtml_(sub)}</div>
+    <div class="sd-status-actions">
+      <button class="sd-btn" onclick="quickFeedStarter()">Fed it just now</button>
+    </div>
+  </div>`;
+}
+
+// Which build day you are on by the calendar, not by how many boxes are
+// ticked - if you miss day 6 entirely, day 7 is still day 7.
+function starterBuildDay_(st) {
+  if (!st.bornOn) return 1;
+  const born = new Date(st.bornOn); born.setHours(0, 0, 0, 0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.max(1, Math.round((today - born) / 86400000) + 1);
+}
+
+function renderStarterBuild_(st) {
+  const el = document.getElementById('sdBuildDays');
+  const today = starterBuildDay_(st);
+  el.innerHTML = SD_BUILD_DAYS.map(d => {
+    const done = !!(st.build || {})[d.day];
+    const cls = 'sd-day' + (done ? ' done' : '') + (!done && d.day === today ? ' today' : '');
+    return `<div class="${cls}">
+      <button class="sd-day-check" onclick="toggleStarterBuildDay(${d.day})" aria-label="Mark day ${d.day}">${done ? '✓' : d.day}</button>
+      <div class="sd-day-body">
+        <div class="sd-day-title">Day ${d.day} · ${escapeHtml_(d.title)}</div>
+        <div class="sd-day-do">${escapeHtml_(d.do)}</div>
+        <div class="sd-day-why">${escapeHtml_(d.why)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const t = document.getElementById('sdTrouble');
+  if (t) t.innerHTML = SD_TROUBLE.map(x =>
+    `<div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">${escapeHtml_(x.name)}</div><div class="sd-buy-note">${escapeHtml_(x.note)}</div></div></div>`).join('');
+}
+
+function renderStarterActive_(st) {
+  const now = new Date();
+  const status = starterStatus_(st, now);
+  const last = sdLastFeed_(st);
+
+  // Meta strip: age, how it is performing, how well the model knows it.
+  const ageDays = st.bornOn ? Math.max(0, Math.round((now - new Date(st.bornOn)) / 86400000)) : null;
+  const rises = (st.feeds || []).filter(f => f.riseX).slice(-5).map(f => f.riseX);
+  const avgRise = rises.length ? (rises.reduce((a, b) => a + b, 0) / rises.length) : null;
+  const cal = starterCalibration_(st);
+  const calFeeds = (st.feeds || []).filter(f => f.peakAt).length;
+  document.getElementById('sdMetaRow').innerHTML = `
+    <div class="sd-meta"><div class="sd-meta-label">Age</div>
+      <div class="sd-meta-value">${ageDays === null ? '—' : ageDays}</div>
+      <div class="sd-meta-sub">${ageDays === null ? 'unknown' : 'days old'}</div></div>
+    <div class="sd-meta"><div class="sd-meta-label">Typical rise</div>
+      <div class="sd-meta-value">${avgRise ? avgRise.toFixed(1) + '×' : '—'}</div>
+      <div class="sd-meta-sub">${rises.length ? 'last ' + rises.length + ' feeds' : 'log a rise'}</div></div>
+    <div class="sd-meta"><div class="sd-meta-label">Peak model</div>
+      <div class="sd-meta-value">${calFeeds >= 2 ? (cal < 0.95 ? 'Fast' : cal > 1.05 ? 'Slow' : 'On') : '—'}</div>
+      <div class="sd-meta-sub">${calFeeds >= 2 ? Math.round(cal * 100) + '% of book' : 'needs 2 peaks'}</div></div>`;
+
+  document.querySelectorAll('#sdLocationSeg button').forEach(b =>
+    b.classList.toggle('active', b.dataset.loc === (st.location || 'counter')));
+  document.getElementById('sdLocationNote').textContent = st.location === 'fridge'
+    ? 'Cold slows it right down, so once a week is plenty. Take it out and give it two counter feeds before you bake with it.'
+    : 'On the counter it needs feeding before it fully collapses - roughly every ' + Math.round(status.intervalH || 12) + ' hours at the moment.';
+
+  // Feed form defaults follow whatever you used last, since that is what
+  // you are most likely to do again.
+  sdFillSelect_('sdFeedRatio', Object.keys(SD_RATIO_FACTOR).map(r => [r, r + '  (' + SD_RATIO_GRAMS[r].join('g / ') + 'g)']), st.ratio);
+  sdFillSelect_('sdFeedFlour', Object.keys(SD_FLOUR_LABEL).map(f => [f, SD_FLOUR_LABEL[f]]), st.flour);
+  sdFillSelect_('sdRiseX', [['', 'Not yet'], ['1.3', 'Barely moved (1.3×)'], ['1.6', 'Rose a bit (1.6×)'],
+    ['2', 'Doubled (2×)'], ['2.5', 'More than doubled (2.5×)'], ['3', 'Tripled (3×)'], ['3.5', 'Over the top (3.5×+)']],
+    last && last.riseX ? String(last.riseX) : '');
+  sdFillSelect_('sdSmell', [['', 'Not noted'], ['yeasty', 'Yeasty and sweet'], ['tangy', 'Tangy, like yoghurt'],
+    ['vinegar', 'Sharply vinegary'], ['acetone', 'Acetone / nail polish']], last && last.smell ? last.smell : '');
+  const tempEl = document.getElementById('sdFeedTemp');
+  if (tempEl && !tempEl.value) tempEl.value = st.tempF || SD_DEFAULT_TEMP_F;
+  const timeEl = document.getElementById('sdFeedTime');
+  if (timeEl && !timeEl.value) timeEl.value = sdTimeValue_(now);
+  if (last) {
+    const hoochEl = document.getElementById('sdHooch');
+    if (hoochEl) hoochEl.value = last.hooch ? 'yes' : 'no';
+    const peakEl = document.getElementById('sdPeakTime');
+    if (peakEl && !peakEl.value && last.peakAt) peakEl.value = sdTimeValue_(new Date(last.peakAt));
+  }
+  initStarterFeedForm_();
+  renderStarterFeedGrams_();
+
+  // Advice is driven off what was actually logged, so it only appears when
+  // there is something real to say.
+  const advice = [];
+  if (last && last.hooch) advice.push('Hooch means hungry. Feed more often, or move to a leaner ratio like 1:5:5 so it takes longer to run out.');
+  if (last && last.smell === 'acetone') advice.push('Acetone is the underfed smell. Two feeds a day at 1:5:5 for a few days will bring it back.');
+  if (avgRise !== null && avgRise < 1.8) advice.push('Averaging under 2× over the last few feeds. Usually warmth or feed frequency - try somewhere 5°F warmer before changing anything else.');
+  const adviceEl = document.getElementById('sdRiseAdvice');
+  adviceEl.innerHTML = advice.length
+    ? advice.map(a => `<div class="ov-mini-empty" style="margin:8px 0 0;">${escapeHtml_(a)}</div>`).join('')
+    : '';
+
+  renderStarterFeedList_(st);
+  renderStarterPlan_(st);
+  const ref = document.getElementById('sdReference');
+  if (ref) ref.innerHTML = SD_REFERENCE.map(x =>
+    `<div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">${escapeHtml_(x.name)}</div><div class="sd-buy-note">${escapeHtml_(x.note)}</div></div></div>`).join('');
+}
+
+function sdFillSelect_(id, pairs, selected) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = pairs.map(([v, label]) =>
+    `<option value="${escapeHtml_(v)}"${String(v) === String(selected) ? ' selected' : ''}>${escapeHtml_(label)}</option>`).join('');
+}
+
+function sdTimeValue_(d) {
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function initStarterFeedForm_() {
+  ['sdFeedRatio', 'sdFeedFlour', 'sdFeedTemp'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.sdBound) {
+      el.dataset.sdBound = '1';
+      el.addEventListener('input', renderStarterFeedGrams_);
+      el.addEventListener('change', renderStarterFeedGrams_);
+    }
+  });
+}
+
+function renderStarterFeedGrams_() {
+  const el = document.getElementById('sdFeedGrams');
+  if (!el) return;
+  const ratio = document.getElementById('sdFeedRatio').value;
+  const flour = document.getElementById('sdFeedFlour').value;
+  const temp = Number(document.getElementById('sdFeedTemp').value) || SD_DEFAULT_TEMP_F;
+  const g = SD_RATIO_GRAMS[ratio] || [50, 50, 50];
+  const st = loadStarter_();
+  const h = starterPeakHours_(st, temp, ratio, flour);
+  const hrs = Math.floor(h), mins = Math.round((h - hrs) * 60);
+  el.textContent = `Keep ${g[0]}g, discard the rest, add ${g[1]}g ${SD_FLOUR_LABEL[flour].toLowerCase()} + ${g[2]}g water. `
+    + `At ${temp}°F that should peak in about ${hrs}h ${mins}m.`;
+}
+
+function renderStarterFeedList_(st) {
+  const el = document.getElementById('sdFeedList');
+  const feeds = (st.feeds || []).slice(-12).reverse();
+  if (!feeds.length) { el.innerHTML = '<div class="ov-mini-empty">No feeds logged yet.</div>'; return; }
+  const now = new Date();
+  el.innerHTML = feeds.map(f => {
+    const at = new Date(f.at);
+    const rise = f.riseX ? f.riseX.toFixed(1) + '×' : '—';
+    const cls = !f.riseX ? '' : (f.riseX >= 2 ? ' strong' : ' weak');
+    const took = f.peakAt ? ' · peaked in ' + (((new Date(f.peakAt) - at) / 3600000).toFixed(1)) + 'h' : '';
+    return `<div class="sd-feed-row">
+      <div class="sd-feed-when">${escapeHtml_(sdDayClock_(at, now))} · ${escapeHtml_(at.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }))}
+        <div class="sd-feed-detail">${escapeHtml_(f.ratio)} · ${escapeHtml_(SD_FLOUR_LABEL[f.flour] || f.flour)} · ${f.tempF}°F${escapeHtml_(took)}</div></div>
+      <div class="sd-feed-rise${cls}">${rise}</div>
+    </div>`;
+  }).join('');
+}
+
+// Back-planner. A fridge starter cannot go straight into a loaf - it needs
+// waking up first, and the levain wants to hit its peak exactly when you
+// want to mix. Working backwards from the bake is the only way that lands.
+function renderStarterPlan_(st) {
+  const el = document.getElementById('sdPlan');
+  if (!el) return;
+  if (!st.bakeAt) { el.innerHTML = '<div class="ov-mini-empty" style="margin-top:8px;">Pick when you want to mix your dough and I will work backwards from it.</div>'; return; }
+
+  const bake = new Date(st.bakeAt);
+  const now = new Date();
+  const levainH = starterPeakHours_(st, st.tempF || SD_DEFAULT_TEMP_F, '1:5:5', st.flour || 'bread');
+  const steps = [];
+
+  if (st.location === 'fridge') {
+    steps.push({ at: new Date(bake.getTime() - 48 * 3600000), what: 'Take it out of the fridge and feed it 1:2:2',
+                 note: 'Leave it on the counter from here. Two warm feeds is what it takes to go from dormant to vigorous.' });
+    steps.push({ at: new Date(bake.getTime() - 24 * 3600000), what: 'Feed again 1:2:2',
+                 note: 'It should be rising noticeably faster than the first feed. If it is not, add one more feed and push the bake back a day.' });
+  } else {
+    steps.push({ at: new Date(bake.getTime() - 24 * 3600000), what: 'Normal feed',
+                 note: 'Nothing special needed - it is already awake.' });
+  }
+  steps.push({ at: new Date(bake.getTime() - levainH * 3600000), what: 'Build the levain, 1:5:5',
+               note: `Sized so it peaks right when you want to mix. At ${st.tempF || SD_DEFAULT_TEMP_F}°F that is about ${levainH.toFixed(1)} hours ahead.` });
+  steps.push({ at: bake, what: 'Mix the dough',
+               note: 'The levain should be domed and just about to sink. Float test it if you want the reassurance.' });
+
+  el.innerHTML = steps.map(s2 => {
+    const past = s2.at < now;
+    return `<div class="sd-plan-step" style="${past ? 'opacity:0.5;' : ''}">
+      <div class="sd-plan-when">${escapeHtml_(s2.at.toLocaleDateString('en-US', { weekday: 'short' }))}<br>${escapeHtml_(sdClock_(s2.at))}</div>
+      <div class="sd-plan-what">${escapeHtml_(s2.what)}<small>${escapeHtml_(s2.note)}</small></div>
+    </div>`;
+  }).join('') + `<button class="sd-btn secondary" style="width:100%; margin-top:10px;" onclick="clearStarterBake()">Clear plan</button>`;
+}
+
+/* ---- The nag ---- */
+
+// Painted onto the nav tab and the subtab, not just inside the section. A
+// reminder you only see after navigating to the page you were supposed to
+// be reminded about is not a reminder.
+function updateStarterNag_() {
+  const st = loadStarter_();
+  let on = false;
+  if (st.stage === 'active') {
+    const level = starterStatus_(st).level;
+    on = level === 'due' || level === 'overdue';
+  } else if (st.stage === 'building') {
+    on = !(st.build || {})[starterBuildDay_(st)] && starterBuildDay_(st) <= 14;
+  }
+  ['sdTabDot', 'sdSidebarDot', 'sdSubtabDot'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', on);
+  });
+}
+
+/* ---- Actions ---- */
+
+function addStarterSuppliesToShopping() {
+  const list = loadShoppingList();
+  const have = new Set(list.map(i => i.name.toLowerCase()));
+  let added = 0;
+  SD_SUPPLIES.forEach(x => {
+    const name = x.name.replace(/\s*\(.*?\)\s*/g, '').trim();
+    if (have.has(name.toLowerCase())) return;
+    list.push({ id: genId_(), name, checked: false });
+    added++;
+  });
+  saveShoppingList(list);
+  renderShoppingList();
+  alert(added ? `Added ${added} item${added === 1 ? '' : 's'} to your Shopping list.` : 'Those are already on your Shopping list.');
+}
+
+function beginStarter() {
+  const st = loadStarter_();
+  st.name = (document.getElementById('sdNameInput').value || '').trim();
+  st.stage = 'building';
+  st.bornOn = new Date().toISOString().slice(0, 10);
+  st.build = { 1: new Date().toISOString() };
+  saveStarter_(st);
+  renderStarter();
+}
+
+function toggleStarterBuildDay(day) {
+  const st = loadStarter_();
+  st.build = st.build || {};
+  if (st.build[day]) delete st.build[day];
+  else st.build[day] = new Date().toISOString();
+  saveStarter_(st);
+  renderStarter();
+}
+
+function promoteStarter() {
+  const st = loadStarter_();
+  st.stage = 'active';
+  saveStarter_(st);
+  renderStarter();
+}
+
+function setStarterLocation(loc) {
+  const st = loadStarter_();
+  st.location = loc;
+  saveStarter_(st);
+  renderStarter();
+}
+
+function logStarterFeed() {
+  const st = loadStarter_();
+  const ratio = document.getElementById('sdFeedRatio').value;
+  const flour = document.getElementById('sdFeedFlour').value;
+  const tempF = Number(document.getElementById('sdFeedTemp').value) || SD_DEFAULT_TEMP_F;
+  const timeStr = document.getElementById('sdFeedTime').value;
+  const at = new Date();
+  if (timeStr) {
+    const [h, m] = timeStr.split(':').map(Number);
+    at.setHours(h, m, 0, 0);
+    // A feed time later than now is one from last night, not the future.
+    if (at > new Date()) at.setDate(at.getDate() - 1);
+  }
+  st.feeds = st.feeds || [];
+  st.feeds.push({ id: genId_(), at: at.toISOString(), ratio, flour, tempF, location: st.location || 'counter' });
+  st.ratio = ratio; st.flour = flour; st.tempF = tempF;
+  saveStarter_(st);
+  document.getElementById('sdFeedTime').value = '';
+  document.getElementById('sdPeakTime').value = '';
+  renderStarter();
+}
+
+function quickFeedStarter() {
+  const st = loadStarter_();
+  st.feeds = st.feeds || [];
+  st.feeds.push({ id: genId_(), at: new Date().toISOString(), ratio: st.ratio || '1:2:2',
+                  flour: st.flour || 'bread', tempF: st.tempF || SD_DEFAULT_TEMP_F, location: st.location || 'counter' });
+  saveStarter_(st);
+  renderStarter();
+}
+
+// Attaches to the most recent feed rather than creating a row of its own -
+// a rise is an observation ABOUT a feed, not a separate event.
+function logStarterRise() {
+  const st = loadStarter_();
+  const last = sdLastFeed_(st);
+  if (!last) { alert('Log a feed first - the rise gets recorded against it.'); return; }
+  const riseX = Number(document.getElementById('sdRiseX').value);
+  if (riseX) last.riseX = riseX; else delete last.riseX;
+  const smell = document.getElementById('sdSmell').value;
+  if (smell) last.smell = smell; else delete last.smell;
+  last.hooch = document.getElementById('sdHooch').value === 'yes';
+  const peakStr = document.getElementById('sdPeakTime').value;
+  if (peakStr) {
+    const fed = new Date(last.at);
+    const peak = new Date(fed);
+    const [h, m] = peakStr.split(':').map(Number);
+    peak.setHours(h, m, 0, 0);
+    // Peaks routinely land the morning after an evening feed.
+    if (peak <= fed) peak.setDate(peak.getDate() + 1);
+    last.peakAt = peak.toISOString();
+  } else {
+    delete last.peakAt;
+  }
+  saveStarter_(st);
+  renderStarter();
+}
+
+function planStarterBake() {
+  const v = document.getElementById('sdBakeAt').value;
+  if (!v) { alert('Pick a date and time to mix your dough.'); return; }
+  const st = loadStarter_();
+  st.bakeAt = new Date(v).toISOString();
+  saveStarter_(st);
+  renderStarter();
+}
+
+function clearStarterBake() {
+  const st = loadStarter_();
+  st.bakeAt = null;
+  saveStarter_(st);
+  renderStarter();
+}
+
 const PENDING_RECIPE_SEEDS = [
   {
     id: 'seed-swiss-fondue-20260811',
@@ -3495,7 +4345,8 @@ function renderKitchenTab() {
 }
 
 function showKitchenSection(section) {
-  ['inventory', 'recipes', 'grocery', 'shopping'].forEach(s => {
+  if (section === 'starter') renderStarter();
+  ['inventory', 'recipes', 'grocery', 'shopping', 'starter'].forEach(s => {
     const el = document.getElementById('kitchenSection' + s.charAt(0).toUpperCase() + s.slice(1));
     if (el) el.style.display = s === section ? 'block' : 'none';
     const tab = document.querySelector(`.kitchen-subtab[data-section="${s}"]`);
@@ -6710,7 +7561,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-20-predicted-clear-times';
+const APP_BUILD_VERSION = '2026-08-21-sourdough-starter';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -11100,6 +11951,14 @@ loadDeploymentUrl();
 loadCalendarWorkerUrl();
 flushPendingLogs();
 renderTrainerStats();
+renderStarter();
+// The starter's status is a clock, so it goes stale just sitting there.
+// A minute is plenty - nothing here changes faster than that.
+setInterval(() => {
+  updateStarterNag_();
+  const sec = document.getElementById('kitchenSectionStarter');
+  if (sec && sec.style.display !== 'none') renderStarter();
+}, 60000);
 initViewportHeightObserver();
 initTabBarViewportPin();
 loadWidgetOrder();
