@@ -21,6 +21,9 @@
     --text: #eef2fb; --muted: #8b96ad; --accent: #5b8cff; --green: #34c795;
     --red: #ef5b6b; --amber: #f0b429; --blue: #5b8cff; --purple: #9c8cf5; --teal: #33c2c2;
     --nav-bg: rgba(16,20,31,0.82);
+    /* The monogram's own brown, lightened for the dark ground - the true
+       #6B4229 goes muddy on #10141f. The light themes below use the real one. */
+    --logo-ink: #C79570;
     --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
   @media (prefers-color-scheme: light) {
@@ -29,6 +32,7 @@
       --text: #1a2233; --muted: #66738c; --accent: #3d6fe0; --green: #1fa972;
       --red: #d8434f; --amber: #c98a12; --blue: #3d6fe0; --purple: #7c6ae0; --teal: #1aa3a3;
       --nav-bg: rgba(244,246,251,0.82);
+      --logo-ink: #6B4229;
     }
   }
   :root[data-theme="light"] {
@@ -36,6 +40,7 @@
     --text: #1a2233; --muted: #66738c; --accent: #3d6fe0; --green: #1fa972;
     --red: #d8434f; --amber: #c98a12; --blue: #3d6fe0; --purple: #7c6ae0; --teal: #1aa3a3;
     --nav-bg: rgba(244,246,251,0.82);
+    --logo-ink: #6B4229;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
@@ -194,31 +199,35 @@
     position: fixed; inset: 0; z-index: 200;
     display: flex; align-items: center; justify-content: center;
     background: var(--bg);
-    animation: splash-out 300ms ease 1250ms forwards;
+    animation: splash-out 320ms ease 1560ms forwards;
   }
   @keyframes splash-out { to { opacity: 0; visibility: hidden; } }
-  .splash-mark { width: 132px; height: 132px; overflow: visible; }
+  .splash-mark { width: 136px; height: 136px; overflow: visible; }
 
   .splash-mark .sp-draw {
     fill: none;
-    stroke: var(--accent);
-    stroke-width: 5;
+    stroke: var(--logo-ink);
+    /* Wider than the logo is anywhere thick (18.4px at its fattest), so
+       the pen sweeps the full body of the letterform. Nothing outside the
+       mark shows, because the whole group is clipped to the monogram's
+       own outline - the width only controls how much of that outline each
+       pass uncovers. */
+    stroke-width: 24;
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-dasharray: 1;
     stroke-dashoffset: 1;
-    animation: sp-draw 820ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+    animation: sp-draw 780ms cubic-bezier(0.55, 0.05, 0.35, 1) forwards;
   }
   @keyframes sp-draw { to { stroke-dashoffset: 0; } }
 
-  /* Staggered so the strokes land in a deliberate order instead of all
-     racing each other. Delays are cumulative with the 820ms draw, so the
-     last stroke finishes around 1150ms - just before the fade begins. */
-  .splash-mark .sp-draw:nth-of-type(2) { animation-delay: 180ms; animation-duration: 620ms; }
-  .splash-mark .sp-draw:nth-of-type(3) { animation-delay: 620ms; animation-duration: 320ms; }
+  /* Stroke two starts just before stroke one lands, so the pen reads as
+     carrying on rather than stopping and restarting. It finishes around
+     1440ms, just ahead of the fade. */
+  .splash-mark .sp-draw:nth-of-type(2) { animation-delay: 700ms; animation-duration: 740ms; }
 
   /* Anything meant to be a solid shape rather than a traced line fades in
-     once the strokes are down. */
+     once the strokes are down. Unused while the mark is pure line work. */
   .splash-mark .sp-fill { opacity: 0; animation: sp-fill 300ms ease 900ms forwards; }
   @keyframes sp-fill { to { opacity: 1; } }
 
@@ -1267,22 +1276,47 @@
      else is parsed. See the .splash rules in the stylesheet for how the
      draw-on effect works.
 
-     >>> TO SWAP IN THE REAL LOGO: replace the paths below and the viewBox
-     to match, and nothing else needs to change. Two rules:
-       1. Keep pathLength="1" on every path you want traced. That's what
-          lets the same CSS drive any shape without measuring it.
-       2. The draw effect strokes an OUTLINE, so it needs paths that are
-          lines - a logo exported as filled shapes has no line to trace
-          and will just pop in. If yours is filled artwork, either export
-          a stroked "skeleton" version for the draw and cross-fade to the
-          filled one (put that on .sp-fill), or say so and I'll set up the
-          mask-based alternative.
-     The mark here is a stand-in: a ring, a trend line and its arrowhead. -->
+     The mark is the AJC monogram from the app icon, and the finished frame
+     is the monogram - not an approximation of it. There was no vector, so
+     two things were recovered from the 512px PNG:
+
+       #spOutline  the true filled OUTLINE of the ink, traced from the
+                   bitmap's contour and refit as cubic Beziers. This is the
+                   artwork: every swell and taper of the calligraphy.
+       .sp-draw    the CENTRELINE, the path a pen travels down the middle.
+
+     The animation strokes the centreline fat enough to cover the widest
+     part of the mark, with the whole group clipped to the outline. So the
+     REVEAL follows the pen, while the SHAPE is always exactly the logo -
+     which is why the stroke thickens and thins as it draws instead of
+     going on as a uniform line. At the end, every pixel of the outline has
+     been uncovered and the result is the icon.
+
+     The centreline is cut into the two strokes the monogram is written in:
+     the G bowl, from the top curl anticlockwise round to the bottom right;
+     then one unbroken motion up the diagonal, up to the sharp apex, back
+     down round the inner curve and out through the tail. Each is a single
+     continuous run of the traced skeleton refit as a handful of Beziers
+     (6 for the bowl, 10 for the flourish), so there is no seam, no
+     backtrack and no pixel staircase anywhere along them.
+
+     >>> TO SWAP IN DIFFERENT ARTWORK: replace #spOutline with the filled
+     shape and the .sp-draw paths with lines running down the middle of it,
+     keeping pathLength="1" on each (that is what lets the same CSS drive
+     any shape without measuring it). If a real vector of the monogram ever
+     turns up, its outline goes straight into #spOutline and this gets
+     sharper still at large sizes. -->
 <div class="splash" id="appSplash" aria-hidden="true">
-  <svg class="splash-mark" viewBox="0 0 120 120" role="img" aria-label="Loading">
-    <path class="sp-draw" pathLength="1" d="M60 10 a50 50 0 1 1 -0.05 0"></path>
-    <path class="sp-draw" pathLength="1" d="M34 76 L52 56 L66 68 L88 40"></path>
-    <path class="sp-draw" pathLength="1" d="M74 40 L88 40 L88 54"></path>
+  <svg class="splash-mark" viewBox="0 0 512 512" role="img" aria-label="AJC">
+    <defs>
+      <clipPath id="spOutline">
+        <path clip-rule="evenodd" d="M135.5 208 C149.72 193.78 164.47 180.85 181.2 169.7 C185.34 166.94 189.43 163.67 193.8 161.3 C197.87 159.1 201.73 156.5 205.8 154.3 C213.01 150.4 220.59 147.2 227.8 143.3 C230.41 141.89 233.69 140.95 236.5 140 C244.58 137.28 252.56 133.94 260.7 131.2 C272.5 127.23 284.98 125.78 297.1 123.6 C299.02 123.25 301.06 123.61 303 123.5 C306.06 123.33 308.86 122.5 312 122.5 C315.65 122.5 319.36 122.3 323 122.5 C324.71 122.59 326.29 123.41 328 123.5 C342.77 124.32 362.45 128.83 367.8 144.7 C368.78 147.61 368.67 150.97 368.5 154 C368.34 156.86 366.9 159.82 366 162.5 C364.41 167.21 359.6 172.22 356.5 176 C354.31 178.68 350.48 181.18 347.6 183.1 C346.77 183.65 344.8 185.19 344 183.7 C343.45 182.68 344.58 181.37 345.1 180.6 C346.69 178.22 348.34 175.71 349.7 173.2 C355.8 161.94 359.95 144.75 346.2 137.3 C340.74 134.34 334.3 131.85 328 131.5 C325.67 131.37 323.33 131.63 321 131.5 C319.29 131.41 317.71 130.59 316 130.5 C313.51 130.36 311.41 131.37 309 131.5 C306.67 131.63 304.33 131.37 302 131.5 C296.62 131.8 291.21 133.45 285.9 134.4 C274.18 136.51 262.92 140.42 251.7 144.2 C237.55 148.97 224.3 156.61 211.2 163.7 C187.8 176.37 166.79 192.71 148 211.5 C135.98 223.52 124.82 236.2 116.7 251.2 C109.08 265.26 102.4 279.73 101.5 296 C101.41 297.71 100.59 299.29 100.5 301 C100.36 303.49 101.37 305.59 101.5 308 C102.28 322.16 108.61 335.16 117.5 346 C120.24 349.34 123.72 351.81 127 354.5 C138.84 364.21 154.04 370.69 169.1 373.4 C172.02 373.93 175.01 374.08 177.9 374.6 C181.38 375.22 184.47 375.3 188 375.5 C192.39 375.74 196.48 376.75 201 376.5 C202.71 376.41 204.29 375.59 206 375.5 C208.66 375.35 211.34 375.65 214 375.5 C217.35 375.31 220.8 374.19 224.1 373.6 C229.39 372.65 234.56 371.93 239.7 370.2 C246.96 367.75 254.27 365.44 261.5 363 C266.86 361.19 271.85 357.98 276.8 355.3 C291.66 347.25 305.51 337.99 317.5 326 C328.2 315.3 336.91 303.39 345.3 290.8 C347.28 287.83 349.24 284.75 351.5 282 C352.01 281.38 353.74 280.35 353.8 279.5 C353.9 277.99 351.38 278.99 350.8 279.3 C347.45 281.12 343.55 281.88 340.2 283.7 C338.2 284.79 335.66 285.27 333.5 286 C327.43 288.05 321.57 290.95 315.5 293 C300.6 298.02 285.65 302.81 270.1 305.6 C262.35 306.99 254.92 308.5 247 308.5 C238.93 308.5 228.69 308.98 222 303.5 C220.44 302.22 218.06 300.17 217.1 298.4 C213.87 292.45 215.79 285.28 217.8 279.3 C220.11 272.43 224.92 265.59 229.5 260 C234.76 253.58 239.6 246.9 245.5 241 C248.61 237.89 251.6 234.29 255 231.5 C256.89 229.95 258.75 228.75 260.5 227 C262.4 225.1 264.16 223.39 266.4 221.9 C266.73 221.68 268.53 220.51 267.6 219.9 C266.92 219.45 265.73 220.41 265.2 220.7 C263.63 221.55 261.78 221.84 260.2 222.7 C257.59 224.11 254.31 225.05 251.5 226 C247.67 227.29 243.75 229.78 240.2 231.7 C233.46 235.35 226.54 238.65 219.8 242.3 C213.09 245.94 206.76 250.66 200.4 254.9 C186.49 264.17 172.87 273.95 160 284.5 C151.95 291.1 144.05 297.9 136 304.5 C133.17 306.82 130.07 309.43 127.5 312 C127.12 312.38 124.53 314.31 124.2 312.9 C124.03 312.17 125.32 310.77 125.7 310.2 C127.29 307.81 129.7 306.2 131.5 304 C137.01 297.28 143.22 290.06 150 284.5 C151.51 283.26 153.1 282.4 154.5 281 C163.64 271.86 174.07 264.64 184 256.5 C194.13 248.2 205.63 239.97 217.2 233.7 C221.88 231.17 226.12 227.83 230.8 225.3 C237.79 221.51 245.21 218.49 252.2 214.7 C256.71 212.26 261.64 210.64 266.5 209 C271.27 207.39 275.86 205.07 281 204.5 C284.04 204.16 287.41 202.48 290.4 204.1 C293.64 205.86 294.26 209.85 292.3 212.8 C290.59 215.36 288.31 216.61 286 218.5 C283.26 220.75 280.74 223.25 278 225.5 C261.43 239.08 245.87 253.44 233.9 271.4 C230.34 276.74 224.07 287.27 229.1 293.4 C231.46 296.28 236.71 296.79 240.1 297.4 C245.78 298.42 252.52 297.6 258.1 296.6 C261.63 295.97 265.34 296.04 268.9 295.4 C273 294.66 277 293.34 281.1 292.6 C309.42 287.51 335.38 274.87 362.3 265.8 C366.49 264.39 370.53 262.6 374.7 261.2 C385.21 257.66 396.23 255.55 407.1 253.6 C409.02 253.25 411.06 253.61 413 253.5 C415.06 253.39 416.91 252.5 419 252.5 C419.49 252.5 422.53 252.42 422 253.7 C421.49 254.92 418.96 255.14 417.9 255.4 C414.21 256.32 410.31 256.99 406.7 258.2 C393.8 262.55 379.9 266.6 370 276.5 C363.19 283.31 357.29 291.72 352.7 300.2 C351.08 303.19 348.65 306.38 346.5 309 C341.52 315.08 337.48 321.92 332.5 328 C326.94 334.78 319.72 340.99 313 346.5 C304.35 353.59 295.1 360.34 285.2 365.7 C281.27 367.83 277.13 369.57 273.2 371.7 C270.59 373.11 267.31 374.05 264.5 375 C259.11 376.82 253.73 378.97 248.3 380.8 C240.15 383.54 231.29 384.89 222.9 386.4 C216.99 387.46 210.99 387.17 205 387.5 C203.52 387.58 202.25 388.4 200.8 388.5 C197.33 388.75 194.35 387.69 191 387.5 C188.01 387.33 184.99 387.67 182 387.5 C180.59 387.42 179.28 386.85 177.9 386.6 C170.59 385.29 163.45 384.61 156.3 382.2 C147.45 379.22 139.06 376.18 130.8 371.7 C117.37 364.42 105.51 351.51 98.3 338.2 C96.74 335.32 95.84 331.8 94.8 328.7 C90.89 317.09 89.82 305.3 90.5 293 C90.92 285.43 93.39 277.44 95.8 270.3 C103.68 246.89 118.03 225.47 135.5 208 Z"></path>
+      </clipPath>
+    </defs>
+    <g clip-path="url(#spOutline)">
+      <path class="sp-draw" pathLength="1" d="M345 183 C378.1 149.9 355.7 128.1 317 126 C249.8 122.3 168.2 177 127.4 226 C107.5 249.9 91.1 282.1 96.4 314 C103.6 356.8 142.7 374.5 181 380.9 C236.4 390.1 297.9 359.8 332.7 318 C342.2 306.5 357 290 360 275"></path>
+      <path class="sp-draw" pathLength="1" d="M125 313 C155.7 282.3 188.9 256.2 226 233.6 C237 226.8 250.5 219.2 263 215.8 C271.5 213.4 283.8 211.3 283.3 210.6 C282.7 209.5 281.1 211.7 280 212.2 C272.9 215.8 268.2 226.6 262 232.1 C248.1 244.5 232.3 259.6 224.6 277 C221.4 284.1 219.6 295.4 228 299.6 C244.7 307.9 270.1 300.9 287 296.2 C307.2 290.6 343.4 280.2 362 273 C382.5 265.1 399.7 256 422 253"></path>
+    </g>
   </svg>
 </div>
 
@@ -6652,7 +6686,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-20-launch-splash';
+const APP_BUILD_VERSION = '2026-08-20-monogram-splash';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
