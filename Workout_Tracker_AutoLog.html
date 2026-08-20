@@ -578,6 +578,11 @@
   .cal-refresh-btn { background: var(--surface); border: none; color: var(--accent); width: 34px; height: 34px; border-radius: 10px; font-size: 16px; cursor: pointer; transition: all 0.15s; }
   .cal-refresh-btn:hover, .cal-refresh-btn:active { background: var(--surface2); }
   .cal-status { font-family: var(--font); font-size: 13px; color: var(--muted); text-align: center; padding: 24px 12px; line-height: 1.5; }
+  /* On a successful load the status is emptied rather than removed, so
+     without this it keeps eating its 24px padding plus a line box - about
+     50px of dead space above the first event, which is 12% of the screen
+     in landscape. */
+  .cal-status:empty { display: none; }
   .cal-status.error { color: var(--red); }
   .cal-day-group { margin-bottom: 14px; }
   .cal-day-label { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding: 0 2px; }
@@ -6549,7 +6554,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-20-landscape-edge-chips';
+const APP_BUILD_VERSION = '2026-08-20-all-view-artboards';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
