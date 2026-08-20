@@ -36,7 +36,7 @@
 
   <!-- ===== Top bar (.app-tabs): 44px, spans the full width but insets
        its contents. Title left, tabs centred, week range right. ===== -->
-  <div style="position: absolute; left: 0; right: 0; top: 0; height: 44px; background: rgba(16,20,31,0.82); border-bottom: 1px solid rgba(210,225,255,0.09); display: flex; align-items: center; padding-left: {{sideInset}}px; padding-right: {{sideInset}}px; box-sizing: border-box; z-index: 30;">
+  <div style="position: absolute; left: {{sideInset}}px; right: {{sideInset}}px; top: 0; height: 44px; background: rgba(16,20,31,0.82); border-bottom: 1px solid rgba(210,225,255,0.09); display: flex; align-items: center; padding: 0 8px; box-sizing: border-box; z-index: 30;">
     <div style="display: flex; align-items: center; width: 100%; padding: 0 14px; box-sizing: border-box;">
       <div style="font-size: 15px; font-weight: 800; letter-spacing: -0.3px; white-space: nowrap;">TRAINER</div>
       <div style="display: flex; align-items: center; gap: 2px; margin: 0 auto;">
@@ -198,7 +198,6 @@
         </div>
         <div style="font-size: 13px; color: #5b8cff; margin-bottom: 8px;">61% of goal vs. 63% of year done</div>
         <div style="font-size: 48px; font-weight: 800; color: #ef5b6b; letter-spacing: -1.5px; line-height: 1;">−1,201</div>
-        <div style="font-size: 13px; color: #8b96ad; margin-top: 6px;">reps behind pace</div>
       </div>
 
       <div style="background: #1a2233; border-radius: 20px; padding: 22px 12px 18px; display: flex; justify-content: space-around;">
@@ -236,22 +235,21 @@
     </div>
   </div>
 
-  <!-- ===== Floating controls. Two small stat pills at the top and
-       bottom of the right edge (the middle of that edge is where the
-       Dynamic Island sits in one rotation), and the Shuffle button in
-       the bottom-left corner above the home indicator. All three clear
-       the literal screen edge by 6px. ===== -->
-  <div style="position: absolute; right: 14px; top: 56px; width: 40px; border-radius: 14px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; box-sizing: border-box;">
-    <div style="font-size: 6px; font-weight: 600; color: #8b96ad; text-transform: uppercase; margin-bottom: 1px;">Sets</div>
-    <div style="font-size: 10px; font-weight: 800; white-space: nowrap;">27/88</div>
+  <!-- ===== Floating controls. Two narrow translucent chips hugging the
+       Dynamic Island on the right edge, and the Shuffle chip mirroring
+       the lower one on the left. 19%/81% of the screen height keeps
+       all three clear of both the island and the corner arcs. ===== -->
+  <div style="position: absolute; right: 14px; top: 19%; width: 32px; height: 60px; border-radius: 16px; background: rgba(26,34,51,0.58); backdrop-filter: blur(10px); box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 3px; box-sizing: border-box;">
+    <div style="font-size: 6px; font-weight: 600; color: #8b96ad; text-transform: uppercase; line-height: 1.15; margin-bottom: 2px; text-align: center;">Sets</div>
+    <div style="font-size: 10px; font-weight: 800; line-height: 1.1; text-align: center;">27<br>/88</div>
   </div>
 
-  <div style="position: absolute; right: 14px; bottom: 22px; width: 40px; border-radius: 14px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; box-sizing: border-box;">
-    <div style="font-size: 6px; font-weight: 600; color: #8b96ad; text-transform: uppercase; margin-bottom: 1px;">Days Active</div>
-    <div style="font-size: 10px; font-weight: 800; white-space: nowrap;">1/7</div>
+  <div style="position: absolute; right: 14px; bottom: 19%; width: 32px; height: 60px; border-radius: 16px; background: rgba(26,34,51,0.58); backdrop-filter: blur(10px); box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 3px; box-sizing: border-box;">
+    <div style="font-size: 6px; font-weight: 600; color: #8b96ad; text-transform: uppercase; line-height: 1.15; margin-bottom: 2px; text-align: center;">Days Active</div>
+    <div style="font-size: 10px; font-weight: 800; line-height: 1.1; text-align: center;">1<br>/7</div>
   </div>
 
-  <div style="position: absolute; left: 14px; bottom: 14px; width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #1db954, #169c46); box-shadow: 0 3px 10px rgba(0,0,0,0.3); z-index: 46; display: flex; align-items: center; justify-content: center;">
+  <div style="position: absolute; left: 14px; bottom: 19%; width: 32px; height: 60px; border-radius: 16px; background: rgba(29,185,84,0.58); backdrop-filter: blur(10px); box-shadow: 0 3px 10px rgba(0,0,0,0.3); z-index: 46; display: flex; align-items: center; justify-content: center;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
   </div>
 

@@ -971,7 +971,20 @@
        screen. Everything below that would otherwise offset off
        env(safe-area-inset-bottom) uses this flat gutter instead. */
     body { max-width: 1080px; padding-bottom: 10px; }
-    .app-tabs { max-width: 1080px; }
+
+    /* The bar stops at the safe area instead of spanning the glass edge
+       to edge. Two things were wrong with full-bleed here: the tab row
+       ran underneath the Dynamic Island on whichever side it lands, and
+       the bar's own top corners were being cut by the ~54px screen
+       radius. Insetting the bar itself (rather than only padding its
+       contents, which the base rule did) fixes both, and the contents
+       then only need their own small padding. */
+    .app-tabs {
+      max-width: 1080px;
+      left: max(6px, env(safe-area-inset-left, 0px));
+      right: max(6px, env(safe-area-inset-right, 0px));
+      padding: env(safe-area-inset-top, 0px) 8px 0;
+    }
 
     .day-title { font-size: 17px; }
     .ov-page-title { font-size: 20px; }
@@ -1027,11 +1040,12 @@
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* Small round icon button in the bottom-left corner. The 14px
-       diagonal inset isn't decorative: the screen's own corner radius
-       is ~54px, so anything sitting flush in a corner gets clipped by
-       the glass even though nothing else on that edge does. 14/14 puts
-       the whole 38px circle inside the arc. position:fixed here is a
+    /* Narrow translucent chip on the left edge, mirroring the Days
+       Active chip's height on the right (bottom:19% is exactly where
+       the .ov-grid strip below ends, so the two line up). Sitting at
+       19-31% down the edge rather than in the corner also keeps it
+       clear of the ~54px screen radius without needing a diagonal
+       inset. position:fixed here is a
        body-level element (a sibling of .app-tabs/.app-sidebar, not
        nested inside .app-views-track, the swipe carousel's transformed
        wrapper) specifically so top/left resolve against the true
@@ -1046,10 +1060,11 @@
       display: flex; align-items: center; justify-content: center;
       position: fixed;
       left: 14px;
-      bottom: 14px;
+      bottom: 19%;
       transform: none;
-      width: 38px; height: 38px; border-radius: 50%;
-      background: linear-gradient(135deg, #1db954, #169c46);
+      width: 32px; height: 60px; border-radius: 16px;
+      background: color-mix(in srgb, #1db954 58%, transparent);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
       color: #fff; font-size: 16px; border: none; cursor: pointer;
       box-shadow: 0 3px 10px rgba(0,0,0,0.3);
       z-index: 60;
@@ -1093,26 +1108,31 @@
        before when it was naturally hidden by living inside the
        off-screen Trainer panel.
 
-       The container itself is now an invisible full-height strip and
-       each tile is its own pill, space-between'd to the two ends of it
-       - Sets under the tab bar, Days Active down by the home
-       indicator - so the middle of the right edge stays clear instead
-       of being blocked by one 280px slab. Week Total Reps is dropped
-       in this tier only (it still shows in the normal 3-up card in
-       portrait/desktop); per-exercise rep totals are already on each
-       exercise's own bar, so it's the one of the three with a
-       redundant readout nearby. The strip clears the physical screen
-       edge, and the bottom pill clears it by more, for the same reason
-       the shuffle button does: the ~54px corner radius clips anything
-       flush in a corner. */
+       The container itself is an invisible strip and each tile is its
+       own chip. The strip spans 19%-81% of the screen height and
+       space-betweens its two chips to those ends, which puts them
+       immediately above and below the Dynamic Island - the island owns
+       the vertical middle of this edge in whichever rotation it lands
+       on, so hugging it is the one placement that never collides with
+       it and never reaches the corner arcs either. Week Total Reps is
+       dropped in this tier only (it still shows in the normal 3-up
+       card in portrait/desktop); per-exercise rep totals are already
+       on each exercise's own bar, so it's the one of the three with a
+       redundant readout nearby.
+
+       The chips are translucent so the exercise list stays readable
+       underneath - and blurred, because 58% alpha over a scrolling
+       list with no blur turns the numbers to mud. */
     .ov-grid { display: none; }
     body.view-is-tracker .ov-grid {
       display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end;
       position: fixed;
       right: 14px;
-      top: calc(56px + env(safe-area-inset-top, 0px));
-      bottom: 22px;
-      width: auto; height: auto;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 62%;
+      bottom: auto;
+      width: auto;
       background: none; border: none; border-radius: 0;
       box-shadow: none;
       margin: 0; padding: 0;
@@ -1122,14 +1142,28 @@
     body.view-is-tracker .ov-grid .ov-tile {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       border-left: none; text-align: center;
-      min-width: 40px; padding: 5px 4px; border-radius: 14px;
-      background: var(--surface);
+      width: 32px; height: 60px; padding: 4px 3px; border-radius: 16px;
+      box-sizing: border-box;
+      background: color-mix(in srgb, var(--surface) 58%, transparent);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
       box-shadow: 0 3px 10px rgba(0,0,0,0.25);
     }
     /* Middle tile (Total Reps) - hidden here only. */
     body.view-is-tracker .ov-grid .ov-tile:nth-child(2) { display: none; }
-    body.view-is-tracker .ov-grid .ov-tile-label { font-size: 6px; margin-bottom: 1px; letter-spacing: 0px; }
-    body.view-is-tracker .ov-grid .ov-tile-value { font-size: 10px; white-space: nowrap; }
+    body.view-is-tracker .ov-grid .ov-tile-label { font-size: 6px; line-height: 1.15; margin-bottom: 2px; letter-spacing: 0px; }
+    body.view-is-tracker .ov-grid .ov-tile-value { font-size: 10px; line-height: 1.1; }
+    /* 32px can't hold "27 / 88" on one line, so the value stacks as
+       27 / /88. The separator span exists only to be dropped here -
+       portrait and desktop render the three spans as one normal line. */
+    body.view-is-tracker .ov-grid .ov-stat-sep { display: none; }
+    body.view-is-tracker .ov-grid .ov-stat-den::before { content: '/'; }
+    body.view-is-tracker .ov-grid .ov-stat-num,
+    body.view-is-tracker .ov-grid .ov-stat-den { display: block; }
+
+    /* "reps behind pace" - the card is already titled Pushup Deficit
+       and colours the number red when behind, so the caption is a line
+       of rail height for nothing at this size. */
+    .tracker-side-rail #puDeficitSub { display: none; }
   }
 
   /* Desktop only (genuinely wide windows - past where any phone or
@@ -6515,7 +6549,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-20-landscape-no-bottom-inset';
+const APP_BUILD_VERSION = '2026-08-20-landscape-edge-chips';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -7547,10 +7581,16 @@ async function loadRemoteWaterLedger() {
 // so they stay live while actually checking off sets there.
 function renderTrainerStats() {
   const { days, totals } = computeWeekStats();
-  document.getElementById('ovSets').textContent = `${totals.setsCompleted} / ${totals.setsPlanned}`;
+  // Split into num/sep/den spans rather than one string: the landscape
+  // edge chips are only 32px wide, so they drop the separator and stack
+  // the two numbers (see .ov-stat-* in the landscape media query).
+  // Everywhere else the three spans read as the same "27 / 88" line.
+  const ratio = (a, b) => `<span class="ov-stat-num">${a}</span>` +
+    `<span class="ov-stat-sep"> / </span><span class="ov-stat-den">${b}</span>`;
+  document.getElementById('ovSets').innerHTML = ratio(totals.setsCompleted, totals.setsPlanned);
   document.getElementById('ovReps').textContent = totals.totalReps;
   const activeDays = days.filter(d => d.setsCompleted > 0).length;
-  document.getElementById('ovDaysActive').textContent = `${activeDays} / 7`;
+  document.getElementById('ovDaysActive').innerHTML = ratio(activeDays, 7);
 }
 
 // Populates the gradient Pushups hero card: big number, a progress bar
