@@ -490,6 +490,7 @@
   #wtCaffeineOnBoard { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .wt-time-input-optional { color: var(--muted); }
   .caff-bac-value { color: var(--purple); }
+  .caff-conc-value { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 1px; }
   .caff-legend { display: flex; gap: 14px; margin-top: 8px; }
   .caff-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); }
   .caff-key-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -2085,6 +2086,7 @@
       <div>
         <div class="ov-page-week">On board</div>
         <div class="ov-page-title" id="caffNowValue">0 mg</div>
+        <div class="caff-conc-value" id="caffConcValue" style="display:none;">0.0 mg/L</div>
         <div class="ov-page-title caff-bac-value" id="caffBacValue" style="display:none;">0.000 BAC</div>
       </div>
     </div>
@@ -2495,6 +2497,20 @@ function computeDrinkAmounts_(type, oz, shots) {
 // real absorption peaks around 45min in rather than instantly), so the
 // curve is a good-enough shape for "can I still sleep", not pharmacology.
 const CAFFEINE_HALF_LIFE_HOURS = 5;
+
+// How much caffeine is "still on board" is a mass (mg) and doesn't care
+// what you weigh - but what that mass DOES to you does, because the same
+// 100 mg spreads through a bigger body to a lower concentration. So the
+// milligrams stay the headline and body weight sets the threshold they're
+// judged against, instead of one hardcoded number for everyone.
+//
+// Caffeine distributes through roughly 0.6 L per kg of body mass, and the
+// usual "low enough to sleep" figure of 50 mg works out to about 1 mg/L
+// at 180 lb. Expressing it that way means the threshold now tracks the
+// most recent weigh-in and lands back on ~50 mg at 180 lb.
+const CAFFEINE_VD_L_PER_KG = 0.6;
+const CAFFEINE_SLEEP_THRESHOLD_MG_PER_L = 1.0;
+const LB_PER_KG = 2.20462;
 
 // Alcohol works the opposite way to caffeine: the liver clears it at a
 // roughly CONSTANT ~0.015 %BAC/hour regardless of how much is on board
@@ -6554,7 +6570,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-20-all-view-artboards';
+const APP_BUILD_VERSION = '2026-08-20-weight-scaled-caffeine';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -6898,13 +6914,36 @@ function currentCaffeineMg_(at, doses) {
 // Most recent logged weigh-in, or the fallback constant. Weight only
 // scales the peak of each drink, so an out-of-date figure skews the
 // curve's height a little, never its shape or timing.
-function bacBodyWeightLb_() {
+function bodyWeightLb_() {
   const log = loadWeightLog();
   for (let i = log.length - 1; i >= 0; i--) {
     const w = Number(log[i] && log[i].weight);
     if (w > 0) return w;
   }
   return BAC_FALLBACK_WEIGHT_LB;
+}
+
+// True when the number above came from an actual weigh-in rather than the
+// fallback - the readouts say which, so a prediction is never silently
+// based on a stand-in weight.
+function hasLoggedWeight_() {
+  return loadWeightLog().some(e => Number(e && e.weight) > 0);
+}
+
+// Litres of body water-ish volume the caffeine spreads through.
+function caffeineVolumeL_() {
+  return (bodyWeightLb_() / LB_PER_KG) * CAFFEINE_VD_L_PER_KG;
+}
+
+function caffeineConcentrationMgPerL_(mg) {
+  const vol = caffeineVolumeL_();
+  return vol > 0 ? mg / vol : 0;
+}
+
+// The mg figure that corresponds to the sleep-threshold concentration for
+// THIS body. ~50 mg at 180 lb, proportionally more if you weigh more.
+function caffeineSleepThresholdMg_() {
+  return CAFFEINE_SLEEP_THRESHOLD_MG_PER_L * caffeineVolumeL_();
 }
 
 // Instantaneous BAC bump from one drink, before any elimination.
@@ -6926,7 +6965,7 @@ function bacAt_(at, doses) {
   const list = (doses || getRecentDrinkDoses_()).filter(e => (Number(e.alcoholOz) || 0) > 0 && e.when <= now);
   if (!list.length) return 0;
 
-  const weightLb = bacBodyWeightLb_();
+  const weightLb = bodyWeightLb_();
   let bac = 0;
   let prev = list[0].when;
   list.forEach(e => {
@@ -7239,18 +7278,35 @@ function renderCaffeineModal_() {
   const subEl = document.getElementById('caffNowSub');
   if (subEl) {
     const bits = [];
+    const threshold = caffeineSleepThresholdMg_();
     if (mgNow >= 1) {
-      const hoursTo50 = Math.log(50 / mgNow) / Math.log(0.5) * CAFFEINE_HALF_LIFE_HOURS;
-      bits.push(hoursTo50 <= 0
-        ? 'Caffeine already below 50 mg.'
-        : `Caffeine drops below 50 mg around ${fmtClock_(new Date(now.getTime() + hoursTo50 * 3600000))}.`);
+      const hoursToThreshold = Math.log(threshold / mgNow) / Math.log(0.5) * CAFFEINE_HALF_LIFE_HOURS;
+      const t = Math.round(threshold);
+      bits.push(hoursToThreshold <= 0
+        ? `Caffeine already below ${t} mg.`
+        : `Caffeine drops below ${t} mg around ${fmtClock_(new Date(now.getTime() + hoursToThreshold * 3600000))}.`);
     }
     if (bacNow >= 0.001) {
       // Linear elimination, so time-to-zero is just BAC / rate.
       const hoursToZero = bacNow / BAC_ELIMINATION_PER_HOUR;
       bits.push(`Alcohol clears around ${fmtClock_(new Date(now.getTime() + hoursToZero * 3600000))}.`);
     }
-    subEl.textContent = bits.length ? bits.join(' ') : 'Nothing on board right now.';
+    // Say out loud which weight both curves are scaled to, so a stale or
+    // missing weigh-in is visible rather than quietly skewing the numbers.
+    const lb = Math.round(bodyWeightLb_());
+    bits.push(hasLoggedWeight_()
+      ? `Scaled to your last weigh-in (${lb} lb).`
+      : `Scaled to ${lb} lb — log a weigh-in for a closer estimate.`);
+    subEl.textContent = bits.join(' ');
+  }
+
+  // Concentration is the part body weight actually changes; the mg above
+  // is the same number whatever you weigh.
+  const concEl = document.getElementById('caffConcValue');
+  if (concEl) {
+    const conc = caffeineConcentrationMgPerL_(mgNow);
+    concEl.textContent = conc.toFixed(1) + ' mg/L';
+    concEl.style.display = mgNow >= 1 ? '' : 'none';
   }
 
   renderCaffeineChart_(doses, now);
@@ -7263,7 +7319,8 @@ function renderCaffeineModal_() {
 // Caffeine and BAC share the x-axis but get INDEPENDENT y-scales - mg
 // and %BAC aren't comparable quantities, so a shared axis would just
 // flatten one of them into the baseline. Each is scaled against its own
-// reference floor (50mg / 0.08 BAC) so a light day still reads as
+// reference floor (the weight-scaled sleep threshold / 0.08 BAC) so a
+// light day still reads as
 // low rather than being stretched to fill the box.
 function renderCaffeineChart_(doses, now) {
   const svg = document.getElementById('caffChart');
@@ -7279,7 +7336,8 @@ function renderCaffeineChart_(doses, now) {
     pts.push({ mg: currentCaffeineMg_(t, doses), bac: bacAt_(t, doses) });
   }
 
-  const caffPeak = Math.max(50, ...pts.map(p => p.mg));
+  const caffThreshold = caffeineSleepThresholdMg_();
+  const caffPeak = Math.max(caffThreshold, ...pts.map(p => p.mg));
   const bacPeak = Math.max(BAC_LEGAL_LIMIT, ...pts.map(p => p.bac));
   const hasBac = pts.some(p => p.bac >= 0.001);
 
@@ -7299,7 +7357,7 @@ function renderCaffeineChart_(doses, now) {
 
   const nowX = x(nowIdx).toFixed(1);
   svg.innerHTML = `
-    <line x1="${PAD}" y1="${yFor(50, caffPeak).toFixed(1)}" x2="${W - PAD}" y2="${yFor(50, caffPeak).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"></line>
+    <line x1="${PAD}" y1="${yFor(caffThreshold, caffPeak).toFixed(1)}" x2="${W - PAD}" y2="${yFor(caffThreshold, caffPeak).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"></line>
     ${hasBac ? `<line x1="${PAD}" y1="${yFor(BAC_LEGAL_LIMIT, bacPeak).toFixed(1)}" x2="${W - PAD}" y2="${yFor(BAC_LEGAL_LIMIT, bacPeak).toFixed(1)}" stroke="var(--red)" stroke-width="1" stroke-dasharray="2 4" opacity="0.5"></line>` : ''}
     ${series(p => p.mg, caffPeak, 'var(--amber)')}
     ${hasBac ? series(p => p.bac, bacPeak, 'var(--purple)') : ''}
@@ -7324,7 +7382,7 @@ function renderCaffeineDrinkList_(entries) {
   card.style.display = rows.length ? '' : 'none';
   if (!rows.length) return;
 
-  const weightLb = bacBodyWeightLb_();
+  const weightLb = bodyWeightLb_();
   listEl.innerHTML = rows.map(e => {
     const label = (WATER_DRINK_TYPES[e.type] || {}).label || e.type;
     const end = e.endAt ? new Date(e.endAt) : null;

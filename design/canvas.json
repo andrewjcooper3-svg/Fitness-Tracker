@@ -1,27 +1,210 @@
 {
+  "pages": [
+    {
+      "id": "landscape",
+      "name": "iPhone landscape"
+    },
+    {
+      "id": "portrait",
+      "name": "iPhone portrait"
+    },
+    {
+      "id": "web",
+      "name": "Web"
+    }
+  ],
   "artboards": [
-    { "file": "Overview.dc.html", "x": 0,    "y": 0,   "w": 972, "h": 470, "title": "Overview" },
-    { "file": "Main.dc.html",     "x": 1072, "y": 0,   "w": 972, "h": 470, "title": "Trainer" },
-    { "file": "Kitchen.dc.html",  "x": 2144, "y": 0,   "w": 972, "h": 470, "title": "Kitchen" },
-    { "file": "Music.dc.html",    "x": 0,    "y": 610, "w": 972, "h": 470, "title": "Music" },
-    { "file": "Calendar.dc.html", "x": 1072, "y": 610, "w": 972, "h": 470, "title": "Calendar" },
-    { "file": "Stats.dc.html",    "x": 2144, "y": 610, "w": 972, "h": 470, "title": "Stats" }
+    {
+      "file": "Overview.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 972,
+      "h": 470,
+      "title": "Overview",
+      "page": "landscape"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 1072,
+      "y": 0,
+      "w": 972,
+      "h": 470,
+      "title": "Trainer",
+      "page": "landscape"
+    },
+    {
+      "file": "Kitchen.dc.html",
+      "x": 2144,
+      "y": 0,
+      "w": 972,
+      "h": 470,
+      "title": "Kitchen",
+      "page": "landscape"
+    },
+    {
+      "file": "Music.dc.html",
+      "x": 0,
+      "y": 610,
+      "w": 972,
+      "h": 470,
+      "title": "Music",
+      "page": "landscape"
+    },
+    {
+      "file": "Calendar.dc.html",
+      "x": 1072,
+      "y": 610,
+      "w": 972,
+      "h": 470,
+      "title": "Calendar",
+      "page": "landscape"
+    },
+    {
+      "file": "Stats.dc.html",
+      "x": 2144,
+      "y": 610,
+      "w": 972,
+      "h": 470,
+      "title": "Stats",
+      "page": "landscape"
+    },
+    {
+      "file": "OverviewPortrait.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 476,
+      "h": 992,
+      "title": "Overview",
+      "page": "portrait"
+    },
+    {
+      "file": "MainPortrait.dc.html",
+      "x": 576,
+      "y": 0,
+      "w": 476,
+      "h": 992,
+      "title": "Trainer",
+      "page": "portrait"
+    },
+    {
+      "file": "KitchenPortrait.dc.html",
+      "x": 1152,
+      "y": 0,
+      "w": 476,
+      "h": 992,
+      "title": "Kitchen",
+      "page": "portrait"
+    },
+    {
+      "file": "MusicPortrait.dc.html",
+      "x": 0,
+      "y": 1112,
+      "w": 476,
+      "h": 992,
+      "title": "Music",
+      "page": "portrait"
+    },
+    {
+      "file": "CalendarPortrait.dc.html",
+      "x": 576,
+      "y": 1112,
+      "w": 476,
+      "h": 992,
+      "title": "Calendar",
+      "page": "portrait"
+    },
+    {
+      "file": "StatsPortrait.dc.html",
+      "x": 1152,
+      "y": 1112,
+      "w": 476,
+      "h": 992,
+      "title": "Stats",
+      "page": "portrait"
+    },
+    {
+      "file": "OverviewWeb.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 940,
+      "title": "Overview",
+      "page": "web"
+    },
+    {
+      "file": "MainWeb.dc.html",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 940,
+      "title": "Trainer",
+      "page": "web"
+    },
+    {
+      "file": "KitchenWeb.dc.html",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 940,
+      "title": "Kitchen",
+      "page": "web"
+    },
+    {
+      "file": "MusicWeb.dc.html",
+      "x": 0,
+      "y": 1100,
+      "w": 1440,
+      "h": 940,
+      "title": "Music",
+      "page": "web"
+    },
+    {
+      "file": "CalendarWeb.dc.html",
+      "x": 1560,
+      "y": 1100,
+      "w": 1440,
+      "h": 940,
+      "title": "Calendar",
+      "page": "web"
+    },
+    {
+      "file": "StatsWeb.dc.html",
+      "x": 3120,
+      "y": 1100,
+      "w": 1440,
+      "h": 940,
+      "title": "Stats",
+      "page": "web"
+    }
   ],
   "annotations": [
     {
       "id": "how-this-works",
       "x": 0,
-      "y": -230,
-      "w": 640,
-      "text": "All six tabs, each drawn as an iPhone 17 Pro Max in landscape: 932x430 of display inside the bezel, clipped to the real corner radius, with the Dynamic Island on the left edge and the home indicator along the bottom. Hatched bands are the side safe areas; nothing reserves space at the bottom any more.\n\nThese are not redraws — they're the app's own markup and stylesheet, lifted straight out of a real render, so what you see is what it actually does. Drag things around on any board and save; tell me and I'll port it into the app.\n\nThe Device and Safe area sliders above each artboard adjust the corner radii and the gutter width."
+      "y": -300,
+      "w": 660,
+      "page": "landscape",
+      "text": "Every tab, in every form factor. Pages along the top switch between iPhone landscape, iPhone portrait and Web.\n\nThese are not redraws - they are the app’s own markup and stylesheet, lifted out of a real render at each size, so what you see is what it actually does. Drag things around on any board and save; tell me which ones and I’ll port them into the app.\n\nThe hatched bands are the safe areas the phone takes back: the Dynamic Island gutters down both sides in landscape, and the island strip plus home indicator in portrait. Anything sitting in one is sitting where the hardware is."
     },
     {
       "id": "data-note",
       "x": 2144,
-      "y": -230,
-      "w": 460,
-      "text": "About the data on these boards:\n\n• Trainer, Overview, Kitchen and Stats draw from what's baked into the page, so they're real.\n• Music shows the disconnected state — Spotify needs a live login.\n• Calendar is seeded with sample events, since it reads iCloud through a Worker that isn't reachable from the build sandbox.\n\nEach board is a static snapshot, so nothing scrolls or responds to clicks — content past the bottom edge is clipped exactly the way it would be before you scrolled."
+      "y": -300,
+      "w": 480,
+      "page": "landscape",
+      "text": "About the data on these boards:\n\n• Trainer, Overview, Kitchen and Stats draw from what is baked into the page, so they are real.\n• Music shows the disconnected state - Spotify needs a live login.\n• Calendar is seeded with sample events, since it reads iCloud through a Worker the build sandbox cannot reach.\n\nEach board is a static snapshot, so nothing scrolls or responds to clicks - content past the bottom edge is clipped exactly the way it would be before you scrolled."
+    },
+    {
+      "id": "web-note",
+      "x": 0,
+      "y": -300,
+      "w": 560,
+      "page": "web",
+      "text": "The web boards are the desktop tier (1100px and up): the top tab bar is replaced by a left sidebar, and the columns get more room. Same app, same stylesheet - just a wider window, so no safe areas apply."
     }
   ],
-  "launch": { "view": "canvas" }
+  "launch": {
+    "view": "canvas",
+    "page": "landscape"
+  }
 }
