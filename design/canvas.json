@@ -15,7 +15,7 @@
       "x": 992,
       "y": 40,
       "w": 300,
-      "text": "Both floating controls sit on the literal screen edge rather than the safe area, so they land inside the hatched zones — the stats pill on the right, the Shuffle button in the bottom-left corner.\n\nWorth deciding whether they should inset to clear it."
+      "text": "Updated to match your saved edits, now live in the app:\n\n• The tall stats pill is gone — Sets and Days Active are separate small pills at the top and bottom of the right edge, so the middle of that edge (where the Dynamic Island lands in one rotation) stays clear. Total Reps is dropped in landscape only.\n• Est. time / Focus rides the MONDAY + GYM row instead of costing a line.\n• Shuffle and both pills clear the physical edge by 6px, and Shuffle is anchored above the home indicator."
     }
   ],
   "launch": { "view": "canvas" }

@@ -93,17 +93,18 @@
         </div>
       </div>
 
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-        <div style="font-size: 17px; font-weight: 800; letter-spacing: -0.3px;">MONDAY</div>
-        <div style="display: flex; align-items: center; gap: 6px; background: rgba(240,180,41,0.14); border-radius: 10px; padding: 5px 10px;">
+      <!-- Title, the day's Est. time/Focus note and the GYM badge all
+           share one row here - the note used to cost a line of its own. -->
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px;">
+        <div style="font-size: 17px; font-weight: 800; letter-spacing: -0.3px; flex: 0 0 auto; padding-top: 4px;">MONDAY</div>
+        <div style="display: flex; align-items: flex-start; gap: 6px; flex: 1 1 0; min-width: 0; padding-top: 4px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b96ad" stroke-width="2" stroke-linecap="round" style="flex: 0 0 auto; margin-top: 1px;"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2 2M9 2h6"></path></svg>
+          <span style="font-size: 12px; line-height: 1.3; color: #8b96ad;">Est. time: 40-50 min. Focus: Legs + Arms + Core.</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; background: rgba(240,180,41,0.14); border-radius: 10px; padding: 5px 10px; flex: 0 0 auto;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f0b429" stroke-width="2" stroke-linecap="round"><path d="M4 9v6M8 7v10M16 7v10M20 9v6M8 12h8"></path></svg>
           <span style="font-size: 12px; font-weight: 700; color: #f0b429;">GYM</span>
         </div>
-      </div>
-
-      <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b96ad" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2 2M9 2h6"></path></svg>
-        <span style="font-size: 13px; color: #eef2fb;">Est. time: 40-50 min. Focus: Legs + Arms + Core.</span>
       </div>
 
       <div class="lbl" style="margin-bottom: 8px;">Day Notes</div>
@@ -233,25 +234,22 @@
     </div>
   </div>
 
-  <!-- ===== Floating controls. Both are pinned to the literal screen
-       edge in the app right now, NOT to the safe area - which is why
-       they land inside the hatched zones above. ===== -->
-  <div style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 34px; height: 280px; border-radius: 17px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; justify-content: space-around; align-items: center; padding: 6px 1px; box-sizing: border-box;">
-    <div style="text-align: center;">
-      <div style="font-size: 8px; font-weight: 600; color: #8b96ad; text-transform: uppercase;">Sets</div>
-      <div style="font-size: 14px; font-weight: 800;">27/88</div>
-    </div>
-    <div style="text-align: center;">
-      <div style="font-size: 8px; font-weight: 600; color: #8b96ad; text-transform: uppercase;">Total Reps</div>
-      <div style="font-size: 14px; font-weight: 800;">300</div>
-    </div>
-    <div style="text-align: center;">
-      <div style="font-size: 8px; font-weight: 600; color: #8b96ad; text-transform: uppercase;">Days Active</div>
-      <div style="font-size: 14px; font-weight: 800;">1/7</div>
-    </div>
+  <!-- ===== Floating controls. Two small stat pills at the top and
+       bottom of the right edge (the middle of that edge is where the
+       Dynamic Island sits in one rotation), and the Shuffle button in
+       the bottom-left corner above the home indicator. All three clear
+       the literal screen edge by 6px. ===== -->
+  <div style="position: absolute; right: 6px; top: 56px; width: 40px; border-radius: 14px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; box-sizing: border-box;">
+    <div style="font-size: 6px; font-weight: 600; color: #8b96ad; text-transform: uppercase; margin-bottom: 1px;">Sets</div>
+    <div style="font-size: 10px; font-weight: 800; white-space: nowrap;">27/88</div>
   </div>
 
-  <div style="position: absolute; left: 0; bottom: 0; width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #1db954, #169c46); box-shadow: 0 3px 10px rgba(0,0,0,0.3); z-index: 46; display: flex; align-items: center; justify-content: center;">
+  <div style="position: absolute; right: 6px; bottom: calc({{bottomInset}}px + 24px); width: 40px; border-radius: 14px; background: #1a2233; box-shadow: 0 3px 10px rgba(0,0,0,0.25); z-index: 45; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 4px; box-sizing: border-box;">
+    <div style="font-size: 6px; font-weight: 600; color: #8b96ad; text-transform: uppercase; margin-bottom: 1px;">Days Active</div>
+    <div style="font-size: 10px; font-weight: 800; white-space: nowrap;">1/7</div>
+  </div>
+
+  <div style="position: absolute; left: 6px; bottom: calc({{bottomInset}}px + 30px); width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #1db954, #169c46); box-shadow: 0 3px 10px rgba(0,0,0,0.3); z-index: 46; display: flex; align-items: center; justify-content: center;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"></path><path d="M4 20L21 3"></path><path d="M21 16v5h-5"></path><path d="M15 15l6 6"></path><path d="M4 4l5 5"></path></svg>
   </div>
 

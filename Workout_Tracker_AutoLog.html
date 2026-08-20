@@ -84,7 +84,14 @@
   .day-tab.rest .tab-type { color: var(--purple); }
   .day-panel { display: none; }
   .day-panel.active { display: block; }
-  .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  /* The day's "Est. time / Focus" note (.alert) is a child of this row
+     rather than a block below it, so the landscape tier can pull it up
+     onto the same line as the title and the GYM/REST badge. Here it
+     still reads as its own line: flex-basis:100% forces it onto a
+     second flex line, and the 12px row-gap reproduces exactly the gap
+     .day-header's margin-bottom used to give it. */
+  .day-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; column-gap: 10px; row-gap: 12px; margin-bottom: 12px; }
+  .day-header > .alert { flex: 0 0 100%; min-width: 0; }
   .day-title { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.1; }
   .day-badge { font-family: var(--font); font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 10px; white-space: nowrap; }
   .badge-gym { background: rgba(217, 164, 65, 0.16); color: var(--amber); }
@@ -952,17 +959,27 @@
      The page header costs no row at all here - it's hidden and drawn
      in the tab bar instead (see the .app-bar-* rules below and
      updateTopBar_ near the bottom of the script). The Sets/Total
-     Reps/Days Active tiles go the other way, out to a body-level pill
-     against the right edge (see initLandscapeReflow_), which both
-     frees the exercise list from reserving a column for them and
-     leaves more of the rail's capped height for the deficit/rings
-     card above it. */
+     Reps/Days Active tiles go the other way, out to body-level pills
+     at the top and bottom of the right edge (see the .ov-grid rules
+     below), which both frees the exercise list from reserving a column
+     for them and leaves more of the rail's capped height for the
+     deficit/rings card above it. The day's Est. time/Focus note gets
+     folded onto the day-title row for the same reason. */
   @media (min-width: 768px) and (max-width: 1099.98px) {
     body { max-width: 1080px; }
     .app-tabs { max-width: 1080px; }
 
     .day-title { font-size: 17px; }
     .ov-page-title { font-size: 20px; }
+
+    /* Est. time / Focus rides the title row here instead of costing a
+       line of its own: order puts it between the day name and the
+       badge, and flex:1 lets it take whatever the two of them leave. */
+    .day-header { flex-wrap: nowrap; row-gap: 0; align-items: flex-start; }
+    .day-header > .day-title { order: 0; flex: 0 0 auto; padding-top: 4px; }
+    .day-header > .alert { order: 1; flex: 1 1 0; font-size: 12px; line-height: 1.3; color: var(--muted); padding-top: 4px; }
+    .day-header > .day-badge { order: 2; flex: 0 0 auto; }
+
     .tracker-side-rail > .ov-note { display: none; }
     .tracker-side-rail > .sp-shuffle-bar { display: none; }
 
@@ -1006,10 +1023,11 @@
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* Small round icon button, sitting in the bottom third of the
-       screen on the left edge - top:80% with translateY(-50%) centers
-       it on that 80%-down point rather than starting there, so it
-       doesn't run past the bottom edge. position:fixed here is a
+    /* Small round icon button in the bottom-left corner, anchored off
+       the bottom so it lands above the home indicator rather than
+       under it, and held a few px off the physical left edge (that's
+       where the rounded corner and, in one rotation, the Dynamic
+       Island gutter are). position:fixed here is a
        body-level element (a sibling of .app-tabs/.app-sidebar, not
        nested inside .app-views-track, the swipe carousel's transformed
        wrapper) specifically so top/left resolve against the true
@@ -1023,16 +1041,16 @@
     body.view-is-tracker .sp-shuffle-fab {
       display: flex; align-items: center; justify-content: center;
       position: fixed;
-      left: 0;
-      top: 80%;
-      transform: translateY(-50%);
+      left: 6px;
+      bottom: calc(30px + env(safe-area-inset-bottom, 0px));
+      transform: none;
       width: 38px; height: 38px; border-radius: 50%;
       background: linear-gradient(135deg, #1db954, #169c46);
       color: #fff; font-size: 16px; border: none; cursor: pointer;
       box-shadow: 0 3px 10px rgba(0,0,0,0.3);
       z-index: 60;
     }
-    body.view-is-tracker .sp-shuffle-fab:active { transform: translateY(-50%) scale(0.94); }
+    body.view-is-tracker .sp-shuffle-fab:active { transform: scale(0.94); }
 
     #view-tracker { grid-template-columns: 1fr 300px; }
     #view-tracker > .tracker-main-col { grid-row: 1; }
@@ -1055,7 +1073,8 @@
     #view-tracker > .tracker-main-col::-webkit-scrollbar,
     #view-tracker > .tracker-side-rail::-webkit-scrollbar { display: none; }
 
-    /* Tall pill on the right edge, mirroring .sp-shuffle-fab's
+    /* Two small pills on the right edge rather than one tall one,
+       mirroring .sp-shuffle-fab's
        body-level positioning (see its comment above for why - a
        transform on .app-views-track, the swipe carousel's wrapper,
        would otherwise become the containing block for position:fixed
@@ -1068,25 +1087,45 @@
        .view-is-tracker, toggled by goToView() - being body-level means
        it's always in the DOM regardless of which tab is active, unlike
        before when it was naturally hidden by living inside the
-       off-screen Trainer panel. top:50% + translateY(-50%) genuinely
-       centers it (unlike the shuffle button, which is deliberately
-       offset toward the bottom third instead). */
+       off-screen Trainer panel.
+
+       The container itself is now an invisible full-height strip and
+       each tile is its own pill, space-between'd to the two ends of it
+       - Sets under the tab bar, Days Active down by the home
+       indicator - so the middle of the right edge stays clear instead
+       of being blocked by one 280px slab. Week Total Reps is dropped
+       in this tier only (it still shows in the normal 3-up card in
+       portrait/desktop); per-exercise rep totals are already on each
+       exercise's own bar, so it's the one of the three with a
+       redundant readout nearby. The strip clears the physical screen
+       edge by a few px rather than sitting flush on it, which on a
+       landscape iPhone is where the rounded corner and the
+       Dynamic Island gutter are. */
     .ov-grid { display: none; }
     body.view-is-tracker .ov-grid {
-      display: flex; flex-direction: column; justify-content: space-around; align-items: center;
+      display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end;
       position: fixed;
-      right: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 34px; height: 280px; border-radius: 17px;
+      right: 6px;
+      top: calc(56px + env(safe-area-inset-top, 0px));
+      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      width: auto; height: auto;
+      background: none; border: none; border-radius: 0;
+      box-shadow: none;
+      margin: 0; padding: 0;
+      pointer-events: none;
+      z-index: 55;
+    }
+    body.view-is-tracker .ov-grid .ov-tile {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border-left: none; text-align: center;
+      min-width: 40px; padding: 5px 4px; border-radius: 14px;
       background: var(--surface);
       box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-      z-index: 55;
-      padding: 6px 1px;
     }
-    body.view-is-tracker .ov-grid .ov-tile { padding: 0; border-left: none; text-align: center; }
-    body.view-is-tracker .ov-grid .ov-tile-label { font-size: 5.5px; margin-bottom: 1px; letter-spacing: 0px; }
-    body.view-is-tracker .ov-grid .ov-tile-value { font-size: 10px; }
+    /* Middle tile (Total Reps) - hidden here only. */
+    body.view-is-tracker .ov-grid .ov-tile:nth-child(2) { display: none; }
+    body.view-is-tracker .ov-grid .ov-tile-label { font-size: 6px; margin-bottom: 1px; letter-spacing: 0px; }
+    body.view-is-tracker .ov-grid .ov-tile-value { font-size: 10px; white-space: nowrap; }
   }
 
   /* Desktop only (genuinely wide windows - past where any phone or
@@ -1452,8 +1491,7 @@
 <!-- MONDAY -->
 <div id="day-mon" class="day-panel active" data-pushup-target="165">
 
-  <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-gym">🏋 GYM</div></div>
-  <div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Arms + Core.</span></div>
+  <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Arms + Core.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
@@ -1468,8 +1506,7 @@
 <!-- TUESDAY -->
 <div id="day-tue" class="day-panel" data-pushup-target="165">
 
-  <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div>
+  <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
@@ -1483,8 +1520,7 @@
 
 <!-- WEDNESDAY -->
 <div id="day-wed" class="day-panel" data-pushup-target="165">
-  <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-gym">🏋 GYM</div></div>
-  <div class="alert amber">⏱ <span>Est. time: 45-50 min. Focus: Legs + Back + Chest. Left arm emphasis. Progressing lifts that were completed clean last week; holding anything marked tough, and Leg Curl ramps slightly higher than Monday's reduced weight.</span></div>
+  <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 45-50 min. Focus: Legs + Back + Chest. Left arm emphasis. Progressing lifts that were completed clean last week; holding anything marked tough, and Leg Curl ramps slightly higher than Monday's reduced weight.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
@@ -1498,8 +1534,7 @@
 
 <!-- THURSDAY -->
 <div id="day-thu" class="day-panel" data-pushup-target="165">
-  <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div>
+  <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
@@ -1513,8 +1548,7 @@
 
 <!-- FRIDAY -->
 <div id="day-fri" class="day-panel" data-pushup-target="165">
-  <div class="day-header"><div class="day-title">FRIDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div></div>
-  <div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div>
+  <div class="day-header"><div class="day-title">FRIDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Gym fixed to Mon/Wed this week (Sat is recovery). Pushups at 165/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
@@ -1528,8 +1562,7 @@
 
 <!-- SATURDAY -->
 <div id="day-sat" class="day-panel" data-pushup-target="220">
-  <div class="day-header"><div class="day-title">SAT</div><div class="day-badge badge-travel">🧘 RECOVERY</div></div>
-  <div class="alert amber">🧘 <span>Lighter week — lifting paused for Saturday, swapped for stretching + a pushup catch-up set. Back to the normal "C day" (Split Squat/Hinge/Row/Press) next Saturday.</span></div>
+  <div class="day-header"><div class="day-title">SAT</div><div class="day-badge badge-travel">🧘 RECOVERY</div><div class="alert amber">🧘 <span>Lighter week — lifting paused for Saturday, swapped for stretching + a pushup catch-up set. Back to the normal "C day" (Split Squat/Hinge/Row/Press) next Saturday.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
@@ -1554,8 +1587,7 @@
 
 <!-- SUNDAY -->
 <div id="day-sun" class="day-panel" data-pushup-target="0">
-  <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-rest">😴 REST</div></div>
-  <div class="alert amber">🧘 <span>Full rest day — no lifting, no pushups. Let the week's work absorb.</span></div>
+  <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-rest">😴 REST</div><div class="alert amber">🧘 <span>Full rest day — no lifting, no pushups. Let the week's work absorb.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
@@ -6479,7 +6511,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-19-water-draft-device-sync';
+const APP_BUILD_VERSION = '2026-08-20-trainer-landscape-canvas-edits';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
