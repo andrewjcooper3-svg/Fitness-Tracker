@@ -1054,6 +1054,12 @@
     .sd-chart-now { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); }
     .sd-chart-svg { width: 100%; height: auto; display: block; margin-top: 6px; overflow: visible; }
     .sd-chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+    /* Sync state for the starter. Quiet when it is working, loud when it is
+       not - a starter is weeks of work and a failed save used to be
+       invisible. Hidden entirely when there is no starter to sync. */
+    .sd-sync-line { font-family: var(--font); font-size: 11.5px; color: var(--muted); padding: 2px 2px 8px; cursor: pointer; }
+    .sd-sync-line:empty { display: none; }
+    .sd-sync-line.err { color: var(--red, #c96f6f); font-weight: 600; }
     .sd-chart-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 11px; color: var(--muted); }
     .sd-chart-swatch { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
     /* A dashed border's dash length is up to the browser and comes out
@@ -1632,7 +1638,7 @@
             <button class="ov-gear-btn" aria-label="Settings">⚙</button>
           </div>
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-22-block-reorder</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-22-starter-own-key-pushup-baseline</div>
       
         <!-- Every block on this page lives in one grid so any of them can be
              moved anywhere in the order - the two big cards span all the columns
@@ -1659,7 +1665,7 @@
               <div class="ov-hero-card-label">💪 Pushups this week <span class="ov-hero-chevron" id="ovPushupChevron">▸</span></div>
             </div>
             <div class="ov-hero-card-number" id="ovPushupNumber">0</div>
-            <div class="ov-hero-card-sub" id="ovPushupSub">of 1,045</div>
+            <div class="ov-hero-card-sub" id="ovPushupSub" title="">of 1,045</div>
             <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovPushupBar" style="width:0%"></div></div>
             <div class="ov-hero-card-status" id="ovPushupStatus">−2,552 deficit · behind · 0/7 days logged</div>
           </div>

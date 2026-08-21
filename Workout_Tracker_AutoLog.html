@@ -1055,6 +1055,12 @@
   .sd-chart-now { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); }
   .sd-chart-svg { width: 100%; height: auto; display: block; margin-top: 6px; overflow: visible; }
   .sd-chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+  /* Sync state for the starter. Quiet when it is working, loud when it is
+     not - a starter is weeks of work and a failed save used to be
+     invisible. Hidden entirely when there is no starter to sync. */
+  .sd-sync-line { font-family: var(--font); font-size: 11.5px; color: var(--muted); padding: 2px 2px 8px; cursor: pointer; }
+  .sd-sync-line:empty { display: none; }
+  .sd-sync-line.err { color: var(--red, #c96f6f); font-weight: 600; }
   .sd-chart-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 11px; color: var(--muted); }
   .sd-chart-swatch { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
   /* A dashed border's dash length is up to the browser and comes out
@@ -2266,6 +2272,12 @@
          has three faces: nothing yet (start one), a 14-day build, and
          ongoing maintenance. renderStarter() decides which. -->
     <div id="sdStatusHost"></div>
+
+    <!-- Whether this device has actually got the starter onto the backend.
+         It used to fail silently - the save reported success and stored
+         nothing - so the state of the sync is now something you can see
+         and retry rather than something you find out about later. -->
+    <div class="sd-sync-line" id="sdSyncLine" onclick="syncStarterToRemote()" title="Tap to sync now"></div>
 
     <!-- ---- No starter yet: what to buy, then begin ---- -->
     <div id="sdSetup" style="display:none;">
@@ -3764,52 +3776,144 @@ function syncKitchenToRemote() {
     const url = getDeploymentUrl();
     if (!url || !navigator.onLine) return;
 
-    // Read-merge-write for the starter specifically. A plain push is a
-    // blind overwrite, so a device that had not caught up would wipe a
-    // feed logged on the other one - measured, not theoretical: phone logs
-    // a feed, laptop annotates an older feed, laptop's push drops the
-    // phone's. Merging against what is actually stored first closes that.
-    //
-    // This used to be skipped when the local starter was still the empty
-    // default (stage 'none'), which is exactly the case that needed it
-    // most: any Kitchen write - ticking a shopping item, editing inventory
-    // - fires this, and a device that had not yet received the starter
-    // would push its empty one straight over the real one. The backend's
-    // "undefined leaves the stored starter alone" guard never engaged,
-    // because the client was always sending a value. Reproduced end to
-    // end: server holds an active starter, a second device adds one
-    // shopping item half a second after load, and the starter is gone.
-    // So: merge unconditionally, and if the result is still empty (the
-    // read failed, or there genuinely is no starter anywhere) send nothing
-    // at all rather than an empty one.
-    let starter = loadStarter_();
-    try {
-      const res = await fetch(url + '?action=loadKitchenState');
-      const data = await res.json();
-      if (data.status === 'success' && data.state && data.state.starter) {
-        starter = mergeStarter_(starter, data.state.starter);
-        localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(starter));
-        renderStarter();
-      }
-    } catch (e) { /* offline - push what we have rather than nothing */ }
-
+    // The starter is deliberately NOT in this payload any more - it saves
+    // on its own (syncStarterToRemote below). It used to ride along, which
+    // meant every shopping tick rewrote it and, worse, tied it to the size
+    // of everything else in the blob.
     fetch(url, {
       method: 'POST',
       body: JSON.stringify({
         action: 'saveKitchenState',
         inventory: loadInventory(),
         groceryManual: loadGroceryManual(),
-        shoppingList: loadShoppingList(),
-        starter: starterIsEmpty_(starter) ? undefined : starter
+        shoppingList: loadShoppingList()
       })
     }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
   }, 400);
 }
 
+/* ---------- Starter sync (its own endpoint, its own status) ----------
+   Three rounds of this failing to sync all traced back to the starter
+   living inside the kitchen blob:
+     1. Every inventory/shopping write rewrote it as a side effect.
+     2. A device that had not received it yet pushed its empty one over
+        the real one.
+     3. The one that actually kept biting: a Script Property value is
+        capped at 9 KB, and inventory + groceries + shopping list + a
+        growing feed history can exceed it. Past the cap the backend's
+        write THROWS, so the whole save was lost - and the client only
+        caught network errors, never the error the backend sent back, so
+        every one of those failures looked like a success.
+   It has its own key and its own endpoint now, and the result of the
+   write is read and shown rather than assumed. */
+
 // "Nothing worth keeping" - no stage and no history. Anything else, even a
 // half-built starter, is real state that must never be pushed over.
 function starterIsEmpty_(st) {
   return !st || (st.stage === 'none' && !(st.feeds || []).length && !Object.keys(st.build || {}).length);
+}
+
+// What the last push actually did, so the Starter tab can say so instead
+// of leaving you to guess. Kept in memory only - it describes this
+// session's connection, not anything worth persisting.
+let starterSyncState_ = { status: 'idle', at: null, message: '' };
+
+function setStarterSyncState_(status, message) {
+  starterSyncState_ = { status, at: new Date(), message: message || '' };
+  renderStarterSyncLine_();
+}
+
+let starterSyncTimer_ = null;
+function syncStarterToRemote() {
+  clearTimeout(starterSyncTimer_);
+  starterSyncTimer_ = setTimeout(async () => {
+    const url = getDeploymentUrl();
+    if (!url) return setStarterSyncState_('error', 'No backend URL configured - set it in Settings.');
+    if (!navigator.onLine) return setStarterSyncState_('offline', 'Offline - saved on this device, will sync later.');
+
+    setStarterSyncState_('syncing');
+
+    // Read-merge-write: a plain push is a blind overwrite, so a device
+    // that had not caught up would drop a feed logged on the other one.
+    let starter = loadStarter_();
+    try {
+      const remote = await fetchStarterState_(url);
+      if (remote) {
+        // Trim after merging too - a union of two devices' histories can be
+        // bigger than either was on its own.
+        starter = trimStarterHistory_(mergeStarter_(starter, remote));
+        localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(starter));
+        renderStarter();
+      }
+    } catch (e) { /* push what we have rather than nothing */ }
+
+    if (starterIsEmpty_(starter)) return setStarterSyncState_('idle');
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'saveStarterState', starter: starter })
+      });
+      const data = await res.json();
+      if (data.status !== 'success') throw new Error(data.message || 'the backend rejected the save');
+      setStarterSyncState_('ok');
+    } catch (e) {
+      setStarterSyncState_('error', String(e.message || e));
+    }
+  }, 400);
+}
+
+// Cache-busted: Apps Script serves reads through a redirect that a browser
+// is happy to reuse, and a cached read is indistinguishable from "the
+// other device never saved".
+async function fetchStarterState_(url) {
+  const res = await fetch(url + '?action=loadStarterState&t=' + Date.now());
+  const data = await res.json();
+  if (data.status !== 'success') throw new Error(data.message || 'load failed');
+  return data.starter || null;
+}
+
+function renderStarterSyncLine_() {
+  const el = document.getElementById('sdSyncLine');
+  if (!el) return;
+  el.classList.remove('err');
+  if (starterIsEmpty_(loadStarter_())) { el.textContent = ''; return; }
+
+  const when = starterSyncState_.at
+    ? starterSyncState_.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : '';
+  switch (starterSyncState_.status) {
+    case 'syncing':
+      el.textContent = '↻ Syncing…';
+      break;
+    case 'ok':
+      el.textContent = `✓ Synced${when ? ' at ' + when : ''} · tap to sync now`;
+      break;
+    case 'offline':
+      el.textContent = '⚠ ' + starterSyncState_.message;
+      el.classList.add('err');
+      break;
+    case 'error':
+      el.textContent = '⚠ Not synced: ' + starterSyncState_.message + ' · tap to retry';
+      el.classList.add('err');
+      break;
+    default:
+      el.textContent = 'Tap to sync this starter';
+  }
+}
+
+async function loadRemoteStarterState() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const remote = await fetchStarterState_(url);
+    if (!remote) return;
+    localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(mergeStarter_(loadStarter_(), remote)));
+    renderStarter();
+    setStarterSyncState_('ok');
+  } catch (e) {
+    setStarterSyncState_('error', String(e.message || e));
+  }
 }
 
 async function loadRemoteKitchenState() {
@@ -3822,6 +3926,9 @@ async function loadRemoteKitchenState() {
     saveInventoryListLocal_(data.state.inventory || []);
     saveGroceryManualLocal_(data.state.groceryManual || []);
     saveShoppingListLocal_(data.state.shoppingList || []);
+    // A starter left over in the old blob (saved before it got its own
+    // key) is still worth merging in - the backend migrates it on the next
+    // starter write, and until then this is where it lives.
     if (data.state.starter) {
       localStorage.setItem(STORAGE_STARTER_KEY,
         JSON.stringify(mergeStarter_(loadStarter_(), data.state.starter)));
@@ -4010,11 +4117,31 @@ function loadStarter_() {
            tempF: SD_DEFAULT_TEMP_F, bakeAt: null };
 }
 
+// A stored value on the backend is capped at 9 KB, and a feed is ~160
+// bytes, so an unbounded history eventually stops syncing - which is
+// exactly the failure this whole area kept hitting. Rather than wait for
+// that, the history is trimmed oldest-first to fit inside a budget with
+// room to spare. Nothing that matters is lost: the peak model calibrates
+// off recent feeds, and the chart only draws the last few days. The floor
+// means a starter never trims itself down to nothing even if some future
+// field makes each feed much bigger.
+const SD_SYNC_BUDGET_BYTES = 8000;
+const SD_MIN_KEPT_FEEDS = 20;
+
+function trimStarterHistory_(st) {
+  if (!st || !Array.isArray(st.feeds)) return st;
+  while (JSON.stringify(st).length > SD_SYNC_BUDGET_BYTES && st.feeds.length > SD_MIN_KEPT_FEEDS) {
+    st.feeds.shift();
+  }
+  return st;
+}
+
 function saveStarter_(st) {
   // Stamped on every write so the merge has something to break ties with.
   st.updatedAt = new Date().toISOString();
+  trimStarterHistory_(st);
   localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(st));
-  if (typeof syncKitchenToRemote === 'function') syncKitchenToRemote();
+  syncStarterToRemote();
 }
 
 // Two devices can both touch the starter - feed it on your phone, tick a
@@ -4251,6 +4378,7 @@ function renderStarter() {
   document.getElementById('sdActive').style.display = stage === 'active' ? '' : 'none';
 
   renderStarterStatus_(st);
+  renderStarterSyncLine_();
   if (stage === 'none') renderStarterSupplies_();
   if (stage === 'building') renderStarterBuild_(st);
   if (stage === 'active') renderStarterActive_(st);
@@ -7615,8 +7743,11 @@ function saveState() {
   renderTrainerStats();
   // The week/month/year rings read the same live day panels, so they went
   // stale on every set you checked or added until you left the tab and came
-  // back. They refresh with the rest of the tab's stats now.
+  // back. They refresh with the rest of the tab's stats now - and so does
+  // Overview's pushup card, which reads the same numbers and would
+  // otherwise disagree with the Trainer ring until the next render.
   if (viewOrder[currentViewIndex] === 'tracker') renderPushupsTab();
+  renderOverviewPushupMini();
   syncDraftToCloud(state);
 }
 
@@ -7938,7 +8069,15 @@ function restoreDay(day, savedDay) {
   const savedExercises = savedDay.exercises || [];
   const hasIds = savedExercises.length > 0 && savedExercises.every(e => isValidExId(e.id));
 
-  if (hasIds) {
+  // An explicitly empty list means every exercise on this day was deleted,
+  // which is different from the list being absent (legacy state that
+  // predates ids, where there is nothing safe to prune against). Without
+  // that distinction, deleting a day's ONLY exercise never pruned - the
+  // template card came straight back on the next load, and with it the
+  // planned reps you had just removed.
+  const deletedEverything = Array.isArray(savedDay.exercises) && savedExercises.length === 0;
+
+  if (hasIds || deletedEverything) {
     // Drop any pre-rendered exercise the user deleted last session - it has
     // no matching id in the saved state at all.
     const savedIds = new Set(savedExercises.map(e => e.id));
@@ -8082,7 +8221,7 @@ function renderActiveViewContent(view) {
   if (view === 'calendar') ensureCalendarLoaded();
   if (view === 'music') renderMusicTab();
   if (view === 'stats') { renderStatsTab(); loadRemoteWeightLog(); }
-  if (view === 'kitchen') { renderKitchenTab(); loadRemoteKitchenState(); loadRemoteRecipes().then(applyPendingRecipeSeeds_); }
+  if (view === 'kitchen') { renderKitchenTab(); loadRemoteKitchenState(); loadRemoteStarterState(); loadRemoteRecipes().then(applyPendingRecipeSeeds_); }
   if (view === 'bodyhealth') { renderBodyHealthTab(); loadRemoteBodyHealthLog(); }
 }
 
@@ -8188,9 +8327,11 @@ function computeWeekStats() {
     const panel = document.getElementById('day-' + key);
     const cards = panel.querySelectorAll('.exercise-card');
     let setsPlanned = 0, setsCompleted = 0, totalReps = 0, pushupTotal = 0;
-    // Summed from the day's live Pushups rows, so adding or deleting a set
-    // moves the target with it - see dayPushupTarget_().
+    // pushupTarget follows the day's live rows; pushupBaseline is what the
+    // week was planned at and does not move when you edit sets. See
+    // dayPushupTarget_() / dayPushupBaseline_().
     const pushupTarget = dayPushupTarget_(panel);
+    const pushupBaseline = dayPushupBaseline_(panel);
 
     cards.forEach(card => {
       const rows = card.querySelectorAll('.set-row');
@@ -8203,7 +8344,7 @@ function computeWeekStats() {
       if (getExerciseName(card).toLowerCase() === 'pushups') pushupTotal += reps;
     });
 
-    return { key, setsPlanned, setsCompleted, totalReps, pushupTotal, pushupTarget };
+    return { key, setsPlanned, setsCompleted, totalReps, pushupTotal, pushupTarget, pushupBaseline };
   });
 
   const totals = days.reduce((acc, d) => ({
@@ -8211,8 +8352,9 @@ function computeWeekStats() {
     setsCompleted: acc.setsCompleted + d.setsCompleted,
     totalReps: acc.totalReps + d.totalReps,
     pushupTotal: acc.pushupTotal + d.pushupTotal,
-    pushupTarget: acc.pushupTarget + d.pushupTarget
-  }), { setsPlanned: 0, setsCompleted: 0, totalReps: 0, pushupTotal: 0, pushupTarget: 0 });
+    pushupTarget: acc.pushupTarget + d.pushupTarget,
+    pushupBaseline: acc.pushupBaseline + d.pushupBaseline
+  }), { setsPlanned: 0, setsCompleted: 0, totalReps: 0, pushupTotal: 0, pushupTarget: 0, pushupBaseline: 0 });
 
   return { days, totals };
 }
@@ -8442,7 +8584,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-22-block-reorder';
+const APP_BUILD_VERSION = '2026-08-22-starter-own-key-pushup-baseline';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9691,7 +9833,15 @@ function renderOverviewPushupMini() {
   const pct = totals.pushupTarget ? Math.min(100, Math.round(totals.pushupTotal / totals.pushupTarget * 100)) : 0;
 
   numEl.textContent = totals.pushupTotal.toLocaleString();
-  document.getElementById('ovPushupSub').textContent = 'of ' + totals.pushupTarget.toLocaleString();
+  // "of 990" normally; "of 990 · 1,045 planned" once the week's workouts
+  // have been edited away from what was planned, so the number you signed
+  // up for is still in front of you.
+  const subEl = document.getElementById('ovPushupSub');
+  subEl.textContent = totals.pushupTarget === totals.pushupBaseline
+    ? 'of ' + totals.pushupTarget.toLocaleString()
+    : `of ${totals.pushupTarget.toLocaleString()} · ${totals.pushupBaseline.toLocaleString()} planned`;
+  subEl.title = totals.pushupTarget === totals.pushupBaseline
+    ? '' : 'What is in your workouts now, then what the week was planned at';
   document.getElementById('ovPushupBar').style.width = pct + '%';
 
   const statusEl = document.getElementById('ovPushupStatus');
@@ -9946,13 +10096,22 @@ function renderOverviewShoppingPreview() {
 // inside now shows that alongside the predicted/expected pace (how much
 // of the target should already be done by today) so "42%" alone doesn't
 // look fine on, say, day 2 of the week when the real pace target is 90%.
-function setGoalRing(ringId, pctId, valueId, actual, target, pctPredicted) {
+// `baseline` is optional and only the week ring passes it: what the week
+// was planned at, shown as a third figure when the workouts have since
+// been edited away from it. The ring percentage stays on `target` - the
+// plan as it actually stands is what you can still hit today.
+function setGoalRing(ringId, pctId, valueId, actual, target, pctPredicted, baseline) {
   const pct = target ? Math.min(100, Math.round(actual / target * 100)) : 0;
   const predictedPct = Math.round((pctPredicted || 0) * 100);
   document.getElementById(ringId).style.setProperty('--pct', pct);
   document.getElementById(pctId).innerHTML =
     `<div class="pu-ring-pct-actual">${pct}%</div><div class="pu-ring-pct-predicted">of ${predictedPct}%</div>`;
-  document.getElementById(valueId).textContent = `${actual.toLocaleString()} / ${target.toLocaleString()}`;
+  const valueEl = document.getElementById(valueId);
+  valueEl.textContent = (baseline === undefined || baseline === target)
+    ? `${actual.toLocaleString()} / ${target.toLocaleString()}`
+    : formatPushupTriple_(actual, target, baseline);
+  valueEl.title = (baseline === undefined || baseline === target)
+    ? '' : 'Done / planned in your workouts now / planned for the week';
 }
 
 // Shared by the full Pushups tab and the Overview mini-card, so the two
@@ -10043,7 +10202,7 @@ function computePushupStats() {
   const deficit = Math.round((pctGoalComplete - pctYearElapsed) * PUSHUP_YEAR_GOAL);
 
   return {
-    week: { actual: weekTotals.pushupTotal, target: weekTotals.pushupTarget, pctPredicted: pctWeekPredicted },
+    week: { actual: weekTotals.pushupTotal, target: weekTotals.pushupTarget, baseline: weekTotals.pushupBaseline, pctPredicted: pctWeekPredicted },
     month: { actual: monthActual, target: monthTarget, pctPredicted: pctMonthPredicted },
     year: { actual: yearActual, target: PUSHUP_YEAR_GOAL, pctPredicted: pctYearElapsed },
     deficit: deficit,
@@ -10054,7 +10213,7 @@ function computePushupStats() {
 
 function renderPushupsTab() {
   const stats = computePushupStats();
-  setGoalRing('puWeekRing', 'puWeekPct', 'puWeekValue', stats.week.actual, stats.week.target, stats.week.pctPredicted);
+  setGoalRing('puWeekRing', 'puWeekPct', 'puWeekValue', stats.week.actual, stats.week.target, stats.week.pctPredicted, stats.week.baseline);
   setGoalRing('puMonthRing', 'puMonthPct', 'puMonthValue', stats.month.actual, stats.month.target, stats.month.pctPredicted);
   setGoalRing('puYearRing', 'puYearPct', 'puYearValue', stats.year.actual, stats.year.target, stats.year.pctPredicted);
 
@@ -11898,7 +12057,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-22-starter-guard';
+const EXPECTED_BACKEND_VERSION = '2026-08-22-starter-own-key';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
@@ -12146,25 +12305,44 @@ function plannedReps(card) {
   return total;
 }
 
-// The day's pushup target used to be read straight off the panel's frozen
-// data-pushup-target attribute, which was written once from the plan and
-// never touched again. Adding a fourth set to a 3 x 55 day therefore
-// changed what you were being asked to do without changing the number you
-// were measured against - the card read "Total: 220 / 165 reps", and the
-// same stale 165 flowed into the week ring, the deficit, and Overview's
-// weekly target. Summing the day's actual Pushups rows is where the plan
-// really lives (the attribute's value was exactly that sum on every day),
-// so it is the source of truth now; the attribute stays as the fallback
-// for a day that has no Pushups card at all to sum.
+// Two different numbers, and conflating them is what made this confusing:
+//
+//   dayPushupTarget_   what is on the board RIGHT NOW - summed from the
+//                      day's actual Pushups rows. Add a set and it goes
+//                      up; delete a set, or the whole Pushups exercise,
+//                      and it goes down. Deleting really does remove it.
+//
+//   dayPushupBaseline_ what the week was PLANNED at - the panel's
+//                      data-pushup-target, written once from the weekly
+//                      plan. Editing today's sets must not quietly rewrite
+//                      what you signed up for on Monday, so this does not
+//                      move until the plan itself changes.
+//
+// There is deliberately no fallback from the first to the second: a day
+// whose Pushups card has been deleted is planning zero pushups now, and
+// falling back to the baseline would make deletion do nothing.
 function dayPushupTarget_(panel) {
   if (!panel) return 0;
-  let target = 0, found = false;
+  let target = 0;
   panel.querySelectorAll('.exercise-card').forEach(card => {
     if (getExerciseName(card).toLowerCase() !== 'pushups') return;
-    found = true;
     target += plannedReps(card);
   });
-  return found ? target : (parseFloat(panel.dataset.pushupTarget) || 0);
+  return target;
+}
+
+function dayPushupBaseline_(panel) {
+  return panel ? (parseFloat(panel.dataset.pushupTarget) || 0) : 0;
+}
+
+// done / planned-now / planned-this-week, collapsing to two when the plan
+// has not been edited - which is the common case, and a third identical
+// number would just be noise.
+function formatPushupTriple_(done, plannedNow, plannedBase) {
+  const n = v => Math.round(v).toLocaleString();
+  return plannedNow === plannedBase
+    ? `${n(done)} / ${n(plannedNow)}`
+    : `${n(done)} / ${n(plannedNow)} / ${n(plannedBase)}`;
 }
 
 // The header's prescription line ("BW · 3 × 55 · Rest 60s") is written
@@ -12188,10 +12366,15 @@ function updateExerciseTotal(card) {
   updateExerciseMetaSets_(card);
 
   if (getExerciseName(card).toLowerCase() === 'pushups') {
-    const target = dayPushupTarget_(card.closest('.day-panel'));
-    totalEl.textContent = `Total: ${total} / ${target} reps`;
+    const panel = card.closest('.day-panel');
+    totalEl.textContent = 'Total: ' +
+      formatPushupTriple_(total, dayPushupTarget_(panel), dayPushupBaseline_(panel)) + ' reps';
+    totalEl.title = dayPushupTarget_(panel) === dayPushupBaseline_(panel)
+      ? 'Done / planned'
+      : 'Done / planned in this day now / planned for this day in the week';
   } else {
     totalEl.textContent = `Total: ${total} reps`;
+    totalEl.title = '';
   }
 }
 
@@ -13033,6 +13216,7 @@ fetchAndApplyRemoteDraft();
 loadRemoteWeightLog();
 loadRemoteBodyHealthLog();
 loadRemoteKitchenState();
+loadRemoteStarterState();
 loadRemoteRecipes().then(applyPendingRecipeSeeds_);
 loadRemotePushupLedger();
 loadRemoteExerciseHistory();

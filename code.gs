@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-22-starter-guard';
+const BACKEND_BUILD_VERSION = '2026-08-22-starter-own-key';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -463,21 +463,63 @@ function loadDraftState_() {
 // buried in a JSON property.
 const KITCHEN_STATE_KEY = 'KITCHEN_STATE';
 
-// The sourdough starter rides along in this blob rather than getting its
-// own key: it IS kitchen state, it is small, and it means one round trip
-// keeps the whole tab in step across devices. Passing undefined leaves
-// whatever is already stored alone, so an older client that does not know
-// about the starter cannot wipe it just by saving its inventory.
+// The starter used to ride along inside this blob. That was wrong twice
+// over: every inventory or shopping-list write rewrote the starter as a
+// side effect, and - the reason it kept failing to sync - a Script
+// Property value is capped at 9 KB, which inventory plus groceries plus a
+// shopping list plus a starter's growing feed history can exceed. Past the
+// cap setProperty THROWS, so the whole kitchen save failed, including the
+// starter. It has its own key now (see STARTER_STATE_KEY below), sized on
+// its own and untouched by kitchen edits.
+//
+// starter is still accepted here so a client running the older code keeps
+// working; it just gets routed to the new key.
 function saveKitchenState_(inventory, groceryManual, shoppingList, starter) {
   const props = PropertiesService.getScriptProperties();
-  const existing = loadKitchenState_() || {};
-  props.setProperty(KITCHEN_STATE_KEY, JSON.stringify({
+  if (starter !== undefined && starter !== null) saveStarterState_(starter);
+  setPropertyChecked_(props, KITCHEN_STATE_KEY, {
     inventory: inventory || [],
     groceryManual: groceryManual || [],
     shoppingList: shoppingList || [],
-    starter: resolveStarterWrite_(existing.starter, starter),
     savedAt: new Date().toISOString()
-  }));
+  });
+}
+
+// PropertiesService caps a value at 9 KB and throws past it. Catching it
+// here turns a silent, total loss of the write into a named error the
+// client can show, instead of a save that reports success and stores
+// nothing.
+const PROP_VALUE_LIMIT_BYTES = 9216;
+function setPropertyChecked_(props, key, obj) {
+  const raw = JSON.stringify(obj);
+  if (raw.length > PROP_VALUE_LIMIT_BYTES) {
+    throw new Error(key + ' is ' + raw.length + ' bytes, over the ' +
+      PROP_VALUE_LIMIT_BYTES + '-byte limit for one stored value - it was not saved.');
+  }
+  props.setProperty(key, raw);
+}
+
+// ---------- Sourdough starter (its own property, its own endpoints) ----------
+const STARTER_STATE_KEY = 'STARTER_STATE';
+
+function saveStarterState_(starter) {
+  const props = PropertiesService.getScriptProperties();
+  const resolved = resolveStarterWrite_(loadStarterState_(), starter);
+  if (resolved === null || resolved === undefined) return;
+  setPropertyChecked_(props, STARTER_STATE_KEY, resolved);
+}
+
+// Falls back to the old in-kitchen copy so a starter recorded before the
+// split is picked up rather than looking like a brand new one; the next
+// save writes it to the new key and it stops being read from there.
+function loadStarterState_() {
+  const props = PropertiesService.getScriptProperties();
+  const raw = props.getProperty(STARTER_STATE_KEY);
+  if (raw) {
+    try { return JSON.parse(raw); } catch (e) { /* fall through to the legacy copy */ }
+  }
+  const legacy = loadKitchenState_();
+  return (legacy && legacy.starter) || null;
 }
 
 // A starter is slow to accumulate - weeks of feeds and observations - and
@@ -503,7 +545,8 @@ function resolveStarterWrite_(stored, incoming) {
 function loadKitchenState_() {
   const props = PropertiesService.getScriptProperties();
   const raw = props.getProperty(KITCHEN_STATE_KEY);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
 }
 
 // ---------- Recipe Database (its own spreadsheet, one tab per recipe) ----------
@@ -1126,6 +1169,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadStarterState') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', starter: loadStarterState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadWeightLog') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', entries: getWeightLog_() }))
@@ -1257,6 +1306,16 @@ function doPost(e) {
       saveKitchenState_(data.inventory, data.groceryManual, data.shoppingList, data.starter);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // The starter saves on its own now, so a feed is never at the mercy of
+    // how big the inventory happens to be. Echoes back what was stored so
+    // the client can confirm the write rather than assume it.
+    if (data.action === 'saveStarterState') {
+      saveStarterState_(data.starter);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success', starter: loadStarterState_() }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
