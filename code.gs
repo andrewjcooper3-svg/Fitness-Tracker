@@ -1385,6 +1385,18 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // Anything that named an action and reached here named one this
+    // deployment does not have. Falling through to the session logger was
+    // actively harmful: it wrote zero rows and answered {status:'success'},
+    // so a newer client talking to an older deployment was told its save
+    // had worked when nothing had been stored anywhere. That is exactly how
+    // the starter kept "syncing" without ever arriving. Session logging is
+    // the no-action case only.
+    if (data.action) {
+      throw new Error('Unknown action "' + data.action + '" - this deployment is running ' +
+        BACKEND_BUILD_VERSION + ' and needs redeploying.');
+    }
+
     const weekLabel = data.week || getCurrentWeekLabel_();
     const day = data.day || '';
     const timestamp = data.timestamp ? new Date(data.timestamp) : new Date();

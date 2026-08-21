@@ -3855,22 +3855,61 @@ function syncStarterToRemote() {
         body: JSON.stringify({ action: 'saveStarterState', starter: starter })
       });
       const data = await res.json();
-      if (data.status !== 'success') throw new Error(data.message || 'the backend rejected the save');
-      setStarterSyncState_('ok');
+
+      // A success is only believed when the response carries back the
+      // starter the backend stored. An older deployment does not know this
+      // action at all and used to fall straight through to the session
+      // logger, which wrote nothing and answered {status:'success'} - so
+      // the phone said "Synced" while the desktop had nothing to fetch.
+      // A bare success here means exactly that, so fall back to the route
+      // an older deployment does understand rather than lose the write.
+      if (data.status === 'success' && data.starter) return setStarterSyncState_('ok');
+      if (data.status === 'success') return pushStarterViaKitchen_(url, starter);
+      throw new Error(data.message || 'the backend rejected the save');
     } catch (e) {
       setStarterSyncState_('error', String(e.message || e));
     }
   }, 400);
 }
 
+// The pre-split route: the starter rides inside the kitchen blob. Only
+// used against a deployment that has not been updated yet, and it says so,
+// because that blob shares one 9KB limit with inventory and can silently
+// stop fitting.
+async function pushStarterViaKitchen_(url, starter) {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'saveKitchenState',
+        inventory: loadInventory(),
+        groceryManual: loadGroceryManual(),
+        shoppingList: loadShoppingList(),
+        starter: starter
+      })
+    });
+    const data = await res.json();
+    if (data.status !== 'success') throw new Error(data.message || 'the backend rejected the save');
+    setStarterSyncState_('stale-backend');
+  } catch (e) {
+    setStarterSyncState_('error', String(e.message || e));
+  }
+}
+
 // Cache-busted: Apps Script serves reads through a redirect that a browser
 // is happy to reuse, and a cached read is indistinguishable from "the
-// other device never saved".
+// other device never saved". Falls back to the old in-kitchen copy when
+// the deployment does not serve this action yet, so a starter saved by
+// either route is still found.
 async function fetchStarterState_(url) {
   const res = await fetch(url + '?action=loadStarterState&t=' + Date.now());
   const data = await res.json();
-  if (data.status !== 'success') throw new Error(data.message || 'load failed');
-  return data.starter || null;
+  if (data.status === 'success' && 'starter' in data) return data.starter || null;
+
+  const legacy = await fetch(url + '?action=loadKitchenState&t=' + Date.now());
+  const legacyData = await legacy.json();
+  if (legacyData.status !== 'success') throw new Error(legacyData.message || 'load failed');
+  return (legacyData.state && legacyData.state.starter) || null;
 }
 
 function renderStarterSyncLine_() {
@@ -3888,6 +3927,10 @@ function renderStarterSyncLine_() {
       break;
     case 'ok':
       el.textContent = `✓ Synced${when ? ' at ' + when : ''} · tap to sync now`;
+      break;
+    case 'stale-backend':
+      el.textContent = `✓ Synced${when ? ' at ' + when : ''} the old way — redeploy code.gs to give the starter its own storage`;
+      el.classList.add('err');
       break;
     case 'offline':
       el.textContent = '⚠ ' + starterSyncState_.message;
@@ -8584,7 +8627,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-22-starter-own-key-pushup-baseline';
+const APP_BUILD_VERSION = '2026-08-22-starter-backend-fallback';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
