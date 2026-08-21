@@ -38,17 +38,67 @@ const C = {
 
 const LEVEL_COLOR = { ok: C.green, soon: C.amber, due: C.amber, overdue: C.red };
 
+// Loads as text and parses here rather than using loadJSON(), which fails
+// with a bare "The data couldn't be read because it isn't in the correct
+// format" for every possible cause. Apps Script answers with an HTML page
+// in several situations - not authorised, wrong URL, a thrown exception -
+// and knowing WHICH is the whole difference between a two-minute fix and
+// an afternoon.
 async function fetchSummary() {
   if (!DEPLOYMENT_URL) throw new Error('Set DEPLOYMENT_URL at the top of this script.');
+  if (!/^https:\/\/script\.google\.com\/.*\/exec$/.test(DEPLOYMENT_URL)) {
+    throw new Error(DEPLOYMENT_URL.endsWith('/dev')
+      ? 'That is the /dev URL. It only works while you are signed into the Apps Script editor - use the /exec one from Deploy > Manage deployments.'
+      : 'DEPLOYMENT_URL does not look like an Apps Script web app URL. It should start https://script.google.com/ and end /exec.');
+  }
+
   // Cache-busted: Apps Script serves reads through a redirect a browser is
   // happy to reuse, and a cached read is indistinguishable from "nothing
   // changed since this morning".
   const req = new Request(`${DEPLOYMENT_URL}?action=widgetSummary&t=${Date.now()}`);
-  req.timeoutInterval = 15;
-  const data = await req.loadJSON();
+  req.timeoutInterval = 20;
+  const body = await req.loadString();
+  const status = (req.response && req.response.statusCode) || 0;
+
+  let data;
+  try {
+    data = JSON.parse(body);
+  } catch (e) {
+    throw new Error(explainNonJson(body, status));
+  }
+
+  // A deployment that predates this endpoint ignores the action and answers
+  // with its bare status page, which is valid JSON but not an answer.
+  if (data && data.status === 'ok' && data.backendVersion) {
+    throw new Error(`This deployment (${data.backendVersion}) predates the widget endpoint. Redeploy code.gs: Deploy > Manage deployments > edit > New version.`);
+  }
   if (!data || data.status !== 'success') throw new Error((data && data.message) || 'Backend refused the request');
-  if (!data.summary) throw new Error('Nothing published yet - open the app once.');
+  if (!data.summary) throw new Error('Nothing published yet - open the tracker once so it can publish.');
   return data.summary;
+}
+
+function explainNonJson(body, status) {
+  const b = String(body || '');
+  if (!b.trim()) return `Empty reply (HTTP ${status}). Check the deployment is still live.`;
+
+  // Google's sign-in / permission interstitial. Almost always the cause:
+  // the web app was deployed with "Who has access" left on Only myself.
+  if (/accounts\.google\.com|ServiceLogin|Sign in|signin\/v2/i.test(b)) {
+    return 'Google is asking this URL to sign in. In Apps Script: Deploy > Manage deployments > edit > set "Who has access" to Anyone, then Deploy.';
+  }
+  if (/Authorization is required|needs? permission|requires authorization/i.test(b)) {
+    return 'The deployment needs authorising. Open the /exec URL in Safari once, approve it, then try again.';
+  }
+  // An exception inside doGet - Apps Script renders it as an HTML page.
+  const err = b.match(/(?:Exception|Error|TypeError|ReferenceError)[^<>\n]{0,160}/i);
+  if (err) return 'The backend threw: ' + err[0].trim();
+  if (/Script function not found|not found/i.test(b)) {
+    return 'Apps Script could not find the web app. Re-check the /exec URL.';
+  }
+  if (/^\s*<(!doctype|html)/i.test(b)) {
+    return `Got an HTML page instead of data (HTTP ${status}). Open the /exec URL in Safari to see what it says.`;
+  }
+  return `Unreadable reply (HTTP ${status}): ${b.slice(0, 120)}`;
 }
 
 // "in 50m" / "3h 20m ago" - the widget's own clock, not the app's.

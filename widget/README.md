@@ -74,9 +74,27 @@ that URL on your phone.
 
 ## If it shows an error
 
+The widget reads the reply as text and parses it itself, rather than using
+Scriptable's `loadJSON()` — that reports every possible cause as the same
+unhelpful *"The data couldn't be read because it isn't in the correct
+format."* Apps Script answers with an HTML page in several situations, and
+knowing which one is the whole difference between a two-minute fix and an
+afternoon.
+
 | Message | What it means |
 |---|---|
 | `Set DEPLOYMENT_URL at the top of this script.` | Step 5. |
-| `Nothing published yet - open the app once.` | Step 2 — the backend is fine, it just has nothing stored. |
-| `Unknown action "widgetSummary" … needs redeploying.` | Step 1 — the deployment predates the endpoint. |
+| `DEPLOYMENT_URL does not look like an Apps Script web app URL.` | It must start `https://script.google.com/` and end `/exec`. |
+| `That is the /dev URL.` | `/dev` only works while you are signed into the editor. Use the `/exec` one from Deploy → Manage deployments. |
+| `Google is asking this URL to sign in.` | The web app's **Who has access** is not *Anyone*. Deploy → Manage deployments → edit → set it → Deploy. This is the usual cause. |
+| `The deployment needs authorising.` | Open the `/exec` URL in Safari once and approve it. |
+| `This deployment (…) predates the widget endpoint.` | Step 1 — redeploy `code.gs`. |
+| `The backend threw: …` | An exception inside `doGet`; the message is Apps Script's own. |
+| `Got an HTML page instead of data (HTTP …)` | Open the `/exec` URL in Safari to see what Google is actually returning. |
+| `Nothing published yet - open the tracker once…` | The backend is fine, it just has nothing stored. |
 | `The internet connection appears to be offline.` | The phone could not reach Apps Script. |
+
+**Quickest check of all:** paste your `/exec` URL into Safari with
+`?action=widgetSummary` on the end. You should see a line of JSON starting
+`{"status":"success"`. Anything else — a sign-in page, an error page — is
+the actual problem, shown directly.
