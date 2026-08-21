@@ -98,3 +98,18 @@ afternoon.
 `?action=widgetSummary` on the end. You should see a line of JSON starting
 `{"status":"success"`. Anything else — a sign-in page, an error page — is
 the actual problem, shown directly.
+
+## Testing it without a phone
+
+`test_widget_strict.mjs` runs the real `AJC-Fitness.js` against
+`scriptable-stub.mjs` — a stub of the Scriptable API that **throws on
+anything the real API does not have**.
+
+```
+node widget/test_widget_strict.mjs
+```
+
+That strictness is the point. An earlier, permissive stub happily answered
+to `DrawContext.fillRoundedRect`, which Scriptable has no such method for,
+so the tests passed and the phone threw. A stub that answers to anything
+proves nothing.

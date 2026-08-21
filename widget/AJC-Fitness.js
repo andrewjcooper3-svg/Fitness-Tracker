@@ -139,6 +139,16 @@ function starterLines(s, now) {
   return { title: 'On the counter', sub: '', color };
 }
 
+// DrawContext has no fillRoundedRect - rounded corners come from a Path.
+// (fillRect and fillEllipse are the only shape helpers on the context
+// itself.)
+function fillRounded(dc, rect, radius) {
+  const p = new Path();
+  p.addRoundedRect(rect, radius, radius);
+  dc.addPath(p);
+  dc.fillPath();
+}
+
 function bar(w, pct, color, width, height) {
   const dc = new DrawContext();
   dc.size = new Size(width, height);
@@ -146,11 +156,11 @@ function bar(w, pct, color, width, height) {
   dc.respectScreenScale = true;
   const r = height / 2;
   dc.setFillColor(new Color('#ffffff', 0.13));
-  dc.fillRoundedRect(new Rect(0, 0, width, height), r, r);
+  fillRounded(dc, new Rect(0, 0, width, height), r);
   const fill = Math.max(0, Math.min(1, pct)) * width;
   if (fill > 0) {
     dc.setFillColor(color);
-    dc.fillRoundedRect(new Rect(0, 0, Math.max(fill, height), height), r, r);
+    fillRounded(dc, new Rect(0, 0, Math.max(fill, height), height), r);
   }
   const img = w.addImage(dc.getImage());
   img.imageSize = new Size(width, height);
