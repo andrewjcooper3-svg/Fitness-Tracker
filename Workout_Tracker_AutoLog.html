@@ -2214,6 +2214,7 @@
           <span class="sd-chart-key"><span class="sd-chart-swatch dash"></span>Projected</span>
           <span class="sd-chart-key"><span class="sd-chart-dot"></span>Peak you saw</span>
           <span class="sd-chart-key"><span class="sd-chart-dot" style="background:none; border:1.5px dashed var(--green)"></span>Height only</span>
+          <span class="sd-chart-key"><span style="color:var(--green); font-weight:700; font-size:13px; line-height:1;">︿</span>Still rising</span>
         </div>
       </div>
 
@@ -2290,8 +2291,8 @@
         </div>
 
         <div class="sd-step">
-          <div class="sd-step-label"><span>3</span>How high did it get?</div>
-          <div class="sd-step-hint">Compare against your feed-time mark. If it has already dropped, read the ring it left on the glass - that is its high-water mark.</div>
+          <div class="sd-step-label"><span>3</span><span id="sdRiseQuestion" style="color:inherit; margin:0;">How high did it get?</span></div>
+          <div class="sd-step-hint" id="sdRiseHint">Compare against your feed-time mark. If it has already dropped, read the ring it left on the glass - that is its high-water mark.</div>
           <div class="sd-choice sd-choice-3" id="sdRiseChoice"></div>
         </div>
 
@@ -3903,12 +3904,17 @@ function sdPeakEvidence_(f) {
   const T = (new Date(f.checkedAt) - new Date(f.at)) / 3600000;
   if (!(T > 0.5 && T < 48)) return null;
 
+  // Each bound carries a small margin, because "still rising at T" means
+  // the peak is strictly LATER than T, not exactly at it. Landing the
+  // prediction right on the check would have the status say "past its
+  // peak" the moment you told it the opposite.
   if (f.checkState === 'rising') {
-    // Peak is after T, so a model predicting sooner than T is too fast.
-    return modelled >= T ? { ratio: 1, exact: false } : { ratio: T / modelled, exact: false };
+    const bound = T * 1.15;
+    return modelled >= bound ? { ratio: 1, exact: false } : { ratio: bound / modelled, exact: false };
   }
   if (f.checkState === 'falling') {
-    return modelled <= T ? { ratio: 1, exact: false } : { ratio: T / modelled, exact: false };
+    const bound = T * 0.92;
+    return modelled <= bound ? { ratio: 1, exact: false } : { ratio: bound / modelled, exact: false };
   }
   if (f.checkState === 'collapsed') {
     // Well past it - treat the peak as comfortably before the check.
@@ -3922,12 +3928,54 @@ function sdPeakEvidence_(f) {
 // since a bound only ever tells you which side of a line the truth is on.
 // Clamped hard so one mistyped time cannot send every prediction sideways.
 function starterCalibration_(st) {
-  const ev = (st.feeds || []).slice(-8).map(sdPeakEvidence_).filter(Boolean);
-  const informative = ev.filter(e => e.exact || e.ratio !== 1);
-  if (informative.length < 2) return 1;
-  let sum = 0, w = 0;
-  informative.forEach(e => { const wt = e.exact ? 2 : 1; sum += e.ratio * wt; w += wt; });
-  return Math.max(0.5, Math.min(2, sum / w));
+  const feeds = (st.feeds || []).slice(-8);
+  const informative = feeds.map(sdPeakEvidence_).filter(e => e && (e.exact || e.ratio !== 1));
+
+  // Damped average rather than a hard cutoff. The old rule needed two
+  // informative observations before it would move at all, which meant the
+  // FIRST useful thing you ever logged did nothing - the exact "I told it
+  // something and the chart did not change" case. One observation now
+  // moves it halfway, two by two thirds, and so on.
+  let cal = 1;
+  if (informative.length) {
+    let sum = 0, w = 0;
+    informative.forEach(e => { const wt = e.exact ? 2 : 1; sum += e.ratio * wt; w += wt; });
+    const mean = sum / w;
+    const confidence = informative.length / (informative.length + 1);
+    cal = 1 + (mean - 1) * confidence;
+  }
+
+  // The newest bound is a constraint, not a vote. If you have just said it
+  // is STILL RISING, a model that thinks it peaked two hours ago is simply
+  // wrong, whatever the older feeds averaged out to - so the calibration is
+  // pushed far enough to agree with what you just saw. It clears itself the
+  // next time you feed, since a fresh feed carries no observation yet.
+  const last = feeds[feeds.length - 1];
+  const lastEv = last && sdPeakEvidence_(last);
+  if (lastEv && !lastEv.exact && lastEv.ratio !== 1) {
+    cal = lastEv.ratio > 1 ? Math.max(cal, lastEv.ratio) : Math.min(cal, lastEv.ratio);
+  }
+  return Math.max(0.5, Math.min(2, cal));
+}
+
+// BUG 2 was here in spirit: a height recorded while it is STILL RISING is
+// not the peak, it is a floor under the peak. Treating it as the peak made
+// the curve shrink to meet it - so reporting growth made the chart go
+// DOWN, which is the opposite of what happened in the jar.
+function sdPeakRiseX_(f) {
+  if (!f || !f.riseX) return null;
+  if (f.checkState === 'rising') return null;   // not there yet
+  return f.riseX;
+}
+
+// Amplitude to draw a feed's curve at: a known peak if there is one,
+// otherwise the usual for this starter - but never below a height already
+// observed on the way up.
+function sdCurveRiseX_(st, f) {
+  const known = sdPeakRiseX_(f);
+  if (known) return known;
+  const typical = starterTypicalRise_(st);
+  return (f && f.checkState === 'rising' && f.riseX) ? Math.max(f.riseX * 1.15, typical) : typical;
 }
 
 // How much the model actually knows, for the readout - so "no idea" and
@@ -4145,7 +4193,7 @@ function renderStarterActive_(st) {
 
   // Meta strip: age, how it is performing, how well the model knows it.
   const ageDays = st.bornOn ? Math.max(0, Math.round((now - new Date(st.bornOn)) / 86400000)) : null;
-  const rises = (st.feeds || []).filter(f => f.riseX).slice(-5).map(f => f.riseX);
+  const rises = (st.feeds || []).map(sdPeakRiseX_).filter(Boolean).slice(-5);
   const avgRise = rises.length ? (rises.reduce((a, b) => a + b, 0) / rises.length) : null;
   const cal = starterCalibration_(st);
   const calInfo = starterCalibrationInfo_(st);
@@ -4262,6 +4310,17 @@ function renderStarterCheck_(st) {
 
   document.getElementById('sdRiseChoice').innerHTML = SD_RISE_CHOICES.map(o =>
     `<button type="button" class="${(sdCheckDraft.riseX || 0) === o.v ? 'active' : ''}" onclick="sdPickRise(${o.v})">${escapeHtml_(o.label)}${o.note ? `<small>${escapeHtml_(o.note)}</small>` : ''}</button>`).join('');
+
+  // Asking "how high did it get" about something still on its way up is
+  // the wrong tense, and it is what makes people record a mid-rise height
+  // as though it were the peak.
+  const rising = sdCheckDraft.state === 'rising';
+  const q = document.getElementById('sdRiseQuestion');
+  if (q) q.textContent = rising ? 'How high is it right now?' : 'How high did it get?';
+  const hint = document.getElementById('sdRiseHint');
+  if (hint) hint.textContent = rising
+    ? 'Against your feed-time mark. Since it is still going up this is a floor, not the peak - the model treats it that way.'
+    : 'Compare against your feed-time mark. If it has already dropped, read the ring it left on the glass - that is its high-water mark.';
 
   const sw = document.getElementById('sdHoochToggle');
   if (sw) { sw.classList.toggle('on', sdCheckDraft.hooch); sw.setAttribute('aria-checked', String(sdCheckDraft.hooch)); }
@@ -4386,7 +4445,10 @@ function sdRiseAt_(hoursSinceFeed, peakH, peakX) {
 }
 
 function starterTypicalRise_(st) {
-  const rises = (st.feeds || []).filter(f => f.riseX).slice(-5).map(f => f.riseX);
+  // Only heights that are actually peaks - a "still rising" reading would
+  // drag the average down with a number the starter had not finished
+  // reaching.
+  const rises = (st.feeds || []).map(sdPeakRiseX_).filter(Boolean).slice(-5);
   if (!rises.length) return 2.2;
   return rises.reduce((a, b) => a + b, 0) / rises.length;
 }
@@ -4423,7 +4485,7 @@ function renderStarterChart_(st) {
     if (!last) { pts.push(null); continue; }
     const peakH = starterPeakHours_(st, last.tempF, last.ratio, last.flour);
     const hrs = (t - new Date(last.at)) / 3600000;
-    pts.push({ t, v: sdRiseAt_(hrs, peakH, last.riseX || peakX) });
+    pts.push({ t, v: sdRiseAt_(hrs, peakH, sdCurveRiseX_(st, last)) });
   }
 
   const nowIdx = Math.round((now - t0) / (STEP_MIN * 60000));
@@ -4457,11 +4519,22 @@ function renderStarterChart_(st) {
     const at = new Date(f.at);
     if (at < t0 || at > t1) return;
     marks += `<line x1="${x(at).toFixed(1)}" y1="${PADT}" x2="${x(at).toFixed(1)}" y2="${H - PADB}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3" opacity="0.5"></line>`;
-    // A filled dot is a peak you actually saw. A hollow one is a height you
-    // read off the high-water ring, placed at the modelled peak time -
-    // right height, uncertain when, and drawn so it cannot be mistaken for
-    // a measurement.
-    if (f.riseX) {
+    // Every check gets drawn, whether or not it moved the model. A check
+    // that agreed with the prediction used to leave no trace at all, which
+    // reads as "nothing happened" rather than "that matched".
+    //
+    // Filled dot   a peak you actually watched
+    // Hollow dot   a height read off the high-water ring, at the modelled
+    //              peak time - right height, uncertain when
+    // Caret        a "still rising" reading: it was at least this high at
+    //              that moment and heading up
+    if (f.checkedAt && f.checkState === 'rising' && f.riseX) {
+      const ck = new Date(f.checkedAt);
+      if (ck >= t0 && ck <= t1) {
+        const cx = x(ck), cy = y(Math.min(f.riseX, yMax));
+        marks += `<path d="M${(cx - 4).toFixed(1)},${(cy + 3).toFixed(1)} L${cx.toFixed(1)},${(cy - 3).toFixed(1)} L${(cx + 4).toFixed(1)},${(cy + 3).toFixed(1)}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`;
+      }
+    } else if (f.riseX) {
       const cy = y(Math.min(f.riseX, yMax)).toFixed(1);
       if (f.peakAt) {
         const pk = new Date(f.peakAt);
@@ -4469,6 +4542,13 @@ function renderStarterChart_(st) {
       } else {
         const pk = new Date(at.getTime() + starterPeakHours_(st, f.tempF, f.ratio, f.flour) * 3600000);
         if (pk >= t0 && pk <= t1) marks += `<circle cx="${x(pk).toFixed(1)}" cy="${cy}" r="3.5" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="2 2"></circle>`;
+      }
+    }
+    // A check with no height is still worth a tick on the time axis.
+    if (f.checkedAt && f.checkState && !f.riseX) {
+      const ck = new Date(f.checkedAt);
+      if (ck >= t0 && ck <= t1) {
+        marks += `<line x1="${x(ck).toFixed(1)}" y1="${H - PADB - 6}" x2="${x(ck).toFixed(1)}" y2="${H - PADB}" stroke="var(--green)" stroke-width="2"></line>`;
       }
     }
   });
@@ -8099,7 +8179,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-21-starter-check-form';
+const APP_BUILD_VERSION = '2026-08-21-starter-check-actually-learns';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
