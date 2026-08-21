@@ -406,7 +406,9 @@
        24-hour day. The chevron lives in its own head row that swallows the
        click, so tapping the title toggles while tapping anywhere else on the
        card still jumps to the Trainer tab as it always did. */
-    .ov-hero-head { display: flex; justify-content: space-between; align-items: center; }
+    .ov-hero-main { min-width: 0; }
+    .ov-hero-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .ov-hero-chevron { opacity: 0.65; font-weight: 400; }
     .ov-pu-chart-wrap { display: none; margin-top: 8px; }
     .ov-pu-chart-wrap.expanded { display: block; }
     .ov-pu-chart { width: 100%; height: 46px; display: block; overflow: visible; }
@@ -474,6 +476,7 @@
     /* Water widget - same ring-on-the-left layout as the Pushups hero,
        scaled down to widget size, with tap-to-log buttons standing in
        for the hero's stat column, plus an hourly bar chart below. */
+    .ov-hero-water .ov-widget-head { cursor: pointer; }
     .wt-undo-btn { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); background: none; border: none; cursor: pointer; padding: 4px 2px; }
     .wt-undo-btn:active { color: var(--text); }
     .wt-.app-body { display: flex; align-items: center; gap: 8px; }
@@ -1208,6 +1211,31 @@
       .ov-glance-grid { grid-template-columns: repeat(3, 1fr); }
     }
   
+    /* Landscape phone and up (768px+): each hero card takes the full width
+       of the view and splits into two columns instead of hiding its chart
+       behind a drop-down. The logging column keeps exactly the width it had
+       when the two cards sat side by side - calc(50% - 22px) of the card's
+       content box is the same pixel width as calc(50% - 8px) of the view
+       minus the card's 14px side padding - so nothing about logging moves;
+       the width that freed up all goes to the chart, which is now always on
+       screen. Both charts stretch to the card's height, which is why their
+       SVGs already carry preserveAspectRatio="none".
+  
+       There is nothing left to expand at this width, so the chevrons are
+       hidden and the heads stop behaving like toggles (heroChartsPinned_()
+       makes the JS side agree). Portrait keeps the drop-downs, where the
+       screen is too narrow to show a chart and the controls at once. */
+    @media (min-width: 768px) {
+      #view-overview > .ov-hero-card { flex: 1 1 100%; display: flex; align-items: stretch; column-gap: 16px; }
+      .ov-hero-main { flex: 0 0 calc(50% - 22px); }
+      .wt-chart-wrap, .ov-pu-chart-wrap {
+        display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; margin-top: 0;
+      }
+      .wt-chart, .ov-pu-chart { flex: 1 1 auto; height: auto; min-height: 54px; }
+      .ov-hero-chevron { display: none; }
+      .ov-hero-head, .ov-hero-water .ov-widget-head { cursor: default; }
+    }
+  
     /* Wide landscape phone / tablet only (768-1099px, NOT desktop):
        shrink the page/day titles and collapse the title/subtitle/week
        line into one row to give more of the limited vertical space
@@ -1580,7 +1608,7 @@
             <button class="ov-gear-btn" aria-label="Settings">⚙</button>
           </div>
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-21-hero-card-dropdowns</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-21-wide-hero-charts</div>
       
         <!-- v3: two bold gradient hero cards (the two things you actually log
              throughout the day) plus a colorful icon-tile grid below for
@@ -1589,14 +1617,21 @@
              from before, so all existing render/update functions keep working
              with zero JS logic changes beyond the Pushups card (which gets a
              new progress-bar target instead of plain text). -->
+        <!-- .ov-hero-main groups everything that isn't the chart. Stacked in
+             portrait it is just a plain block and changes nothing; from 768px up
+             the card goes full-width and this becomes the left column (still the
+             width it had when the cards were side by side) with the chart taking
+             the width that freed up. -->
         <div class="ov-hero-card ov-hero-pushup" data-widget="pushups">
-          <div class="ov-hero-head" style="cursor:pointer;">
-            <div class="ov-hero-card-label">💪 Pushups this week <span id="ovPushupChevron" style="opacity:0.65; font-weight:400;">▸</span></div>
+          <div class="ov-hero-main">
+            <div class="ov-hero-head">
+              <div class="ov-hero-card-label">💪 Pushups this week <span class="ov-hero-chevron" id="ovPushupChevron">▸</span></div>
+            </div>
+            <div class="ov-hero-card-number" id="ovPushupNumber">0</div>
+            <div class="ov-hero-card-sub" id="ovPushupSub">of 1,045</div>
+            <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovPushupBar" style="width:0%"></div></div>
+            <div class="ov-hero-card-status" id="ovPushupStatus">−2,552 deficit · behind · 0/7 days logged</div>
           </div>
-          <div class="ov-hero-card-number" id="ovPushupNumber">0</div>
-          <div class="ov-hero-card-sub" id="ovPushupSub">of 1,045</div>
-          <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovPushupBar" style="width:0%"></div></div>
-          <div class="ov-hero-card-status" id="ovPushupStatus">−2,552 deficit · behind · 0/7 days logged</div>
           <div class="ov-pu-chart-wrap" id="ovPushupChartWrap" data-restored="1">
             <svg class="ov-pu-chart" id="ovPushupChart" viewBox="0 0 320 46" preserveAspectRatio="none"><rect x="0.00" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="0.00" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="0.00" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="0.00" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="46.57" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="46.57" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="46.57" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="46.57" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="93.14" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="93.14" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="93.14" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="93.14" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="139.71" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="139.71" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="139.71" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="139.71" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="186.29" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="186.29" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="186.29" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="186.29" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="232.86" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="232.86" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="232.86" y="0.0" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="232.86" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="279.43" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="279.43" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="279.43" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect></svg>
             <div class="ov-pu-chart-labels" id="ovPushupChartLabels"><span class="">M</span><span class="">T</span><span class="">W</span><span class="">T</span><span class="today">F</span><span class="">S</span><span class="">S</span></div>
@@ -1605,8 +1640,9 @@
         </div>
       
         <div class="ov-hero-card ov-hero-water" id="ovBoard">
-          <div class="ov-widget-head" style="cursor:pointer;">
-            <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water <span id="wtChartChevron" style="opacity:0.65; font-weight:400;">▸</span></div>
+          <div class="ov-hero-main">
+          <div class="ov-widget-head">
+            <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water <span class="ov-hero-chevron" id="wtChartChevron">▸</span></div>
             <button class="wt-undo-btn" id="wtUndoBtn" style="display:none;">↩ Undo</button>
           </div>
           <div class="wt-body">
@@ -1651,6 +1687,7 @@
           <div class="wt-caffeine-line" id="wtCaffeineLine">
             <span id="wtCaffeineOnBoard"></span>
             <span class="wt-drink-preview" id="wtDrinkPreview">Pending - 10 oz net · 140 mg</span>
+          </div>
           </div>
           <div class="wt-chart-wrap" id="wtChartWrap">
             <!-- Resolution is a preference, not a constant: an hour a bar reads

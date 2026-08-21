@@ -407,7 +407,9 @@
      24-hour day. The chevron lives in its own head row that swallows the
      click, so tapping the title toggles while tapping anywhere else on the
      card still jumps to the Trainer tab as it always did. */
-  .ov-hero-head { display: flex; justify-content: space-between; align-items: center; }
+  .ov-hero-main { min-width: 0; }
+  .ov-hero-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .ov-hero-chevron { opacity: 0.65; font-weight: 400; }
   .ov-pu-chart-wrap { display: none; margin-top: 8px; }
   .ov-pu-chart-wrap.expanded { display: block; }
   .ov-pu-chart { width: 100%; height: 46px; display: block; overflow: visible; }
@@ -475,6 +477,7 @@
   /* Water widget - same ring-on-the-left layout as the Pushups hero,
      scaled down to widget size, with tap-to-log buttons standing in
      for the hero's stat column, plus an hourly bar chart below. */
+  .ov-hero-water .ov-widget-head { cursor: pointer; }
   .wt-undo-btn { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); background: none; border: none; cursor: pointer; padding: 4px 2px; }
   .wt-undo-btn:active { color: var(--text); }
   .wt-body { display: flex; align-items: center; gap: 8px; }
@@ -1209,6 +1212,31 @@
     .ov-glance-grid { grid-template-columns: repeat(3, 1fr); }
   }
 
+  /* Landscape phone and up (768px+): each hero card takes the full width
+     of the view and splits into two columns instead of hiding its chart
+     behind a drop-down. The logging column keeps exactly the width it had
+     when the two cards sat side by side - calc(50% - 22px) of the card's
+     content box is the same pixel width as calc(50% - 8px) of the view
+     minus the card's 14px side padding - so nothing about logging moves;
+     the width that freed up all goes to the chart, which is now always on
+     screen. Both charts stretch to the card's height, which is why their
+     SVGs already carry preserveAspectRatio="none".
+
+     There is nothing left to expand at this width, so the chevrons are
+     hidden and the heads stop behaving like toggles (heroChartsPinned_()
+     makes the JS side agree). Portrait keeps the drop-downs, where the
+     screen is too narrow to show a chart and the controls at once. */
+  @media (min-width: 768px) {
+    #view-overview > .ov-hero-card { flex: 1 1 100%; display: flex; align-items: stretch; column-gap: 16px; }
+    .ov-hero-main { flex: 0 0 calc(50% - 22px); }
+    .wt-chart-wrap, .ov-pu-chart-wrap {
+      display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; margin-top: 0;
+    }
+    .wt-chart, .ov-pu-chart { flex: 1 1 auto; height: auto; min-height: 54px; }
+    .ov-hero-chevron { display: none; }
+    .ov-hero-head, .ov-hero-water .ov-widget-head { cursor: default; }
+  }
+
   /* Wide landscape phone / tablet only (768-1099px, NOT desktop):
      shrink the page/day titles and collapse the title/subtitle/week
      line into one row to give more of the limited vertical space
@@ -1544,14 +1572,21 @@
        from before, so all existing render/update functions keep working
        with zero JS logic changes beyond the Pushups card (which gets a
        new progress-bar target instead of plain text). -->
+  <!-- .ov-hero-main groups everything that isn't the chart. Stacked in
+       portrait it is just a plain block and changes nothing; from 768px up
+       the card goes full-width and this becomes the left column (still the
+       width it had when the cards were side by side) with the chart taking
+       the width that freed up. -->
   <div class="ov-hero-card ov-hero-pushup" data-widget="pushups" onclick="showAppView('tracker')">
-    <div class="ov-hero-head" onclick="togglePushupChart_(event)" style="cursor:pointer;">
-      <div class="ov-hero-card-label">💪 Pushups this week <span id="ovPushupChevron" style="opacity:0.65; font-weight:400;">▸</span></div>
+    <div class="ov-hero-main">
+      <div class="ov-hero-head" onclick="togglePushupChart_(event)">
+        <div class="ov-hero-card-label">💪 Pushups this week <span class="ov-hero-chevron" id="ovPushupChevron">▸</span></div>
+      </div>
+      <div class="ov-hero-card-number" id="ovPushupNumber">0</div>
+      <div class="ov-hero-card-sub" id="ovPushupSub">of 0</div>
+      <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovPushupBar" style="width:0%"></div></div>
+      <div class="ov-hero-card-status" id="ovPushupStatus"></div>
     </div>
-    <div class="ov-hero-card-number" id="ovPushupNumber">0</div>
-    <div class="ov-hero-card-sub" id="ovPushupSub">of 0</div>
-    <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovPushupBar" style="width:0%"></div></div>
-    <div class="ov-hero-card-status" id="ovPushupStatus"></div>
     <div class="ov-pu-chart-wrap" id="ovPushupChartWrap" onclick="event.stopPropagation()">
       <svg class="ov-pu-chart" id="ovPushupChart" viewBox="0 0 320 46" preserveAspectRatio="none"></svg>
       <div class="ov-pu-chart-labels" id="ovPushupChartLabels"></div>
@@ -1560,8 +1595,9 @@
   </div>
 
   <div class="ov-hero-card ov-hero-water" id="ovBoard">
-    <div class="ov-widget-head" onclick="toggleWaterChart_()" style="cursor:pointer;">
-      <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water <span id="wtChartChevron" style="opacity:0.65; font-weight:400;">▸</span></div>
+    <div class="ov-hero-main">
+    <div class="ov-widget-head" onclick="toggleWaterChart_()">
+      <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water <span class="ov-hero-chevron" id="wtChartChevron">▸</span></div>
       <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
     </div>
     <div class="wt-body">
@@ -1607,6 +1643,7 @@
     <div class="wt-caffeine-line" id="wtCaffeineLine" onclick="openCaffeineModal(event)">
       <span id="wtCaffeineOnBoard"></span>
       <span class="wt-drink-preview" id="wtDrinkPreview"></span>
+    </div>
     </div>
     <div class="wt-chart-wrap" id="wtChartWrap">
       <!-- Resolution is a preference, not a constant: an hour a bar reads
@@ -7528,6 +7565,10 @@ function saveState() {
   localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
   updatePushupLedger();
   renderTrainerStats();
+  // The week/month/year rings read the same live day panels, so they went
+  // stale on every set you checked or added until you left the tab and came
+  // back. They refresh with the rest of the tab's stats now.
+  if (viewOrder[currentViewIndex] === 'tracker') renderPushupsTab();
   syncDraftToCloud(state);
 }
 
@@ -8099,7 +8140,9 @@ function computeWeekStats() {
     const panel = document.getElementById('day-' + key);
     const cards = panel.querySelectorAll('.exercise-card');
     let setsPlanned = 0, setsCompleted = 0, totalReps = 0, pushupTotal = 0;
-    const pushupTarget = parseFloat(panel.dataset.pushupTarget) || 0;
+    // Summed from the day's live Pushups rows, so adding or deleting a set
+    // moves the target with it - see dayPushupTarget_().
+    const pushupTarget = dayPushupTarget_(panel);
 
     cards.forEach(card => {
       const rows = card.querySelectorAll('.set-row');
@@ -8277,7 +8320,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-21-hero-card-dropdowns';
+const APP_BUILD_VERSION = '2026-08-21-wide-hero-charts';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -8944,7 +8987,16 @@ function adjustDrinkAmount(event, type, direction) {
 // it every time) - tapping the "Water" header expands/collapses it in
 // place rather than navigating anywhere, matching the rest of the
 // water card's tap-to-log behavior instead of opening a separate view.
+// From 768px up both hero charts are pinned open beside their controls, so
+// there is nothing for a head tap to toggle - the CSS wins either way, but
+// silently flipping a class and writing a preference the user never chose
+// would make the drop-down come back in the wrong state on their phone.
+function heroChartsPinned_() {
+  return typeof matchMedia === 'function' && matchMedia('(min-width: 768px)').matches;
+}
+
 function toggleWaterChart_() {
+  if (heroChartsPinned_()) return;
   const wrap = document.getElementById('wtChartWrap');
   const chevron = document.getElementById('wtChartChevron');
   if (!wrap) return;
@@ -9538,6 +9590,10 @@ function renderOverviewPushupMini() {
 const STORAGE_PUSHUP_CHART_OPEN = 'WORKOUT_OV_PUSHUP_CHART_OPEN';
 
 function togglePushupChart_(event) {
+  // Pinned open: let the click bubble so the head behaves like the rest of
+  // the card and opens the Trainer tab, rather than swallowing it for a
+  // toggle that no longer exists at this width.
+  if (heroChartsPinned_()) return;
   if (event) event.stopPropagation();
   const wrap = document.getElementById('ovPushupChartWrap');
   const chevron = document.getElementById('ovPushupChevron');
@@ -11956,13 +12012,61 @@ function parseExerciseCard(card) {
 
 /* ---------- Adding sets / exercises + live totals ---------- */
 
+// What a card is PRESCRIBED, as opposed to sumReps()'s what-you-actually-
+// did: every set row's target (its placeholder), falling back to whatever
+// was typed on a custom exercise that has no placeholder to read.
+function plannedReps(card) {
+  let total = 0;
+  card.querySelectorAll('.set-row').forEach(row => {
+    const n = parseFloat(targetOrTyped(row.querySelectorAll('.set-input')[1]));
+    if (!isNaN(n)) total += n;
+  });
+  return total;
+}
+
+// The day's pushup target used to be read straight off the panel's frozen
+// data-pushup-target attribute, which was written once from the plan and
+// never touched again. Adding a fourth set to a 3 x 55 day therefore
+// changed what you were being asked to do without changing the number you
+// were measured against - the card read "Total: 220 / 165 reps", and the
+// same stale 165 flowed into the week ring, the deficit, and Overview's
+// weekly target. Summing the day's actual Pushups rows is where the plan
+// really lives (the attribute's value was exactly that sum on every day),
+// so it is the source of truth now; the attribute stays as the fallback
+// for a day that has no Pushups card at all to sum.
+function dayPushupTarget_(panel) {
+  if (!panel) return 0;
+  let target = 0, found = false;
+  panel.querySelectorAll('.exercise-card').forEach(card => {
+    if (getExerciseName(card).toLowerCase() !== 'pushups') return;
+    found = true;
+    target += plannedReps(card);
+  });
+  return found ? target : (parseFloat(panel.dataset.pushupTarget) || 0);
+}
+
+// The header's prescription line ("BW · 3 × 55 · Rest 60s") is written
+// once from the plan too, so it kept claiming three sets after you added a
+// fourth. Only the set count ahead of the "x" is rewritten - the equipment,
+// the rep target and any rest note are the plan's own words and stay put.
+function updateExerciseMetaSets_(card) {
+  const metaEl = card.querySelector('.exercise-meta');
+  if (!metaEl) return;
+  const count = card.querySelectorAll('.set-row').length;
+  metaEl.textContent = metaEl.textContent.split('·').map(seg =>
+    /^\s*\d+\s*[×x]\s*\S/.test(seg) ? seg.replace(/^(\s*)\d+/, '$1' + count) : seg
+  ).join('·');
+}
+
 function updateExerciseTotal(card) {
   const total = sumReps(card);
   const bar = ensureExerciseInfoBar_(card);
   const totalEl = bar.querySelector('.exercise-total-inline');
 
+  updateExerciseMetaSets_(card);
+
   if (getExerciseName(card).toLowerCase() === 'pushups') {
-    const target = card.closest('.day-panel').dataset.pushupTarget;
+    const target = dayPushupTarget_(card.closest('.day-panel'));
     totalEl.textContent = `Total: ${total} / ${target} reps`;
   } else {
     totalEl.textContent = `Total: ${total} reps`;
