@@ -945,6 +945,9 @@
   .stats-card { background: var(--surface); border-radius: 18px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
   .stats-card-title { font-family: var(--font); font-size: 13px; font-weight: 700; margin-bottom: 12px; }
   .stats-chart { width: 100%; height: 140px; display: block; overflow: visible; }
+  /* No data to draw - collapse instead of leaving an empty box with the
+     explanation stranded below it. */
+  .stats-chart.stats-chart-empty { height: 0; }
   .stats-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; }
   .stats-chart-detail { font-family: var(--font); font-size: 12px; color: var(--text); text-align: center; margin-top: 6px; min-height: 15px; }
   .stats-card-clickable { cursor: pointer; transition: background 0.15s; }
@@ -1053,7 +1056,12 @@
   .sd-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
   .sd-chart-title { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
   .sd-chart-now { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); }
-  .sd-chart-svg { width: 100%; height: auto; display: block; margin-top: 6px; overflow: visible; }
+  /* An explicit height, not auto: the chart now draws at its own pixel
+     size, and height:auto derives the height FROM the viewBox - which is
+     set from the measured height. That circle settled on the viewBox's
+     original 320:132 ratio, so a 1070px-wide desktop card got a 441px-tall
+     chart. */
+  .sd-chart-svg { width: 100%; height: 150px; display: block; margin-top: 6px; overflow: visible; }
   .sd-chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
   /* Sync state for the starter. Quiet when it is working, loud when it is
      not - a starter is weeks of work and a failed save used to be
@@ -1255,6 +1263,17 @@
      hidden and the heads stop behaving like toggles (heroChartsPinned_()
      makes the JS side agree). Portrait keeps the drop-downs, where the
      screen is too narrow to show a chart and the controls at once. */
+  /* Stats, 768px and up: two cards side by side rather than one column
+     stretched across the whole window. Landscape gains the most - the page
+     is only 430px tall there, and stacked cards pushed the Weight card
+     mostly off-screen. It also keeps each chart near its natural width, so
+     eight weekly bars read as bars rather than slabs. */
+  @media (min-width: 768px) {
+    #view-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; align-items: start; }
+    #view-stats > .ov-page-head,
+    #view-stats > .ov-note { grid-column: 1 / -1; }
+  }
+
   @media (min-width: 768px) {
     .ov-blocks > .ov-hero-card { display: flex; align-items: stretch; column-gap: 16px; }
     .ov-hero-main { flex: 0 0 calc(50% - 22px); }
@@ -3517,28 +3536,74 @@ function computeWeeklyPushupHistory(weeks) {
   return result;
 }
 
+/* A viewBox fixed at 320 wide plus preserveAspectRatio="none" stretches
+   the whole drawing horizontally to fill its element. That is harmless for
+   plain bars but wrong for everything else: on a 1084px-wide desktop card
+   the scale is 3.4x across and 1x down, so text glyphs smear sideways,
+   corner radii go oval and vertical strokes fatten. Measuring the element
+   and drawing in its own pixels means one unit is one pixel at every
+   width, so nothing is ever distorted. */
+function fitChartBox_(svg, fallbackW, fallbackH) {
+  const r = svg.getBoundingClientRect();
+  const w = Math.round(r.width) || fallbackW || 320;
+  const h = Math.round(r.height) || fallbackH || 140;
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.removeAttribute('preserveAspectRatio');
+  return { w, h };
+}
+
+// Bars keep a sane width instead of becoming huge slabs on a wide screen,
+// and the row is centred in whatever space is left.
+const STATS_MAX_BAR_W = 64;
+
 function renderStatsPushupChart() {
   const weeks = computeWeeklyPushupHistory(8);
   const svg = document.getElementById('statsPushupChart');
   const labelsEl = document.getElementById('statsPushupLabels');
   const weeklyTarget = PUSHUP_DAILY_BASELINE * 6;
   const maxVal = Math.max(weeklyTarget, ...weeks.map(w => w.total), 1);
-  const chartW = 320, chartH = 112, topMargin = 20, barGap = 6;
-  const barW = (chartW - barGap * (weeks.length - 1)) / weeks.length;
 
-  let bars = '';
+  const box = fitChartBox_(svg, 320, 140);
+  const topMargin = 20, barGap = 6;
+  const chartH = box.h - topMargin - 8;
+  const barW = Math.min(STATS_MAX_BAR_W, (box.w - barGap * (weeks.length - 1)) / weeks.length);
+  const groupW = barW * weeks.length + barGap * (weeks.length - 1);
+  const offsetX = Math.max(0, (box.w - groupW) / 2);
+  const targetY = topMargin + chartH - (weeklyTarget / maxVal) * chartH;
+
+  // The weekly target as a line across the chart - the bar colours already
+  // encode hit/missed, but with the bars spread out on a wide screen there
+  // was nothing showing WHERE the bar had to reach.
+  let bars = `<line x1="0" y1="${targetY.toFixed(1)}" x2="${box.w}" y2="${targetY.toFixed(1)}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 4" opacity="0.45"></line>`;
+
   weeks.forEach((w, i) => {
-    const h = Math.max(2, (w.total / maxVal) * chartH);
-    const x = i * (barW + barGap);
-    const y = topMargin + (chartH - h);
-    const color = w.total >= weeklyTarget ? 'var(--green)' : 'var(--accent)';
+    const x = offsetX + i * (barW + barGap);
     const cx = x + barW / 2;
-    const labelY = Math.max(10, y - 5);
-    bars += `<text x="${cx.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="9" fill="var(--muted)" font-family="var(--font)">${w.total}</text>`;
-    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${color}" style="cursor:pointer;" onclick="openWeekDetailModal('${dateKey(w.weekStart)}')"></rect>`;
+    // An empty week used to draw a 2px sliver that read as a stray rule
+    // under its "0". A faint full-height track says "nothing here" without
+    // pretending to be a bar.
+    bars += `<rect x="${x.toFixed(1)}" y="${topMargin}" width="${barW.toFixed(1)}" height="${chartH.toFixed(1)}" rx="4" fill="var(--surface2)" opacity="0.45"></rect>`;
+    if (w.total > 0) {
+      const h = Math.max(3, (w.total / maxVal) * chartH);
+      const y = topMargin + (chartH - h);
+      const color = w.total >= weeklyTarget ? 'var(--green)' : 'var(--accent)';
+      bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${color}"></rect>`;
+      bars += `<text x="${cx.toFixed(1)}" y="${Math.max(11, y - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">${w.total.toLocaleString()}</text>`;
+    }
+    bars += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${box.h}" fill="transparent" style="cursor:pointer;" onclick="openWeekDetailModal('${dateKey(w.weekStart)}')"></rect>`;
   });
   svg.innerHTML = bars;
-  labelsEl.innerHTML = weeks.map(w => `<span onclick="openWeekDetailModal('${dateKey(w.weekStart)}')" style="cursor:pointer;">${w.weekStart.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</span>`).join('');
+
+  // Labels take the bars' exact geometry - same width, same gap, same
+  // offset - rather than flexing evenly across the row. Sharing the row
+  // evenly is subtly wrong: the bars are spaced by barW+barGap while equal
+  // flex children are spaced by barW+(7/8)barGap, so the two drift further
+  // apart at every column and the last label sits ~3px off its bar.
+  labelsEl.style.justifyContent = 'flex-start';
+  labelsEl.style.gap = barGap + 'px';
+  labelsEl.style.paddingLeft = offsetX + 'px';
+  labelsEl.style.paddingRight = offsetX + 'px';
+  labelsEl.innerHTML = weeks.map(w => `<span style="flex:0 0 ${barW.toFixed(1)}px; text-align:center; cursor:pointer;" onclick="openWeekDetailModal('${dateKey(w.weekStart)}')">${w.weekStart.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</span>`).join('');
 }
 
 function openWeekDetailModal(weekStartKey) {
@@ -3666,11 +3731,15 @@ function renderWeightLineChart(svgId, labelsId, maxEntries, detailId) {
 
   if (log.length < 2) {
     svg.innerHTML = '';
+    // Collapsed rather than left as an empty 140px box with the message
+    // stranded underneath it.
+    svg.classList.add('stats-chart-empty');
     labelsEl.innerHTML = '<span class="ov-mini-empty">Log at least 2 weigh-ins to see a trend.</span>';
     WEIGHT_CHART_ENTRIES_[svgId] = [];
     if (detailId) { const el = document.getElementById(detailId); if (el) el.textContent = ''; }
     return;
   }
+  svg.classList.remove('stats-chart-empty');
 
   const entries = log.slice(-maxEntries);
   WEIGHT_CHART_ENTRIES_[svgId] = entries;
@@ -3678,17 +3747,23 @@ function renderWeightLineChart(svgId, labelsId, maxEntries, detailId) {
   const minW = Math.min(...weights), maxW = Math.max(...weights);
   const pad = Math.max(1, (maxW - minW) * 0.15);
   const lo = minW - pad, hi = maxW + pad;
-  const chartW = 320, chartH = 132;
+  // Drawn in real pixels (see fitChartBox_) so the line weight and the
+  // dots stay round at any width. The inset keeps the end dots from being
+  // clipped in half by the edges.
+  const box = fitChartBox_(svg, 320, 140);
+  const INSET = 6;
+  const chartW = Math.max(1, box.w - INSET * 2);
+  const chartH = Math.max(1, box.h - INSET * 2);
   const stepX = entries.length > 1 ? chartW / (entries.length - 1) : 0;
-  const yFor = w => chartH - ((w - lo) / (hi - lo)) * chartH;
+  const yFor = w => INSET + chartH - ((w - lo) / (hi - lo)) * chartH;
 
-  const points = entries.map((e, i) => `${(i * stepX).toFixed(1)},${yFor(e.weight).toFixed(1)}`).join(' ');
+  const points = entries.map((e, i) => `${(INSET + i * stepX).toFixed(1)},${yFor(e.weight).toFixed(1)}`).join(' ');
   const minIdx = weights.indexOf(minW), maxIdx = weights.indexOf(maxW);
   const dots = entries.map((e, i) => {
     const isExtreme = i === minIdx || i === maxIdx;
     const r = isExtreme ? 4.5 : 3.5;
     const color = isExtreme ? 'var(--accent)' : 'var(--teal)';
-    const cx = (i * stepX).toFixed(1), cy = yFor(e.weight).toFixed(1);
+    const cx = (INSET + i * stepX).toFixed(1), cy = yFor(e.weight).toFixed(1);
     let hit = '';
     if (detailId) {
       // A visible dot is a tiny, fiddly tap target on a phone - a
@@ -3731,6 +3806,32 @@ function renderStatsWeightChart() {
 function renderStatsTab() {
   renderStatsPushupChart();
   renderStatsWeightChart();
+}
+
+/* These charts are laid out for the width they are drawn at, so a width
+   change is a redraw, not a rescale - rotating the phone, resizing the
+   window, or crossing the two-column breakpoint. A ResizeObserver on the
+   cards catches all of it, including the breakpoint changing a card's
+   width without the window resizing at all. Guarded against re-entry:
+   redrawing sets attributes on the SVG, which the observer would otherwise
+   see as another change. */
+let chartResizeRaf_ = null;
+function initChartResizeObserver_() {
+  if (typeof ResizeObserver === 'undefined') return;
+  const ro = new ResizeObserver(() => {
+    if (chartResizeRaf_) return;
+    chartResizeRaf_ = requestAnimationFrame(() => {
+      chartResizeRaf_ = null;
+      const view = viewOrder[currentViewIndex];
+      if (view === 'stats') renderStatsTab();
+      const sd = document.getElementById('kitchenSectionStarter');
+      if (view === 'kitchen' && sd && sd.style.display !== 'none') renderStarterChart_(loadStarter_());
+    });
+  });
+  ['statsPushupChart', 'statsWeightChart', 'sdChart'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.parentElement) ro.observe(el.parentElement);
+  });
 }
 
 /* ---------- Kitchen tab (inventory, recipes, grocery list) ----------
@@ -4819,7 +4920,11 @@ function renderStarterChart_(st) {
   const t0 = new Date(now.getTime() - SD_CHART_BACK_H * 3600000);
   const t1 = new Date(now.getTime() + SD_CHART_FWD_H * 3600000);
   const span = t1 - t0;
-  const W = 320, H = 132, PADX = 4, PADT = 10, PADB = 16;
+  // Real pixels, not a stretched 320-wide drawing - this chart carries its
+  // own "2x" gridline labels, and on a wide screen a scaled viewBox smeared
+  // them sideways along with the curve's stroke weight.
+  const box = fitChartBox_(svg, 320, 132);
+  const W = box.w, H = box.h, PADX = 4, PADT = 10, PADB = 16;
   const peakX = starterTypicalRise_(st);
   const yMax = Math.max(3, peakX + 0.5);
 
@@ -8627,7 +8732,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-22-starter-backend-fallback';
+const APP_BUILD_VERSION = '2026-08-22-stats-wide-charts';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -13285,6 +13390,7 @@ setInterval(() => {
   if (sec && sec.style.display !== 'none') renderStarter();
 }, 60000);
 initViewportHeightObserver();
+initChartResizeObserver_();
 initTabBarViewportPin();
 // Local order first, so the page is already arranged on this device
 // before any network call. loadRemoteOverviewLayoutState() re-applies it
