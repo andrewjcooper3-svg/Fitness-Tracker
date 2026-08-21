@@ -1036,6 +1036,42 @@
     .sd-feed-del { flex-shrink: 0; width: 34px; height: 34px; border: none; border-radius: 10px; background: var(--surface2); color: var(--muted); font-family: var(--font); font-size: 16px; line-height: 1; cursor: pointer; }
     .sd-feed-del:active { background: rgba(239,91,107,0.18); color: var(--red); }
   
+    /* Tappable chips instead of dropdowns for the two questions that matter.
+       A select hides its options until you open it, which is the wrong trade
+       when there are only four answers and you want to see them all at a
+       glance - and the whole point is that this is quick to do while you are
+       stood at the counter. */
+    .sd-choice { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sd-choice button {
+      flex: 1 1 calc(50% - 3px); min-width: 96px; min-height: 44px;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      font-family: var(--font); font-size: 13px; font-weight: 600;
+      border-radius: 11px; padding: 6px 8px; cursor: pointer; text-align: center;
+    }
+    .sd-choice.sd-choice-3 button { flex: 1 1 calc(33.333% - 4px); min-width: 62px; font-size: 12.5px; }
+    .sd-choice button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sd-choice button small { display: block; font-weight: 500; font-size: 10.5px; opacity: 0.75; margin-top: 1px; }
+  
+    .sd-step { margin-top: 14px; }
+    .sd-step:first-of-type { margin-top: 0; }
+    .sd-step-label { font-family: var(--font); font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+    .sd-step-label span { color: var(--accent); margin-right: 6px; }
+    .sd-step-hint { font-family: var(--font); font-size: 12px; color: var(--muted); line-height: 1.45; margin: -2px 0 7px; }
+  
+    .sd-check-head { font-family: var(--font); font-size: 12px; color: var(--muted); background: var(--surface2); border-radius: 10px; padding: 8px 11px; margin-bottom: 12px; line-height: 1.45; }
+    .sd-check-head b { color: var(--text); font-weight: 700; }
+  
+    .sd-optional { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .sd-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+    .sd-toggle-row label { font-family: var(--font); font-size: 13.5px; font-weight: 600; }
+    .sd-toggle-row small { display: block; font-weight: 400; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .sd-switch { flex-shrink: 0; width: 52px; height: 30px; border-radius: 15px; border: none; background: var(--surface2); cursor: pointer; position: relative; padding: 0; }
+    .sd-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--muted); transition: transform 0.15s, background 0.15s; }
+    .sd-switch.on { background: rgba(240,180,41,0.28); }
+    .sd-switch.on::after { transform: translateX(22px); background: var(--amber); }
+  
+    .sd-learned { font-family: var(--font); font-size: 12.5px; line-height: 1.45; color: var(--green); background: rgba(52,199,149,0.12); border-radius: 10px; padding: 9px 11px; margin-top: 10px; }
+  
     .sd-plan-step { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .sd-plan-step:last-child { border-bottom: none; }
     .sd-plan-when { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); width: 92px; flex-shrink: 0; line-height: 1.35; }
@@ -1510,7 +1546,7 @@
           </div>
           
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-21-starter-missed-peaks</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-21-starter-check-form</div>
       
         <!-- v3: two bold gradient hero cards (the two things you actually log
              throughout the day) plus a colorful icon-tile grid below for

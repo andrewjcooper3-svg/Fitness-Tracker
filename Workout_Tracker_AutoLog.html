@@ -1037,6 +1037,42 @@
   .sd-feed-del { flex-shrink: 0; width: 34px; height: 34px; border: none; border-radius: 10px; background: var(--surface2); color: var(--muted); font-family: var(--font); font-size: 16px; line-height: 1; cursor: pointer; }
   .sd-feed-del:active { background: rgba(239,91,107,0.18); color: var(--red); }
 
+  /* Tappable chips instead of dropdowns for the two questions that matter.
+     A select hides its options until you open it, which is the wrong trade
+     when there are only four answers and you want to see them all at a
+     glance - and the whole point is that this is quick to do while you are
+     stood at the counter. */
+  .sd-choice { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sd-choice button {
+    flex: 1 1 calc(50% - 3px); min-width: 96px; min-height: 44px;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+    font-family: var(--font); font-size: 13px; font-weight: 600;
+    border-radius: 11px; padding: 6px 8px; cursor: pointer; text-align: center;
+  }
+  .sd-choice.sd-choice-3 button { flex: 1 1 calc(33.333% - 4px); min-width: 62px; font-size: 12.5px; }
+  .sd-choice button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sd-choice button small { display: block; font-weight: 500; font-size: 10.5px; opacity: 0.75; margin-top: 1px; }
+
+  .sd-step { margin-top: 14px; }
+  .sd-step:first-of-type { margin-top: 0; }
+  .sd-step-label { font-family: var(--font); font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .sd-step-label span { color: var(--accent); margin-right: 6px; }
+  .sd-step-hint { font-family: var(--font); font-size: 12px; color: var(--muted); line-height: 1.45; margin: -2px 0 7px; }
+
+  .sd-check-head { font-family: var(--font); font-size: 12px; color: var(--muted); background: var(--surface2); border-radius: 10px; padding: 8px 11px; margin-bottom: 12px; line-height: 1.45; }
+  .sd-check-head b { color: var(--text); font-weight: 700; }
+
+  .sd-optional { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .sd-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+  .sd-toggle-row label { font-family: var(--font); font-size: 13.5px; font-weight: 600; }
+  .sd-toggle-row small { display: block; font-weight: 400; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .sd-switch { flex-shrink: 0; width: 52px; height: 30px; border-radius: 15px; border: none; background: var(--surface2); cursor: pointer; position: relative; padding: 0; }
+  .sd-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--muted); transition: transform 0.15s, background 0.15s; }
+  .sd-switch.on { background: rgba(240,180,41,0.28); }
+  .sd-switch.on::after { transform: translateX(22px); background: var(--amber); }
+
+  .sd-learned { font-family: var(--font); font-size: 12.5px; line-height: 1.45; color: var(--green); background: rgba(52,199,149,0.12); border-radius: 10px; padding: 9px 11px; margin-top: 10px; }
+
   .sd-plan-step { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .sd-plan-step:last-child { border-bottom: none; }
   .sd-plan-when { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); width: 92px; flex-shrink: 0; line-height: 1.35; }
@@ -2232,45 +2268,49 @@
       </div>
 
       <div class="config-box" id="sdRiseBox">
-        <div class="config-title" style="margin-bottom:6px;">How did the last feed go</div>
-        <div class="ov-mini-empty" style="margin:0 0 8px;">Mark the jar at feed time. Even if you miss the peak, the starter leaves a ring on the glass at its high-water mark - so you can read how far it rose hours later. The rise number is the honest health check: one that used to triple and now barely doubles is telling you something.</div>
-        <div class="sd-field-row">
-          <div class="sd-field">
-            <div class="sd-field-label">It rose</div>
-            <select id="sdRiseX" class="config-input"></select>
+        <div class="config-title" style="margin-bottom:8px;">Check on it</div>
+        <!-- Which feed this is about, said out loud. Without it you are
+             annotating an invisible thing and have to trust that the app
+             means the one you think it does. -->
+        <div class="sd-check-head" id="sdCheckHead"></div>
+
+        <div class="sd-step">
+          <div class="sd-step-label"><span>1</span>When did you look?</div>
+          <div class="sd-field-row sd-row-wide">
+            <div class="sd-field">
+              <input type="time" id="sdCheckTime" class="config-input">
+            </div>
+          </div>
+          <button class="sd-btn secondary" style="width:100%; margin-top:6px; min-height:38px; font-size:13px;" onclick="sdCheckTimeNow()">Just now</button>
+        </div>
+
+        <div class="sd-step">
+          <div class="sd-step-label"><span>2</span>What did you find?</div>
+          <div class="sd-choice" id="sdCheckStateChoice"></div>
+        </div>
+
+        <div class="sd-step">
+          <div class="sd-step-label"><span>3</span>How high did it get?</div>
+          <div class="sd-step-hint">Compare against your feed-time mark. If it has already dropped, read the ring it left on the glass - that is its high-water mark.</div>
+          <div class="sd-choice sd-choice-3" id="sdRiseChoice"></div>
+        </div>
+
+        <div class="sd-optional">
+          <div class="sd-step-label" style="color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:0.4px;">Optional</div>
+          <div class="sd-toggle-row">
+            <label for="sdHoochToggle">Liquid on top<small>Grey hooch means it is hungry</small></label>
+            <button type="button" class="sd-switch" id="sdHoochToggle" role="switch" aria-checked="false" onclick="sdToggleHooch()"><span class="sr-only"></span></button>
+          </div>
+          <div class="sd-field-row sd-row-wide" style="margin-top:6px;">
+            <div class="sd-field">
+              <div class="sd-field-label">Smell</div>
+              <select id="sdSmell" class="config-input"></select>
+            </div>
           </div>
         </div>
-        <!-- Asking for an exact peak time only works if you happened to be
-             standing there. Asking when you NEXT LOOKED and what you found
-             is answerable every time, and it still pins the peak down -
-             "still rising at 6pm" and "already falling at 6pm" put the
-             peak on opposite sides of 6pm. -->
-        <div class="sd-field-row sd-row-wide">
-          <div class="sd-field">
-            <div class="sd-field-label">When you next looked</div>
-            <input type="time" id="sdCheckTime" class="config-input">
-          </div>
-        </div>
-        <div class="sd-field-row">
-          <div class="sd-field">
-            <div class="sd-field-label">It was</div>
-            <select id="sdCheckState" class="config-input"></select>
-          </div>
-        </div>
-        <div class="sd-field-row">
-          <div class="sd-field">
-            <div class="sd-field-label">Smell</div>
-            <select id="sdSmell" class="config-input"></select>
-          </div>
-          <div class="sd-field">
-            <div class="sd-field-label">Hooch on top</div>
-            <select id="sdHooch" class="config-input">
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </select>
-          </div>
-        </div>
-        <button class="sd-btn secondary" style="width:100%; margin-top:10px;" onclick="logStarterRise()">Save</button>
+
+        <button class="sd-btn" style="width:100%; margin-top:14px;" onclick="logStarterRise()">Save this check</button>
+        <div id="sdCheckLearned"></div>
         <div id="sdRiseAdvice"></div>
       </div>
 
@@ -4138,23 +4178,11 @@ function renderStarterActive_(st) {
   sdFillSelect_('sdFeedFlour', Object.keys(SD_FLOUR_LABEL).map(f => [f, SD_FLOUR_LABEL[f]]), st.flour);
   const keepEl = document.getElementById('sdFeedKeep');
   if (keepEl && !keepEl.value) keepEl.value = st.keepG || SD_DEFAULT_KEEP_G;
-  sdFillSelect_('sdRiseX', [['', 'Not yet'], ['1.3', 'Barely moved (1.3×)'], ['1.6', 'Rose a bit (1.6×)'],
-    ['2', 'Doubled (2×)'], ['2.5', 'More than doubled (2.5×)'], ['3', 'Tripled (3×)'], ['3.5', 'Over the top (3.5×+)']],
-    last && last.riseX ? String(last.riseX) : '');
-  sdFillSelect_('sdSmell', [['', 'Not noted'], ['yeasty', 'Yeasty and sweet'], ['tangy', 'Tangy, like yoghurt'],
-    ['vinegar', 'Sharply vinegary'], ['acetone', 'Acetone / nail polish']], last && last.smell ? last.smell : '');
-  sdFillSelect_('sdCheckState', [['', 'Did not look'], ['rising', 'Still rising'], ['peak', 'Right at the top'],
-    ['falling', 'On the way down'], ['collapsed', 'Already collapsed']], last && last.checkState ? last.checkState : '');
+  renderStarterCheck_(st);
   const tempEl = document.getElementById('sdFeedTemp');
   if (tempEl && !tempEl.value) tempEl.value = st.tempF || SD_DEFAULT_TEMP_F;
   const timeEl = document.getElementById('sdFeedTime');
   if (timeEl && !timeEl.value) timeEl.value = sdTimeValue_(now);
-  if (last) {
-    const hoochEl = document.getElementById('sdHooch');
-    if (hoochEl) hoochEl.value = last.hooch ? 'yes' : 'no';
-    const checkEl = document.getElementById('sdCheckTime');
-    if (checkEl && !checkEl.value && last.checkedAt) checkEl.value = sdTimeValue_(new Date(last.checkedAt));
-  }
   initStarterFeedForm_();
   renderStarterFeedGrams_();
 
@@ -4176,6 +4204,105 @@ function renderStarterActive_(st) {
   const ref = document.getElementById('sdReference');
   if (ref) ref.innerHTML = SD_REFERENCE.map(x =>
     `<div class="sd-buy"><div class="sd-buy-dot"></div><div><div class="sd-buy-name">${escapeHtml_(x.name)}</div><div class="sd-buy-note">${escapeHtml_(x.note)}</div></div></div>`).join('');
+}
+
+// The check form holds a draft rather than reading straight off the
+// controls, because chips have no value attribute to read back and the
+// draft is what lets a half-finished answer survive a re-render (the
+// section repaints itself every minute to keep the clock honest).
+let sdCheckDraft = null;
+
+const SD_CHECK_STATES = [
+  { v: 'rising',    label: 'Still rising',   note: 'not there yet' },
+  { v: 'peak',      label: 'At the top',     note: 'domed, about to sink' },
+  { v: 'falling',   label: 'On the way down', note: 'past its best' },
+  { v: 'collapsed', label: 'Collapsed',      note: 'flat, sunken' }
+];
+
+const SD_RISE_CHOICES = [
+  { v: 1.3, label: '1.3×', note: 'barely' },
+  { v: 1.6, label: '1.6×', note: 'a bit' },
+  { v: 2,   label: '2×',   note: 'doubled' },
+  { v: 2.5, label: '2.5×', note: 'more' },
+  { v: 3,   label: '3×',   note: 'tripled' },
+  { v: 0,   label: 'Not sure', note: '' }
+];
+
+function sdSyncCheckDraft_(last) {
+  if (sdCheckDraft && sdCheckDraft.feedId === (last && last.id)) return;
+  sdCheckDraft = {
+    feedId: last ? last.id : null,
+    time: last && last.checkedAt ? sdTimeValue_(new Date(last.checkedAt)) : '',
+    state: last && last.checkState ? last.checkState : '',
+    riseX: last && last.riseX ? last.riseX : null,
+    hooch: !!(last && last.hooch)
+  };
+}
+
+function renderStarterCheck_(st) {
+  const last = sdLastFeed_(st);
+  const box = document.getElementById('sdRiseBox');
+  if (!box) return;
+  if (!last) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  sdSyncCheckDraft_(last);
+
+  const fed = new Date(last.at);
+  const now = new Date();
+  document.getElementById('sdCheckHead').innerHTML =
+    `About the feed from <b>${escapeHtml_(sdDayClock_(fed, now))}</b> — `
+    + `${last.keepG ? escapeHtml_(last.keepG + 'g ') : ''}${escapeHtml_(last.ratio)} at ${last.tempF}°F, `
+    + `fed ${escapeHtml_(sdRel_(fed, now))}.`;
+
+  const timeEl = document.getElementById('sdCheckTime');
+  if (timeEl && timeEl.value !== sdCheckDraft.time) timeEl.value = sdCheckDraft.time;
+
+  document.getElementById('sdCheckStateChoice').innerHTML = SD_CHECK_STATES.map(o =>
+    `<button type="button" class="${sdCheckDraft.state === o.v ? 'active' : ''}" onclick="sdPickCheckState('${o.v}')">${escapeHtml_(o.label)}<small>${escapeHtml_(o.note)}</small></button>`).join('');
+
+  document.getElementById('sdRiseChoice').innerHTML = SD_RISE_CHOICES.map(o =>
+    `<button type="button" class="${(sdCheckDraft.riseX || 0) === o.v ? 'active' : ''}" onclick="sdPickRise(${o.v})">${escapeHtml_(o.label)}${o.note ? `<small>${escapeHtml_(o.note)}</small>` : ''}</button>`).join('');
+
+  const sw = document.getElementById('sdHoochToggle');
+  if (sw) { sw.classList.toggle('on', sdCheckDraft.hooch); sw.setAttribute('aria-checked', String(sdCheckDraft.hooch)); }
+
+  sdFillSelect_('sdSmell', [['', 'Not noted'], ['yeasty', 'Yeasty and sweet'], ['tangy', 'Tangy, like yoghurt'],
+    ['vinegar', 'Sharply vinegary'], ['acetone', 'Acetone / nail polish']], last.smell || '');
+
+  // Say what the last saved check actually taught the model, so the point
+  // of filling this in is visible rather than implied.
+  const learned = document.getElementById('sdCheckLearned');
+  if (learned) {
+    const ev = sdPeakEvidence_(last);
+    if (!last.checkState && !last.peakAt) learned.innerHTML = '';
+    else if (ev && ev.ratio !== 1) {
+      const h = starterPeakHours_(st, last.tempF, last.ratio, last.flour);
+      learned.innerHTML = `<div class="sd-learned">Saved. The model now expects this feed to peak in about ${h.toFixed(1)}h.</div>`;
+    } else {
+      learned.innerHTML = `<div class="sd-learned">Saved — that matches what the model already expected, so nothing needed changing.</div>`;
+    }
+  }
+}
+
+function sdCheckTimeNow() {
+  sdCheckDraft = sdCheckDraft || {};
+  sdCheckDraft.time = sdTimeValue_(new Date());
+  document.getElementById('sdCheckTime').value = sdCheckDraft.time;
+}
+
+function sdPickCheckState(v) {
+  sdCheckDraft.state = sdCheckDraft.state === v ? '' : v;
+  renderStarter();
+}
+
+function sdPickRise(v) {
+  sdCheckDraft.riseX = (sdCheckDraft.riseX || 0) === v ? null : v;
+  renderStarter();
+}
+
+function sdToggleHooch() {
+  sdCheckDraft.hooch = !sdCheckDraft.hooch;
+  renderStarter();
 }
 
 function sdFillSelect_(id, pairs, selected) {
@@ -4566,6 +4693,7 @@ function logStarterFeed() {
   st.ratio = ratio; st.flour = flour; st.tempF = tempF; st.keepG = keepG;
   saveStarter_(st);
   document.getElementById('sdFeedTime').value = '';
+  sdCheckDraft = null;
   document.getElementById('sdCheckTime').value = '';
   renderStarter();
 }
@@ -4576,6 +4704,7 @@ function quickFeedStarter() {
   st.feeds.push({ id: genId_(), at: new Date().toISOString(), keepG: st.keepG || SD_DEFAULT_KEEP_G,
                   ratio: st.ratio || '1:2:2', flour: st.flour || 'bread',
                   tempF: st.tempF || SD_DEFAULT_TEMP_F, location: st.location || 'counter' });
+  sdCheckDraft = null;
   saveStarter_(st);
   renderStarter();
 }
@@ -4586,13 +4715,13 @@ function logStarterRise() {
   const st = loadStarter_();
   const last = sdLastFeed_(st);
   if (!last) { alert('Log a feed first - the rise gets recorded against it.'); return; }
-  const riseX = Number(document.getElementById('sdRiseX').value);
+  const riseX = Number(sdCheckDraft && sdCheckDraft.riseX);
   if (riseX) last.riseX = riseX; else delete last.riseX;
   const smell = document.getElementById('sdSmell').value;
   if (smell) last.smell = smell; else delete last.smell;
-  last.hooch = document.getElementById('sdHooch').value === 'yes';
+  last.hooch = !!(sdCheckDraft && sdCheckDraft.hooch);
   const checkStr = document.getElementById('sdCheckTime').value;
-  const state = document.getElementById('sdCheckState').value;
+  const state = (sdCheckDraft && sdCheckDraft.state) || '';
   if (checkStr && state) {
     const fed = new Date(last.at);
     const at = new Date(fed);
@@ -7970,7 +8099,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-21-starter-missed-peaks';
+const APP_BUILD_VERSION = '2026-08-21-starter-check-form';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
