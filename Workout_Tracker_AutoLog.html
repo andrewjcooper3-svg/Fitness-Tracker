@@ -402,6 +402,19 @@
   .ov-hero-progress { height: 6px; background: var(--surface2); border-radius: 3px; margin-top: 7px; overflow: hidden; }
   .ov-hero-progress-fill { height: 100%; background: #e0916f; border-radius: 3px; transition: width 0.6s ease; }
   .ov-hero-card-status { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); margin-top: 6px; }
+  /* Pushups drop-down - same collapse mechanics as the water chart so the
+     two hero cards behave identically, but a 7-bar week instead of a
+     24-hour day. The chevron lives in its own head row that swallows the
+     click, so tapping the title toggles while tapping anywhere else on the
+     card still jumps to the Trainer tab as it always did. */
+  .ov-hero-head { display: flex; justify-content: space-between; align-items: center; }
+  .ov-pu-chart-wrap { display: none; margin-top: 8px; }
+  .ov-pu-chart-wrap.expanded { display: block; }
+  .ov-pu-chart { width: 100%; height: 46px; display: block; overflow: visible; }
+  .ov-pu-chart-labels { display: flex; font-family: var(--font); font-size: 9.5px; color: var(--muted); margin-top: 2px; }
+  .ov-pu-chart-labels span { flex: 1; text-align: center; }
+  .ov-pu-chart-labels span.today { color: var(--text); font-weight: 700; }
+  .ov-pu-chart-detail { font-family: var(--font); font-size: 10.5px; color: var(--text); margin-top: 4px; min-height: 13px; }
 
   /* Colorful icon-tile grid for everything else - each category gets
      its own tinted icon chip so the page reads at a glance, bento-style,
@@ -1182,8 +1195,12 @@
        columns to 3 so more of it fits without scrolling. Flexbox on the
        view (not inline-block on the cards) so this can't fall into the
        classic inline-block-plus-whitespace gap bug - every other direct
-       child just gets flex-basis:100% to stay full-width/stacked as before. */
-    #view-overview { display: flex; flex-wrap: wrap; column-gap: 16px; }
+       child just gets flex-basis:100% to stay full-width/stacked as before.
+       align-items:flex-start is load-bearing: the default (stretch) height-
+       locks the two hero cards on the same flex line, so expanding Water's
+       chart dragged the Pushups card taller with it (an empty gap under its
+       status line). Each card is now only as tall as its own content. */
+    #view-overview { display: flex; flex-wrap: wrap; column-gap: 16px; align-items: flex-start; }
     #view-overview > .ov-page-head,
     #view-overview > .ov-build-stamp,
     #view-overview > .ov-glance-grid,
@@ -1528,11 +1545,18 @@
        with zero JS logic changes beyond the Pushups card (which gets a
        new progress-bar target instead of plain text). -->
   <div class="ov-hero-card ov-hero-pushup" data-widget="pushups" onclick="showAppView('tracker')">
-    <div class="ov-hero-card-label">💪 Pushups this week</div>
+    <div class="ov-hero-head" onclick="togglePushupChart_(event)" style="cursor:pointer;">
+      <div class="ov-hero-card-label">💪 Pushups this week <span id="ovPushupChevron" style="opacity:0.65; font-weight:400;">▸</span></div>
+    </div>
     <div class="ov-hero-card-number" id="ovPushupNumber">0</div>
     <div class="ov-hero-card-sub" id="ovPushupSub">of 0</div>
     <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovPushupBar" style="width:0%"></div></div>
     <div class="ov-hero-card-status" id="ovPushupStatus"></div>
+    <div class="ov-pu-chart-wrap" id="ovPushupChartWrap" onclick="event.stopPropagation()">
+      <svg class="ov-pu-chart" id="ovPushupChart" viewBox="0 0 320 46" preserveAspectRatio="none"></svg>
+      <div class="ov-pu-chart-labels" id="ovPushupChartLabels"></div>
+      <div class="ov-pu-chart-detail" id="ovPushupChartDetail"></div>
+    </div>
   </div>
 
   <div class="ov-hero-card ov-hero-water" id="ovBoard">
@@ -8253,7 +8277,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-21-water-slots-starter-sync';
+const APP_BUILD_VERSION = '2026-08-21-hero-card-dropdowns';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9499,11 +9523,110 @@ function renderOverviewPushupMini() {
   const statusEl = document.getElementById('ovPushupStatus');
   if (stats.deficit === null) {
     statusEl.textContent = `${activeDays}/7 days logged`;
+  } else {
+    const ahead = stats.deficit >= 0;
+    const deficitText = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
+    statusEl.textContent = `${deficitText} deficit · ${ahead ? 'on pace' : 'behind'} · ${activeDays}/7 days logged`;
+  }
+
+  renderPushupWeekChart_(days);
+}
+
+// The Pushups card's drop-down, mirroring the water card's. Both hero
+// cards now expand, so neither looks odd sitting next to the other - and
+// stopPropagation keeps the card's own tap-to-open-Trainer intact.
+const STORAGE_PUSHUP_CHART_OPEN = 'WORKOUT_OV_PUSHUP_CHART_OPEN';
+
+function togglePushupChart_(event) {
+  if (event) event.stopPropagation();
+  const wrap = document.getElementById('ovPushupChartWrap');
+  const chevron = document.getElementById('ovPushupChevron');
+  if (!wrap) return;
+  const expanded = wrap.classList.toggle('expanded');
+  if (chevron) chevron.textContent = expanded ? '▾' : '▸';
+  try { localStorage.setItem(STORAGE_PUSHUP_CHART_OPEN, expanded ? '1' : '0'); } catch (e) {}
+  updateViewportHeight('overview', true);
+}
+
+// Per-day pushups for the current week: a bar per day against that day's
+// own target, so a light day that hit its (smaller) target reads as full
+// rather than short next to a heavy one. The target line is drawn per bar
+// for the same reason - one flat line across the week would be wrong
+// whenever the plan isn't uniform.
+const PUSHUP_DAY_LABELS = { mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S' };
+let pushupChartDays_ = [];
+
+function renderPushupWeekChart_(days) {
+  const svg = document.getElementById('ovPushupChart');
+  if (!svg) return;
+  pushupChartDays_ = days;
+
+  const chartW = 320, chartH = 46, barGap = 6;
+  const barW = (chartW - barGap * (days.length - 1)) / days.length;
+  // Floor of 10 keeps an all-zero week from rendering one stray rep as a
+  // full-height bar; the target is in the scale so the goal line is always
+  // on screen even on a day you blew past or fell well short of it.
+  const maxVal = Math.max(10, ...days.map(d => Math.max(d.pushupTotal, d.pushupTarget)));
+
+  const todayKey = dayKeys[(new Date().getDay() + 6) % 7];
+
+  let out = '';
+  days.forEach((d, i) => {
+    const x = i * (barW + barGap);
+    const hgt = d.pushupTotal > 0 ? Math.max(3, (d.pushupTotal / maxVal) * chartH) : 1;
+    const y = chartH - hgt;
+    // A faint full-height track behind each bar. With only seven columns
+    // (versus the water chart's 24-96) an empty day would otherwise be a
+    // 1px sliver with nothing to show which day it belongs to.
+    out += `<rect x="${x.toFixed(2)}" y="0" width="${barW.toFixed(2)}" height="${chartH}" rx="2" fill="var(--surface2)" opacity="0.5"></rect>`;
+    const met = d.pushupTarget > 0 && d.pushupTotal >= d.pushupTarget;
+    const color = d.pushupTotal > 0 ? (met ? 'var(--teal)' : '#e0916f') : 'var(--surface2)';
+    out += `<rect x="${x.toFixed(2)}" y="${y.toFixed(1)}" width="${barW.toFixed(2)}" height="${hgt.toFixed(1)}" rx="2" fill="${color}"></rect>`;
+    if (d.pushupTarget > 0) {
+      const ty = chartH - (d.pushupTarget / maxVal) * chartH;
+      out += `<rect x="${x.toFixed(2)}" y="${ty.toFixed(1)}" width="${barW.toFixed(2)}" height="1.5" fill="var(--muted)" opacity="0.55"></rect>`;
+    }
+    out += `<rect x="${x.toFixed(2)}" y="0" width="${barW.toFixed(2)}" height="${chartH}" fill="transparent" style="cursor:pointer;" onclick="showPushupDayDetail_(${i})" onmouseenter="showPushupDayDetail_(${i})"></rect>`;
+  });
+  svg.innerHTML = out;
+
+  const labelEl = document.getElementById('ovPushupChartLabels');
+  if (labelEl) {
+    labelEl.innerHTML = days.map(d =>
+      `<span class="${d.key === todayKey ? 'today' : ''}">${PUSHUP_DAY_LABELS[d.key] || ''}</span>`
+    ).join('');
+  }
+  const detailEl = document.getElementById('ovPushupChartDetail');
+  if (detailEl) detailEl.textContent = 'Tap or hover a day for the count';
+
+  // Restore the open/closed state chosen last time, since renderOverview()
+  // runs on every view switch and would otherwise leave the chevron and the
+  // wrap out of sync with each other.
+  const wrap = document.getElementById('ovPushupChartWrap');
+  const chevron = document.getElementById('ovPushupChevron');
+  if (wrap && !wrap.dataset.restored) {
+    wrap.dataset.restored = '1';
+    let open = false;
+    try { open = localStorage.getItem(STORAGE_PUSHUP_CHART_OPEN) === '1'; } catch (e) {}
+    wrap.classList.toggle('expanded', open);
+    if (chevron) chevron.textContent = open ? '▾' : '▸';
+  }
+}
+
+function showPushupDayDetail_(idx) {
+  const detailEl = document.getElementById('ovPushupChartDetail');
+  const d = pushupChartDays_[idx];
+  if (!detailEl || !d) return;
+  const name = d.key.charAt(0).toUpperCase() + d.key.slice(1);
+  if (!d.pushupTarget && !d.pushupTotal) {
+    detailEl.textContent = `${name} — no pushups planned`;
     return;
   }
-  const ahead = stats.deficit >= 0;
-  const deficitText = (ahead ? '+' : '−') + Math.abs(stats.deficit).toLocaleString();
-  statusEl.textContent = `${deficitText} deficit · ${ahead ? 'on pace' : 'behind'} · ${activeDays}/7 days logged`;
+  const gap = d.pushupTotal - d.pushupTarget;
+  const tail = d.pushupTarget
+    ? ` of ${d.pushupTarget.toLocaleString()} (${gap >= 0 ? '+' : '−'}${Math.abs(gap).toLocaleString()})`
+    : '';
+  detailEl.textContent = `${name} — ${d.pushupTotal.toLocaleString()}${tail}`;
 }
 
 function renderOverviewCalendarPreview() {
