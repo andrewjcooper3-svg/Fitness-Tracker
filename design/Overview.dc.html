@@ -298,6 +298,10 @@
     .ov-page-head-actions { display: flex; align-items: center; gap: 10px; }
     .ov-gear-btn { font-size: 20px; line-height: 1; color: var(--muted); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
     .ov-gear-btn:active { color: var(--accent); }
+    /* The Edit toggle sits in the same row as the glyph buttons but carries
+       a word, so it needs text sizing rather than the 20px glyph size. */
+    #ovEditBtn { font-family: var(--font); font-size: 13px; font-weight: 700; padding: 6px 6px; }
+    #ovEditBtn.active { color: var(--accent); }
     .ov-build-stamp { font-family: var(--font); font-size: 9px; color: var(--muted); opacity: 0.3; text-align: right; margin: -10px 2px 10px; }
   
     /* Big activity-ring hero (Apple Fitness style) - sits directly on the
@@ -426,6 +430,35 @@
        left win the cascade, collapsing this grid's tile padding to
        almost nothing (content sat flush against the rounded corners). */
     .ov-glance-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+    /* The hero cards live in the same grid as the tiles so the whole page is
+       one reorderable list; they just span every column. Their own
+       margin-bottom would double up with the grid's gap. */
+    .ov-blocks > .ov-hero-card { grid-column: 1 / -1; margin-bottom: 0; }
+    /* Edit mode: a move-earlier/move-later pair per block, and the block
+       itself stops responding to taps so rearranging never navigates away.
+       Hidden (not just unstyled) when not editing, so they can't be tabbed
+       to or read out while the page is in its normal state. */
+    .ov-block-controls { display: none; }
+    .ov-blocks.editing > [data-block] { cursor: default; }
+    .ov-blocks.editing > [data-block] > .ov-block-controls {
+      display: flex; gap: 4px; position: absolute; top: 6px; right: 8px; z-index: 3;
+    }
+    .ov-block-move {
+      font-family: var(--font); font-size: 13px; line-height: 1; font-weight: 700;
+      width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
+      color: var(--text); background: var(--surface2); border: 1px solid var(--border);
+    }
+    .ov-block-move:active { color: var(--accent); border-color: var(--accent); }
+    .ov-block-move:disabled { opacity: 0.3; cursor: default; }
+    /* The two hero cards carry live controls of their own (steppers, selects,
+       the drink time box) that would sit under the move buttons and still
+       look tappable. Dimming the card while editing says plainly that the
+       only thing you can do right now is move it. */
+    .ov-blocks.editing > [data-block] > *:not(.ov-block-controls) { opacity: 0.45; pointer-events: none; }
+    /* The water card's resolution pills sit exactly where the move buttons
+       go. They are inert while editing anyway, so take them out of the way
+       rather than have the two overlap. */
+    .ov-blocks.editing .wt-chart-slots { visibility: hidden; }
     /* grid-column explicitly set (not left to default) because these
        tiles also carry the shared .ov-widget class (needed so the
        existing render functions' closest('.ov-widget') lookup still
@@ -1192,41 +1225,31 @@
       #view-tracker > .tracker-main-col { grid-column: 1; grid-row: 2; }
       #view-tracker > .tracker-side-rail { grid-column: 2; grid-row: 2; position: sticky; top: 24px; display: flex; flex-direction: column; }
   
-      /* Overview: the two hero cards (Pushups/Water) side by side instead
-         of stacked full-width, and the glance-tile grid widened from 2
-         columns to 3 so more of it fits without scrolling. Flexbox on the
-         view (not inline-block on the cards) so this can't fall into the
-         classic inline-block-plus-whitespace gap bug - every other direct
-         child just gets flex-basis:100% to stay full-width/stacked as before.
-         align-items:flex-start is load-bearing: the default (stretch) height-
-         locks the two hero cards on the same flex line, so expanding Water's
-         chart dragged the Pushups card taller with it (an empty gap under its
-         status line). Each card is now only as tall as its own content. */
-      #view-overview { display: flex; flex-wrap: wrap; column-gap: 16px; align-items: flex-start; }
-      #view-overview > .ov-page-head,
-      #view-overview > .ov-build-stamp,
-      #view-overview > .ov-glance-grid,
-      #view-overview > .ov-note { flex: 1 1 100%; }
-      #view-overview > .ov-hero-card { flex: 1 1 calc(50% - 8px); min-width: 0; }
+      /* Overview: the glance-tile grid widens from 2 columns to 3 so more of
+         it fits without scrolling. The hero cards span every column of that
+         same grid (see .ov-blocks above) rather than sitting side by side -
+         they were paired here once, but sharing a flex line height-locked
+         them, so expanding Water's chart dragged the Pushups card taller
+         with it, and from 768px up each card wants the full width for its
+         chart anyway. */
       .ov-glance-grid { grid-template-columns: repeat(3, 1fr); }
     }
   
-    /* Landscape phone and up (768px+): each hero card takes the full width
-       of the view and splits into two columns instead of hiding its chart
-       behind a drop-down. The logging column keeps exactly the width it had
-       when the two cards sat side by side - calc(50% - 22px) of the card's
-       content box is the same pixel width as calc(50% - 8px) of the view
-       minus the card's 14px side padding - so nothing about logging moves;
-       the width that freed up all goes to the chart, which is now always on
-       screen. Both charts stretch to the card's height, which is why their
-       SVGs already carry preserveAspectRatio="none".
+    /* Landscape phone and up (768px+): each hero card splits into two
+       columns instead of hiding its chart behind a drop-down. The logging
+       column keeps exactly the width it had when the two cards sat side by
+       side - calc(50% - 22px) of the card's content box is the same pixel
+       width as half the view minus the card's 14px side padding - so nothing
+       about logging moves; the width that freed up all goes to the chart,
+       which is now always on screen. Both charts stretch to the card's
+       height, which is why their SVGs carry preserveAspectRatio="none".
   
        There is nothing left to expand at this width, so the chevrons are
        hidden and the heads stop behaving like toggles (heroChartsPinned_()
        makes the JS side agree). Portrait keeps the drop-downs, where the
        screen is too narrow to show a chart and the controls at once. */
     @media (min-width: 768px) {
-      #view-overview > .ov-hero-card { flex: 1 1 100%; display: flex; align-items: stretch; column-gap: 16px; }
+      .ov-blocks > .ov-hero-card { display: flex; align-items: stretch; column-gap: 16px; }
       .ov-hero-main { flex: 0 0 calc(50% - 22px); }
       .wt-chart-wrap, .ov-pu-chart-wrap {
         display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; margin-top: 0;
@@ -1581,6 +1604,7 @@
         <div class="app-bar-right" id="appBarRight">
           <span class="app-bar-meta" id="appBarMeta">Aug 17 - Aug 23</span>
           <span class="app-bar-actions" id="appBarActions"><div class="ov-page-head-actions">
+            <button class="ov-gear-btn" id="ovEditBtn" title="Rearrange the blocks on this page">Edit</button>
             <button class="ov-gear-btn" aria-label="Refresh" title="Force a fresh reload">↻</button>
             <button class="ov-gear-btn" aria-label="Settings">⚙</button>
           </div></span>
@@ -1594,7 +1618,14 @@
           </div>
           
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-21-wide-hero-charts</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-22-block-reorder</div>
+      
+        <!-- Every block on this page lives in one grid so any of them can be
+             moved anywhere in the order - the two big cards span all the columns
+             and the small tiles take one each, but as far as reordering is
+             concerned they are one flat list. data-block is the key the saved
+             order is written in; it has to stay stable. -->
+        <div class="ov-glance-grid ov-blocks" id="ovBlocks" data-tap-guard="1">
       
         <!-- v3: two bold gradient hero cards (the two things you actually log
              throughout the day) plus a colorful icon-tile grid below for
@@ -1608,7 +1639,7 @@
              the card goes full-width and this becomes the left column (still the
              width it had when the cards were side by side) with the chart taking
              the width that freed up. -->
-        <div class="ov-hero-card ov-hero-pushup" data-widget="pushups">
+        <div class="ov-hero-card ov-hero-pushup" data-widget="pushups" data-block="pushups">
           <div class="ov-hero-main">
             <div class="ov-hero-head">
               <div class="ov-hero-card-label">💪 Pushups this week <span class="ov-hero-chevron" id="ovPushupChevron">▸</span></div>
@@ -1623,9 +1654,9 @@
             <div class="ov-pu-chart-labels" id="ovPushupChartLabels"><span class="">M</span><span class="">T</span><span class="">W</span><span class="">T</span><span class="today">F</span><span class="">S</span><span class="">S</span></div>
             <div class="ov-pu-chart-detail" id="ovPushupChartDetail">Tap or hover a day for the count</div>
           </div>
-        </div>
+        <div class="ov-block-controls"><button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up" disabled="">↑</button><button type="button" class="ov-block-move" data-dir="1" aria-label="Move down">↓</button></div></div>
       
-        <div class="ov-hero-card ov-hero-water" id="ovBoard">
+        <div class="ov-hero-card ov-hero-water" id="ovBoard" data-block="water">
           <div class="ov-hero-main">
           <div class="ov-widget-head">
             <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water <span class="ov-hero-chevron" id="wtChartChevron">▸</span></div>
@@ -1686,23 +1717,22 @@
             <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
             <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for a breakdown</div>
           </div>
-        </div>
+        <div class="ov-block-controls"><button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up">↑</button><button type="button" class="ov-block-move" data-dir="1" aria-label="Move down">↓</button></div></div>
       
         <!-- Matching set of simple line icons (same stroke width/size) instead
              of raw platform emoji - emoji glyphs vary wildly in visual style/
              weight/optical size from each other (some flat, some filled,
              some multi-color), which read as "not lined up" even when every
              box is genuinely pixel-aligned. -->
-        <div class="ov-glance-grid">
-          <div class="ov-glance-tile ov-widget" data-widget="weight" data-size="small">
+          <div class="ov-glance-tile ov-widget" data-widget="weight" data-block="weight" data-size="small">
             <div class="ov-glance-left">
               <div class="ov-glance-icon c-weight"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="4" height="6" rx="1"></rect><rect x="17" y="9" width="4" height="6" rx="1"></rect><line x1="7" y1="12" x2="17" y2="12"></line></svg></div>
               <div class="ov-glance-label">Weight</div>
             </div>
             <div class="ov-glance-right" id="ovWeightPreview"><div class="ov-mini-empty">Tap to log a weigh-in</div></div>
-          </div>
+          <div class="ov-block-controls"><button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up">↑</button><button type="button" class="ov-block-move" data-dir="1" aria-label="Move down">↓</button></div></div>
       
-          <div class="ov-glance-tile ov-widget" data-widget="spotify" data-size="small">
+          <div class="ov-glance-tile ov-widget" data-widget="spotify" data-block="spotify" data-size="small">
             <span class="sp-status-dot" id="spStatusDot"></span>
             <div class="ov-glance-left">
               <div class="sp-np-art-wrap ov-glance-icon c-spotify">
@@ -1716,29 +1746,29 @@
               <div class="sp-np-artist" id="spNpArtist"></div>
               <div class="sp-playlists" id="spPlaylistTiles"><div class="sp-playlists-empty">Pin playlists in the Music tab</div></div>
             </div>
-          </div>
+          <div class="ov-block-controls"><button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up">↑</button><button type="button" class="ov-block-move" data-dir="1" aria-label="Move down">↓</button></div></div>
       
-          <div class="ov-glance-tile ov-widget" data-widget="kitchen" data-size="small">
+          <div class="ov-glance-tile ov-widget" data-widget="kitchen" data-block="kitchen" data-size="small">
             <div class="ov-glance-left">
               <div class="ov-glance-icon c-kitchen"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="13" r="7"></circle><line x1="17" y1="13" x2="22" y2="13"></line></svg></div>
               <div class="ov-glance-label">Kitchen</div>
             </div>
             <div class="ov-glance-right" id="ovKitchenPreview"><div class="ov-mini-empty">Nothing needed right now</div></div>
-          </div>
+          <div class="ov-block-controls"><button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up">↑</button><button type="button" class="ov-block-move" data-dir="1" aria-label="Move down">↓</button></div></div>
       
-          <div class="ov-glance-tile ov-widget" data-widget="shopping" data-size="small">
+          <div class="ov-glance-tile ov-widget" data-widget="shopping" data-block="shopping" data-size="small">
             <div class="ov-glance-left">
               <div class="ov-glance-icon c-shopping"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"></path></svg></div>
               <div class="ov-glance-label">Shopping</div>
             </div>
             <div class="ov-glance-right" id="ovShoppingPreview"><div class="ov-mini-empty">Nothing needed right now</div></div>
-          </div>
+          <div class="ov-block-controls"><button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up">↑</button><button type="button" class="ov-block-move" data-dir="1" aria-label="Move down">↓</button></div></div>
       
-          <div class="ov-glance-tile ov-glance-tile-wide ov-widget" data-widget="upcoming" data-size="small">
+          <div class="ov-glance-tile ov-glance-tile-wide ov-widget" data-widget="upcoming" data-block="upcoming" data-size="small">
             <div class="ov-glance-icon c-upcoming"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><line x1="16" y1="3" x2="16" y2="7"></line><line x1="8" y1="3" x2="8" y2="7"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
             <div class="ov-glance-label">Upcoming</div>
             <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
-          </div>
+          <div class="ov-block-controls"><button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up">↑</button><button type="button" class="ov-block-move" data-dir="1" aria-label="Move down" disabled="">↓</button></div></div>
         </div>
       
         <div class="ov-note">Reflects what's checked off this week, saved on this device.<br>Automatically resets once a new week begins.</div>

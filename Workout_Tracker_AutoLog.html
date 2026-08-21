@@ -299,6 +299,10 @@
   .ov-page-head-actions { display: flex; align-items: center; gap: 10px; }
   .ov-gear-btn { font-size: 20px; line-height: 1; color: var(--muted); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
   .ov-gear-btn:active { color: var(--accent); }
+  /* The Edit toggle sits in the same row as the glyph buttons but carries
+     a word, so it needs text sizing rather than the 20px glyph size. */
+  #ovEditBtn { font-family: var(--font); font-size: 13px; font-weight: 700; padding: 6px 6px; }
+  #ovEditBtn.active { color: var(--accent); }
   .ov-build-stamp { font-family: var(--font); font-size: 9px; color: var(--muted); opacity: 0.3; text-align: right; margin: -10px 2px 10px; }
 
   /* Big activity-ring hero (Apple Fitness style) - sits directly on the
@@ -427,6 +431,35 @@
      left win the cascade, collapsing this grid's tile padding to
      almost nothing (content sat flush against the rounded corners). */
   .ov-glance-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+  /* The hero cards live in the same grid as the tiles so the whole page is
+     one reorderable list; they just span every column. Their own
+     margin-bottom would double up with the grid's gap. */
+  .ov-blocks > .ov-hero-card { grid-column: 1 / -1; margin-bottom: 0; }
+  /* Edit mode: a move-earlier/move-later pair per block, and the block
+     itself stops responding to taps so rearranging never navigates away.
+     Hidden (not just unstyled) when not editing, so they can't be tabbed
+     to or read out while the page is in its normal state. */
+  .ov-block-controls { display: none; }
+  .ov-blocks.editing > [data-block] { cursor: default; }
+  .ov-blocks.editing > [data-block] > .ov-block-controls {
+    display: flex; gap: 4px; position: absolute; top: 6px; right: 8px; z-index: 3;
+  }
+  .ov-block-move {
+    font-family: var(--font); font-size: 13px; line-height: 1; font-weight: 700;
+    width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
+    color: var(--text); background: var(--surface2); border: 1px solid var(--border);
+  }
+  .ov-block-move:active { color: var(--accent); border-color: var(--accent); }
+  .ov-block-move:disabled { opacity: 0.3; cursor: default; }
+  /* The two hero cards carry live controls of their own (steppers, selects,
+     the drink time box) that would sit under the move buttons and still
+     look tappable. Dimming the card while editing says plainly that the
+     only thing you can do right now is move it. */
+  .ov-blocks.editing > [data-block] > *:not(.ov-block-controls) { opacity: 0.45; pointer-events: none; }
+  /* The water card's resolution pills sit exactly where the move buttons
+     go. They are inert while editing anyway, so take them out of the way
+     rather than have the two overlap. */
+  .ov-blocks.editing .wt-chart-slots { visibility: hidden; }
   /* grid-column explicitly set (not left to default) because these
      tiles also carry the shared .ov-widget class (needed so the
      existing render functions' closest('.ov-widget') lookup still
@@ -1193,41 +1226,31 @@
     #view-tracker > .tracker-main-col { grid-column: 1; grid-row: 2; }
     #view-tracker > .tracker-side-rail { grid-column: 2; grid-row: 2; position: sticky; top: 24px; display: flex; flex-direction: column; }
 
-    /* Overview: the two hero cards (Pushups/Water) side by side instead
-       of stacked full-width, and the glance-tile grid widened from 2
-       columns to 3 so more of it fits without scrolling. Flexbox on the
-       view (not inline-block on the cards) so this can't fall into the
-       classic inline-block-plus-whitespace gap bug - every other direct
-       child just gets flex-basis:100% to stay full-width/stacked as before.
-       align-items:flex-start is load-bearing: the default (stretch) height-
-       locks the two hero cards on the same flex line, so expanding Water's
-       chart dragged the Pushups card taller with it (an empty gap under its
-       status line). Each card is now only as tall as its own content. */
-    #view-overview { display: flex; flex-wrap: wrap; column-gap: 16px; align-items: flex-start; }
-    #view-overview > .ov-page-head,
-    #view-overview > .ov-build-stamp,
-    #view-overview > .ov-glance-grid,
-    #view-overview > .ov-note { flex: 1 1 100%; }
-    #view-overview > .ov-hero-card { flex: 1 1 calc(50% - 8px); min-width: 0; }
+    /* Overview: the glance-tile grid widens from 2 columns to 3 so more of
+       it fits without scrolling. The hero cards span every column of that
+       same grid (see .ov-blocks above) rather than sitting side by side -
+       they were paired here once, but sharing a flex line height-locked
+       them, so expanding Water's chart dragged the Pushups card taller
+       with it, and from 768px up each card wants the full width for its
+       chart anyway. */
     .ov-glance-grid { grid-template-columns: repeat(3, 1fr); }
   }
 
-  /* Landscape phone and up (768px+): each hero card takes the full width
-     of the view and splits into two columns instead of hiding its chart
-     behind a drop-down. The logging column keeps exactly the width it had
-     when the two cards sat side by side - calc(50% - 22px) of the card's
-     content box is the same pixel width as calc(50% - 8px) of the view
-     minus the card's 14px side padding - so nothing about logging moves;
-     the width that freed up all goes to the chart, which is now always on
-     screen. Both charts stretch to the card's height, which is why their
-     SVGs already carry preserveAspectRatio="none".
+  /* Landscape phone and up (768px+): each hero card splits into two
+     columns instead of hiding its chart behind a drop-down. The logging
+     column keeps exactly the width it had when the two cards sat side by
+     side - calc(50% - 22px) of the card's content box is the same pixel
+     width as half the view minus the card's 14px side padding - so nothing
+     about logging moves; the width that freed up all goes to the chart,
+     which is now always on screen. Both charts stretch to the card's
+     height, which is why their SVGs carry preserveAspectRatio="none".
 
      There is nothing left to expand at this width, so the chevrons are
      hidden and the heads stop behaving like toggles (heroChartsPinned_()
      makes the JS side agree). Portrait keeps the drop-downs, where the
      screen is too narrow to show a chart and the controls at once. */
   @media (min-width: 768px) {
-    #view-overview > .ov-hero-card { flex: 1 1 100%; display: flex; align-items: stretch; column-gap: 16px; }
+    .ov-blocks > .ov-hero-card { display: flex; align-items: stretch; column-gap: 16px; }
     .ov-hero-main { flex: 0 0 calc(50% - 22px); }
     .wt-chart-wrap, .ov-pu-chart-wrap {
       display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; margin-top: 0;
@@ -1559,11 +1582,19 @@
       <div class="ov-page-title">Overview</div>
     </div>
     <div class="ov-page-head-actions">
+      <button class="ov-gear-btn" id="ovEditBtn" onclick="toggleOverviewEdit()" title="Rearrange the blocks on this page">Edit</button>
       <button class="ov-gear-btn" onclick="forceFullRefresh()" aria-label="Refresh" title="Force a fresh reload">↻</button>
       <button class="ov-gear-btn" onclick="openSettingsModal()" aria-label="Settings">⚙</button>
     </div>
   </div>
   <div class="ov-build-stamp" id="ovBuildStamp"></div>
+
+  <!-- Every block on this page lives in one grid so any of them can be
+       moved anywhere in the order - the two big cards span all the columns
+       and the small tiles take one each, but as far as reordering is
+       concerned they are one flat list. data-block is the key the saved
+       order is written in; it has to stay stable. -->
+  <div class="ov-glance-grid ov-blocks" id="ovBlocks">
 
   <!-- v3: two bold gradient hero cards (the two things you actually log
        throughout the day) plus a colorful icon-tile grid below for
@@ -1577,7 +1608,7 @@
        the card goes full-width and this becomes the left column (still the
        width it had when the cards were side by side) with the chart taking
        the width that freed up. -->
-  <div class="ov-hero-card ov-hero-pushup" data-widget="pushups" onclick="showAppView('tracker')">
+  <div class="ov-hero-card ov-hero-pushup" data-widget="pushups" data-block="pushups" onclick="showAppView('tracker')">
     <div class="ov-hero-main">
       <div class="ov-hero-head" onclick="togglePushupChart_(event)">
         <div class="ov-hero-card-label">💪 Pushups this week <span class="ov-hero-chevron" id="ovPushupChevron">▸</span></div>
@@ -1594,7 +1625,7 @@
     </div>
   </div>
 
-  <div class="ov-hero-card ov-hero-water" id="ovBoard">
+  <div class="ov-hero-card ov-hero-water" id="ovBoard" data-block="water">
     <div class="ov-hero-main">
     <div class="ov-widget-head" onclick="toggleWaterChart_()">
       <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water <span class="ov-hero-chevron" id="wtChartChevron">▸</span></div>
@@ -1663,8 +1694,7 @@
        weight/optical size from each other (some flat, some filled,
        some multi-color), which read as "not lined up" even when every
        box is genuinely pixel-aligned. -->
-  <div class="ov-glance-grid">
-    <div class="ov-glance-tile ov-widget" data-widget="weight" data-size="small" onclick="if (!overviewEditing) openWeightDetailModal()">
+    <div class="ov-glance-tile ov-widget" data-widget="weight" data-block="weight" data-size="small" onclick="if (!overviewEditing) openWeightDetailModal()">
       <div class="ov-glance-left">
         <div class="ov-glance-icon c-weight"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="4" height="6" rx="1"></rect><rect x="17" y="9" width="4" height="6" rx="1"></rect><line x1="7" y1="12" x2="17" y2="12"></line></svg></div>
         <div class="ov-glance-label">Weight</div>
@@ -1672,7 +1702,7 @@
       <div class="ov-glance-right" id="ovWeightPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-glance-tile ov-widget" data-widget="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
+    <div class="ov-glance-tile ov-widget" data-widget="spotify" data-block="spotify" data-size="small" onclick="handleWidgetTap(event, 'music')">
       <span class="sp-status-dot" id="spStatusDot"></span>
       <div class="ov-glance-left">
         <div class="sp-np-art-wrap ov-glance-icon c-spotify">
@@ -1688,7 +1718,7 @@
       </div>
     </div>
 
-    <div class="ov-glance-tile ov-widget" data-widget="kitchen" data-size="small" onclick="handleWidgetTap(event, 'kitchen')">
+    <div class="ov-glance-tile ov-widget" data-widget="kitchen" data-block="kitchen" data-size="small" onclick="handleWidgetTap(event, 'kitchen')">
       <div class="ov-glance-left">
         <div class="ov-glance-icon c-kitchen"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="13" r="7"></circle><line x1="17" y1="13" x2="22" y2="13"></line></svg></div>
         <div class="ov-glance-label">Kitchen</div>
@@ -1696,7 +1726,7 @@
       <div class="ov-glance-right" id="ovKitchenPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-glance-tile ov-widget" data-widget="shopping" data-size="small" onclick="handleShoppingWidgetTap(event)">
+    <div class="ov-glance-tile ov-widget" data-widget="shopping" data-block="shopping" data-size="small" onclick="handleShoppingWidgetTap(event)">
       <div class="ov-glance-left">
         <div class="ov-glance-icon c-shopping"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M2 3h2l2.4 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L21 7H6"></path></svg></div>
         <div class="ov-glance-label">Shopping</div>
@@ -1704,7 +1734,7 @@
       <div class="ov-glance-right" id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
-    <div class="ov-glance-tile ov-glance-tile-wide ov-widget" data-widget="upcoming" data-size="small" onclick="handleWidgetTap(event, 'calendar')">
+    <div class="ov-glance-tile ov-glance-tile-wide ov-widget" data-widget="upcoming" data-block="upcoming" data-size="small" onclick="handleWidgetTap(event, 'calendar')">
       <div class="ov-glance-icon c-upcoming"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><line x1="16" y1="3" x2="16" y2="7"></line><line x1="8" y1="3" x2="8" y2="7"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
       <div class="ov-glance-label">Upcoming</div>
       <div id="ovUpcomingPreview"><div class="ov-mini-empty">Loading…</div></div>
@@ -3739,17 +3769,29 @@ function syncKitchenToRemote() {
     // feed logged on the other one - measured, not theoretical: phone logs
     // a feed, laptop annotates an older feed, laptop's push drops the
     // phone's. Merging against what is actually stored first closes that.
+    //
+    // This used to be skipped when the local starter was still the empty
+    // default (stage 'none'), which is exactly the case that needed it
+    // most: any Kitchen write - ticking a shopping item, editing inventory
+    // - fires this, and a device that had not yet received the starter
+    // would push its empty one straight over the real one. The backend's
+    // "undefined leaves the stored starter alone" guard never engaged,
+    // because the client was always sending a value. Reproduced end to
+    // end: server holds an active starter, a second device adds one
+    // shopping item half a second after load, and the starter is gone.
+    // So: merge unconditionally, and if the result is still empty (the
+    // read failed, or there genuinely is no starter anywhere) send nothing
+    // at all rather than an empty one.
     let starter = loadStarter_();
-    if (starter && starter.stage !== 'none') {
-      try {
-        const res = await fetch(url + '?action=loadKitchenState');
-        const data = await res.json();
-        if (data.status === 'success' && data.state && data.state.starter) {
-          starter = mergeStarter_(starter, data.state.starter);
-          localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(starter));
-        }
-      } catch (e) { /* offline - push what we have rather than nothing */ }
-    }
+    try {
+      const res = await fetch(url + '?action=loadKitchenState');
+      const data = await res.json();
+      if (data.status === 'success' && data.state && data.state.starter) {
+        starter = mergeStarter_(starter, data.state.starter);
+        localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(starter));
+        renderStarter();
+      }
+    } catch (e) { /* offline - push what we have rather than nothing */ }
 
     fetch(url, {
       method: 'POST',
@@ -3758,10 +3800,16 @@ function syncKitchenToRemote() {
         inventory: loadInventory(),
         groceryManual: loadGroceryManual(),
         shoppingList: loadShoppingList(),
-        starter: starter
+        starter: starterIsEmpty_(starter) ? undefined : starter
       })
     }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
   }, 400);
+}
+
+// "Nothing worth keeping" - no stage and no history. Anything else, even a
+// half-built starter, is real state that must never be pushed over.
+function starterIsEmpty_(st) {
+  return !st || (st.stage === 'none' && !(st.feeds || []).length && !Object.keys(st.build || {}).length);
 }
 
 async function loadRemoteKitchenState() {
@@ -8169,19 +8217,124 @@ function computeWeekStats() {
   return { days, totals };
 }
 
-// Overview's Spotify/Upcoming widgets can be resized like iOS home screen
-// widgets - small (half-width, headline only), wide (full-width, default
-// content), or large (full-width, more content) - and reordered. Both are
-// only editable behind the Edit button, and persist per-device.
+// Every block on Overview - both hero cards and all five glance tiles -
+// can be put in whatever order you want, behind the Edit button. The order
+// is one flat list keyed by data-block, saved locally and pushed to the
+// backend so it follows you between devices rather than being something
+// you have to redo on each one.
+//
+// (This replaces an earlier per-device widget reorder that never actually
+// worked: it looked for its widgets inside #ovBoard, which by then had
+// become the Water card, so the move buttons had nothing to move - and
+// nothing rendered them or the Edit button in the first place.)
 const STORAGE_OVERVIEW_WIDGET_SIZES = 'WORKOUT_OVERVIEW_WIDGET_SIZES';
 const STORAGE_OVERVIEW_WIDGET_ORDER = 'WORKOUT_OVERVIEW_WIDGET_ORDER';
 let overviewEditing = false;
 
+function overviewBlocksEl_() { return document.getElementById('ovBlocks'); }
+function overviewBlocks_() {
+  const board = overviewBlocksEl_();
+  return board ? Array.from(board.querySelectorAll(':scope > [data-block]')) : [];
+}
+
 function toggleOverviewEdit() {
+  const board = overviewBlocksEl_();
+  if (!board) return;
   overviewEditing = !overviewEditing;
-  document.getElementById('ovBoard').classList.toggle('editing', overviewEditing);
-  document.getElementById('ovEditBtn').textContent = overviewEditing ? 'Done' : 'Edit';
+  board.classList.toggle('editing', overviewEditing);
+  const btn = document.getElementById('ovEditBtn');
+  if (btn) {
+    btn.textContent = overviewEditing ? 'Done' : 'Edit';
+    btn.classList.toggle('active', overviewEditing);
+  }
+  refreshOverviewBlockControls_();
   updateViewportHeight('overview', true);
+}
+
+// The move buttons are injected rather than written into each block's
+// markup - seven blocks, identical controls, and one of them (Upcoming)
+// is re-rendered from JS, which would drop hand-written ones.
+function initOverviewBlockControls_() {
+  const board = overviewBlocksEl_();
+  // One capture-phase guard instead of an overviewEditing check inside
+  // every block's own handler: the blocks navigate in several different
+  // ways (showAppView, a Kitchen subtab, a modal, the two charts' own
+  // toggles), and any one of them missed would move a block and then
+  // navigate away from the page you were arranging.
+  if (board && !board.dataset.tapGuard) {
+    board.dataset.tapGuard = '1';
+    board.addEventListener('click', e => {
+      if (!overviewEditing) return;
+      if (e.target.closest('.ov-block-move')) return;
+      e.stopPropagation();
+      e.preventDefault();
+    }, true);
+  }
+  overviewBlocks_().forEach(el => {
+    if (el.querySelector(':scope > .ov-block-controls')) return;
+    const controls = document.createElement('div');
+    controls.className = 'ov-block-controls';
+    controls.innerHTML =
+      '<button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up">↑</button>' +
+      '<button type="button" class="ov-block-move" data-dir="1" aria-label="Move down">↓</button>';
+    controls.querySelectorAll('.ov-block-move').forEach(b => {
+      b.addEventListener('click', e => moveOverviewBlock_(e, b, parseInt(b.dataset.dir, 10)));
+    });
+    el.appendChild(controls);
+  });
+  refreshOverviewBlockControls_();
+}
+
+// Grey out the ends of the list so it's obvious when a block can't go any
+// further, instead of a button that silently does nothing.
+function refreshOverviewBlockControls_() {
+  const blocks = overviewBlocks_();
+  blocks.forEach((el, i) => {
+    const up = el.querySelector('.ov-block-move[data-dir="-1"]');
+    const down = el.querySelector('.ov-block-move[data-dir="1"]');
+    if (up) up.disabled = i === 0;
+    if (down) down.disabled = i === blocks.length - 1;
+  });
+}
+
+function moveOverviewBlock_(event, btn, direction) {
+  event.stopPropagation();
+  event.preventDefault();
+  const board = overviewBlocksEl_();
+  const block = btn.closest('[data-block]');
+  if (!board || !block) return;
+  const blocks = overviewBlocks_();
+  const idx = blocks.indexOf(block);
+  const swapIdx = idx + direction;
+  if (swapIdx < 0 || swapIdx >= blocks.length) return;
+  if (direction < 0) board.insertBefore(block, blocks[swapIdx]);
+  else board.insertBefore(blocks[swapIdx], block);
+  saveOverviewBlockOrder_();
+  refreshOverviewBlockControls_();
+  updateViewportHeight('overview', true);
+}
+
+function saveOverviewBlockOrder_() {
+  const order = overviewBlocks_().map(el => el.dataset.block);
+  localStorage.setItem(STORAGE_OVERVIEW_WIDGET_ORDER, JSON.stringify(order));
+  syncOverviewLayoutToRemote();
+}
+
+// Sorted rather than appended one by one: appending only the saved keys
+// would shove every one of them past any block the saved order predates,
+// so a newly added block would jump to the front. Ranking unknown blocks
+// last (and leaning on a stable sort) leaves them in markup order at the
+// end, which is where a new block belongs.
+function applyOverviewBlockOrder_() {
+  const board = overviewBlocksEl_();
+  if (!board) return;
+  let order = null;
+  try { order = JSON.parse(localStorage.getItem(STORAGE_OVERVIEW_WIDGET_ORDER) || 'null'); } catch (e) {}
+  if (!Array.isArray(order) || !order.length) return;
+  const rank = new Map(order.map((k, i) => [k, i]));
+  const rankOf = el => (rank.has(el.dataset.block) ? rank.get(el.dataset.block) : Number.MAX_SAFE_INTEGER);
+  overviewBlocks_().sort((a, b) => rankOf(a) - rankOf(b)).forEach(el => board.appendChild(el));
+  refreshOverviewBlockControls_();
 }
 
 function handleWidgetTap(event, view) {
@@ -8208,21 +8361,6 @@ function setWidgetSize(event, btn, size) {
   updateViewportHeight('overview', true);
 }
 
-function moveWidget(event, btn, direction) {
-  event.stopPropagation();
-  const widget = btn.closest('.ov-widget');
-  const board = document.getElementById('ovBoard');
-  if (!widget || !board) return;
-  const widgets = Array.from(board.querySelectorAll('.ov-widget'));
-  const idx = widgets.indexOf(widget);
-  const swapIdx = idx + direction;
-  if (swapIdx < 0 || swapIdx >= widgets.length) return;
-  if (direction < 0) board.insertBefore(widget, widgets[swapIdx]);
-  else board.insertBefore(widgets[swapIdx], widget);
-  saveWidgetOrder();
-  updateViewportHeight('overview', true);
-}
-
 function saveWidgetSizes() {
   const sizes = {};
   document.querySelectorAll('.ov-widget').forEach(w => { sizes[w.dataset.widget] = w.dataset.size; });
@@ -8237,27 +8375,10 @@ function loadWidgetSizes() {
   });
 }
 
-function saveWidgetOrder() {
-  const order = Array.from(document.querySelectorAll('.ov-widget')).map(w => w.dataset.widget);
-  localStorage.setItem(STORAGE_OVERVIEW_WIDGET_ORDER, JSON.stringify(order));
-  syncOverviewLayoutToRemote();
-}
-
-function loadWidgetOrder() {
-  const order = JSON.parse(localStorage.getItem(STORAGE_OVERVIEW_WIDGET_ORDER) || 'null');
-  if (!order) return;
-  const board = document.getElementById('ovBoard');
-  if (!board) return;
-  order.forEach(key => {
-    const w = board.querySelector(`.ov-widget[data-widget="${key}"]`);
-    if (w) board.appendChild(w);
-  });
-}
-
-// Whole-blob sync for the Overview widget board layout (sizes + order) -
-// same debounced-push / pull-and-apply pattern as Settings/Kitchen/
-// Spotify above, so rearranging or resizing widgets on one device
-// carries over to the others instead of staying stuck per-device.
+// Whole-blob sync for the Overview board layout (block order + widget
+// sizes) - same debounced-push / pull-and-apply pattern as Settings/
+// Kitchen/Spotify above, so rearranging the page on one device carries
+// over to the others instead of staying stuck per-device.
 let overviewLayoutSyncTimer_ = null;
 function syncOverviewLayoutToRemote() {
   clearTimeout(overviewLayoutSyncTimer_);
@@ -8282,8 +8403,9 @@ async function loadRemoteOverviewLayoutState() {
     if (data.status !== 'success' || !data.state) return;
     if (data.state.sizes) localStorage.setItem(STORAGE_OVERVIEW_WIDGET_SIZES, JSON.stringify(data.state.sizes));
     if (data.state.order) localStorage.setItem(STORAGE_OVERVIEW_WIDGET_ORDER, JSON.stringify(data.state.order));
-    loadWidgetOrder();
+    applyOverviewBlockOrder_();
     loadWidgetSizes();
+    updateViewportHeight('overview', true);
   } catch (e) {
     // Offline/unreachable - whatever's cached locally stands.
   }
@@ -8320,7 +8442,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-21-wide-hero-charts';
+const APP_BUILD_VERSION = '2026-08-22-block-reorder';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -11776,7 +11898,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-21-starter-sync';
+const EXPECTED_BACKEND_VERSION = '2026-08-22-starter-guard';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
@@ -12937,7 +13059,12 @@ setInterval(() => {
 }, 60000);
 initViewportHeightObserver();
 initTabBarViewportPin();
-loadWidgetOrder();
+// Local order first, so the page is already arranged on this device
+// before any network call. loadRemoteOverviewLayoutState() re-applies it
+// when the backend is holding a newer arrangement from another device -
+// it is already in flight by now, but its callback lands well after this.
+initOverviewBlockControls_();
+applyOverviewBlockOrder_();
 loadWidgetSizes();
 goToView('overview', false);
 

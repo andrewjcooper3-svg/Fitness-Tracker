@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-21-starter-sync';
+const BACKEND_BUILD_VERSION = '2026-08-22-starter-guard';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -475,9 +475,29 @@ function saveKitchenState_(inventory, groceryManual, shoppingList, starter) {
     inventory: inventory || [],
     groceryManual: groceryManual || [],
     shoppingList: shoppingList || [],
-    starter: starter === undefined ? (existing.starter || null) : starter,
+    starter: resolveStarterWrite_(existing.starter, starter),
     savedAt: new Date().toISOString()
   }));
+}
+
+// A starter is slow to accumulate - weeks of feeds and observations - and
+// there is no undo for losing it, so this refuses two ways of dropping it:
+// an omitted field (an older client that predates the starter entirely),
+// and an EMPTY starter sent over a stored one that has real history (a
+// client that had not received it yet when some other kitchen edit fired a
+// save). Only a starter carrying something is allowed to replace one that
+// already carries something.
+function starterHasContent_(st) {
+  if (!st || typeof st !== 'object') return false;
+  if (st.stage && st.stage !== 'none') return true;
+  if (st.feeds && st.feeds.length) return true;
+  return !!(st.build && Object.keys(st.build).length);
+}
+
+function resolveStarterWrite_(stored, incoming) {
+  if (incoming === undefined || incoming === null) return stored || null;
+  if (!starterHasContent_(incoming) && starterHasContent_(stored)) return stored;
+  return incoming;
 }
 
 function loadKitchenState_() {
