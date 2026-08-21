@@ -550,6 +550,9 @@
     margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
   }
   .wt-caffeine-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+  .wt-chart-slots { display: flex; gap: 4px; justify-content: flex-end; margin-bottom: 6px; }
+  .wt-chart-slots button { min-height: 26px; padding: 0 9px; border: none; border-radius: 8px; background: var(--surface2); color: var(--muted); font-family: var(--font); font-size: 11px; font-weight: 600; cursor: pointer; }
+  .wt-chart-slots button.active { background: var(--teal); color: #fff; }
   .wt-alcohol-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); flex-shrink: 0; }
   .wt-line-sep { width: 1px; height: 10px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
   .wt-caffeine-chev { opacity: 0.7; margin-left: 2px; }
@@ -1582,9 +1585,15 @@
       <span class="wt-drink-preview" id="wtDrinkPreview"></span>
     </div>
     <div class="wt-chart-wrap" id="wtChartWrap">
+      <!-- Resolution is a preference, not a constant: an hour a bar reads
+           as chunky, and 15 minutes reads as a fine comb. Rather than pick
+           for you, the toggle lets you see all three against your own day.
+           It sits on the chart because that is the only place the choice
+           means anything. -->
+      <div class="wt-chart-slots" id="wtChartSlots"></div>
       <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
       <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
-      <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for that hour's breakdown</div>
+      <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for a breakdown</div>
     </div>
   </div>
 
@@ -3660,16 +3669,35 @@ function saveShoppingList(items) { localStorage.setItem(STORAGE_SHOPPING_LIST_KE
 let kitchenSyncTimer_ = null;
 function syncKitchenToRemote() {
   clearTimeout(kitchenSyncTimer_);
-  kitchenSyncTimer_ = setTimeout(() => {
+  kitchenSyncTimer_ = setTimeout(async () => {
     const url = getDeploymentUrl();
     if (!url || !navigator.onLine) return;
+
+    // Read-merge-write for the starter specifically. A plain push is a
+    // blind overwrite, so a device that had not caught up would wipe a
+    // feed logged on the other one - measured, not theoretical: phone logs
+    // a feed, laptop annotates an older feed, laptop's push drops the
+    // phone's. Merging against what is actually stored first closes that.
+    let starter = loadStarter_();
+    if (starter && starter.stage !== 'none') {
+      try {
+        const res = await fetch(url + '?action=loadKitchenState');
+        const data = await res.json();
+        if (data.status === 'success' && data.state && data.state.starter) {
+          starter = mergeStarter_(starter, data.state.starter);
+          localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(starter));
+        }
+      } catch (e) { /* offline - push what we have rather than nothing */ }
+    }
+
     fetch(url, {
       method: 'POST',
       body: JSON.stringify({
         action: 'saveKitchenState',
         inventory: loadInventory(),
         groceryManual: loadGroceryManual(),
-        shoppingList: loadShoppingList()
+        shoppingList: loadShoppingList(),
+        starter: starter
       })
     }).catch(() => { /* offline/unreachable - local copy stands, will retry on next save */ });
   }, 400);
@@ -3685,6 +3713,11 @@ async function loadRemoteKitchenState() {
     saveInventoryListLocal_(data.state.inventory || []);
     saveGroceryManualLocal_(data.state.groceryManual || []);
     saveShoppingListLocal_(data.state.shoppingList || []);
+    if (data.state.starter) {
+      localStorage.setItem(STORAGE_STARTER_KEY,
+        JSON.stringify(mergeStarter_(loadStarter_(), data.state.starter)));
+      renderStarter();
+    }
     if (viewOrder[currentViewIndex] === 'kitchen') renderKitchenTab();
     if (viewOrder[currentViewIndex] === 'overview') renderOverview();
   } catch (e) {
@@ -3869,7 +3902,48 @@ function loadStarter_() {
 }
 
 function saveStarter_(st) {
+  // Stamped on every write so the merge has something to break ties with.
+  st.updatedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(st));
+  if (typeof syncKitchenToRemote === 'function') syncKitchenToRemote();
+}
+
+// Two devices can both touch the starter - feed it on your phone, tick a
+// build day on the laptop - so a straight last-write-wins would quietly
+// drop one of them. Feeds and build days are unioned; only the scalar
+// settings fall back to whichever copy was written last.
+function mergeStarter_(local, remote) {
+  if (!remote) return local;
+  if (!local || !local.feeds) return remote;
+
+  const byId = {};
+  const add = (f) => {
+    if (!f || !f.id) return;
+    const prev = byId[f.id];
+    if (!prev) { byId[f.id] = f; return; }
+    // Same feed from both sides: keep the richer one, since observations
+    // are only ever added to a feed, never removed.
+    const score = (x) => (x.checkState ? 2 : 0) + (x.riseX ? 1 : 0) + (x.peakAt ? 1 : 0);
+    byId[f.id] = score(f) >= score(prev) ? f : prev;
+  };
+  (local.feeds || []).forEach(add);
+  (remote.feeds || []).forEach(add);
+  const feeds = Object.keys(byId).map(k => byId[k]).sort((a, b) => new Date(a.at) - new Date(b.at));
+
+  const localNewer = new Date(local.updatedAt || 0) >= new Date(remote.updatedAt || 0);
+  const newer = localNewer ? local : remote;
+  const older = localNewer ? remote : local;
+
+  return Object.assign({}, older, newer, {
+    feeds,
+    build: Object.assign({}, older.build || {}, newer.build || {}),
+    // A starter that exists anywhere exists everywhere - never fall back
+    // to "none" just because one device has not caught up yet.
+    stage: [local.stage, remote.stage].includes('active') ? 'active'
+         : [local.stage, remote.stage].includes('building') ? 'building'
+         : (newer.stage || 'none'),
+    bornOn: local.bornOn || remote.bornOn || null
+  });
 }
 
 function sdLastFeed_(st) {
@@ -8179,7 +8253,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-21-starter-check-actually-learns';
+const APP_BUILD_VERSION = '2026-08-21-water-slots-starter-sync';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9098,71 +9172,128 @@ function formatHour12_(h) {
   return h12 + ' ' + period;
 }
 
-// 24 fixed hourly slots (not just the hours with data) so the chart
-// reads as "today's timeline" rather than a bar-per-drink list - an
+// Fixed slots across the whole day (not just the ones with data) so the
+// chart reads as "today's timeline" rather than a bar-per-drink list - an
 // early-morning coffee and a late-night glass of water should land far
-// apart on the axis rather than sitting side by side. Each bar carries
-// a second, invisible full-height rect on top purely as a hit target -
-// otherwise an empty hour's real bar is a sliver only ~3px tall, far
-// too small to reliably tap or hover.
+// apart on the axis rather than sitting side by side.
+//
+// The slot width is a preference. An hour a bar is chunky; 30 minutes is
+// the sweet spot for most days; 15 minutes shows exactly when you drank
+// but turns into a fine comb. The gap between bars shrinks as the slots
+// do, otherwise at 15 minutes the gaps would be wider than the bars and
+// the chart would read as mostly background.
+const WATER_SLOT_OPTIONS = [
+  { min: 60, label: '1h', gap: 2 },
+  { min: 30, label: '30m', gap: 1 },
+  { min: 15, label: '15m', gap: 0.5 }
+];
+const STORAGE_WATER_SLOT_KEY = 'WORKOUT_WATER_CHART_SLOT';
+
+function waterChartSlotMin_() {
+  const v = Number(localStorage.getItem(STORAGE_WATER_SLOT_KEY));
+  return WATER_SLOT_OPTIONS.some(o => o.min === v) ? v : 30;
+}
+
+function setWaterChartSlot(min) {
+  localStorage.setItem(STORAGE_WATER_SLOT_KEY, String(min));
+  renderOverviewWaterWidget();
+}
+
+function renderWaterSlotToggle_() {
+  const el = document.getElementById('wtChartSlots');
+  if (!el) return;
+  const cur = waterChartSlotMin_();
+  el.innerHTML = WATER_SLOT_OPTIONS.map(o =>
+    `<button type="button" class="${o.min === cur ? 'active' : ''}" onclick="event.stopPropagation(); setWaterChartSlot(${o.min})">${o.label}</button>`).join('');
+}
+
+function waterSlotLabel_(index, slotMin) {
+  const startMin = index * slotMin;
+  const endMin = startMin + slotMin;
+  const fmt = m => {
+    const h = Math.floor(m / 60) % 24, mm = m % 60;
+    const period = h < 12 ? 'AM' : 'PM';
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return h12 + (mm ? ':' + String(mm).padStart(2, '0') : '') + ' ' + period;
+  };
+  return slotMin >= 60 ? fmt(startMin) : fmt(startMin) + '–' + fmt(endMin);
+}
+
+// Each bar carries a second, invisible rect on top purely as a hit target.
+// At 15 minutes a bar is under 3px wide, so the target is widened to a
+// thumb-friendly minimum and centred on its bar - adjacent targets overlap
+// slightly, which costs a pixel or two of precision at the boundary and
+// buys being able to tap the thing at all.
 function renderWaterHourlyChart(entries) {
   const svg = document.getElementById('wtHourlyChart');
   if (!svg) return;
-  // A drink with an end time is divided across the hours it actually
-  // spans, in proportion to how much of the window falls in each - a
-  // 12oz coffee sipped 9:00-10:30 puts 8oz in the 9am bar and 4oz in
-  // the 10am one, instead of dumping the whole thing into 9am and
-  // implying you downed it at once. Drinks with no end time behave
-  // exactly as before, landing wholly in their own hour.
-  waterChartHourEntries_ = new Array(24).fill(null).map(() => []);
+  renderWaterSlotToggle_();
+
+  const slotMin = waterChartSlotMin_();
+  const slotCount = (24 * 60) / slotMin;
+  const slotMs = slotMin * 60000;
+  const opt = WATER_SLOT_OPTIONS.find(o => o.min === slotMin) || WATER_SLOT_OPTIONS[1];
+
+  // A drink with an end time is divided across the slots it actually
+  // spans, in proportion to how much of the window falls in each - a 12oz
+  // coffee sipped 9:00-10:30 spreads across those slots instead of dumping
+  // the whole thing at 9:00 and implying you downed it at once. Drinks
+  // with no end time land wholly in their own slot.
+  waterChartHourEntries_ = new Array(slotCount).fill(null).map(() => []);
   entries.forEach(e => {
     const start = new Date(e.loggedAt);
     if (isNaN(start.getTime())) return;
     const end = e.endAt ? new Date(e.endAt) : null;
     const spanMs = (end && !isNaN(end.getTime())) ? (end - start) : 0;
+    const dayStart = new Date(start); dayStart.setHours(0, 0, 0, 0);
 
     if (spanMs <= 0) {
-      const hour = start.getHours();
-      if (hour >= 0 && hour < 24) waterChartHourEntries_[hour].push(e);
+      const idx = Math.floor((start - dayStart) / slotMs);
+      if (idx >= 0 && idx < slotCount) waterChartHourEntries_[idx].push(e);
       return;
     }
 
-    for (let h = 0; h < 24; h++) {
-      const hourStart = new Date(start); hourStart.setHours(h, 0, 0, 0);
-      const hourEnd = new Date(hourStart.getTime() + 3600000);
-      const overlap = Math.min(end, hourEnd) - Math.max(start, hourStart);
+    for (let i = 0; i < slotCount; i++) {
+      const slotStart = new Date(dayStart.getTime() + i * slotMs);
+      const slotEnd = new Date(slotStart.getTime() + slotMs);
+      const overlap = Math.min(end, slotEnd) - Math.max(start, slotStart);
       if (overlap <= 0) continue;
       const share = overlap / spanMs;
-      waterChartHourEntries_[h].push(Object.assign({}, e, {
+      waterChartHourEntries_[i].push(Object.assign({}, e, {
         hydrationOz: e.hydrationOz * share,
         rawOz: e.rawOz * share,
         partialOfSpan: true
       }));
     }
   });
-  const hourTotals = waterChartHourEntries_.map(list => list.reduce((sum, e) => sum + e.hydrationOz, 0));
+  const slotTotals = waterChartHourEntries_.map(list => list.reduce((sum, e) => sum + e.hydrationOz, 0));
 
-  const chartW = 320, chartH = 60, barGap = 2;
-  const barW = (chartW - barGap * 23) / 24;
-  const maxVal = Math.max(...hourTotals, 8);
+  const chartW = 320, chartH = 60, barGap = opt.gap;
+  const barW = (chartW - barGap * (slotCount - 1)) / slotCount;
+  // Finer slots hold less each, so a fixed floor would flatten the chart.
+  // Scaling the floor with the slot width keeps the shape comparable
+  // whichever resolution you are looking at.
+  const maxVal = Math.max(...slotTotals, 8 * (slotMin / 60));
+  const hitW = Math.max(barW, 7);
 
   let bars = '';
-  hourTotals.forEach((oz, h) => {
+  slotTotals.forEach((oz, i) => {
     const hgt = oz > 0 ? Math.max(3, (oz / maxVal) * chartH) : 1;
-    const x = h * (barW + barGap);
+    const x = i * (barW + barGap);
     const y = chartH - hgt;
-    // Theme tokens, not fixed white: the water card was originally a
-    // blue gradient that white bars read well against, but it's a plain
-    // surface now, so white-on-white left this chart completely
-    // invisible in light mode.
+    // Theme tokens, not fixed white: the water card was originally a blue
+    // gradient that white bars read well against, but it's a plain surface
+    // now, so white-on-white left this chart invisible in light mode.
     const color = oz > 0 ? 'var(--teal)' : 'var(--surface2)';
-    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hgt.toFixed(1)}" rx="1.5" fill="${color}"></rect>`;
-    bars += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${chartH}" fill="transparent" style="cursor:pointer;" onclick="showWaterHourDetail(${h})" onmouseenter="showWaterHourDetail(${h})"></rect>`;
+    const rx = Math.min(1.5, barW / 2);
+    bars += `<rect x="${x.toFixed(2)}" y="${y.toFixed(1)}" width="${barW.toFixed(2)}" height="${hgt.toFixed(1)}" rx="${rx.toFixed(2)}" fill="${color}"></rect>`;
+    const hx = Math.max(0, Math.min(chartW - hitW, x + barW / 2 - hitW / 2));
+    bars += `<rect x="${hx.toFixed(2)}" y="0" width="${hitW.toFixed(2)}" height="${chartH}" fill="transparent" style="cursor:pointer;" onclick="showWaterHourDetail(${i})" onmouseenter="showWaterHourDetail(${i})"></rect>`;
   });
   svg.innerHTML = bars;
 
   const detailEl = document.getElementById('wtChartDetail');
-  if (detailEl) detailEl.textContent = "Tap or hover a bar for that hour's breakdown";
+  if (detailEl) detailEl.textContent = 'Tap or hover a bar for a breakdown';
 }
 
 // Groups an hour's entries by drink type (a busy hour might have two
@@ -9172,7 +9303,7 @@ function showWaterHourDetail(hour) {
   const detailEl = document.getElementById('wtChartDetail');
   if (!detailEl) return;
   const entries = waterChartHourEntries_[hour] || [];
-  const label = formatHour12_(hour);
+  const label = waterSlotLabel_(hour, waterChartSlotMin_());
 
   if (!entries.length) {
     detailEl.textContent = label + ' — no intake logged';
@@ -11466,7 +11597,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-19-water-draft-sync';
+const EXPECTED_BACKEND_VERSION = '2026-08-21-starter-sync';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');

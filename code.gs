@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-19-water-draft-sync';
+const BACKEND_BUILD_VERSION = '2026-08-21-starter-sync';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -463,12 +463,19 @@ function loadDraftState_() {
 // buried in a JSON property.
 const KITCHEN_STATE_KEY = 'KITCHEN_STATE';
 
-function saveKitchenState_(inventory, groceryManual, shoppingList) {
+// The sourdough starter rides along in this blob rather than getting its
+// own key: it IS kitchen state, it is small, and it means one round trip
+// keeps the whole tab in step across devices. Passing undefined leaves
+// whatever is already stored alone, so an older client that does not know
+// about the starter cannot wipe it just by saving its inventory.
+function saveKitchenState_(inventory, groceryManual, shoppingList, starter) {
   const props = PropertiesService.getScriptProperties();
+  const existing = loadKitchenState_() || {};
   props.setProperty(KITCHEN_STATE_KEY, JSON.stringify({
     inventory: inventory || [],
     groceryManual: groceryManual || [],
     shoppingList: shoppingList || [],
+    starter: starter === undefined ? (existing.starter || null) : starter,
     savedAt: new Date().toISOString()
   }));
 }
@@ -1227,7 +1234,7 @@ function doPost(e) {
     }
 
     if (data.action === 'saveKitchenState') {
-      saveKitchenState_(data.inventory, data.groceryManual, data.shoppingList);
+      saveKitchenState_(data.inventory, data.groceryManual, data.shoppingList, data.starter);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
