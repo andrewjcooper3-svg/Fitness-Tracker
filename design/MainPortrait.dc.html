@@ -952,6 +952,37 @@
     .sd-field { flex: 1 1 0; min-width: 0; }
     .sd-field-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
   
+    /* Date and time inputs are the ones that break out of a flex row. Their
+       UA shadow content carries a wide min-content size - on iOS a
+       datetime-local renders the full "MM/DD/YYYY, --:-- --" - and flex
+       min-width:0 alone does not always beat it. Forcing width and letting
+       the rows wrap means nothing can push past the card, whatever the
+       browser decides those controls should be. */
+    #kitchenSectionStarter input,
+    #kitchenSectionStarter select {
+      width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;
+    }
+    #kitchenSectionStarter .weight-entry-row { flex-wrap: wrap; }
+    #kitchenSectionStarter .weight-entry-row > .config-input { flex: 1 1 100%; }
+    #kitchenSectionStarter .weight-entry-row > .config-save { flex: 1 1 auto; min-height: 44px; }
+    .sd-status, .sd-meta, .sd-feed-row, .sd-plan-step, .sd-day, .sd-buy { min-width: 0; }
+    .sd-status-headline, .sd-status-sub, .sd-day-do, .sd-day-why, .sd-buy-note, .sd-plan-what { overflow-wrap: anywhere; }
+  
+    /* ---- Rise chart ---- */
+    .sd-chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
+    .sd-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+    .sd-chart-title { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sd-chart-now { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); }
+    .sd-chart-svg { width: 100%; height: auto; display: block; margin-top: 6px; overflow: visible; }
+    .sd-chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+    .sd-chart-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 11px; color: var(--muted); }
+    .sd-chart-swatch { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+    /* A dashed border's dash length is up to the browser and comes out
+       near-solid at this size, so the dash is painted explicitly. */
+    .sd-chart-swatch.dash { width: 18px; border-radius: 0; opacity: 0.6;
+      background: repeating-linear-gradient(to right, var(--accent) 0 4px, transparent 4px 8px); }
+    .sd-chart-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  
     .sd-day { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--border); }
     .sd-day:last-child { border-bottom: none; }
     .sd-day-check { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--border); background: none; color: var(--muted); font-family: var(--font); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -1465,18 +1496,18 @@
           <div class="pu-status-badge behind" id="puStatusBadge">Behind</div>
         </div>
         <div class="ov-hero-week" id="puDeficitSince">59% of goal vs. 64% of year done</div>
-        <div class="ov-hero-number behind" id="puDeficitNumber">−2,415</div>
+        <div class="ov-hero-number behind" id="puDeficitNumber">−2,552</div>
         <div class="ov-hero-sub" id="puDeficitSub">reps behind pace</div>
       </div>
       
       <div class="pu-rings-card">
         <div class="pu-ring-item">
-          <div class="pu-ring pu-ring-week" id="puWeekRing" style="--pct: 0;"><div class="pu-ring-pct" id="puWeekPct"><div class="pu-ring-pct-actual">0%</div><div class="pu-ring-pct-predicted">of 63%</div></div></div>
+          <div class="pu-ring pu-ring-week" id="puWeekRing" style="--pct: 0;"><div class="pu-ring-pct" id="puWeekPct"><div class="pu-ring-pct-actual">0%</div><div class="pu-ring-pct-predicted">of 79%</div></div></div>
           <div class="pu-ring-label">Week</div>
           <div class="pu-ring-value" id="puWeekValue">0 / 1,045</div>
         </div>
         <div class="pu-ring-item">
-          <div class="pu-ring pu-ring-month" id="puMonthRing" style="--pct: 46;"><div class="pu-ring-pct" id="puMonthPct"><div class="pu-ring-pct-actual">46%</div><div class="pu-ring-pct-predicted">of 65%</div></div></div>
+          <div class="pu-ring pu-ring-month" id="puMonthRing" style="--pct: 46;"><div class="pu-ring-pct" id="puMonthPct"><div class="pu-ring-pct-actual">46%</div><div class="pu-ring-pct-predicted">of 69%</div></div></div>
           <div class="pu-ring-label">Month</div>
           <div class="pu-ring-value" id="puMonthValue">1,985 / 4,290</div>
         </div>

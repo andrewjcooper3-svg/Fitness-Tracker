@@ -952,6 +952,37 @@
     .sd-field { flex: 1 1 0; min-width: 0; }
     .sd-field-label { font-family: var(--font); font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
   
+    /* Date and time inputs are the ones that break out of a flex row. Their
+       UA shadow content carries a wide min-content size - on iOS a
+       datetime-local renders the full "MM/DD/YYYY, --:-- --" - and flex
+       min-width:0 alone does not always beat it. Forcing width and letting
+       the rows wrap means nothing can push past the card, whatever the
+       browser decides those controls should be. */
+    #kitchenSectionStarter input,
+    #kitchenSectionStarter select {
+      width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;
+    }
+    #kitchenSectionStarter .weight-entry-row { flex-wrap: wrap; }
+    #kitchenSectionStarter .weight-entry-row > .config-input { flex: 1 1 100%; }
+    #kitchenSectionStarter .weight-entry-row > .config-save { flex: 1 1 auto; min-height: 44px; }
+    .sd-status, .sd-meta, .sd-feed-row, .sd-plan-step, .sd-day, .sd-buy { min-width: 0; }
+    .sd-status-headline, .sd-status-sub, .sd-day-do, .sd-day-why, .sd-buy-note, .sd-plan-what { overflow-wrap: anywhere; }
+  
+    /* ---- Rise chart ---- */
+    .sd-chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
+    .sd-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+    .sd-chart-title { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .sd-chart-now { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--accent); }
+    .sd-chart-svg { width: 100%; height: auto; display: block; margin-top: 6px; overflow: visible; }
+    .sd-chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+    .sd-chart-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 11px; color: var(--muted); }
+    .sd-chart-swatch { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+    /* A dashed border's dash length is up to the browser and comes out
+       near-solid at this size, so the dash is painted explicitly. */
+    .sd-chart-swatch.dash { width: 18px; border-radius: 0; opacity: 0.6;
+      background: repeating-linear-gradient(to right, var(--accent) 0 4px, transparent 4px 8px); }
+    .sd-chart-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  
     .sd-day { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--border); }
     .sd-day:last-child { border-bottom: none; }
     .sd-day-check { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--border); background: none; color: var(--muted); font-family: var(--font); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -1669,6 +1700,20 @@
           <div id="sdActive" style="display:none;">
             <div class="sd-meta-row" id="sdMetaRow"></div>
       
+            <div class="sd-chart-card" id="sdChartCard" style="display:none;">
+              <div class="sd-chart-head">
+                <div class="sd-chart-title">Rise &amp; feeds</div>
+                <div class="sd-chart-now" id="sdChartNow"></div>
+              </div>
+              <svg viewBox="0 0 320 132" class="sd-chart-svg" id="sdChart" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <div id="sdChartAxis" style="display:flex; justify-content:space-between; margin-top:2px;"></div>
+              <div class="sd-chart-legend">
+                <span class="sd-chart-key"><span class="sd-chart-swatch" style="background:var(--accent)"></span>Modelled rise</span>
+                <span class="sd-chart-key"><span class="sd-chart-swatch dash"></span>Projected</span>
+                <span class="sd-chart-key"><span class="sd-chart-dot"></span>Rise you logged</span>
+              </div>
+            </div>
+      
             <div class="config-box">
               <div class="config-title" style="margin-bottom:8px;">Where is it right now</div>
               <div class="sd-seg" id="sdLocationSeg">
@@ -1684,24 +1729,34 @@
                 <div class="config-chevron" id="sdFeedChevron">▸</div>
               </div>
               <div class="config-body" id="sdFeedBody">
+                <!-- Grams and ratio are independent and were conflated before:
+                     how much starter you KEEP sets the batch size, the RATIO
+                     sets the timing. Keeping 100g at 1:1:1 is a perfectly
+                     normal feed and has to be expressible. -->
                 <div class="sd-field-row">
                   <div class="sd-field">
-                    <div class="sd-field-label">Ratio</div>
-                    <select id="sdFeedRatio" class="config-input" style="width:100%;"></select>
+                    <div class="sd-field-label">Keep (g)</div>
+                    <input type="number" id="sdFeedKeep" class="config-input" min="5" max="500" step="5">
                   </div>
                   <div class="sd-field">
-                    <div class="sd-field-label">Flour</div>
-                    <select id="sdFeedFlour" class="config-input" style="width:100%;"></select>
+                    <div class="sd-field-label">Ratio</div>
+                    <select id="sdFeedRatio" class="config-input"></select>
                   </div>
                 </div>
                 <div class="sd-field-row">
                   <div class="sd-field">
-                    <div class="sd-field-label">Temp °F</div>
-                    <input type="number" id="sdFeedTemp" class="config-input" style="width:100%;" min="50" max="100" step="1">
+                    <div class="sd-field-label">Flour</div>
+                    <select id="sdFeedFlour" class="config-input"></select>
                   </div>
                   <div class="sd-field">
+                    <div class="sd-field-label">Temp °F</div>
+                    <input type="number" id="sdFeedTemp" class="config-input" min="50" max="100" step="1">
+                  </div>
+                </div>
+                <div class="sd-field-row">
+                  <div class="sd-field">
                     <div class="sd-field-label">Fed at</div>
-                    <input type="time" id="sdFeedTime" class="config-input" style="width:100%;">
+                    <input type="time" id="sdFeedTime" class="config-input">
                   </div>
                 </div>
                 <div class="ov-mini-empty" style="margin:8px 0 0;" id="sdFeedGrams"></div>
@@ -1715,21 +1770,21 @@
               <div class="sd-field-row">
                 <div class="sd-field">
                   <div class="sd-field-label">It rose</div>
-                  <select id="sdRiseX" class="config-input" style="width:100%;"></select>
+                  <select id="sdRiseX" class="config-input"></select>
                 </div>
                 <div class="sd-field">
                   <div class="sd-field-label">Peaked at</div>
-                  <input type="time" id="sdPeakTime" class="config-input" style="width:100%;">
+                  <input type="time" id="sdPeakTime" class="config-input">
                 </div>
               </div>
               <div class="sd-field-row">
                 <div class="sd-field">
                   <div class="sd-field-label">Smell</div>
-                  <select id="sdSmell" class="config-input" style="width:100%;"></select>
+                  <select id="sdSmell" class="config-input"></select>
                 </div>
                 <div class="sd-field">
                   <div class="sd-field-label">Hooch on top</div>
-                  <select id="sdHooch" class="config-input" style="width:100%;">
+                  <select id="sdHooch" class="config-input">
                     <option value="no">No</option>
                     <option value="yes">Yes</option>
                   </select>
@@ -1742,7 +1797,7 @@
             <div class="config-box">
               <div class="config-title" style="margin-bottom:8px;">Plan a bake</div>
               <div class="weight-entry-row">
-                <input type="datetime-local" id="sdBakeAt" class="config-input" style="flex:1;">
+                <input type="datetime-local" id="sdBakeAt" class="config-input">
                 <button class="config-save">Plan</button>
               </div>
               <div id="sdPlan"></div>
