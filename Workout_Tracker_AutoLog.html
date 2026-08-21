@@ -1103,6 +1103,23 @@
   .sd-feed-del { flex-shrink: 0; width: 34px; height: 34px; border: none; border-radius: 10px; background: var(--surface2); color: var(--muted); font-family: var(--font); font-size: 16px; line-height: 1; cursor: pointer; }
   .sd-feed-del:active { background: rgba(239,91,107,0.18); color: var(--red); }
 
+  /* Every look at the jar, listed under the feed it belongs to. Indented
+     and tied together by a rule down the left so a feed and its
+     observations read as one block rather than a flat run of rows. */
+  .sd-feed-group { border-bottom: 1px solid var(--border); }
+  .sd-feed-group:last-child { border-bottom: none; }
+  .sd-feed-group .sd-feed-row { border-bottom: none; padding-bottom: 4px; }
+  .sd-check-list { margin: 0 0 10px 4px; padding-left: 12px; border-left: 2px solid var(--border); }
+  .sd-check-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .sd-check-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--green); }
+  .sd-check-dot.peak { background: var(--green); }
+  .sd-check-when { font-family: var(--font); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .sd-check-after { color: var(--muted); font-weight: 500; }
+  .sd-check-what { font-family: var(--font); font-size: 11.5px; color: var(--muted); flex: 1; min-width: 0; }
+  .sd-check-del { flex-shrink: 0; width: 26px; height: 26px; border: none; border-radius: 8px; background: none; color: var(--muted); font-family: var(--font); font-size: 14px; line-height: 1; cursor: pointer; }
+  .sd-check-del:active { background: rgba(239,91,107,0.18); color: var(--red); }
+  .sd-check-none { font-family: var(--font); font-size: 11.5px; color: var(--muted); opacity: 0.7; margin: 0 0 10px 16px; }
+
   /* Tappable chips instead of dropdowns for the two questions that matter.
      A select hides its options until you open it, which is the wrong trade
      when there are only four answers and you want to see them all at a
@@ -4254,11 +4271,69 @@ const SD_REFERENCE = [
 function loadStarter_() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_STARTER_KEY) || 'null');
-    if (raw && typeof raw === 'object') return raw;
+    if (raw && typeof raw === 'object') {
+      (raw.feeds || []).forEach(sdMigrateFeedChecks_);
+      return raw;
+    }
   } catch (e) { /* fall through to a fresh one */ }
   return { stage: 'none', name: '', bornOn: null, build: {}, feeds: [],
            location: 'counter', ratio: '1:2:2', flour: 'bread', keepG: SD_DEFAULT_KEEP_G,
            tempF: SD_DEFAULT_TEMP_F, bakeAt: null };
+}
+
+/* Every look at the jar is kept.
+   A feed used to hold ONE observation, in checkedAt/checkState/riseX, and
+   logging another simply overwrote it - so checking at 8am, noon and 4pm
+   left only the 4pm reading and the earlier two were gone for good. Worse,
+   a later "falling" reading deleted the peakAt of a peak you had actually
+   watched. Observations live in f.checks now and are only ever appended.
+
+   The old summary fields are still written, derived from the list, so the
+   peak model, the chart and the merge keep reading the shape they expect -
+   but derived properly: a peak that was genuinely seen is kept even when a
+   later reading says it is on the way down. */
+function sdCheckId_() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function sdMigrateFeedChecks_(f) {
+  if (!f || Array.isArray(f.checks)) return f;
+  f.checks = [];
+  if (f.checkedAt && f.checkState) {
+    f.checks.push({ id: sdCheckId_(), at: f.checkedAt, state: f.checkState,
+                    riseX: f.riseX, smell: f.smell, hooch: !!f.hooch });
+  } else if (f.riseX) {
+    // A height recorded with no state or time - keep it rather than drop it.
+    f.checks.push({ id: sdCheckId_(), at: f.at, state: '', riseX: f.riseX,
+                    smell: f.smell, hooch: !!f.hooch });
+  }
+  return f;
+}
+
+function sdFeedChecks_(f) {
+  return ((f && f.checks) || []).slice().sort((a, b) => new Date(a.at) - new Date(b.at));
+}
+
+function sdSummariseChecks_(f) {
+  const checks = sdFeedChecks_(f);
+  delete f.peakAt; delete f.checkedAt; delete f.checkState; delete f.riseX; delete f.smell;
+  f.hooch = checks.some(c => c.hooch);
+  if (!checks.length) return f;
+
+  const peak = checks.filter(c => c.state === 'peak').pop();
+  if (peak) f.peakAt = peak.at;
+
+  const latest = checks[checks.length - 1];
+  f.checkedAt = latest.at;
+  f.checkState = latest.state;
+
+  // The peak's own height is the starter's true high-water mark; only fall
+  // back to the most recent reading when no peak was ever seen.
+  const withRise = checks.filter(c => c.riseX);
+  const riseSource = (peak && peak.riseX) ? peak : withRise[withRise.length - 1];
+  if (riseSource) f.riseX = riseSource.riseX;
+
+  const smelled = checks.filter(c => c.smell).pop();
+  if (smelled) f.smell = smelled.smell;
+  return f;
 }
 
 // A stored value on the backend is capped at 9 KB, and a feed is ~160
@@ -4274,6 +4349,11 @@ const SD_MIN_KEPT_FEEDS = 20;
 
 function trimStarterHistory_(st) {
   if (!st || !Array.isArray(st.feeds)) return st;
+  // Migrate first, then measure. A feed in the old shape grows when it is
+  // read back (its single embedded observation becomes a checks array), so
+  // trimming the pre-migration size stored something that came back over
+  // budget and was refused on the next save.
+  st.feeds.forEach(sdMigrateFeedChecks_);
   while (JSON.stringify(st).length > SD_SYNC_BUDGET_BYTES && st.feeds.length > SD_MIN_KEPT_FEEDS) {
     st.feeds.shift();
   }
@@ -4292,19 +4372,58 @@ function saveStarter_(st) {
 // build day on the laptop - so a straight last-write-wins would quietly
 // drop one of them. Feeds and build days are unioned; only the scalar
 // settings fall back to whichever copy was written last.
+/* Deletions have to travel, or the union below simply undoes them: the
+   other device still holds the feed (or observation) you just removed, and
+   the next merge hands it straight back. So a delete records the id in a
+   tombstone list that merges along with everything else, exactly like the
+   water entries. The lists are ids only and capped, so they stay small. */
+const SD_MAX_TOMBSTONES = 200;
+
+function sdTombstones_(st, kind) {
+  st.deleted = st.deleted || {};
+  st.deleted[kind] = st.deleted[kind] || [];
+  return st.deleted[kind];
+}
+
+function sdTombstone_(st, kind, id) {
+  const list = sdTombstones_(st, kind);
+  if (id && list.indexOf(id) === -1) list.push(id);
+  if (list.length > SD_MAX_TOMBSTONES) list.splice(0, list.length - SD_MAX_TOMBSTONES);
+}
+
 function mergeStarter_(local, remote) {
   if (!remote) return local;
   if (!local || !local.feeds) return remote;
 
+  const union = (a, b) => {
+    const out = [];
+    (a || []).concat(b || []).forEach(id => { if (id && out.indexOf(id) === -1) out.push(id); });
+    return out.slice(-SD_MAX_TOMBSTONES);
+  };
+  const deleted = {
+    feeds: union((local.deleted || {}).feeds, (remote.deleted || {}).feeds),
+    checks: union((local.deleted || {}).checks, (remote.deleted || {}).checks)
+  };
+  const deadFeed = new Set(deleted.feeds);
+  const deadCheck = new Set(deleted.checks);
+
   const byId = {};
   const add = (f) => {
-    if (!f || !f.id) return;
+    if (!f || !f.id || deadFeed.has(f.id)) return;
     const prev = byId[f.id];
-    if (!prev) { byId[f.id] = f; return; }
-    // Same feed from both sides: keep the richer one, since observations
-    // are only ever added to a feed, never removed.
-    const score = (x) => (x.checkState ? 2 : 0) + (x.riseX ? 1 : 0) + (x.peakAt ? 1 : 0);
-    byId[f.id] = score(f) >= score(prev) ? f : prev;
+    if (!prev) { byId[f.id] = sdSummariseChecks_(Object.assign({}, f, {
+      checks: sdFeedChecks_(f).filter(c => !deadCheck.has(c.id))
+    })); return; }
+    // Same feed from both sides: union their observations, since a feed
+    // checked on the phone and again on the laptop has real readings on
+    // both and picking a winner would throw half of them away.
+    const merged = Object.assign({}, prev, f);
+    const seen = {};
+    sdFeedChecks_(prev).concat(sdFeedChecks_(f)).forEach(c => {
+      if (c && c.id && !seen[c.id] && !deadCheck.has(c.id)) seen[c.id] = c;
+    });
+    merged.checks = Object.keys(seen).map(k => seen[k]).sort((a, b) => new Date(a.at) - new Date(b.at));
+    byId[f.id] = sdSummariseChecks_(merged);
   };
   (local.feeds || []).forEach(add);
   (remote.feeds || []).forEach(add);
@@ -4316,6 +4435,7 @@ function mergeStarter_(local, remote) {
 
   return Object.assign({}, older, newer, {
     feeds,
+    deleted,
     build: Object.assign({}, older.build || {}, newer.build || {}),
     // A starter that exists anywhere exists everywhere - never fall back
     // to "none" just because one device has not caught up yet.
@@ -4418,6 +4538,11 @@ function starterCalibration_(st) {
 // DOWN, which is the opposite of what happened in the jar.
 function sdPeakRiseX_(f) {
   if (!f || !f.riseX) return null;
+  // A peak that was actually watched counts even if a LATER look found it
+  // on the way up again after a feed, or simply came in afterwards - the
+  // height was still reached. Only discard the reading when the newest
+  // state is "rising" and no peak was ever seen for this feed.
+  if (f.peakAt) return f.riseX;
   if (f.checkState === 'rising') return null;   // not there yet
   return f.riseX;
 }
@@ -4987,29 +5112,35 @@ function renderStarterChart_(st) {
     //              peak time - right height, uncertain when
     // Caret        a "still rising" reading: it was at least this high at
     //              that moment and heading up
-    if (f.checkedAt && f.checkState === 'rising' && f.riseX) {
-      const ck = new Date(f.checkedAt);
-      if (ck >= t0 && ck <= t1) {
-        const cx = x(ck), cy = y(Math.min(f.riseX, yMax));
+    // One mark per observation, not one per feed. Checking the jar three
+    // times used to leave a single dot, because the earlier two had been
+    // overwritten before they ever reached here.
+    sdFeedChecks_(f).forEach(c => {
+      const ck = new Date(c.at);
+      if (ck < t0 || ck > t1) return;
+      const cx = x(ck);
+
+      if (!c.riseX) {
+        // No height, but you still looked - worth a tick on the time axis.
+        marks += `<line x1="${cx.toFixed(1)}" y1="${H - PADB - 6}" x2="${cx.toFixed(1)}" y2="${H - PADB}" stroke="var(--green)" stroke-width="2"></line>`;
+        return;
+      }
+
+      const cy = y(Math.min(c.riseX, yMax));
+      if (c.state === 'rising') {
+        // Caret: at least this high at that moment, and heading up.
         marks += `<path d="M${(cx - 4).toFixed(1)},${(cy + 3).toFixed(1)} L${cx.toFixed(1)},${(cy - 3).toFixed(1)} L${(cx + 4).toFixed(1)},${(cy + 3).toFixed(1)}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`;
-      }
-    } else if (f.riseX) {
-      const cy = y(Math.min(f.riseX, yMax)).toFixed(1);
-      if (f.peakAt) {
-        const pk = new Date(f.peakAt);
-        if (pk >= t0 && pk <= t1) marks += `<circle cx="${x(pk).toFixed(1)}" cy="${cy}" r="3.5" fill="var(--green)"></circle>`;
+      } else if (c.state === 'peak') {
+        // Filled dot: a peak you actually watched, at the time you saw it.
+        marks += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="var(--green)"></circle>`;
+      } else if (c.state === 'falling' || c.state === 'collapsed') {
+        // Downward caret: it was this high and already past the top.
+        marks += `<path d="M${(cx - 4).toFixed(1)},${(cy - 3).toFixed(1)} L${cx.toFixed(1)},${(cy + 3).toFixed(1)} L${(cx + 4).toFixed(1)},${(cy - 3).toFixed(1)}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`;
       } else {
-        const pk = new Date(at.getTime() + starterPeakHours_(st, f.tempF, f.ratio, f.flour) * 3600000);
-        if (pk >= t0 && pk <= t1) marks += `<circle cx="${x(pk).toFixed(1)}" cy="${cy}" r="3.5" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="2 2"></circle>`;
+        // Height with no state - right height, uncertain when.
+        marks += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="2 2"></circle>`;
       }
-    }
-    // A check with no height is still worth a tick on the time axis.
-    if (f.checkedAt && f.checkState && !f.riseX) {
-      const ck = new Date(f.checkedAt);
-      if (ck >= t0 && ck <= t1) {
-        marks += `<line x1="${x(ck).toFixed(1)}" y1="${H - PADB - 6}" x2="${x(ck).toFixed(1)}" y2="${H - PADB}" stroke="var(--green)" stroke-width="2"></line>`;
-      }
-    }
+    });
   });
 
   const nowX = x(now).toFixed(1);
@@ -5085,6 +5216,13 @@ function renderStarterGapAdvice_(st) {
   el.innerHTML = lines.map(t => `<div class="ov-mini-empty" style="margin:8px 0 0;">${escapeHtml_(t)}</div>`).join('');
 }
 
+const SD_CHECK_WORD = {
+  rising: 'still rising',
+  peak: 'right at the top',
+  falling: 'on the way down',
+  collapsed: 'collapsed'
+};
+
 function renderStarterFeedList_(st) {
   const el = document.getElementById('sdFeedList');
   const feeds = (st.feeds || []).slice(-12).reverse();
@@ -5096,16 +5234,35 @@ function renderStarterFeedList_(st) {
     const cls = !f.riseX ? '' : (f.riseX >= 2 ? ' strong' : ' weak');
     let took = '';
     if (f.peakAt) took = ' · peaked in ' + (((new Date(f.peakAt) - at) / 3600000).toFixed(1)) + 'h';
-    else if (f.checkedAt && f.checkState) {
-      const hrs = ((new Date(f.checkedAt) - at) / 3600000).toFixed(1);
-      const word = { rising: 'still rising at', falling: 'falling by', collapsed: 'flat by' }[f.checkState];
-      if (word) took = ' · ' + word + ' ' + hrs + 'h';
-    }
-    return `<div class="sd-feed-row">
-      <div class="sd-feed-when">${escapeHtml_(sdDayClock_(at, now))} · ${escapeHtml_(at.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }))}
-        <div class="sd-feed-detail">${f.keepG ? f.keepG + 'g ' : ''}${escapeHtml_(f.ratio)} · ${escapeHtml_(SD_FLOUR_LABEL[f.flour] || f.flour)} · ${f.tempF}°F${escapeHtml_(took)}</div></div>
-      <div class="sd-feed-rise${cls}">${rise}</div>
-      <button class="sd-feed-del" onclick="deleteStarterFeed('${escapeHtml_(f.id)}')" aria-label="Delete this feed" title="Delete this feed">×</button>
+
+    // Every observation, newest last, under the feed it belongs to - these
+    // used to overwrite each other, so only the most recent one survived.
+    const checks = sdFeedChecks_(f);
+    const checkRows = checks.map(c => {
+      const ck = new Date(c.at);
+      const hrs = ((ck - at) / 3600000);
+      const bits = [];
+      if (c.state) bits.push(SD_CHECK_WORD[c.state] || c.state);
+      if (c.riseX) bits.push(c.riseX.toFixed(1) + '×');
+      if (c.smell) bits.push(c.smell);
+      if (c.hooch) bits.push('hooch');
+      return `<div class="sd-check-row">
+        <span class="sd-check-dot${c.state === 'peak' ? ' peak' : ''}"></span>
+        <span class="sd-check-when">${escapeHtml_(sdClock_(ck))}<span class="sd-check-after"> · ${hrs >= 0 ? '+' : ''}${hrs.toFixed(1)}h</span></span>
+        <span class="sd-check-what">${escapeHtml_(bits.join(' · ') || 'looked at it')}</span>
+        <button class="sd-check-del" onclick="deleteStarterCheck('${escapeHtml_(f.id)}','${escapeHtml_(c.id)}')" aria-label="Delete this observation" title="Delete this observation">×</button>
+      </div>`;
+    }).join('');
+
+    return `<div class="sd-feed-group">
+      <div class="sd-feed-row">
+        <div class="sd-feed-when">${escapeHtml_(sdDayClock_(at, now))} · ${escapeHtml_(at.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }))}
+          <div class="sd-feed-detail">${f.keepG ? f.keepG + 'g ' : ''}${escapeHtml_(f.ratio)} · ${escapeHtml_(SD_FLOUR_LABEL[f.flour] || f.flour)} · ${f.tempF}°F${escapeHtml_(took)}</div></div>
+        <div class="sd-feed-rise${cls}">${rise}</div>
+        <button class="sd-feed-del" onclick="deleteStarterFeed('${escapeHtml_(f.id)}')" aria-label="Delete this feed" title="Delete this feed">×</button>
+      </div>
+      ${checks.length ? `<div class="sd-check-list">${checkRows}</div>`
+                      : '<div class="sd-check-none">No looks logged for this feed yet.</div>'}
     </div>`;
   }).join('');
 }
@@ -5254,28 +5411,53 @@ function logStarterRise() {
   const st = loadStarter_();
   const last = sdLastFeed_(st);
   if (!last) { alert('Log a feed first - the rise gets recorded against it.'); return; }
-  const riseX = Number(sdCheckDraft && sdCheckDraft.riseX);
-  if (riseX) last.riseX = riseX; else delete last.riseX;
-  const smell = document.getElementById('sdSmell').value;
-  if (smell) last.smell = smell; else delete last.smell;
-  last.hooch = !!(sdCheckDraft && sdCheckDraft.hooch);
-  const checkStr = document.getElementById('sdCheckTime').value;
+
+  const riseX = Number(sdCheckDraft && sdCheckDraft.riseX) || null;
+  const smell = document.getElementById('sdSmell').value || '';
+  const hooch = !!(sdCheckDraft && sdCheckDraft.hooch);
   const state = (sdCheckDraft && sdCheckDraft.state) || '';
-  if (checkStr && state) {
+  const checkStr = document.getElementById('sdCheckTime').value;
+
+  if (!state && !riseX && !smell && !hooch) {
+    alert('Nothing to record yet - pick what it is doing, or how high it is.');
+    return;
+  }
+
+  let at = new Date();
+  if (checkStr) {
     const fed = new Date(last.at);
-    const at = new Date(fed);
+    at = new Date(fed);
     const [h, m] = checkStr.split(':').map(Number);
     at.setHours(h, m, 0, 0);
     // Checks routinely land the morning after an evening feed.
     if (at <= fed) at.setDate(at.getDate() + 1);
-    last.checkedAt = at.toISOString();
-    last.checkState = state;
-    // Only "right at the top" is an actual peak time. The others are
-    // bounds, and pretending otherwise would poison the calibration.
-    if (state === 'peak') last.peakAt = at.toISOString(); else delete last.peakAt;
-  } else {
-    delete last.checkedAt; delete last.checkState; delete last.peakAt;
   }
+
+  // Appended, never overwritten - each look at the jar is its own record.
+  // Only "right at the top" is an actual peak time; the rest are bounds,
+  // and sdPeakEvidence_ treats them as such.
+  last.checks = last.checks || [];
+  last.checks.push({ id: sdCheckId_(), at: at.toISOString(), state, riseX, smell, hooch });
+  sdSummariseChecks_(last);
+
+  sdCheckDraft = null;
+  saveStarter_(st);
+  renderStarter();
+}
+
+// One observation, not the whole feed - a mistyped height should not cost
+// you the feed and every other look at it.
+function deleteStarterCheck(feedId, checkId) {
+  const st = loadStarter_();
+  const feed = (st.feeds || []).find(f => f.id === feedId);
+  if (!feed) return;
+  const check = (feed.checks || []).find(c => c.id === checkId);
+  if (!check) return;
+  const when = new Date(check.at);
+  if (!confirm(`Delete the ${sdClock_(when)} observation?`)) return;
+  feed.checks = feed.checks.filter(c => c.id !== checkId);
+  sdTombstone_(st, 'checks', checkId);
+  sdSummariseChecks_(feed);
   saveStarter_(st);
   renderStarter();
 }
@@ -5290,6 +5472,7 @@ function deleteStarterFeed(id) {
   const when = new Date(feed.at);
   if (!confirm(`Delete the feed from ${sdClock_(when)} on ${when.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}?`)) return;
   st.feeds = st.feeds.filter(f => f.id !== id);
+  sdTombstone_(st, 'feeds', id);
   saveStarter_(st);
   renderStarter();
 }
@@ -8732,7 +8915,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-22-stats-wide-charts';
+const APP_BUILD_VERSION = '2026-08-22-starter-check-log';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

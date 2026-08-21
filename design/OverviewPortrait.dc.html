@@ -1102,6 +1102,23 @@
     .sd-feed-del { flex-shrink: 0; width: 34px; height: 34px; border: none; border-radius: 10px; background: var(--surface2); color: var(--muted); font-family: var(--font); font-size: 16px; line-height: 1; cursor: pointer; }
     .sd-feed-del:active { background: rgba(239,91,107,0.18); color: var(--red); }
   
+    /* Every look at the jar, listed under the feed it belongs to. Indented
+       and tied together by a rule down the left so a feed and its
+       observations read as one block rather than a flat run of rows. */
+    .sd-feed-group { border-bottom: 1px solid var(--border); }
+    .sd-feed-group:last-child { border-bottom: none; }
+    .sd-feed-group .sd-feed-row { border-bottom: none; padding-bottom: 4px; }
+    .sd-check-list { margin: 0 0 10px 4px; padding-left: 12px; border-left: 2px solid var(--border); }
+    .sd-check-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .sd-check-dot { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--green); }
+    .sd-check-dot.peak { background: var(--green); }
+    .sd-check-when { font-family: var(--font); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+    .sd-check-after { color: var(--muted); font-weight: 500; }
+    .sd-check-what { font-family: var(--font); font-size: 11.5px; color: var(--muted); flex: 1; min-width: 0; }
+    .sd-check-del { flex-shrink: 0; width: 26px; height: 26px; border: none; border-radius: 8px; background: none; color: var(--muted); font-family: var(--font); font-size: 14px; line-height: 1; cursor: pointer; }
+    .sd-check-del:active { background: rgba(239,91,107,0.18); color: var(--red); }
+    .sd-check-none { font-family: var(--font); font-size: 11.5px; color: var(--muted); opacity: 0.7; margin: 0 0 10px 16px; }
+  
     /* Tappable chips instead of dropdowns for the two questions that matter.
        A select hides its options until you open it, which is the wrong trade
        when there are only four answers and you want to see them all at a
@@ -1657,7 +1674,7 @@
             <button class="ov-gear-btn" aria-label="Settings">⚙</button>
           </div>
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-22-stats-wide-charts</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-22-starter-check-log</div>
       
         <!-- Every block on this page lives in one grid so any of them can be
              moved anywhere in the order - the two big cards span all the columns
