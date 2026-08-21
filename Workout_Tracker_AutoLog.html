@@ -3881,6 +3881,79 @@ function saveGroceryManual(items) { localStorage.setItem(STORAGE_GROCERY_MANUAL_
 function loadShoppingList() { return JSON.parse(localStorage.getItem(STORAGE_SHOPPING_LIST_KEY) || '[]'); }
 function saveShoppingList(items) { localStorage.setItem(STORAGE_SHOPPING_LIST_KEY, JSON.stringify(items)); syncKitchenToRemote(); }
 
+/* ---------- Home-screen widget summary ----------
+   An iPhone widget (Scriptable - see widget/ in the repo) cannot run this
+   page's code, and reimplementing the peak model in it would guarantee the
+   two drift apart the next time the model changes. So the app publishes a
+   small precomputed summary whenever anything the widget shows changes,
+   and the widget just draws it.
+
+   Everything time-related is published as an absolute timestamp, never as
+   "in 50m" - iOS refreshes a widget on its own schedule (roughly every
+   15-60 minutes, and it throttles ones you ignore), so any relative
+   phrasing baked in here would be wrong by the time it is read. The widget
+   turns those timestamps into countdowns itself, at draw time. */
+function buildWidgetSummary_() {
+  const now = new Date();
+  const out = { updatedAt: now.toISOString() };
+
+  const st = loadStarter_();
+  const stage = st.stage || 'none';
+  if (stage === 'none') {
+    out.starter = { stage: 'none', headline: 'No starter yet' };
+  } else if (stage === 'building') {
+    const dayNum = starterBuildDay_(st);
+    const day = SD_BUILD_DAYS[Math.min(dayNum, 14) - 1];
+    out.starter = { stage: 'building', level: 'ok', day: dayNum,
+                    headline: `Day ${dayNum} of 14`, sub: day ? day.title : '' };
+  } else {
+    const status = starterStatus_(st, now);
+    if (status.level === 'none') {
+      out.starter = { stage: 'active', level: 'none', headline: 'Log its first feed' };
+    } else {
+      out.starter = {
+        stage: 'active',
+        level: status.level,
+        location: st.location || 'counter',
+        fedAt: status.fedAt ? status.fedAt.toISOString() : null,
+        dueAt: status.dueAt ? status.dueAt.toISOString() : null,
+        peakAt: status.peakAt ? status.peakAt.toISOString() : null
+      };
+    }
+  }
+
+  try {
+    const pu = computePushupStats();
+    const week = computeWeekStats().totals;
+    out.pushups = {
+      done: pu.week.actual,
+      plannedNow: week.pushupTarget,
+      plannedWeek: week.pushupBaseline,
+      deficit: pu.deficit
+    };
+  } catch (e) { /* the tracker panels are not in the DOM yet - skip this half */ }
+
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
+  out.water = { oz: Math.round(ledger[dateKey(now)] || 0), goal: WATER_DAILY_GOAL };
+
+  return out;
+}
+
+let widgetSummaryTimer_ = null;
+function syncWidgetSummary() {
+  clearTimeout(widgetSummaryTimer_);
+  widgetSummaryTimer_ = setTimeout(() => {
+    const url = getDeploymentUrl();
+    if (!url || !navigator.onLine) return;
+    let summary;
+    try { summary = buildWidgetSummary_(); } catch (e) { return; }
+    fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'saveWidgetSummary', summary })
+    }).catch(() => { /* the widget will show the previous summary until next time */ });
+  }, 2000);
+}
+
 // Kitchen (Inventory/Recipes/manual Grocery items) used to be local-only,
 // one device with no sync. Whole-state push on every save, whole-state
 // pull on load - simplest correct approach for one person's own devices,
@@ -4366,6 +4439,7 @@ function saveStarter_(st) {
   trimStarterHistory_(st);
   localStorage.setItem(STORAGE_STARTER_KEY, JSON.stringify(st));
   syncStarterToRemote();
+  syncWidgetSummary();
 }
 
 // Two devices can both touch the starter - feed it on your phone, tick a
@@ -8080,6 +8154,7 @@ function saveState() {
   if (viewOrder[currentViewIndex] === 'tracker') renderPushupsTab();
   renderOverviewPushupMini();
   syncDraftToCloud(state);
+  syncWidgetSummary();
 }
 
 // Mirrors the in-progress state (everything typed/checked so far, before
@@ -8915,7 +8990,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-22-starter-check-log';
+const APP_BUILD_VERSION = '2026-08-22-widget-summary';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9168,6 +9243,9 @@ function recomputeWaterLedgerForDay_(day, entries) {
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
   ledger[day] = (entries || []).reduce((sum, e) => sum + (Number(e.hydrationOz) || 0), 0);
   localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
+  // Every path that changes today's total runs through here, so this is the
+  // one place the widget's water figure needs refreshing from.
+  syncWidgetSummary();
 }
 
 function getSyncedWaterDays_() {
@@ -10055,6 +10133,9 @@ function logWaterIntake(event, type) {
   // over (flushCompletedWaterDays_). This only shares the in-progress
   // day with your other devices.
   scheduleWaterDraftSync_();
+  // This path increments the ledger directly rather than going through
+  // recomputeWaterLedgerForDay_, so it needs its own nudge to the widget.
+  syncWidgetSummary();
 }
 
 // Undoes the most recent entry - locally that's unambiguous (today's own
@@ -12388,7 +12469,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-22-starter-own-key';
+const EXPECTED_BACKEND_VERSION = '2026-08-22-widget-summary';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');

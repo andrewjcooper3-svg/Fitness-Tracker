@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-22-starter-own-key';
+const BACKEND_BUILD_VERSION = '2026-08-22-widget-summary';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -497,6 +497,26 @@ function setPropertyChecked_(props, key, obj) {
       PROP_VALUE_LIMIT_BYTES + '-byte limit for one stored value - it was not saved.');
   }
   props.setProperty(key, raw);
+}
+
+// ---------- Home-screen widget summary ----------
+//
+// A small precomputed blob the iPhone widget reads (widget/ in the repo).
+// The app builds it - the peak model lives there, and duplicating it here
+// would guarantee the two drift apart - so this only stores and serves it.
+// Everything time-related inside is an absolute timestamp, so the widget
+// can render an accurate countdown between its infrequent refreshes.
+const WIDGET_SUMMARY_KEY = 'WIDGET_SUMMARY';
+
+function saveWidgetSummary_(summary) {
+  if (!summary || typeof summary !== 'object') return;
+  setPropertyChecked_(PropertiesService.getScriptProperties(), WIDGET_SUMMARY_KEY, summary);
+}
+
+function loadWidgetSummary_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(WIDGET_SUMMARY_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
 }
 
 // ---------- Sourdough starter (its own property, its own endpoints) ----------
@@ -1175,6 +1195,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'widgetSummary') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', summary: loadWidgetSummary_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadWeightLog') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', entries: getWeightLog_() }))
@@ -1316,6 +1342,13 @@ function doPost(e) {
       saveStarterState_(data.starter);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success', starter: loadStarterState_() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveWidgetSummary') {
+      saveWidgetSummary_(data.summary);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
