@@ -1744,7 +1744,8 @@
               <div class="sd-chart-legend">
                 <span class="sd-chart-key"><span class="sd-chart-swatch" style="background:var(--accent)"></span>Modelled rise</span>
                 <span class="sd-chart-key"><span class="sd-chart-swatch dash"></span>Projected</span>
-                <span class="sd-chart-key"><span class="sd-chart-dot"></span>Rise you logged</span>
+                <span class="sd-chart-key"><span class="sd-chart-dot"></span>Peak you saw</span>
+                <span class="sd-chart-key"><span class="sd-chart-dot" style="background:none; border:1.5px dashed var(--green)"></span>Height only</span>
               </div>
             </div>
       
@@ -1800,17 +1801,28 @@
       
             <div class="config-box" id="sdRiseBox">
               <div class="config-title" style="margin-bottom:6px;">How did the last feed go</div>
-              <div class="ov-mini-empty" style="margin:0 0 8px;">Mark the jar at feed time, then record the high point. The rise number is the honest health check - a starter that used to triple and now barely doubles is telling you something.</div>
+              <div class="ov-mini-empty" style="margin:0 0 8px;">Mark the jar at feed time. Even if you miss the peak, the starter leaves a ring on the glass at its high-water mark - so you can read how far it rose hours later. The rise number is the honest health check: one that used to triple and now barely doubles is telling you something.</div>
               <div class="sd-field-row">
                 <div class="sd-field">
                   <div class="sd-field-label">It rose</div>
                   <select id="sdRiseX" class="config-input"></select>
                 </div>
               </div>
+              <!-- Asking for an exact peak time only works if you happened to be
+                   standing there. Asking when you NEXT LOOKED and what you found
+                   is answerable every time, and it still pins the peak down -
+                   "still rising at 6pm" and "already falling at 6pm" put the
+                   peak on opposite sides of 6pm. -->
               <div class="sd-field-row sd-row-wide">
                 <div class="sd-field">
-                  <div class="sd-field-label">Peaked at</div>
-                  <input type="time" id="sdPeakTime" class="config-input">
+                  <div class="sd-field-label">When you next looked</div>
+                  <input type="time" id="sdCheckTime" class="config-input">
+                </div>
+              </div>
+              <div class="sd-field-row">
+                <div class="sd-field">
+                  <div class="sd-field-label">It was</div>
+                  <select id="sdCheckState" class="config-input"></select>
                 </div>
               </div>
               <div class="sd-field-row">
@@ -1828,6 +1840,18 @@
               </div>
               <button class="sd-btn secondary" style="width:100%; margin-top:10px;">Save</button>
               <div id="sdRiseAdvice"></div>
+            </div>
+      
+            <div class="config-box">
+              <div class="config-title" style="margin-bottom:4px;">Feeding before you go out</div>
+              <div class="ov-mini-empty" style="margin:0 0 8px;">A leaner feed takes longer to peak. Say how long until you will next see it and this picks the ratio that gets the peak close to your return instead of hours before it.</div>
+              <div class="sd-field-row">
+                <div class="sd-field">
+                  <div class="sd-field-label">Back in (hours)</div>
+                  <input type="number" id="sdGapHours" class="config-input" min="1" max="72" step="1" value="10">
+                </div>
+              </div>
+              <div id="sdGapAdvice"></div>
             </div>
       
             <div class="config-box">

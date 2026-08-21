@@ -2176,7 +2176,8 @@
         <div class="sd-chart-legend">
           <span class="sd-chart-key"><span class="sd-chart-swatch" style="background:var(--accent)"></span>Modelled rise</span>
           <span class="sd-chart-key"><span class="sd-chart-swatch dash"></span>Projected</span>
-          <span class="sd-chart-key"><span class="sd-chart-dot"></span>Rise you logged</span>
+          <span class="sd-chart-key"><span class="sd-chart-dot"></span>Peak you saw</span>
+          <span class="sd-chart-key"><span class="sd-chart-dot" style="background:none; border:1.5px dashed var(--green)"></span>Height only</span>
         </div>
       </div>
 
@@ -2232,17 +2233,28 @@
 
       <div class="config-box" id="sdRiseBox">
         <div class="config-title" style="margin-bottom:6px;">How did the last feed go</div>
-        <div class="ov-mini-empty" style="margin:0 0 8px;">Mark the jar at feed time, then record the high point. The rise number is the honest health check - a starter that used to triple and now barely doubles is telling you something.</div>
+        <div class="ov-mini-empty" style="margin:0 0 8px;">Mark the jar at feed time. Even if you miss the peak, the starter leaves a ring on the glass at its high-water mark - so you can read how far it rose hours later. The rise number is the honest health check: one that used to triple and now barely doubles is telling you something.</div>
         <div class="sd-field-row">
           <div class="sd-field">
             <div class="sd-field-label">It rose</div>
             <select id="sdRiseX" class="config-input"></select>
           </div>
         </div>
+        <!-- Asking for an exact peak time only works if you happened to be
+             standing there. Asking when you NEXT LOOKED and what you found
+             is answerable every time, and it still pins the peak down -
+             "still rising at 6pm" and "already falling at 6pm" put the
+             peak on opposite sides of 6pm. -->
         <div class="sd-field-row sd-row-wide">
           <div class="sd-field">
-            <div class="sd-field-label">Peaked at</div>
-            <input type="time" id="sdPeakTime" class="config-input">
+            <div class="sd-field-label">When you next looked</div>
+            <input type="time" id="sdCheckTime" class="config-input">
+          </div>
+        </div>
+        <div class="sd-field-row">
+          <div class="sd-field">
+            <div class="sd-field-label">It was</div>
+            <select id="sdCheckState" class="config-input"></select>
           </div>
         </div>
         <div class="sd-field-row">
@@ -2260,6 +2272,18 @@
         </div>
         <button class="sd-btn secondary" style="width:100%; margin-top:10px;" onclick="logStarterRise()">Save</button>
         <div id="sdRiseAdvice"></div>
+      </div>
+
+      <div class="config-box">
+        <div class="config-title" style="margin-bottom:4px;">Feeding before you go out</div>
+        <div class="ov-mini-empty" style="margin:0 0 8px;">A leaner feed takes longer to peak. Say how long until you will next see it and this picks the ratio that gets the peak close to your return instead of hours before it.</div>
+        <div class="sd-field-row">
+          <div class="sd-field">
+            <div class="sd-field-label">Back in (hours)</div>
+            <input type="number" id="sdGapHours" class="config-input" min="1" max="72" step="1" value="10">
+          </div>
+        </div>
+        <div id="sdGapAdvice"></div>
       </div>
 
       <div class="config-box">
@@ -3812,21 +3836,69 @@ function sdLastFeed_(st) {
   return feeds.length ? feeds[feeds.length - 1] : null;
 }
 
-// How wrong the model has been for this particular starter, averaged over
-// the last few feeds that recorded an actual peak. Clamped hard so one
-// mistyped time cannot send every future prediction sideways.
-function starterCalibration_(st) {
-  const withPeak = (st.feeds || []).filter(f => f.peakAt && f.at);
-  if (withPeak.length < 2) return 1;
-  const recent = withPeak.slice(-5);
-  let sum = 0, n = 0;
-  recent.forEach(f => {
+// Turn one observation into what it says about the true peak time, in
+// hours after the feed. Catching the peak gives a number; the far commoner
+// case - looking once, hours later, and finding it up or down - gives a
+// BOUND, which is still real information:
+//
+//   still rising at T   the peak is later than T
+//   right at the top    the peak is T
+//   on the way down     the peak was earlier than T
+//   already collapsed   the peak was well before T
+//
+// Bounds only correct the model when they CONTRADICT it. If you say "still
+// rising at 6h" and the model already predicted 8h, the model is
+// consistent with what you saw and nothing is learned - which is the
+// honest outcome, not a reason to invent a number.
+function sdPeakEvidence_(f) {
+  if (!f || !f.at) return null;
+  const modelled = sdModelPeakHours_(f.tempF, f.ratio, f.flour);
+  if (!(modelled > 0)) return null;
+
+  if (f.peakAt) {
     const observed = (new Date(f.peakAt) - new Date(f.at)) / 3600000;
-    const modelled = sdModelPeakHours_(f.tempF, f.ratio, f.flour);
-    if (observed > 0.5 && observed < 36 && modelled > 0) { sum += observed / modelled; n++; }
-  });
-  if (!n) return 1;
-  return Math.max(0.5, Math.min(2, sum / n));
+    if (observed > 0.5 && observed < 36) return { ratio: observed / modelled, exact: true };
+  }
+  if (!f.checkedAt || !f.checkState) return null;
+  const T = (new Date(f.checkedAt) - new Date(f.at)) / 3600000;
+  if (!(T > 0.5 && T < 48)) return null;
+
+  if (f.checkState === 'rising') {
+    // Peak is after T, so a model predicting sooner than T is too fast.
+    return modelled >= T ? { ratio: 1, exact: false } : { ratio: T / modelled, exact: false };
+  }
+  if (f.checkState === 'falling') {
+    return modelled <= T ? { ratio: 1, exact: false } : { ratio: T / modelled, exact: false };
+  }
+  if (f.checkState === 'collapsed') {
+    // Well past it - treat the peak as comfortably before the check.
+    const bound = T * 0.7;
+    return modelled <= bound ? { ratio: 1, exact: false } : { ratio: bound / modelled, exact: false };
+  }
+  return null;
+}
+
+// How wrong the model has been for THIS starter. Exact peaks count double,
+// since a bound only ever tells you which side of a line the truth is on.
+// Clamped hard so one mistyped time cannot send every prediction sideways.
+function starterCalibration_(st) {
+  const ev = (st.feeds || []).slice(-8).map(sdPeakEvidence_).filter(Boolean);
+  const informative = ev.filter(e => e.exact || e.ratio !== 1);
+  if (informative.length < 2) return 1;
+  let sum = 0, w = 0;
+  informative.forEach(e => { const wt = e.exact ? 2 : 1; sum += e.ratio * wt; w += wt; });
+  return Math.max(0.5, Math.min(2, sum / w));
+}
+
+// How much the model actually knows, for the readout - so "no idea" and
+// "coached by four real peaks" never look the same.
+function starterCalibrationInfo_(st) {
+  const feeds = (st.feeds || []).slice(-8);
+  const exact = feeds.filter(f => f.peakAt).length;
+  const checks = feeds.filter(f => f.checkState).length;
+  const bounds = feeds.filter(f => !f.peakAt && f.checkState &&
+    (sdPeakEvidence_(f) || {}).ratio !== undefined && sdPeakEvidence_(f).ratio !== 1).length;
+  return { exact, checks, bounds, learning: starterCalibration_(st) !== 1 };
 }
 
 function sdModelPeakHours_(tempF, ratio, flour) {
@@ -4036,7 +4108,13 @@ function renderStarterActive_(st) {
   const rises = (st.feeds || []).filter(f => f.riseX).slice(-5).map(f => f.riseX);
   const avgRise = rises.length ? (rises.reduce((a, b) => a + b, 0) / rises.length) : null;
   const cal = starterCalibration_(st);
-  const calFeeds = (st.feeds || []).filter(f => f.peakAt).length;
+  const calInfo = starterCalibrationInfo_(st);
+  // Three genuinely different states, and they used to read the same:
+  // nothing logged, logged but the model was never contradicted, and
+  // actively corrected. "Matches so far" is a real answer, not a nag.
+  const calSub = calInfo.learning
+    ? Math.round(cal * 100) + '% of book'
+    : (calInfo.checks ? 'matches so far' : 'log a check');
   document.getElementById('sdMetaRow').innerHTML = `
     <div class="sd-meta"><div class="sd-meta-label">Age</div>
       <div class="sd-meta-value">${ageDays === null ? '—' : ageDays}</div>
@@ -4045,8 +4123,8 @@ function renderStarterActive_(st) {
       <div class="sd-meta-value">${avgRise ? avgRise.toFixed(1) + '×' : '—'}</div>
       <div class="sd-meta-sub">${rises.length ? 'last ' + rises.length + ' feeds' : 'log a rise'}</div></div>
     <div class="sd-meta"><div class="sd-meta-label">Peak model</div>
-      <div class="sd-meta-value">${calFeeds >= 2 ? (cal < 0.95 ? 'Fast' : cal > 1.05 ? 'Slow' : 'On') : '—'}</div>
-      <div class="sd-meta-sub">${calFeeds >= 2 ? Math.round(cal * 100) + '% of book' : 'needs 2 peaks'}</div></div>`;
+      <div class="sd-meta-value">${calInfo.learning ? (cal < 0.95 ? 'Fast' : cal > 1.05 ? 'Slow' : 'On') : (calInfo.checks ? 'On' : 'Book')}</div>
+      <div class="sd-meta-sub">${escapeHtml_(calSub)}</div></div>`;
 
   document.querySelectorAll('#sdLocationSeg button').forEach(b =>
     b.classList.toggle('active', b.dataset.loc === (st.location || 'counter')));
@@ -4065,6 +4143,8 @@ function renderStarterActive_(st) {
     last && last.riseX ? String(last.riseX) : '');
   sdFillSelect_('sdSmell', [['', 'Not noted'], ['yeasty', 'Yeasty and sweet'], ['tangy', 'Tangy, like yoghurt'],
     ['vinegar', 'Sharply vinegary'], ['acetone', 'Acetone / nail polish']], last && last.smell ? last.smell : '');
+  sdFillSelect_('sdCheckState', [['', 'Did not look'], ['rising', 'Still rising'], ['peak', 'Right at the top'],
+    ['falling', 'On the way down'], ['collapsed', 'Already collapsed']], last && last.checkState ? last.checkState : '');
   const tempEl = document.getElementById('sdFeedTemp');
   if (tempEl && !tempEl.value) tempEl.value = st.tempF || SD_DEFAULT_TEMP_F;
   const timeEl = document.getElementById('sdFeedTime');
@@ -4072,8 +4152,8 @@ function renderStarterActive_(st) {
   if (last) {
     const hoochEl = document.getElementById('sdHooch');
     if (hoochEl) hoochEl.value = last.hooch ? 'yes' : 'no';
-    const peakEl = document.getElementById('sdPeakTime');
-    if (peakEl && !peakEl.value && last.peakAt) peakEl.value = sdTimeValue_(new Date(last.peakAt));
+    const checkEl = document.getElementById('sdCheckTime');
+    if (checkEl && !checkEl.value && last.checkedAt) checkEl.value = sdTimeValue_(new Date(last.checkedAt));
   }
   initStarterFeedForm_();
   renderStarterFeedGrams_();
@@ -4090,6 +4170,7 @@ function renderStarterActive_(st) {
     : '';
 
   renderStarterChart_(st);
+  renderStarterGapAdvice_(st);
   renderStarterFeedList_(st);
   renderStarterPlan_(st);
   const ref = document.getElementById('sdReference');
@@ -4109,12 +4190,13 @@ function sdTimeValue_(d) {
 }
 
 function initStarterFeedForm_() {
-  ['sdFeedKeep', 'sdFeedRatio', 'sdFeedFlour', 'sdFeedTemp'].forEach(id => {
+  ['sdFeedKeep', 'sdFeedRatio', 'sdFeedFlour', 'sdFeedTemp', 'sdGapHours'].forEach(id => {
     const el = document.getElementById(id);
     if (el && !el.dataset.sdBound) {
       el.dataset.sdBound = '1';
-      el.addEventListener('input', renderStarterFeedGrams_);
-      el.addEventListener('change', renderStarterFeedGrams_);
+      const onEdit = () => { renderStarterFeedGrams_(); renderStarterGapAdvice_(loadStarter_()); };
+      el.addEventListener('input', onEdit);
+      el.addEventListener('change', onEdit);
     }
   });
 }
@@ -4248,10 +4330,18 @@ function renderStarterChart_(st) {
     const at = new Date(f.at);
     if (at < t0 || at > t1) return;
     marks += `<line x1="${x(at).toFixed(1)}" y1="${PADT}" x2="${x(at).toFixed(1)}" y2="${H - PADB}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="2 3" opacity="0.5"></line>`;
-    if (f.riseX && f.peakAt) {
-      const pk = new Date(f.peakAt);
-      if (pk >= t0 && pk <= t1) {
-        marks += `<circle cx="${x(pk).toFixed(1)}" cy="${y(Math.min(f.riseX, yMax)).toFixed(1)}" r="3.5" fill="var(--green)"></circle>`;
+    // A filled dot is a peak you actually saw. A hollow one is a height you
+    // read off the high-water ring, placed at the modelled peak time -
+    // right height, uncertain when, and drawn so it cannot be mistaken for
+    // a measurement.
+    if (f.riseX) {
+      const cy = y(Math.min(f.riseX, yMax)).toFixed(1);
+      if (f.peakAt) {
+        const pk = new Date(f.peakAt);
+        if (pk >= t0 && pk <= t1) marks += `<circle cx="${x(pk).toFixed(1)}" cy="${cy}" r="3.5" fill="var(--green)"></circle>`;
+      } else {
+        const pk = new Date(at.getTime() + starterPeakHours_(st, f.tempF, f.ratio, f.flour) * 3600000);
+        if (pk >= t0 && pk <= t1) marks += `<circle cx="${x(pk).toFixed(1)}" cy="${cy}" r="3.5" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="2 2"></circle>`;
       }
     }
   });
@@ -4277,6 +4367,58 @@ function renderStarterChart_(st) {
   }
 }
 
+// Which ratio lands the peak near when you get back. A lean feed has more
+// to get through before it peaks, which is exactly the lever for an
+// overnight or a workday - the alternative is coming home to something
+// that peaked six hours ago and collapsed.
+function renderStarterGapAdvice_(st) {
+  const el = document.getElementById('sdGapAdvice');
+  if (!el) return;
+  const hours = Number(document.getElementById('sdGapHours').value);
+  if (!(hours > 0)) { el.innerHTML = ''; return; }
+  const temp = st.tempF || SD_DEFAULT_TEMP_F;
+  const flour = st.flour || 'bread';
+
+  const options = Object.keys(SD_RATIO_PARTS).map(r => ({
+    ratio: r, peakH: starterPeakHours_(st, temp, r, flour)
+  }));
+  // Leanest feed that still peaks by roughly the time you are back. A
+  // small overshoot is fine - you would walk in on it at the top - so the
+  // window allows 10% past.
+  // When nothing peaks soon enough the gap is SHORTER than even the
+  // fastest feed, so the fallback is the fastest ratio - not the leanest,
+  // which is the opposite end and was recommending a 12h feed for a 5h gap.
+  const inTime = options.filter(o => o.peakH <= hours * 1.1);
+  const best = inTime.length ? inTime[inTime.length - 1] : options[0];
+  const shortfall = hours - best.peakH;
+  const lines = [];
+
+  // Going leaner means keeping LESS, not adding more. Scaling the current
+  // kept weight by the ratio is how you end up being told to add 500g of
+  // flour: the batch size should stay roughly where it is, so the kept
+  // weight comes down as the ratio goes up.
+  const currentParts = SD_RATIO_PARTS[st.ratio || '1:2:2'] || 2;
+  const currentKeep = st.keepG || SD_DEFAULT_KEEP_G;
+  const targetTotal = currentKeep * (1 + 2 * currentParts);
+  const parts = SD_RATIO_PARTS[best.ratio];
+  const keep = Math.max(10, Math.round(targetTotal / (1 + 2 * parts) / 5) * 5);
+  const add = Math.round(keep * parts);
+
+  if (shortfall > 5) {
+    lines.push(`Nothing on the counter holds ${hours}h. Even 1:5:5 peaks in about ${options[options.length - 1].peakH.toFixed(1)}h at ${temp}°F, so it would spend ${(hours - options[options.length - 1].peakH).toFixed(0)}h collapsed before you got back. Feed it and put it straight in the fridge - cold is the only thing that stretches this far.`);
+  } else {
+    lines.push(`Feed it ${best.ratio} - keep ${keep}g, add ${add}g flour and ${add}g water (${keep + add * 2}g total). At ${temp}°F that peaks in about ${best.peakH.toFixed(1)}h.`);
+    if (shortfall > 2) {
+      lines.push(`It will be a couple of hours past its peak by the time you are back - fine to use, just sourer and a bit slower. The fridge is the tidier answer if that bothers you.`);
+    } else if (shortfall < -1.5) {
+      lines.push(`That still has ${(-shortfall).toFixed(1)}h to go when you get back, which is the shortest this ratio can do at ${temp}°F. Somewhere warmer would speed it up.`);
+    } else if (shortfall < -0.3) {
+      lines.push(`That lands just after you are back, so you should catch it near the top.`);
+    }
+  }
+  el.innerHTML = lines.map(t => `<div class="ov-mini-empty" style="margin:8px 0 0;">${escapeHtml_(t)}</div>`).join('');
+}
+
 function renderStarterFeedList_(st) {
   const el = document.getElementById('sdFeedList');
   const feeds = (st.feeds || []).slice(-12).reverse();
@@ -4286,7 +4428,13 @@ function renderStarterFeedList_(st) {
     const at = new Date(f.at);
     const rise = f.riseX ? f.riseX.toFixed(1) + '×' : '—';
     const cls = !f.riseX ? '' : (f.riseX >= 2 ? ' strong' : ' weak');
-    const took = f.peakAt ? ' · peaked in ' + (((new Date(f.peakAt) - at) / 3600000).toFixed(1)) + 'h' : '';
+    let took = '';
+    if (f.peakAt) took = ' · peaked in ' + (((new Date(f.peakAt) - at) / 3600000).toFixed(1)) + 'h';
+    else if (f.checkedAt && f.checkState) {
+      const hrs = ((new Date(f.checkedAt) - at) / 3600000).toFixed(1);
+      const word = { rising: 'still rising at', falling: 'falling by', collapsed: 'flat by' }[f.checkState];
+      if (word) took = ' · ' + word + ' ' + hrs + 'h';
+    }
     return `<div class="sd-feed-row">
       <div class="sd-feed-when">${escapeHtml_(sdDayClock_(at, now))} · ${escapeHtml_(at.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }))}
         <div class="sd-feed-detail">${f.keepG ? f.keepG + 'g ' : ''}${escapeHtml_(f.ratio)} · ${escapeHtml_(SD_FLOUR_LABEL[f.flour] || f.flour)} · ${f.tempF}°F${escapeHtml_(took)}</div></div>
@@ -4418,7 +4566,7 @@ function logStarterFeed() {
   st.ratio = ratio; st.flour = flour; st.tempF = tempF; st.keepG = keepG;
   saveStarter_(st);
   document.getElementById('sdFeedTime').value = '';
-  document.getElementById('sdPeakTime').value = '';
+  document.getElementById('sdCheckTime').value = '';
   renderStarter();
 }
 
@@ -4443,17 +4591,22 @@ function logStarterRise() {
   const smell = document.getElementById('sdSmell').value;
   if (smell) last.smell = smell; else delete last.smell;
   last.hooch = document.getElementById('sdHooch').value === 'yes';
-  const peakStr = document.getElementById('sdPeakTime').value;
-  if (peakStr) {
+  const checkStr = document.getElementById('sdCheckTime').value;
+  const state = document.getElementById('sdCheckState').value;
+  if (checkStr && state) {
     const fed = new Date(last.at);
-    const peak = new Date(fed);
-    const [h, m] = peakStr.split(':').map(Number);
-    peak.setHours(h, m, 0, 0);
-    // Peaks routinely land the morning after an evening feed.
-    if (peak <= fed) peak.setDate(peak.getDate() + 1);
-    last.peakAt = peak.toISOString();
+    const at = new Date(fed);
+    const [h, m] = checkStr.split(':').map(Number);
+    at.setHours(h, m, 0, 0);
+    // Checks routinely land the morning after an evening feed.
+    if (at <= fed) at.setDate(at.getDate() + 1);
+    last.checkedAt = at.toISOString();
+    last.checkState = state;
+    // Only "right at the top" is an actual peak time. The others are
+    // bounds, and pretending otherwise would poison the calibration.
+    if (state === 'peak') last.peakAt = at.toISOString(); else delete last.peakAt;
   } else {
-    delete last.peakAt;
+    delete last.checkedAt; delete last.checkState; delete last.peakAt;
   }
   saveStarter_(st);
   renderStarter();
@@ -7817,7 +7970,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-21-starter-time-inputs-and-delete';
+const APP_BUILD_VERSION = '2026-08-21-starter-missed-peaks';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
