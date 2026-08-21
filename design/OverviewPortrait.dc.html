@@ -962,6 +962,33 @@
     #kitchenSectionStarter select {
       width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;
     }
+    /* The specific iOS fix. A time input's width is set by its shadow
+       ::-webkit-date-and-time-value, which carries its own min-content
+       width and auto margins - width:100% on the host does not reach it, so
+       the control renders wider than its box and spills out to the right.
+       Zeroing the appearance and the inner element's margins is what
+       actually lets it shrink. */
+    #kitchenSectionStarter input[type="time"],
+    #kitchenSectionStarter input[type="datetime-local"],
+    #kitchenSectionStarter input[type="date"] {
+      -webkit-appearance: none; appearance: none;
+      background: var(--surface2); color: var(--text);
+      font-family: var(--font); font-size: 13px;
+    }
+    #kitchenSectionStarter input[type="time"]::-webkit-date-and-time-value,
+    #kitchenSectionStarter input[type="datetime-local"]::-webkit-date-and-time-value,
+    #kitchenSectionStarter input[type="date"]::-webkit-date-and-time-value {
+      margin: 0; padding: 0; text-align: left; min-width: 0; width: 100%;
+    }
+    #kitchenSectionStarter input[type="time"]::-webkit-calendar-picker-indicator,
+    #kitchenSectionStarter input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      margin: 0; padding: 0; flex-shrink: 0;
+    }
+    /* Belt and braces: a date or time control gets a whole row to itself, so
+       even a browser that refuses to shrink it has the full card width. */
+    .sd-field-row.sd-row-wide { display: block; }
+    .sd-field-row.sd-row-wide .sd-field { width: 100%; }
+  
     #kitchenSectionStarter .weight-entry-row { flex-wrap: wrap; }
     #kitchenSectionStarter .weight-entry-row > .config-input { flex: 1 1 100%; }
     #kitchenSectionStarter .weight-entry-row > .config-save { flex: 1 1 auto; min-height: 44px; }
@@ -1006,6 +1033,8 @@
     .sd-feed-rise { font-family: var(--font); font-size: 14px; font-weight: 800; white-space: nowrap; }
     .sd-feed-rise.strong { color: var(--green); }
     .sd-feed-rise.weak { color: var(--amber); }
+    .sd-feed-del { flex-shrink: 0; width: 34px; height: 34px; border: none; border-radius: 10px; background: var(--surface2); color: var(--muted); font-family: var(--font); font-size: 16px; line-height: 1; cursor: pointer; }
+    .sd-feed-del:active { background: rgba(239,91,107,0.18); color: var(--red); }
   
     .sd-plan-step { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .sd-plan-step:last-child { border-bottom: none; }
@@ -1495,7 +1524,7 @@
             <button class="ov-gear-btn" aria-label="Settings">⚙</button>
           </div>
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-21-starter-chart-and-grams</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-21-starter-time-inputs-and-delete</div>
       
         <!-- v3: two bold gradient hero cards (the two things you actually log
              throughout the day) plus a colorful icon-tile grid below for
