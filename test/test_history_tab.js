@@ -115,7 +115,8 @@ const mock = rows => route => {
       check('quads picked up Leg Press', muscles.rows.some(m => /^Quads/.test(m)), muscles.rows.join(' | '));
       check('back picked up Lat Pulldown', muscles.rows.some(m => /^Back/.test(m)), muscles.rows.join(' | '));
       check('chest picked up Pushups', muscles.rows.some(m => /^Chest/.test(m)), muscles.rows.join(' | '));
-      check('the note totals the sets', /\d+ completed sets in this range/.test(muscles.note), muscles.note);
+      check('the note totals the sets and names the window',
+        /\d+ completed sets?, (all time|3 months|1 year|\w{3} \d+ . \w{3} \d+)/.test(muscles.note), muscles.note);
       // An inline span ignores width; the bars must actually be drawn.
       const fills = await page.evaluate(() =>
         [...document.querySelectorAll('#hxMuscles .hx-muscle-fill')].map(f => Math.round(f.getBoundingClientRect().width)));
@@ -123,6 +124,45 @@ const mock = rows => route => {
       check('the top group\'s bar fills its track', fills[0] > 100, String(fills[0]));
       check('bars shrink down the ranking', fills.every((w, i) => i === 0 || w <= fills[i - 1]) && fills[fills.length - 1] > 0,
         fills.join(','));
+
+      console.log('\n  -- Muscle time windows --');
+      const winProbe = async win => {
+        await page.evaluate(w => setMuscleWindow(w), win);
+        await page.waitForTimeout(250);
+        return page.evaluate(() => ({
+          active: (document.querySelector('#hxMuscleSeg button.active') || {}).textContent,
+          note: document.getElementById('hxMuscleNote').textContent,
+          sets: [...document.querySelectorAll('#hxMuscles .hx-muscle-val')]
+            .reduce((n, v) => n + parseInt(v.textContent, 10), 0),
+          rows: document.querySelectorAll('#hxMuscles .hx-muscle').length
+        }));
+      };
+      const wAll = await winProbe('range');
+      const wThis = await winProbe('week');
+      const wLast = await winProbe('lastweek');
+      console.log('   all  :', wAll.active, '|', wAll.note);
+      console.log('   this :', wThis.active, '|', wThis.note);
+      console.log('   last :', wLast.active, '|', wLast.note);
+      check('the range button names the tab range', wAll.active === 'All time', wAll.active);
+      check('This week narrows the card', wThis.sets < wAll.sets && wThis.active === 'This week',
+        `${wThis.sets} of ${wAll.sets}`);
+      check('Last week is a different week', wLast.active === 'Last week' && wLast.note !== wThis.note,
+        `${wLast.note} vs ${wThis.note}`);
+      check('each window names its actual dates',
+        /\w{3} \d+ . \w{3} \d+/.test(wThis.note) && /\w{3} \d+ . \w{3} \d+/.test(wLast.note),
+        `${wThis.note} | ${wLast.note}`);
+
+      const savedWindow = await page.evaluate(() => localStorage.getItem('WORKOUT_HISTORY_MUSCLE_WINDOW'));
+      check('the window choice is remembered', savedWindow === 'lastweek', String(savedWindow));
+      // The card's window sits on top of the tab range rather than escaping
+      // it, so the button has to say which range it is deferring to.
+      await page.evaluate(() => { setHistoryRange(90); setMuscleWindow('range'); });
+      await page.waitForTimeout(300);
+      const rangeBtnLabel = await page.evaluate(() => document.getElementById('hxMuscleRangeBtn').textContent);
+      console.log('   with the 3M chip the button reads:', rangeBtnLabel);
+      check('the range button relabels with the tab chip', rangeBtnLabel === '3 months', rangeBtnLabel);
+      await page.evaluate(() => { setHistoryRange(0); setMuscleWindow('range'); });
+      await page.waitForTimeout(300);
 
       const stalling = await page.evaluate(() =>
         [...document.querySelectorAll('#hxStalling .hx-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()));
@@ -490,6 +530,36 @@ const mock = rows => route => {
       const ragged = Math.max(...bottoms) - Math.min(...bottoms);
       console.log('  column bottoms:', bottoms.join(', '), '| ragged by', ragged);
       check('the columns end at a similar depth', ragged < 320, String(ragged));
+
+      /* Hovering used to start a render loop: the hovered week went into the
+         card's detail line, that longer text wrapped to a second row in a
+         narrow column, the card grew, the ResizeObserver fired, every chart
+         was re-rendered, and the element under the cursor was destroyed
+         mid-hover - several times a second. Playwright saw it as "element
+         was detached from the DOM, retrying" until it timed out. */
+      console.log('\n  -- Hovering does not re-render the chart --');
+      for (const id of ['hxVolumeChart', 'hxCompletionChart', 'statsPushupChart']) {
+        const hits = await page.locator(`#${id} .chart-hit`).all();
+        const target = hits[hits.length - 1];
+        const box = i => page.evaluate(x => {
+          const c = document.getElementById(x).closest('.stats-card').getBoundingClientRect();
+          return [Math.round(c.width), Math.round(c.height)];
+        }, i);
+        const before = await box(id);
+        let ok = true, err = '';
+        try {
+          await target.hover({ timeout: 4000 });
+          await page.waitForTimeout(700);
+          ok = await target.evaluate(el => el.isConnected);  // a re-render would have replaced it
+        } catch (e) { ok = false; err = String(e.message || e).split('\n')[0]; }
+        const after = await box(id);
+        console.log(`   ${id}: card ${before.join('x')} -> ${after.join('x')}`);
+        check(`${id} survives a hover without being re-rendered`, ok, err);
+        check(`${id}'s card does not resize under the cursor`,
+          before[0] === after[0] && before[1] === after[1], `${before.join('x')} -> ${after.join('x')}`);
+        await page.mouse.move(2, 2);
+        await page.waitForTimeout(150);
+      }
 
       const seg = await page.evaluate(() => Math.round(document.getElementById('hxSeg').getBoundingClientRect().width));
       console.log('  segmented control:', seg + 'px');

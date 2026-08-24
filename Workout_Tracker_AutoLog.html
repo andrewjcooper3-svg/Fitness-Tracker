@@ -956,7 +956,11 @@
   .stats-chart.stats-chart-empty { height: 0; }
   .stats-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; }
   .stats-chart-labels:empty { display: none; }
-  .stats-chart-detail { font-family: var(--font); font-size: 12px; color: var(--muted); text-align: center; margin-top: 6px; min-height: 15px; }
+  /* One line, always. The hovered read-out lands here, and a longer week
+     wrapping to a second row would resize the card under the cursor. The
+     tooltip carries the full text either way. */
+  .stats-chart-detail { font-family: var(--font); font-size: 12px; color: var(--muted); text-align: center;
+    margin-top: 6px; height: 16px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ---- Chart chrome ----
      Recessive by construction: the grid is a hairline one step off the
@@ -1016,6 +1020,16 @@
 
   /* Sets per muscle group. Hevy draws a body diagram; a ranked bar says the
      same thing without pretending to anatomy the data does not have. */
+  .hx-card-head { display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .hx-mini-seg { display: flex; gap: 3px; background: var(--surface2); border-radius: 10px; padding: 3px; }
+  .hx-mini-seg button { font-family: var(--font); font-size: 10.5px; font-weight: 700; color: var(--muted);
+    background: none; border: none; border-radius: 8px; padding: 5px 9px; cursor: pointer; white-space: nowrap; }
+  .hx-mini-seg button.active { background: var(--surface); color: var(--accent); }
+  /* Wraps, unlike .stats-chart-detail, which is pinned to one line so a
+     hover read-out can't resize its card. */
+  .hx-card-note { font-family: var(--font); font-size: 11.5px; color: var(--muted);
+    line-height: 1.45; margin: 0 0 8px; }
   .hx-muscle { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
   .hx-muscle-name { font-family: var(--font); font-size: 12px; flex: 0 0 92px; }
   /* Meter spec: the unfilled track is a lighter step of the fill's own ramp,
@@ -2351,8 +2365,19 @@
     </div>
 
     <div class="stats-card">
-      <div class="stats-card-title">Muscle distribution</div>
-      <div class="stats-chart-detail" id="hxMuscleNote" style="text-align:left; margin:0 0 8px;"></div>
+      <div class="hx-card-head">
+        <div class="stats-card-title" style="margin:0;">Muscle distribution</div>
+        <!-- Its own window, deliberately. Balance is the one thing worth
+             checking a week at a time, while every other chart on this tab
+             wants months - so this card gets to disagree with the range
+             chips, and the line under it always names the exact window. -->
+        <div class="hx-mini-seg" id="hxMuscleSeg">
+          <button data-win="week" onclick="setMuscleWindow('week')">This week</button>
+          <button data-win="lastweek" onclick="setMuscleWindow('lastweek')">Last week</button>
+          <button class="active" data-win="range" id="hxMuscleRangeBtn" onclick="setMuscleWindow('range')">All time</button>
+        </div>
+      </div>
+      <div class="hx-card-note" id="hxMuscleNote"></div>
       <div id="hxMuscles"></div>
     </div>
 
@@ -4469,6 +4494,41 @@ function muscleFor_(name) {
    without reading the source. */
 let hxMuscleOpen_ = null;
 
+/* This card carries its own time window on top of the tab's range chips.
+   A week is the unit balance is actually judged in - "did I skip legs
+   again this week" - while the trend charts want months, so forcing both
+   onto one control would make one of them useless. The window is stated in
+   words under the header so the two can never be read as contradicting. */
+const STORAGE_MUSCLE_WINDOW_KEY = 'WORKOUT_HISTORY_MUSCLE_WINDOW';
+let hxMuscleWindow_ = 'range';
+
+function initMuscleWindow_() {
+  try {
+    const saved = localStorage.getItem(STORAGE_MUSCLE_WINDOW_KEY);
+    if (['range', 'week', 'lastweek'].includes(saved)) hxMuscleWindow_ = saved;
+  } catch (e) {}
+}
+
+function setMuscleWindow(win) {
+  hxMuscleWindow_ = win;
+  hxMuscleOpen_ = null;
+  try { localStorage.setItem(STORAGE_MUSCLE_WINDOW_KEY, win); } catch (e) {}
+  renderHistoryMuscles_(historyInRange_());
+  updateViewportHeight('stats', true);
+}
+
+// Monday-to-Sunday, matching how the rest of the app counts a week.
+function hxMuscleWindowBounds_() {
+  if (hxMuscleWindow_ === 'range') return null;
+  const monday = getWeekMondayFor(new Date());
+  if (hxMuscleWindow_ === 'lastweek') monday.setDate(monday.getDate() - 7);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const next = new Date(monday);
+  next.setDate(monday.getDate() + 7);
+  return { from: dateKey(monday), toExclusive: dateKey(next), monday, sunday };
+}
+
 function toggleHistoryMuscle(name) {
   hxMuscleOpen_ = (hxMuscleOpen_ === name) ? null : name;
   renderHistoryMuscles_(historyInRange_());
@@ -4480,8 +4540,19 @@ function renderHistoryMuscles_(rows) {
   const note = document.getElementById('hxMuscleNote');
   if (!el) return;
 
+  // The third button follows the tab's range chip, so its label has to say
+  // which range that currently is rather than always claiming "All time".
+  const rangeLabel = historyRangeDays_ === 90 ? '3 months' : historyRangeDays_ === 365 ? '1 year' : 'All time';
+  const rangeBtn = document.getElementById('hxMuscleRangeBtn');
+  if (rangeBtn) rangeBtn.textContent = rangeLabel;
+  document.querySelectorAll('#hxMuscleSeg button').forEach(b =>
+    b.classList.toggle('active', b.dataset.win === hxMuscleWindow_));
+
+  const win = hxMuscleWindowBounds_();
+  const scoped = win ? rows.filter(r => r.date >= win.from && r.date < win.toExclusive) : rows;
+
   const byMuscle = {};
-  rows.forEach(r => {
+  scoped.forEach(r => {
     if (!r.done) return;
     const m = muscleFor_(r.exercise);
     const g = byMuscle[m] = byMuscle[m] || { sets: 0, ex: {} };
@@ -4492,8 +4563,19 @@ function renderHistoryMuscles_(rows) {
     .filter(m => m.sets > 0).sort((a, b) => b.sets - a.sets);
   const total = list.reduce((n, m) => n + m.sets, 0);
 
-  if (note) note.textContent = total ? `${total} completed sets in this range — tap a group to see what is in it` : '';
-  if (!list.length) { el.innerHTML = '<div class="hx-empty">No completed sets in this range.</div>'; return; }
+  const fmtDay = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const when = win ? `${fmtDay(win.monday)} – ${fmtDay(win.sunday)}` : rangeLabel.toLowerCase();
+  if (note) {
+    note.textContent = total
+      ? `${total} completed set${total === 1 ? '' : 's'}, ${when} — tap a group to see what is in it`
+      : `Nothing completed ${win ? when : 'in this range'} yet.`;
+  }
+  if (!list.length) {
+    el.innerHTML = `<div class="hx-empty">${win && hxMuscleWindow_ === 'week'
+      ? 'No sets logged yet this week — check back once you have trained.'
+      : 'No completed sets in this window.'}</div>`;
+    return;
+  }
 
   const max = list[0].sets;
   el.innerHTML = list.map(m => {
@@ -5089,9 +5171,31 @@ function renderStatsTab() {
    redrawing sets attributes on the SVG, which the observer would otherwise
    see as another change. */
 let chartResizeRaf_ = null;
+const chartLastWidth_ = new WeakMap();
+
+/* WIDTH only, and that is the whole point of this function.
+
+   A chart's geometry depends on how wide its card is; the height is fixed
+   in CSS. Redrawing on a height change is not just wasted work, it is a
+   loop: hovering a column writes that week into the card's detail line,
+   a longer line wraps to two rows in a narrow desktop column, the card
+   grows, the observer fires, every chart's innerHTML is replaced, the
+   element under the cursor is destroyed mid-hover, pointerleave puts the
+   short text back, the card shrinks - and round again, several times a
+   second, for as long as the pointer rests on a bar. */
+function chartWidthChanged_(entries) {
+  let changed = false;
+  entries.forEach(e => {
+    const w = Math.round(e.contentRect.width);
+    if (chartLastWidth_.get(e.target) !== w) { chartLastWidth_.set(e.target, w); changed = true; }
+  });
+  return changed;
+}
+
 function initChartResizeObserver_() {
   if (typeof ResizeObserver === 'undefined') return;
-  const ro = new ResizeObserver(() => {
+  const ro = new ResizeObserver(entries => {
+    if (!chartWidthChanged_(entries)) return;
     if (chartResizeRaf_) return;
     chartResizeRaf_ = requestAnimationFrame(() => {
       chartResizeRaf_ = null;
@@ -10408,7 +10512,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-muscle-fix';
+const APP_BUILD_VERSION = '2026-08-24-muscle-window';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -15078,6 +15182,7 @@ setInterval(() => {
 initViewportHeightObserver();
 initChartResizeObserver_();
 initHistoryRange_();
+initMuscleWindow_();
 initTabBarViewportPin();
 // Local order first, so the page is already arranged on this device
 // before any network call. loadRemoteOverviewLayoutState() re-applies it
