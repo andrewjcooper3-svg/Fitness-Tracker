@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-24-workout-history';
+const BACKEND_BUILD_VERSION = '2026-08-24-history-autobackfill';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1368,8 +1368,19 @@ function doGet(e) {
   }
 
   if (action === 'loadWorkoutHistory') {
+    let history = getWorkoutHistory_();
+    // First read after deploying: the rollup sheet is empty while the week
+    // tabs are already full of sessions. Build it here rather than making
+    // anyone run a function by hand in the editor - the manual entry point
+    // stays for repairs. Only ever runs while there is nothing to return,
+    // so a full history never pays for the walk.
+    let backfilled = 0;
+    if (!history.length) {
+      backfilled = backfillWorkoutHistory();
+      history = getWorkoutHistory_();
+    }
     return ContentService
-      .createTextOutput(JSON.stringify({ status: 'success', history: getWorkoutHistory_() }))
+      .createTextOutput(JSON.stringify({ status: 'success', history: history, backfilled: backfilled }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 

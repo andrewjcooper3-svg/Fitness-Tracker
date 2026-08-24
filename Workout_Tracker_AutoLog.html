@@ -3983,7 +3983,17 @@ async function loadWorkoutHistory(force) {
     if (data.status !== 'success') throw new Error(data.message || 'the backend refused the request');
     historyRows_ = data.history || [];
     localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify({ rows: historyRows_, at: new Date().toISOString() }));
-    setHistoryStatus_(historyRows_.length ? '' : 'No history yet. Log a session, or run backfillWorkoutHistory() once in the Apps Script editor to pull in what is already in the Sheet.');
+    if (historyRows_.length) {
+      // The backend builds the rollup from the existing week tabs the first
+      // time it is asked and finds nothing - worth saying so once, since
+      // several weeks appearing at once is otherwise a surprise.
+      setHistoryStatus_(data.backfilled
+        ? `Built from ${data.backfilled} day${data.backfilled === 1 ? '' : 's'} already in your Sheet.`
+        : '');
+    } else {
+      setHistoryStatus_('Nothing in the Sheet to show yet. History fills in as sessions are logged - '
+        + 'the current week appears once it is logged or when the week rolls over.');
+    }
     renderHistoryTab();
   } catch (e) {
     setHistoryStatus_(String(e.message || e) + (historyRows_ ? ' — showing the last copy.' : ''), true);
@@ -9656,7 +9666,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-history-tab';
+const APP_BUILD_VERSION = '2026-08-24-history-autobackfill';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -13136,7 +13146,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-24-workout-history';
+const EXPECTED_BACKEND_VERSION = '2026-08-24-history-autobackfill';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
