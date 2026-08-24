@@ -2423,11 +2423,6 @@
     </div>
 
     <div class="stats-card">
-      <div class="stats-card-title">Needs attention</div>
-      <div id="hxStalling"></div>
-    </div>
-
-    <div class="stats-card">
       <div class="stats-card-title">Weekly volume</div>
       <svg viewBox="0 0 320 140" class="stats-chart" id="hxVolumeChart" preserveAspectRatio="none"></svg>
       <div class="stats-chart-labels" id="hxVolumeLabels"></div>
@@ -5542,59 +5537,6 @@ function qualityMixBar_(g, y, r) {
     + `</span>`;
 }
 
-function historyStalling_(rows) {
-  const byEx = {};
-  rows.forEach(r => { (byEx[r.exercise] = byEx[r.exercise] || []).push(r); });
-  const out = [];
-
-  Object.keys(byEx).forEach(name => {
-    const sessions = byEx[name].sort((a, b) => a.date.localeCompare(b.date));
-    const recent = sessions.slice(-3);
-    if (recent.length < 2) return;
-
-    const tough = recent.reduce((n, r) => n + r.yellow + r.red, 0);
-    const reds = recent.reduce((n, r) => n + r.red, 0);
-    const clean = recent.reduce((n, r) => n + r.green, 0);
-    const missed = recent.reduce((n, r) => n + (r.sets - r.done), 0);
-
-    const loaded = sessions.some(x => x.topWeight > 0);
-    const values = recent.map(r => loaded ? r.topWeight : r.totalReps);
-    const stalled = values.every(v => v === values[0]);
-    const held = loaded ? values[0] + ' lb' : values[0] + ' reps';
-
-    if (reds) {
-      out.push({ name, level: 'red', why: `${reds} set${reds === 1 ? '' : 's'} marked too tough - back ${loaded ? 'the weight' : 'it'} off` });
-    } else if (missed >= 2) {
-      out.push({ name, level: 'amber', why: `${missed} planned sets not finished - cut the target` });
-    } else if (stalled && tough && recent.length >= 3) {
-      out.push({ name, level: 'amber', why: `${held} for ${recent.length} sessions and still tough` });
-    } else if (stalled && !tough && clean && recent.length >= 3) {
-      out.push({ name, level: 'green', why: `${recent.length} clean sessions at ${held} - ready to go up` });
-    }
-  });
-
-  const rank = { red: 0, amber: 1, green: 2 };
-  return out.sort((a, b) => rank[a.level] - rank[b.level]);
-}
-
-function renderHistoryStalling_(rows) {
-  const el = document.getElementById('hxStalling');
-  if (!el) return;
-  const items = historyStalling_(rows);
-  if (!items.length) {
-    el.innerHTML = '<div class="hx-empty">Nothing stalling or straining. Two sessions of an exercise are needed before it shows up here.</div>';
-    return;
-  }
-  const colour = { red: 'var(--red)', amber: 'var(--amber)', green: 'var(--green)' };
-  el.innerHTML = items.map(i => `<div class="hx-row" onclick="openHistoryExercise('${escapeHtml_(escapeJsAttr_(i.name))}')" style="cursor:pointer;">
-    <span class="hx-qmix" style="width:4px;height:26px;border-radius:2px;background:${colour[i.level]}"></span>
-    <div class="hx-row-main">
-      <div class="hx-row-title">${escapeHtml_(i.name)}</div>
-      <div class="hx-row-sub">${escapeHtml_(i.why)}</div>
-    </div>
-    <span class="hx-ex-chevron">›</span></div>`).join('');
-}
-
 /* One weekly-column chart, fed by whichever measure the caller wants. All
    three Overview charts share the frame, so the eye can compare them
    without re-learning the axis each time. */
@@ -5654,7 +5596,6 @@ function renderHistoryOverview_(rows) {
   const weeks = historyByWeek_(rows);
   renderHistoryTiles_(rows);
   renderHistoryMuscles_(rows);
-  renderHistoryStalling_(rows);
 
   renderHistoryWeekBars_('hxFreqChart', 'hxFreqLabels', 'hxFreqDetail', weeks,
     w => Object.keys(w.days).length, v => String(v), null,
@@ -11488,7 +11429,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-widget-layout';
+const APP_BUILD_VERSION = '2026-08-24-drop-nagging';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

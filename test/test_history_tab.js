@@ -229,12 +229,11 @@ const mock = rows => route => {
       check('it closes again', await page.evaluate(() =>
         !document.getElementById('muscleBalanceOverlay').classList.contains('open')));
 
-      const stalling = await page.evaluate(() =>
-        [...document.querySelectorAll('#hxStalling .hx-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()));
-      stalling.forEach(t => console.log('   ', t));
-      check('Cable Crunch flagged for reds', stalling.some(t => /Cable Crunch.*too tough/i.test(t)), stalling.join(' | '));
-      check('Plank flagged for unfinished sets', stalling.some(t => /Plank.*not finished/i.test(t)), stalling.join(' | '));
-      check('Leg Press is NOT flagged (it is progressing)', !stalling.some(t => /Leg Press/.test(t)));
+      // The "Needs attention" card is gone - it flagged three of five
+      // exercises, which is nagging rather than signalling, and the plan
+      // notes already give that advice where it can be acted on.
+      const gone = await page.evaluate(() => !document.getElementById('hxStalling'));
+      check('the Needs attention card is gone', gone);
 
       const bars = await page.evaluate(() => ({
         freq: document.querySelectorAll('#hxFreqChart rect').length,
@@ -650,8 +649,10 @@ const mock = rows => route => {
       console.log('  overview cards:', JSON.stringify(cols.map(c => `${c.left},${c.top}-${c.bottom}`)));
       const lefts = [...new Set(cols.map(c => c.left))].sort((a, b) => a - b);
       check('overview runs three columns at 1400px', lefts.length === 3, lefts.join(','));
+      // Seven since Needs attention was removed: tiles, workouts/week,
+      // muscles, volume, sets completed, plus the two absorbed cards.
       check('the absorbed Pushups and Weight cards joined the flow',
-        cols.length === 8, String(cols.length));
+        cols.length === 7, String(cols.length));
 
       // The complaint that started this: a grid row is as tall as its
       // tallest card, so a short one leaves a hole. Packed columns must not.
@@ -792,12 +793,10 @@ const mock = rows => route => {
     console.log('  status:', status);
     check('a stale deployment says so', /no history endpoint yet.*redeploy/i.test(status), status);
     const empty = await page.evaluate(() => ({
-      stalling: document.getElementById('hxStalling').textContent,
       muscles: document.getElementById('hxMuscles').textContent,
       tiles: document.getElementById('hxTiles').innerText.replace(/\s+/g, ' ').trim()
     }));
     console.log('  empty:', JSON.stringify(empty));
-    check('empty state is a sentence, not a blank card', /Nothing stalling/.test(empty.stalling), empty.stalling);
     check('muscle card explains itself when empty', /No completed sets/.test(empty.muscles), empty.muscles);
     check('tiles read zero rather than NaN', !/NaN/.test(empty.tiles), empty.tiles);
 
