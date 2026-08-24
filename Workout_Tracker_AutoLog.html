@@ -1372,31 +1372,49 @@
      mostly off-screen. It also keeps each chart near its natural width, so
      eight weekly bars read as bars rather than slabs. */
   @media (min-width: 768px) {
-    /* The page is one column; the blocks inside it each go two-up. Pairing
-       at the page level only worked while History was exactly two cards -
-       with the sections in place it dealt them into different rows. */
-    .hx-section, .hx-legacy {
-      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: 12px; align-items: start;
-    }
-    /* The Workouts feed is a single child of its section, so the grid above
-       would leave it in one column with the other half empty. Deal the
-       cards themselves two-up instead. */
-    #hxSectionWorkouts { display: block; }
-    #hxDayList {
-      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-      column-gap: 12px; align-items: start;
-    }
-    /* Same for the exercise detail: it is one child holding four cards, so
-       it takes the full width and deals its own cards two-up. The header
-       card spans both so the exercise name stays on its own line. */
+    /* The page is one column; the blocks inside it go multi-up.
+
+       CSS columns rather than a grid, deliberately. A grid puts every card
+       in a row, so the row is as tall as its tallest card and a short one
+       (the tiles, say) leaves a hole underneath it. Columns pack the cards
+       against each other instead, which is what kills the ragged gaps on a
+       wide screen. */
+    #hxSectionOverview, #hxDayList { columns: 2; column-gap: 12px; }
+    #hxSectionOverview > .stats-card,
+    #hxDayList > .hx-wk { break-inside: avoid; }
+    #hxSectionWorkouts, #hxSectionExercises { display: block; }
+
+    /* Four tiles in a row instead of a 2x2 block: the card ends up one line
+       tall, which is the whole point of a summary strip. */
+    .hx-tiles { grid-template-columns: repeat(4, 1fr); }
+
+    /* The segmented control is a menu, not a banner - stretched the width
+       of a desktop it read as a huge empty bar with three small words in
+       it. The range chips are already only as wide as their content. */
+    .hx-seg { max-width: 460px; }
+
+    /* Otherwise the exercise list is one long thin card down the page. */
+    #hxExerciseList { columns: 2; column-gap: 20px; }
+    #hxExerciseList > .hx-ex-item { break-inside: avoid; }
+
+    /* The detail view keeps a grid: the header and the session history want
+       the full width, and Records / Charts read best as a pair. */
     #hxExerciseDetailWrap {
-      grid-column: 1 / -1; display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: 12px; align-items: start;
     }
     #hxExerciseDetailWrap > .stats-card:first-child,
     #hxExerciseDetailWrap > .stats-card:last-child { grid-column: 1 / -1; }
+    /* That last card is the session list, and full width it is one date on
+       the left with its number stranded a thousand pixels away. */
+    #hxExerciseRows { columns: 2; column-gap: 24px; }
+    #hxExerciseRows > .hx-row { break-inside: avoid; }
+  }
+
+  /* A desktop is wide enough for a third column; two left the cards very
+     fat and the page very long. */
+  @media (min-width: 1200px) {
+    #hxSectionOverview, #hxDayList, #hxExerciseList { columns: 3; }
   }
 
   @media (min-width: 768px) {
@@ -2302,6 +2320,27 @@
       <div class="stats-chart-labels" id="hxCompletionLabels"></div>
       <div class="stats-chart-detail" id="hxCompletionDetail"></div>
     </div>
+
+    <!-- Absorbed from the old Stats tab. They live inside the Overview
+         section so they join its column flow instead of forming a separate
+         row underneath it, which left a hole at the foot of the short
+         column - and so they stop repeating under every segment. -->
+    <div class="stats-card">
+      <div class="stats-card-title">Pushups — Last 8 Weeks</div>
+      <svg viewBox="0 0 320 140" class="stats-chart" id="statsPushupChart" preserveAspectRatio="none"></svg>
+      <div class="stats-chart-labels" id="statsPushupLabels"></div>
+    </div>
+
+    <!-- Whole card opens the full Weight modal (entry form, history, ...) -
+         the chart's own points still show their own date/weight inline via
+         showWeightPointDetail_, which stops propagation so tapping a point
+         doesn't also open the modal underneath it. -->
+    <div class="stats-card stats-card-clickable" onclick="openWeightDetailModal()">
+      <div class="stats-card-title">Weight Trend</div>
+      <svg viewBox="0 0 320 140" class="stats-chart" id="statsWeightChart" preserveAspectRatio="none"></svg>
+      <div class="stats-chart-labels" id="statsWeightLabels"></div>
+      <div class="stats-chart-detail" id="statsWeightDetail"></div>
+    </div>
   </div>
 
   <!-- ---- Exercises: the list, then one exercise's records + charts ---- -->
@@ -2358,26 +2397,7 @@
     <div id="hxDayList"></div>
   </div>
 
-  <div class="hx-legacy">
-  <div class="stats-card">
-    <div class="stats-card-title">Pushups — Last 8 Weeks</div>
-    <svg viewBox="0 0 320 140" class="stats-chart" id="statsPushupChart" preserveAspectRatio="none"></svg>
-    <div class="stats-chart-labels" id="statsPushupLabels"></div>
-  </div>
-
-  <!-- Whole card opens the full Weight modal (entry form, history, ...) -
-       the chart's own points still show their own date/weight inline via
-       showWeightPointDetail_, which stops propagation so tapping a point
-       doesn't also open the modal underneath it. -->
-  <div class="stats-card stats-card-clickable" onclick="openWeightDetailModal()">
-    <div class="stats-card-title">Weight Trend</div>
-    <svg viewBox="0 0 320 140" class="stats-chart" id="statsWeightChart" preserveAspectRatio="none"></svg>
-    <div class="stats-chart-labels" id="statsWeightLabels"></div>
-    <div class="stats-chart-detail" id="statsWeightDetail"></div>
-  </div>
-  </div>
-
-  <div class="ov-note">Pushup totals come from your daily ledger. Weight trend appears once you've logged at least two weigh-ins - tap the Weight Trend card to log one.</div>
+  <div class="ov-note" id="hxLegacyNote">Pushup totals come from your daily ledger. Weight trend appears once you've logged at least two weigh-ins - tap the Weight Trend card to log one.</div>
 </div>
 
 <div id="view-kitchen" class="app-view">
@@ -4122,6 +4142,10 @@ function showHistorySection(name) {
     const el = document.getElementById('hxSection' + k.charAt(0).toUpperCase() + k.slice(1));
     if (el) el.style.display = k === name ? '' : 'none';
   });
+  // The absorbed Pushups and Weight cards live inside the Overview section,
+  // so they hide with it. Their footnote sits outside and needs telling.
+  const note = document.getElementById('hxLegacyNote');
+  if (note) note.style.display = name === 'overview' ? '' : 'none';
   document.querySelectorAll('#hxSeg .hx-seg-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.hx === name));
   renderHistoryTab();
@@ -9983,7 +10007,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-history-hevy';
+const APP_BUILD_VERSION = '2026-08-24-history-wide';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

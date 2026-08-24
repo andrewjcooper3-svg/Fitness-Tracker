@@ -65,7 +65,7 @@ const mock = rows => route => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const rows = history();
 
-  for (const [w, h, tag] of [[430, 932, 'portrait'], [1400, 900, 'desktop']]) {
+  for (const [w, h, tag] of [[430, 932, 'portrait'], [932, 430, 'landscape'], [1400, 900, 'desktop']]) {
     console.log(`\n=== ${tag} ===`);
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: 'dark' });
     const page = await ctx.newPage();
@@ -276,18 +276,65 @@ const mock = rows => route => {
       check('pushup + weight cards absorbed, not lost', kept.pushup && kept.weight, JSON.stringify(kept));
     }
 
-    if (tag === 'desktop') {
-      const cols = await page.evaluate(() => {
-        const cards = [...document.querySelectorAll('#hxSectionOverview > .stats-card')].map(c => {
+    if (tag === 'landscape') {
+      // A phone on its side is only 430px tall, so wasted vertical space
+      // costs the most here.
+      const cols = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxSectionOverview > .stats-card')].map(c => {
           const r = c.getBoundingClientRect();
-          return { top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width) };
-        });
-        return cards;
+          return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left) };
+        }));
+      const lefts = [...new Set(cols.map(c => c.left))].sort((a, b) => a - b);
+      check('landscape runs two columns', lefts.length === 2, lefts.join(','));
+      const gaps = lefts.map(x => {
+        const col = cols.filter(c => c.left === x).sort((a, b) => a.top - b.top);
+        return Math.max(0, ...col.slice(1).map((c, i) => c.top - col[i].bottom));
       });
-      console.log('  overview cards:', JSON.stringify(cols.slice(0, 4)));
-      check('overview pairs up into two columns on desktop',
-        cols.length >= 2 && Math.abs(cols[0].top - cols[1].top) < 4 && cols[0].left !== cols[1].left,
-        JSON.stringify(cols.slice(0, 2)));
+      console.log('  worst gap per column:', gaps.join(', '));
+      check('no dead space between stacked cards', Math.max(...gaps) <= 14, gaps.join(','));
+      const bottoms = lefts.map(x => Math.max(...cols.filter(c => c.left === x).map(c => c.bottom)));
+      console.log('  column bottoms:', bottoms.join(', '));
+      check('the two columns end at a similar depth',
+        Math.abs(bottoms[0] - bottoms[1]) < 200, bottoms.join(','));
+      const seg = await page.evaluate(() => Math.round(document.getElementById('hxSeg').getBoundingClientRect().width));
+      check('the segmented control stays a menu here too', seg <= 470, String(seg));
+    }
+
+    if (tag === 'desktop') {
+      const cols = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxSectionOverview > .stats-card')].map(c => {
+          const r = c.getBoundingClientRect();
+          return { top: Math.round(r.top), bottom: Math.round(r.bottom),
+                   left: Math.round(r.left), w: Math.round(r.width) };
+        }));
+      console.log('  overview cards:', JSON.stringify(cols.map(c => `${c.left},${c.top}-${c.bottom}`)));
+      const lefts = [...new Set(cols.map(c => c.left))].sort((a, b) => a - b);
+      check('overview runs three columns at 1400px', lefts.length === 3, lefts.join(','));
+      check('the absorbed Pushups and Weight cards joined the flow',
+        cols.length === 8, String(cols.length));
+
+      // The complaint that started this: a grid row is as tall as its
+      // tallest card, so a short one leaves a hole. Packed columns must not.
+      const gaps = lefts.map(x => {
+        const col = cols.filter(c => c.left === x).sort((a, b) => a.top - b.top);
+        return Math.max(0, ...col.slice(1).map((c, i) => c.top - col[i].bottom));
+      });
+      console.log('  worst gap per column:', gaps.join(', '));
+      check('no dead space between stacked cards', Math.max(...gaps) <= 14, gaps.join(','));
+
+      // And the columns should finish at roughly the same depth.
+      const bottoms = lefts.map(x => Math.max(...cols.filter(c => c.left === x).map(c => c.bottom)));
+      const ragged = Math.max(...bottoms) - Math.min(...bottoms);
+      console.log('  column bottoms:', bottoms.join(', '), '| ragged by', ragged);
+      check('the columns end at a similar depth', ragged < 260, String(ragged));
+
+      const seg = await page.evaluate(() => Math.round(document.getElementById('hxSeg').getBoundingClientRect().width));
+      console.log('  segmented control:', seg + 'px');
+      check('the segmented control is a menu, not a full-width banner', seg <= 470, String(seg));
+
+      const tileCols = await page.evaluate(() =>
+        [...new Set([...document.querySelectorAll('#hxTiles > div')].map(d => Math.round(d.getBoundingClientRect().left)))].length);
+      check('the four tiles sit on one row', tileCols === 4, String(tileCols));
       const scale = await page.evaluate(() => {
         const svg = document.getElementById('hxVolumeChart');
         const m = svg.getScreenCTM();
@@ -301,14 +348,26 @@ const mock = rows => route => {
       await page.evaluate(() => showHistorySection('workouts'));
       await page.waitForTimeout(400);
       const feed = await page.evaluate(() =>
-        [...document.querySelectorAll('#hxDayList .hx-wk')].slice(0, 2).map(c => {
+        [...document.querySelectorAll('#hxDayList .hx-wk')].map(c => {
           const r = c.getBoundingClientRect();
-          return { top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width) };
+          return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left) };
         }));
-      console.log('  feed cards:', JSON.stringify(feed));
-      check('the workouts feed goes two-up on desktop',
-        feed.length === 2 && Math.abs(feed[0].top - feed[1].top) < 4 && feed[0].left !== feed[1].left,
-        JSON.stringify(feed));
+      const feedCols = [...new Set(feed.map(c => c.left))].sort((a, b) => a - b);
+      console.log('  feed columns:', feedCols.join(', '), '| cards', feed.length);
+      check('the workouts feed runs three columns on desktop', feedCols.length === 3, feedCols.join(','));
+      const feedGaps = feedCols.map(x => {
+        const col = feed.filter(c => c.left === x).sort((a, b) => a.top - b.top);
+        return Math.max(0, ...col.slice(1).map((c, i) => c.top - col[i].bottom));
+      });
+      console.log('  worst feed gap per column:', feedGaps.join(', '));
+      check('the feed cards pack against each other', Math.max(...feedGaps) <= 14, feedGaps.join(','));
+      const legacyHidden = await page.evaluate(() => {
+        const pu = document.getElementById('statsPushupChart');
+        return { chartVisible: !!(pu && pu.getBoundingClientRect().height),
+                 noteShown: document.getElementById('hxLegacyNote').style.display !== 'none' };
+      });
+      check('Pushups and Weight do not follow you onto Workouts',
+        !legacyHidden.chartVisible && !legacyHidden.noteShown, JSON.stringify(legacyHidden));
 
       await page.evaluate(() => { showHistorySection('exercises'); openHistoryExercise('Leg Press'); });
       await page.waitForTimeout(500);
@@ -320,6 +379,11 @@ const mock = rows => route => {
       console.log('  detail cards:', JSON.stringify(det));
       check('the exercise header spans the full width', det[0].w > det[1].w + 100,
         `${det[0].w} vs ${det[1].w}`);
+      const rowCols = await page.evaluate(() =>
+        [...new Set([...document.querySelectorAll('#hxExerciseRows > .hx-row')]
+          .map(r => Math.round(r.getBoundingClientRect().left)))].length);
+      console.log('  session-list columns:', rowCols);
+      check('the session list splits rather than stranding each value', rowCols === 2, String(rowCols));
       check('records and charts sit side by side',
         Math.abs(det[1].top - det[2].top) < 4 && det[1].left !== det[2].left, JSON.stringify(det.slice(1, 3)));
       await page.evaluate(() => { closeHistoryExercise(); showHistorySection('overview'); });
