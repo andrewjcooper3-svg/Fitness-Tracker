@@ -1025,7 +1025,14 @@
   /* display:block matters - a bare inline span ignores width and height,
      so the track would render empty at every percentage. */
   .hx-muscle-fill { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
-  .hx-muscle-val { font-family: var(--font); font-size: 11.5px; color: var(--muted); white-space: nowrap; flex: 0 0 54px; text-align: right; }
+  .hx-muscle-val { font-family: var(--font); font-size: 11.5px; color: var(--muted); white-space: nowrap; flex: 0 0 54px; text-align: right;
+    font-variant-numeric: tabular-nums; }
+  .hx-muscle { cursor: pointer; border-radius: 8px; }
+  .hx-muscle.open .hx-muscle-name { color: var(--accent); }
+  .hx-muscle-ex { padding: 2px 0 8px 102px; }
+  .hx-muscle-ex > div { display: flex; justify-content: space-between; gap: 10px;
+    font-family: var(--font); font-size: 11.5px; color: var(--muted); padding: 2px 0; }
+  .hx-muscle-ex > div > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
   /* Exercise list -> detail, Hevy's drill-in. */
   .hx-ex-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
@@ -1044,6 +1051,7 @@
   .hx-rec-value { font-family: var(--font); font-size: 13.5px; font-weight: 800; white-space: nowrap; }
   .hx-rec-when { font-family: var(--font); font-size: 10.5px; color: var(--muted); }
   .hx-pr { color: var(--amber); font-size: 11px; margin-left: 4px; }
+  .hx-row-skipped .hx-row-title, .hx-row-skipped .hx-row-sub { opacity: 0.55; }
 
   /* Workout card - Hevy's feed entry. */
   .hx-wk { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px; margin-bottom: 10px; }
@@ -4419,17 +4427,31 @@ function historyInRange_() {
    Other rather than silently dropped - a muscle chart that quietly
    ignores exercises is worse than one that admits the gap. */
 const MUSCLE_PATTERNS = [
-  [/incline.*(chest|press)|chest press|bench|pushup|push-up|dip\b/i, 'Chest'],
-  [/lat pulldown|pulldown|pull-?up|chin-?up|\brow\b|lat /i, 'Back'],
-  [/lateral raise|shoulder|overhead press|ohp|delt|front raise|shrug/i, 'Shoulders'],
-  [/bicep|curl(?!.*leg)/i, 'Biceps'],
-  [/tricep|pushdown|pulldown rope|skull/i, 'Triceps'],
-  [/leg curl|hamstring|deadlift|rdl|good morning/i, 'Hamstrings'],
-  [/leg press|squat|leg extension|lunge|quad|split squat/i, 'Quads'],
-  [/glute|hip thrust|kickback|abduct/i, 'Glutes'],
-  [/calf|calve/i, 'Calves'],
-  [/crunch|plank|ab\b|abs\b|knee raise|leg raise|core|oblique|sit-?up/i, 'Core'],
-  [/walk|run|bike|row erg|cardio|treadmill|sauna|stretch|mobility/i, 'Cardio & other']
+  // Cardio first: "Row Erg" and "Rowing Machine" are not back work, and
+  // Back's \brow\b would otherwise claim them.
+  [/\b(row(ing)? (erg|machine)|erg)\b|treadmill|elliptical|stair ?master|jog|\brun\b|walk|\bbike\b|cycling|cardio|sauna|stretch|mobility|yoga|conditioning/i, 'Cardio & other'],
+  // Triceps before Back and Chest: a rope PUSHdown is not a pulldown, and a
+  // close-grip bench is not a chest press.
+  [/tricep|push ?down|skull ?crush|close[- ]?grip bench|overhead extension|rope (extension|pull ?down)/i, 'Triceps'],
+  [/glute|hip ?thrust|hip ?abduct|abductor|kickback|\bbridge\b/i, 'Glutes'],
+  // Hamstrings BEFORE Biceps. "Leg Curl" is a curl, and the old arm pattern
+  // took it - a lookahead for "leg" AFTER the word "curl" never fires,
+  // because the leg is in front of it. That single bug was moving every
+  // hamstring set into Biceps.
+  [/leg ?curl|ham(string)?\b|nordic|romanian|\brdl\b|deadlift|good ?morning/i, 'Hamstrings'],
+  [/leg ?press|squat|leg ?extension|lunge|\bquad|step[- ]?up|hack |sissy/i, 'Quads'],
+  [/calf|calve|soleus/i, 'Calves'],
+  [/bicep|preacher|\bcurl\b/i, 'Biceps'],
+  [/crunch|plank|\babs?\b|oblique|knee ?raise|leg ?raise|sit[- ]?up|russian twist|ab ?wheel|hollow|dead ?bug|pallof|woodchop|\bcore\b/i, 'Core'],
+  // Shoulders before Back and Chest: an upright ROW is a shoulder move, a
+  // rear delt FLY is not a chest fly, and a face PULL is not a pulldown.
+  [/shoulder|delt|lateral raise|lat raise|front raise|overhead press|\bohp\b|arnold|push press|military|upright row|shrug|face ?pull|reverse ?fly/i, 'Shoulders'],
+  // "Pull Up" with a space was falling through to Other, along with every
+  // chin-up - hence the optional separator on each of these.
+  [/lat ?pull ?down|pull ?down|pull[- ]?up|chin[- ]?up|\brows?\b|\blats?\b|t-? ?bar|seal row|pullover|back ?extension|hyperextension/i, 'Back'],
+  // Chest last of the lifts, so a bare "Press" that nothing else claimed
+  // reads as a bench variant rather than disappearing into Other.
+  [/bench|chest|\bpec\b|pec ?deck|\bflye?s?\b|pushup|push[- ]?up|\bdips?\b|cable cross|\bpress\b/i, 'Chest']
 ];
 
 function muscleFor_(name) {
@@ -4437,28 +4459,55 @@ function muscleFor_(name) {
   return 'Other';
 }
 
+/* Sets per muscle group, ranked. Nominal categories, so every bar takes the
+   same hue - colouring them darker-where-bigger would spend the identity
+   channel re-encoding what the bar length already says.
+
+   Each row opens to show the exercises feeding it, because the first
+   question anyone asks of a distribution chart is "is that real, or is your
+   bucketing wrong?" - and the honest answer is that it should be checkable
+   without reading the source. */
+let hxMuscleOpen_ = null;
+
+function toggleHistoryMuscle(name) {
+  hxMuscleOpen_ = (hxMuscleOpen_ === name) ? null : name;
+  renderHistoryMuscles_(historyInRange_());
+  updateViewportHeight('stats', true);
+}
+
 function renderHistoryMuscles_(rows) {
   const el = document.getElementById('hxMuscles');
   const note = document.getElementById('hxMuscleNote');
   if (!el) return;
+
   const byMuscle = {};
   rows.forEach(r => {
+    if (!r.done) return;
     const m = muscleFor_(r.exercise);
-    byMuscle[m] = (byMuscle[m] || 0) + r.done;
+    const g = byMuscle[m] = byMuscle[m] || { sets: 0, ex: {} };
+    g.sets += r.done;
+    g.ex[r.exercise] = (g.ex[r.exercise] || 0) + r.done;
   });
-  const list = Object.keys(byMuscle).map(k => ({ name: k, sets: byMuscle[k] }))
+  const list = Object.keys(byMuscle).map(k => ({ name: k, sets: byMuscle[k].sets, ex: byMuscle[k].ex }))
     .filter(m => m.sets > 0).sort((a, b) => b.sets - a.sets);
   const total = list.reduce((n, m) => n + m.sets, 0);
 
-  if (note) note.textContent = total ? `${total} completed sets in this range` : '';
+  if (note) note.textContent = total ? `${total} completed sets in this range — tap a group to see what is in it` : '';
   if (!list.length) { el.innerHTML = '<div class="hx-empty">No completed sets in this range.</div>'; return; }
 
   const max = list[0].sets;
-  el.innerHTML = list.map(m => `<div class="hx-muscle">
-    <span class="hx-muscle-name">${escapeHtml_(m.name)}</span>
-    <span class="hx-muscle-track"><span class="hx-muscle-fill" style="width:${(m.sets / max * 100).toFixed(1)}%"></span></span>
-    <span class="hx-muscle-val">${m.sets} · ${Math.round(m.sets / total * 100)}%</span>
-  </div>`).join('');
+  el.innerHTML = list.map(m => {
+    const open = hxMuscleOpen_ === m.name;
+    const parts = Object.keys(m.ex).sort((a, b) => m.ex[b] - m.ex[a]);
+    const breakdown = open ? `<div class="hx-muscle-ex">` + parts.map(n =>
+      `<div><span>${escapeHtml_(n)}</span><span>${m.ex[n]} set${m.ex[n] === 1 ? '' : 's'}</span></div>`).join('') + `</div>` : '';
+    return `<div class="hx-muscle${open ? ' open' : ''}" onclick="toggleHistoryMuscle('${escapeHtml_(escapeJsAttr_(m.name))}')"
+        title="${escapeHtml_(parts.slice(0, 6).map(n => n + ' ' + m.ex[n]).join(' · '))}">
+      <span class="hx-muscle-name">${escapeHtml_(m.name)}</span>
+      <span class="hx-muscle-track"><span class="hx-muscle-fill" style="width:${(m.sets / max * 100).toFixed(1)}%"></span></span>
+      <span class="hx-muscle-val">${m.sets} · ${Math.round(m.sets / total * 100)}%</span>
+    </div>${breakdown}`;
+  }).join('');
 }
 
 /* The stat-tile contract is label + value + an optional delta against a
@@ -4704,10 +4753,16 @@ function renderHistoryExerciseList() {
   const items = Object.keys(byEx)
     .filter(n => !search || n.toLowerCase().includes(search.toLowerCase()))
     .map(name => {
-      const s = byEx[name].sort((a, b) => a.date.localeCompare(b.date));
-      const last = s[s.length - 1];
+      const all = byEx[name].sort((a, b) => a.date.localeCompare(b.date));
+      // Only days that happened count towards "best" and towards the
+      // session tally - a planned-but-skipped Plank has no 0-rep record.
+      const s = all.filter(hxSessionHappened_);
       const loaded = s.some(x => x.topWeight > 0);
-      return { name, sessions: s.length, last, loaded, best: Math.max(...s.map(x => loaded ? x.topWeight : x.totalReps)) };
+      return {
+        name, sessions: s.length, planned: all.length,
+        last: (s[s.length - 1] || all[all.length - 1]), loaded,
+        best: s.length ? Math.max(...s.map(x => loaded ? x.topWeight : x.totalReps)) : null
+      };
     })
     .sort((a, b) => b.last.date.localeCompare(a.last.date));
 
@@ -4720,9 +4775,9 @@ function renderHistoryExerciseList() {
     return `<div class="hx-ex-item" onclick="openHistoryExercise('${escapeHtml_(escapeJsAttr_(i.name))}')">
       <div class="hx-row-main">
         <div class="hx-row-title">${escapeHtml_(i.name)}</div>
-        <div class="hx-row-sub">${i.sessions} session${i.sessions === 1 ? '' : 's'} · last ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+        <div class="hx-row-sub">${i.sessions ? `${i.sessions} session${i.sessions === 1 ? '' : 's'}` : `planned ${i.planned}×, never done`} · last ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
       </div>
-      <div class="hx-row-value">${i.best}${i.loaded ? ' lb' : ' reps'}<span class="hx-delta hx-flat">best</span></div>
+      <div class="hx-row-value">${i.best === null ? '—' : i.best + (i.loaded ? ' lb' : ' reps')}<span class="hx-delta hx-flat">${i.best === null ? 'not done' : 'best'}</span></div>
       <span class="hx-ex-chevron">›</span>
     </div>`;
   }).join('');
@@ -4743,6 +4798,16 @@ function closeHistoryExercise() {
   document.getElementById('hxExerciseDetailWrap').style.display = 'none';
   renderHistoryExerciseList();
   updateViewportHeight('stats', true);
+}
+
+/* A day where the exercise was planned but nothing was completed is not a
+   data point - it is an absence. Plotting it as 0 lb drags the trend line
+   to the floor and makes a missed session look like a catastrophic drop in
+   strength, which is not what happened. Those days still appear in the
+   session list, flagged; they just do not get a mark on the chart or a
+   place in the trend arithmetic. */
+function hxSessionHappened_(r) {
+  return (r.done > 0) || (r.totalReps > 0);
 }
 
 // Hevy's PR block: the best each record has ever been, and when. Computed
@@ -4786,16 +4851,34 @@ function renderHistoryExercise() {
   if (nameEl) nameEl.textContent = name;
   renderHistoryRecords_(name);
 
-  const sessions = historyInRange_().filter(r => r.exercise === name)
+  const listed = historyInRange_().filter(r => r.exercise === name)
     .sort((a, b) => a.date.localeCompare(b.date));
+  const sessions = listed.filter(hxSessionHappened_);
+  const skipped = listed.length - sessions.length;
   const summary = document.getElementById('hxExerciseSummary');
   const rowsEl = document.getElementById('hxExerciseRows');
   const svg = document.getElementById('hxExerciseChart');
 
-  if (!sessions.length) {
+  if (!listed.length) {
     if (summary) summary.textContent = 'Nothing in this range.';
     if (rowsEl) rowsEl.innerHTML = '<div class="hx-empty">Nothing in this range.</div>';
     if (svg) svg.innerHTML = '';
+    return;
+  }
+  if (!sessions.length) {
+    if (summary) summary.textContent = `Planned ${listed.length} time${listed.length === 1 ? '' : 's'} in this range, never completed.`;
+    if (svg) svg.innerHTML = '';
+    const picker0 = document.getElementById('hxMetricPicker');
+    if (picker0) picker0.style.display = 'none';
+    const detail0 = document.getElementById('hxExerciseDetail');
+    if (detail0) detail0.textContent = '';
+    if (rowsEl) rowsEl.innerHTML = listed.slice().reverse().map(sn => {
+      const d = new Date(sn.date + 'T00:00:00');
+      return `<div class="hx-row"><div class="hx-row-main">
+        <div class="hx-row-title">${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+        <div class="hx-row-sub">planned ${sn.sets} set${sn.sets === 1 ? '' : 's'} · not completed</div>
+      </div></div>`;
+    }).join('');
     return;
   }
 
@@ -4818,7 +4901,8 @@ function renderHistoryExercise() {
   if (summary) {
     summary.textContent = `${sessions.length} session${sessions.length === 1 ? '' : 's'} · `
       + `${M.label.toLowerCase()} ${M.fmt(first)}${M.unit} → ${M.fmt(last)}${M.unit}`
-      + (delta === 0 ? ' (no change)' : ` (${delta > 0 ? '+' : ''}${delta})`);
+      + (delta === 0 ? ' (no change)' : ` (${delta > 0 ? '+' : ''}${delta})`)
+      + (skipped ? ` · ${skipped} planned day${skipped === 1 ? '' : 's'} not completed, left off the chart` : '');
   }
 
   /* A progression over time is a line, not a row of bars - bars invite you
@@ -4872,17 +4956,38 @@ function renderHistoryExercise() {
   const bestEver = Math.max(...(historyRows_ || []).filter(r => r.exercise === name).map(valueFor));
 
   if (rowsEl) {
-    rowsEl.innerHTML = sessions.slice().reverse().map((sn, i, arr) => {
-      const prev = arr[i + 1];
-      const v = valueFor(sn), pv = prev ? valueFor(prev) : null;
-      const diff = pv === null ? null : Math.round((v - pv) * 10) / 10;
+    /* The list keeps every planned day, including the ones that never
+       happened - it is the record, and a missing Thursday is worth seeing.
+       The delta, though, is measured against the last day that actually
+       happened, so a skipped week doesn't read as a loss and then a
+       matching gain. */
+    let lastReal = null;
+    const withDelta = listed.map(sn => {
+      if (!hxSessionHappened_(sn)) return { sn, skipped: true };
+      const v = valueFor(sn);
+      const diff = lastReal === null ? null : Math.round((v - lastReal) * 10) / 10;
+      lastReal = v;
+      return { sn, v, diff };
+    });
+
+    rowsEl.innerHTML = withDelta.slice().reverse().map(({ sn, v, diff, skipped }) => {
+      const d = new Date(sn.date + 'T00:00:00');
+      const when = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (skipped) {
+        return `<div class="hx-row hx-row-skipped">
+          <div class="hx-row-main">
+            <div class="hx-row-title">${when}</div>
+            <div class="hx-row-sub">planned ${sn.sets} set${sn.sets === 1 ? '' : 's'} · not completed</div>
+          </div>
+          <div class="hx-row-value"><span class="hx-delta hx-flat">—</span></div>
+        </div>`;
+      }
       const cls = diff === null ? '' : diff > 0 ? 'hx-up' : diff < 0 ? 'hx-down' : 'hx-flat';
       const arrow = diff === null ? '' : diff > 0 ? '▲ +' + diff : diff < 0 ? '▼ ' + diff : '— same';
-      const d = new Date(sn.date + 'T00:00:00');
       const pr = (v > 0 && v === bestEver) ? '<span class="hx-pr" title="Best ever">★</span>' : '';
       return `<div class="hx-row">
         <div class="hx-row-main">
-          <div class="hx-row-title">${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${pr}</div>
+          <div class="hx-row-title">${when}${pr}</div>
           <div class="hx-row-sub">${sn.done}/${sn.sets} sets · ${sn.totalReps} reps${sn.volume ? ' · ' + sn.volume.toLocaleString() + ' lb volume' : ''}</div>
         </div>
         ${qualityMixBar_(sn.green, sn.yellow, sn.red)}
@@ -10303,7 +10408,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-charts';
+const APP_BUILD_VERSION = '2026-08-24-muscle-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

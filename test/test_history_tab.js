@@ -289,6 +289,77 @@ const mock = rows => route => {
       await page.evaluate(() => { closeHistoryExercise(); showHistorySection('overview'); });
       await page.waitForTimeout(300);
 
+      console.log('\n  -- A planned day that never happened is not a 0 --');
+      // Plank is planned 3 sets every week in the fixture and completed
+      // none of them, so it is the pure case.
+      await page.evaluate(() => openHistoryExercise('Plank'));
+      await page.waitForTimeout(500);
+      const plank = await page.evaluate(() => ({
+        summary: document.getElementById('hxExerciseSummary').textContent,
+        chartMarks: document.querySelectorAll('#hxExerciseChart .chart-dot').length,
+        rows: [...document.querySelectorAll('#hxExerciseRows .hx-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
+        skippedRows: document.querySelectorAll('#hxExerciseRows .hx-row-skipped').length
+      }));
+      console.log('   summary:', plank.summary);
+      console.log('   first row:', plank.rows[0]);
+      check('a never-completed exercise plots nothing at all', plank.chartMarks === 0, String(plank.chartMarks));
+      check('and says so rather than charting a flat zero',
+        /never completed/i.test(plank.summary), plank.summary);
+      check('but the planned days are still listed', plank.rows.length === 6, String(plank.rows.length));
+      check('each marked as not completed', /not completed/.test(plank.rows[0]), plank.rows[0]);
+
+      // Mixed case: an exercise that mostly happened, with one skipped day.
+      await page.evaluate(() => {
+        // Blank out the most recent Leg Press session in place.
+        const r = historyRows_.filter(x => x.exercise === 'Leg Press').sort((a, b) => a.date.localeCompare(b.date)).pop();
+        r.done = 0; r.totalReps = 0; r.topWeight = 0; r.volume = 0;
+        r.est1RM = 0; r.bestSetVolume = 0; r.green = 0; r.yellow = 0; r.red = 0;
+        openHistoryExercise('Leg Press');
+        // The picker is sticky across exercises; put it back on weight so
+        // this checks the weight trend rather than reps.
+        document.getElementById('hxMetricPicker').value = 'topWeight';
+        renderHistoryExercise();
+      });
+      await page.waitForTimeout(500);
+      const mixed = await page.evaluate(() => ({
+        summary: document.getElementById('hxExerciseSummary').textContent,
+        dots: document.querySelectorAll('#hxExerciseChart .chart-dot').length,
+        rows: [...document.querySelectorAll('#hxExerciseRows .hx-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
+        skipped: document.querySelectorAll('#hxExerciseRows .hx-row-skipped').length,
+        low: Math.min(...[...document.querySelectorAll('#hxExerciseChart .chart-dot')].map(c => +c.getAttribute('cy')))
+      }));
+      console.log('   summary:', mixed.summary);
+      console.log('   rows:', mixed.rows.slice(0, 2).join(' | '));
+      check('the skipped day is left off the chart', mixed.dots === 6, String(mixed.dots));
+      check('the trend says how many it left off',
+        /1 planned day not completed, left off the chart/.test(mixed.summary), mixed.summary);
+      check('the trend still ends on the last real session',
+        /135 lb → 245 lb/.test(mixed.summary), mixed.summary);
+      check('the skipped day is still in the list', mixed.skipped === 1, String(mixed.skipped));
+      check('and carries no delta arrow', !/▼|▲/.test(mixed.rows[0]), mixed.rows[0]);
+      // The delta below it must compare to the last day that actually
+      // happened, not to a phantom zero.
+      check('the next row down is not a crash from zero', !/\+245|\+250/.test(mixed.rows[1] || ''), mixed.rows[1]);
+
+      await page.evaluate(() => { closeHistoryExercise(); showHistorySection('overview'); loadWorkoutHistory(true); });
+      await page.waitForTimeout(1200);
+
+      console.log('\n  -- Muscle groups are auditable --');
+      const drill = await page.evaluate(() => {
+        toggleHistoryMuscle('Chest');
+        return {
+          rows: [...document.querySelectorAll('#hxMuscles .hx-muscle-ex > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()),
+          title: document.querySelector('#hxMuscles .hx-muscle').getAttribute('title'),
+          note: document.getElementById('hxMuscleNote').textContent
+        };
+      });
+      console.log('   chest breakdown:', drill.rows.join(' | '));
+      check('a group opens to the exercises behind it',
+        drill.rows.length >= 1 && /Pushups \d+ sets/.test(drill.rows.join(' ')), drill.rows.join(' | '));
+      check('and every row carries the same as hover text', !!drill.title, String(drill.title));
+      check('the note invites the drill-down', /tap a group/i.test(drill.note), drill.note);
+      await page.evaluate(() => toggleHistoryMuscle('Chest'));
+
       console.log('\n  -- Chart engine --');
       // The NaN class of bug: one formatter returning a number instead of a
       // string made the gutter NaN, and every mark landed on x=NaN - the
