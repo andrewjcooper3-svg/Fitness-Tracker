@@ -1029,8 +1029,10 @@
   .hx-balance-sheet { max-width: 560px; }
   .hx-body-wrap { display: flex; justify-content: center; }
   .hx-body-svg { width: 100%; max-width: 320px; height: auto; display: block; }
-  .hx-body-part { stroke: var(--surface); stroke-width: 1.5; cursor: pointer; }
-  .hx-body-inert { fill: color-mix(in srgb, var(--muted) 26%, var(--surface2)); stroke: var(--surface); stroke-width: 1.5; }
+  .hx-body-part { stroke: var(--surface); stroke-width: 1; cursor: pointer; }
+  .hx-body-inert { fill: color-mix(in srgb, var(--muted) 22%, var(--surface2)); stroke: var(--surface); stroke-width: 1; }
+  .hx-body-line { fill: none; stroke: var(--surface); stroke-width: 1.1; stroke-linecap: round;
+    stroke-linejoin: round; opacity: 0.75; pointer-events: none; }
   @media (hover: hover) { .hx-body-part:hover { stroke: var(--accent); stroke-width: 2; } }
   .hx-body-legend { display: flex; align-items: center; justify-content: center; gap: 4px;
     font-family: var(--font); font-size: 10px; color: var(--muted); margin: 6px 0 16px; }
@@ -4668,87 +4670,142 @@ function muscleRatios_(list) {
 }
 
 /* ---------- The body diagram ----------
-   A flat, diagrammatic figure rather than an anatomical render: it matches
-   the rest of the app, and every visible piece IS a muscle region, so
-   there is no decorative outline to keep in sync with the data. Head,
-   neck, forearms, hands and feet are inert filler.
+   Muscles are rounded polygons rather than rectangles. A handful of points
+   per muscle, corners rounded generously, which gives an organic shape
+   without hand-authoring bezier curves - and, more usefully, means a
+   muscle can be reshaped by nudging a couple of numbers.
+
+   Only the left half is described. The right half is the same list
+   mirrored, so the figure cannot drift out of symmetry. Head, neck,
+   forearms, hands and feet are inert filler and say so.
 
    One hue, light to dark, because this encodes magnitude - a rainbow here
    would invent categories that are not in the data. */
+function hxBlob_(pts, r) {
+  const n = pts.length;
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n], cur = pts[i], next = pts[(i + 1) % n];
+    const v1x = cur[0] - prev[0], v1y = cur[1] - prev[1];
+    const v2x = next[0] - cur[0], v2y = next[1] - cur[1];
+    const l1 = Math.hypot(v1x, v1y) || 1, l2 = Math.hypot(v2x, v2y) || 1;
+    const rr = Math.min(r, l1 / 2, l2 / 2);
+    const ax = cur[0] - v1x / l1 * rr, ay = cur[1] - v1y / l1 * rr;
+    const bx = cur[0] + v2x / l2 * rr, by = cur[1] + v2y / l2 * rr;
+    d += `${i ? 'L' : 'M'}${ax.toFixed(1)} ${ay.toFixed(1)}`
+       + `Q${cur[0].toFixed(1)} ${cur[1].toFixed(1)} ${bx.toFixed(1)} ${by.toFixed(1)}`;
+  }
+  return d + 'Z';
+}
+
+// side: 'C' centred and drawn once, 'L' drawn twice - once as given, once
+// mirrored about the midline.
 const BODY_PARTS = {
   Front: [
-    { t: 'circle', cx: 60, cy: 18, r: 12 },
-    { t: 'rect', x: 54, y: 27, w: 12, h: 12, rx: 4 },
-    { t: 'rect', x: 45, y: 37, w: 30, h: 8, rx: 4 },
-    { t: 'ellipse', cx: 38, cy: 50, rx: 11, ry: 11, m: 'Shoulders' },
-    { t: 'ellipse', cx: 82, cy: 50, rx: 11, ry: 11, m: 'Shoulders' },
-    { t: 'rect', x: 45, y: 42, w: 14.5, h: 30, rx: 7, m: 'Chest' },
-    { t: 'rect', x: 60.5, y: 42, w: 14.5, h: 30, rx: 7, m: 'Chest' },
-    { t: 'rect', x: 48, y: 71, w: 24, h: 49, rx: 8, m: 'Core' },
-    { t: 'rect', x: 28, y: 56, w: 12, h: 40, rx: 6, m: 'Biceps' },
-    { t: 'rect', x: 80, y: 56, w: 12, h: 40, rx: 6, m: 'Biceps' },
-    { t: 'rect', x: 26, y: 93, w: 11, h: 35, rx: 5 },
-    { t: 'rect', x: 83, y: 93, w: 11, h: 35, rx: 5 },
-    { t: 'rect', x: 47, y: 117, w: 26, h: 17, rx: 6 },
-    { t: 'rect', x: 45, y: 130, w: 13, h: 57, rx: 6, m: 'Quads' },
-    { t: 'rect', x: 62, y: 130, w: 13, h: 57, rx: 6, m: 'Quads' },
-    { t: 'rect', x: 46, y: 183, w: 11, h: 10, rx: 4 },
-    { t: 'rect', x: 63, y: 183, w: 11, h: 10, rx: 4 },
-    { t: 'rect', x: 46, y: 188, w: 11, h: 44, rx: 5, m: 'Calves' },
-    { t: 'rect', x: 63, y: 188, w: 11, h: 44, rx: 5, m: 'Calves' },
-    { t: 'rect', x: 44, y: 229, w: 13, h: 10, rx: 3 },
-    { t: 'rect', x: 63, y: 229, w: 13, h: 10, rx: 3 }
+    { side: 'C', t: 'ellipse', cx: 60, cy: 17, rx: 10.5, ry: 12.5 },
+    { side: 'C', p: [[54, 27], [66, 27], [68, 39], [52, 39]], r: 3 },
+    { side: 'L', p: [[45, 36], [33, 41], [28, 53], [31, 65], [41, 63], [46, 49]], r: 6, m: 'Shoulders' },
+    { side: 'L', p: [[59, 42], [46, 44], [40, 53], [43, 66], [55, 70], [59, 66]], r: 7, m: 'Chest' },
+    { side: 'C', p: [[46, 68], [74, 68], [71, 99], [65, 119], [55, 119], [49, 99]], r: 10, m: 'Core' },
+    { side: 'L', p: [[41, 62], [31, 65], [26, 80], [29, 97], [38, 99], [42, 81]], r: 7, m: 'Biceps' },
+    { side: 'L', p: [[38, 97], [28, 100], [25, 115], [29, 130], [36, 131], [39, 114]], r: 6 },
+    { side: 'L', t: 'ellipse', cx: 32, cy: 135, rx: 5.5, ry: 6.5 },
+    { side: 'C', p: [[49, 113], [71, 113], [73, 129], [47, 129]], r: 7 },
+    { side: 'L', p: [[47, 123], [40, 135], [40, 160], [45, 181], [56, 181], [58, 150], [57, 125]], r: 9, m: 'Quads' },
+    { side: 'L', p: [[45, 177], [57, 177], [57, 191], [45, 191]], r: 6 },
+    { side: 'L', p: [[46, 188], [42, 201], [43, 220], [47, 231], [55, 230], [56, 209], [55, 190]], r: 7, m: 'Calves' },
+    { side: 'L', p: [[44, 228], [58, 228], [59, 240], [42, 240]], r: 4 }
   ],
   Back: [
-    { t: 'circle', cx: 60, cy: 18, r: 12 },
-    { t: 'rect', x: 54, y: 27, w: 12, h: 12, rx: 4 },
-    { t: 'rect', x: 45, y: 36, w: 30, h: 14, rx: 6, m: 'Shoulders' },
-    { t: 'ellipse', cx: 38, cy: 50, rx: 11, ry: 11, m: 'Shoulders' },
-    { t: 'ellipse', cx: 82, cy: 50, rx: 11, ry: 11, m: 'Shoulders' },
-    { t: 'rect', x: 45, y: 48, w: 30, h: 44, rx: 8, m: 'Back' },
-    { t: 'rect', x: 48, y: 88, w: 24, h: 24, rx: 7, m: 'Back' },
-    { t: 'rect', x: 28, y: 56, w: 12, h: 40, rx: 6, m: 'Triceps' },
-    { t: 'rect', x: 80, y: 56, w: 12, h: 40, rx: 6, m: 'Triceps' },
-    { t: 'rect', x: 26, y: 93, w: 11, h: 35, rx: 5 },
-    { t: 'rect', x: 83, y: 93, w: 11, h: 35, rx: 5 },
-    { t: 'rect', x: 46, y: 108, w: 28, h: 26, rx: 8, m: 'Glutes' },
-    { t: 'rect', x: 45, y: 130, w: 13, h: 57, rx: 6, m: 'Hamstrings' },
-    { t: 'rect', x: 62, y: 130, w: 13, h: 57, rx: 6, m: 'Hamstrings' },
-    { t: 'rect', x: 46, y: 183, w: 11, h: 10, rx: 4 },
-    { t: 'rect', x: 63, y: 183, w: 11, h: 10, rx: 4 },
-    { t: 'rect', x: 46, y: 188, w: 11, h: 44, rx: 5, m: 'Calves' },
-    { t: 'rect', x: 63, y: 188, w: 11, h: 44, rx: 5, m: 'Calves' },
-    { t: 'rect', x: 44, y: 229, w: 13, h: 10, rx: 3 },
-    { t: 'rect', x: 63, y: 229, w: 13, h: 10, rx: 3 }
+    { side: 'C', t: 'ellipse', cx: 60, cy: 17, rx: 10.5, ry: 12.5 },
+    { side: 'C', p: [[54, 27], [66, 27], [68, 37], [52, 37]], r: 3 },
+    { side: 'C', p: [[49, 31], [71, 31], [80, 50], [60, 61], [40, 50]], r: 8, m: 'Shoulders' },
+    { side: 'L', p: [[45, 36], [33, 41], [28, 53], [31, 65], [41, 63], [46, 49]], r: 6, m: 'Shoulders' },
+    { side: 'L', p: [[59, 51], [44, 55], [38, 67], [43, 87], [54, 97], [59, 93]], r: 8, m: 'Back' },
+    { side: 'C', p: [[51, 89], [69, 89], [70, 107], [50, 107]], r: 7, m: 'Back' },
+    { side: 'L', p: [[41, 62], [31, 65], [26, 80], [29, 97], [38, 99], [42, 81]], r: 7, m: 'Triceps' },
+    { side: 'L', p: [[38, 97], [28, 100], [25, 115], [29, 130], [36, 131], [39, 114]], r: 6 },
+    { side: 'L', t: 'ellipse', cx: 32, cy: 135, rx: 5.5, ry: 6.5 },
+    { side: 'L', p: [[59, 103], [46, 105], [40, 114], [43, 128], [54, 134], [59, 130]], r: 9, m: 'Glutes' },
+    { side: 'L', p: [[47, 129], [41, 141], [41, 162], [46, 181], [56, 181], [58, 152], [57, 131]], r: 9, m: 'Hamstrings' },
+    { side: 'L', p: [[45, 177], [57, 177], [57, 191], [45, 191]], r: 6 },
+    { side: 'L', p: [[46, 188], [42, 201], [43, 220], [47, 231], [55, 230], [56, 209], [55, 190]], r: 7, m: 'Calves' },
+    { side: 'L', p: [[44, 228], [58, 228], [59, 240], [42, 240]], r: 4 }
   ]
 };
 
-// 8% is "trained a little", not "not trained" - an untouched group stays
+/* Definition lines - the linea alba and ab rows, the delt cap, the lat
+   taper, the split down a quad, the two heads of a calf. They carry no
+   data; they are drawn in the surface colour on top of the fills, and they
+   are what stops a shaded region from reading as a blob. Kept separate
+   from BODY_PARTS so the anatomy can be embellished without touching
+   anything the numbers flow through. */
+const BODY_LINES = {
+  Front: [
+    { side: 'C', pts: [[60, 71], [60, 115]] },
+    { side: 'C', pts: [[50, 79], [70, 79]] },
+    { side: 'C', pts: [[51, 89], [69, 89]] },
+    { side: 'C', pts: [[53, 99], [67, 99]] },
+    { side: 'C', pts: [[56, 108], [64, 108]] },
+    { side: 'L', pts: [[47, 49], [53, 57], [58, 58]] },
+    { side: 'L', pts: [[36, 44], [33, 54]] },
+    { side: 'L', pts: [[35, 70], [34, 92]] },
+    { side: 'L', pts: [[49, 133], [51, 173]] },
+    { side: 'L', pts: [[50, 196], [50, 222]] }
+  ],
+  Back: [
+    { side: 'C', pts: [[60, 35], [60, 105]] },
+    { side: 'L', pts: [[53, 36], [45, 49]] },
+    { side: 'L', pts: [[48, 60], [53, 92]] },
+    { side: 'L', pts: [[36, 44], [33, 54]] },
+    { side: 'L', pts: [[35, 70], [34, 92]] },
+    { side: 'L', pts: [[46, 119], [57, 123]] },
+    { side: 'L', pts: [[49, 139], [51, 176]] },
+    { side: 'L', pts: [[47, 197], [50, 206], [53, 197]] }
+  ]
+};
+
+const BODY_W = 120, BODY_H = 250;
+
+// 10% is "trained a little", not "not trained" - an untouched group stays
 // flat surface so the difference between none and some is unmistakable.
 function muscleShade_(share) {
   if (!(share > 0)) return 'var(--surface2)';
   return `color-mix(in srgb, var(--accent) ${(10 + share * 85).toFixed(0)}%, var(--surface2))`;
 }
 
+function bodyShape_(p, fill, data) {
+  const cls = p.m ? 'hx-body-part' : 'hx-body-inert';
+  if (p.t === 'ellipse') {
+    return `<ellipse cx="${p.cx}" cy="${p.cy}" rx="${p.rx}" ry="${p.ry}" class="${cls}" fill="${fill}"${data}></ellipse>`;
+  }
+  return `<path d="${hxBlob_(p.p, p.r)}" class="${cls}" fill="${fill}"${data}></path>`;
+}
+
 function renderBodyDiagram_(el, byMuscle, maxSets) {
   if (!el) return;
   const views = Object.keys(BODY_PARTS);
-  const W = 120, H = 252, GAP = 18;
-  let out = `<svg viewBox="0 0 ${W * 2 + GAP} ${H + 16}" class="hx-body-svg" role="img" aria-label="Muscle groups shaded by how much they were trained">`;
+  const GAP = 16;
+  let out = `<svg viewBox="0 0 ${BODY_W * 2 + GAP} ${BODY_H + 16}" class="hx-body-svg" role="img"`
+    + ` aria-label="Front and back views with each muscle group shaded by how much it was trained">`;
   views.forEach((view, vi) => {
-    const dx = vi * (W + GAP);
-    out += `<g transform="translate(${dx},0)">`;
+    out += `<g transform="translate(${vi * (BODY_W + GAP)},0)">`;
     BODY_PARTS[view].forEach(p => {
       const sets = p.m && byMuscle[p.m] ? byMuscle[p.m].sets : 0;
       const fill = p.m ? muscleShade_(maxSets ? sets / maxSets : 0) : 'var(--surface2)';
-      const attrs = p.t === 'circle' ? `cx="${p.cx}" cy="${p.cy}" r="${p.r}"`
-        : p.t === 'ellipse' ? `cx="${p.cx}" cy="${p.cy}" rx="${p.rx}" ry="${p.ry}"`
-        : `x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.rx}"`;
-      const cls = p.m ? 'hx-body-part' : 'hx-body-inert';
-      const data = p.m ? ` data-muscle="${escapeHtml_(p.m)}" data-sets="${sets.toFixed(1)}"` : '';
-      out += `<${p.t} ${attrs} class="${cls}" fill="${fill}"${data}></${p.t}>`;
+      const data = p.m ? ` data-muscle="${escapeHtml_(p.m)}"` : '';
+      const shape = bodyShape_(p, fill, data);
+      out += shape;
+      // The right half is the left half reflected, so the two can never
+      // drift apart as the shapes get tuned.
+      if (p.side === 'L') out += `<g transform="translate(${BODY_W},0) scale(-1,1)">${shape}</g>`;
     });
-    out += `<text x="${W / 2}" y="${H + 12}" text-anchor="middle" class="chart-tick">${view}</text>`;
+    (BODY_LINES[view] || []).forEach(l => {
+      const d = 'M' + l.pts.map(pt => pt.join(' ')).join('L');
+      out += `<path d="${d}" class="hx-body-line"></path>`;
+      if (l.side === 'L') out += `<g transform="translate(${BODY_W},0) scale(-1,1)"><path d="${d}" class="hx-body-line"></path></g>`;
+    });
+    out += `<text x="${BODY_W / 2}" y="${BODY_H + 12}" text-anchor="middle" class="chart-tick">${view}</text>`;
     out += `</g>`;
   });
   out += `</svg>`;
@@ -10881,7 +10938,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-muscle-balance';
+const APP_BUILD_VERSION = '2026-08-24-body-diagram';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
