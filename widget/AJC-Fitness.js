@@ -246,27 +246,207 @@ function errorWidget(err) {
   return w;
 }
 
+/* Today, not the week.
+   The week total was the wrong headline: what actually goes wrong is a
+   skipped Tuesday that Saturday then pays for at 455 reps, and a weekly
+   figure hides that until Friday. A gap you can still close today is the
+   number worth putting on a home screen. */
+function pushupTodayBlock(w, p, width, big) {
+  if (!p) return;
+  const left = Math.max(0, (p.todayTarget || 0) - (p.today || 0));
+  const done = left === 0 && p.todayTarget > 0;
+  header(w, 'Pushups today', done ? C.green : C.accent);
+  w.addSpacer(4);
+
+  const row = w.addStack();
+  row.centerAlignContent();
+  if (!p.todayTarget) {
+    label(row, 'Rest day', big ? 22 : 18, C.muted, true);
+  } else if (done) {
+    label(row, '✓', big ? 22 : 18, C.green, true);
+    row.addSpacer(5);
+    label(row, `${p.today.toLocaleString()} done`, big ? 13 : 11, C.muted);
+  } else {
+    label(row, left.toLocaleString(), big ? 26 : 20, C.text, true);
+    row.addSpacer(5);
+    label(row, `to go of ${p.todayTarget}`, big ? 13 : 11, C.muted);
+  }
+  w.addSpacer(6);
+  weekDots(w, p, width);
+}
+
+/* One dot per day, Monday first. A missed day and a day that has not
+   happened yet must not look the same, or every Monday morning reads as a
+   disaster - so future days are hollow and past misses are red. */
+function weekDots(w, p, width) {
+  const days = p.days || [];
+  if (!days.length) return;
+  const h = 14, gap = Math.max(3, (width - days.length * h) / (days.length - 1));
+  const dc = new DrawContext();
+  dc.size = new Size(width, h + 4);
+  dc.opaque = false;
+  dc.respectScreenScale = true;
+
+  days.forEach((d, i) => {
+    const x = i * (h + gap);
+    const hit = d.target > 0 && d.done >= d.target;
+    const part = d.target > 0 && d.done > 0 && d.done < d.target;
+
+    if (d.today) {                       // a ring marks where you are
+      dc.setStrokeColor(C.text);
+      dc.setLineWidth(1);
+      dc.strokeEllipse(new Rect(x - 1, 1, h + 2, h + 2));
+    }
+    if (hit) {
+      dc.setFillColor(C.green);
+      dc.fillEllipse(new Rect(x, 2, h, h));
+    } else if (part) {
+      dc.setFillColor(C.amber);
+      dc.fillEllipse(new Rect(x + 3, 5, h - 6, h - 6));
+      dc.setStrokeColor(C.amber);
+      dc.setLineWidth(1.5);
+      dc.strokeEllipse(new Rect(x + 1, 3, h - 2, h - 2));
+    } else if (d.target === 0) {         // Sunday: nothing was asked
+      dc.setStrokeColor(new Color(C.muted.hex, 0.4));
+      dc.setLineWidth(1);
+      dc.strokeEllipse(new Rect(x + 3, 5, h - 6, h - 6));
+    } else if (d.future) {
+      dc.setStrokeColor(new Color(C.muted.hex, 0.7));
+      dc.setLineWidth(1.5);
+      dc.strokeEllipse(new Rect(x + 1, 3, h - 2, h - 2));
+    } else {                             // in the past and not done
+      dc.setStrokeColor(C.red);
+      dc.setLineWidth(1.5);
+      dc.strokeEllipse(new Rect(x + 1, 3, h - 2, h - 2));
+    }
+  });
+
+  const img = w.addImage(dc.getImage());
+  img.imageSize = new Size(width, h + 4);
+}
+
+function liftLine(w, lift, size) {
+  if (!lift) return;
+  const row = w.addStack();
+  row.centerAlignContent();
+  const dot = row.addText('●');
+  dot.font = Font.systemFont(7);
+  dot.textColor = lift.today ? C.accent : C.muted;
+  row.addSpacer(5);
+  label(row, lift.today ? `Lift today · ${lift.headline || lift.day}`
+                        : `Next lift ${lift.day}`, size || 10, C.muted);
+}
+
+/* Arcs are not in the Scriptable API, so the ring is a polyline of short
+   segments - only move/addLine/strokePath, all of which exist. */
+function ring(dc, cx, cy, r, from, to, width, color) {
+  if (to <= from) return;
+  const path = new Path();
+  const steps = Math.max(2, Math.round((to - from) / (Math.PI / 40)));
+  for (let i = 0; i <= steps; i++) {
+    const a = from + (to - from) * (i / steps);
+    const pt = new Point(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    if (i === 0) path.move(pt); else path.addLine(pt);
+  }
+  dc.addPath(path);
+  dc.setStrokeColor(color);
+  dc.setLineWidth(width);
+  dc.strokePath();
+}
+
+/* Lock Screen. These render tinted and near-monochrome, so the design
+   leans on shape and alpha rather than hue. */
+function buildAccessory(summary, family) {
+  const p = summary.pushups;
+  const left = p ? Math.max(0, (p.todayTarget || 0) - (p.today || 0)) : 0;
+  const pct = p && p.todayTarget ? Math.min(1, p.today / p.todayTarget) : 0;
+
+  if (family === 'accessoryInline') {
+    const w = new ListWidget();
+    w.url = OPEN_URL;
+    if (!p || !p.todayTarget) w.addText('Pushups: rest day');
+    else w.addText(left ? `${left} pushups to go` : 'Pushups done');
+    return w;
+  }
+
+  if (family === 'accessoryCircular') {
+    const w = new ListWidget();
+    w.url = OPEN_URL;
+    w.addAccessoryWidgetBackground = true;
+    const S = 58, dc = new DrawContext();
+    dc.size = new Size(S, S);
+    dc.opaque = false;
+    dc.respectScreenScale = true;
+    const start = -Math.PI / 2;
+    ring(dc, S / 2, S / 2, S / 2 - 5, start, start + Math.PI * 2, 5, new Color('#ffffff', 0.25));
+    if (pct > 0) ring(dc, S / 2, S / 2, S / 2 - 5, start, start + Math.PI * 2 * pct, 5, new Color('#ffffff', 1));
+    const img = w.addImage(dc.getImage());
+    img.imageSize = new Size(S, S);
+    img.centerAlignImage();
+    const t = w.addText(!p || !p.todayTarget ? '—' : (left ? String(left) : '✓'));
+    t.font = Font.boldSystemFont(13);
+    t.centerAlignText();
+    return w;
+  }
+
+  // accessoryRectangular
+  const w = new ListWidget();
+  w.url = OPEN_URL;
+  const top = w.addText(!p || !p.todayTarget ? 'Pushups · rest day'
+                       : left ? `${left} pushups to go` : 'Pushups done ✓');
+  top.font = Font.boldSystemFont(13);
+  if (p && p.days) {
+    w.addSpacer(3);
+    // Text dots, not a drawn image: the Lock Screen tints images flat and
+    // the filled/hollow distinction is what carries the meaning here.
+    const marks = p.days.map(d => {
+      if (d.target === 0) return '·';
+      if (d.done >= d.target) return '●';
+      if (d.future) return '○';
+      return '✕';
+    }).join(' ');
+    const s = w.addText(marks);
+    s.font = Font.systemFont(11);
+  }
+  if (summary.lift) {
+    const l = w.addText(summary.lift.today ? 'Lift today' : `Next lift ${summary.lift.day}`);
+    l.font = Font.systemFont(10);
+    l.textOpacity = 0.7;
+  }
+  return w;
+}
+
 function build(summary, family) {
   const now = new Date();
+
+  if (family && family.startsWith('accessory')) return buildAccessory(summary, family);
+
   const w = shell();
 
   if (family === 'small') {
-    // One thing, the one with a deadline.
-    starterBlock(w, summary.starter, now, false);
+    pushupTodayBlock(w, summary.pushups, 128, false);
+    w.addSpacer(6);
+    liftLine(w, summary.lift, 9);
     w.addSpacer();
-    if (summary.pushups) {
-      const row = w.addStack();
-      row.centerAlignContent();
-      label(row, `${summary.pushups.done.toLocaleString()} pushups`, 11, C.muted);
-    }
-    if (summary.water) label(w, `${summary.water.oz} of ${summary.water.goal} oz`, 11, C.muted);
+    const L = starterLines(summary.starter, now);
+    const row = w.addStack();
+    row.centerAlignContent();
+    const dot = row.addText('●');
+    dot.font = Font.systemFont(7);
+    dot.textColor = L.color;
+    row.addSpacer(5);
+    label(row, L.title, 10, C.muted);
     return w;
   }
 
   if (family === 'large') {
-    starterBlock(w, summary.starter, now, true);
+    pushupTodayBlock(w, summary.pushups, 300, true);
+    w.addSpacer(6);
+    liftLine(w, summary.lift, 11);
     w.addSpacer(12);
     pushupBlock(w, summary.pushups, 300);
+    w.addSpacer(12);
+    starterBlock(w, summary.starter, now, true);
     w.addSpacer(12);
     waterBlock(w, summary.water, 300);
     w.addSpacer();
@@ -274,25 +454,28 @@ function build(summary, family) {
     return w;
   }
 
-  // medium: starter on the left, the two bars on the right
+  // medium: today's pushups carry the left, starter and water the right
   const cols = w.addStack();
   cols.layoutHorizontally();
   cols.topAlignContent();
 
   const left = cols.addStack();
   left.layoutVertically();
-  left.size = new Size(140, 0);
-  starterBlock(left, summary.starter, now, false);
+  left.size = new Size(150, 0);
+  pushupTodayBlock(left, summary.pushups, 150, false);
+  left.addSpacer(6);
+  liftLine(left, summary.lift, 9);
 
   cols.addSpacer(14);
 
   const right = cols.addStack();
   right.layoutVertically();
-  pushupBlock(right, summary.pushups, 150);
+  starterBlock(right, summary.starter, now, false);
   right.addSpacer(10);
-  waterBlock(right, summary.water, 150);
+  waterBlock(right, summary.water, 140);
   return w;
 }
+
 
 let widget;
 try {

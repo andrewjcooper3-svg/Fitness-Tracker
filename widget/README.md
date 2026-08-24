@@ -39,15 +39,54 @@ long-press the new widget → **Edit Widget** → set **Script** to *AJC
 Fitness*. Leave "When Interacting" as *Run Script* to open the tracker on
 tap.
 
+**8. Put it on the Lock Screen too.** This is the one worth doing. Long-press
+the Lock Screen → **Customise** → tap the area under the clock (or the small
+slots above it) → **Scriptable** → set **Script** to *AJC Fitness*. Three
+shapes are supported and each is a different amount of detail:
+
+| Slot | Shows |
+|---|---|
+| **Circular** (small, above or below the clock) | A ring of today's pushup progress with the number left in the middle. |
+| **Rectangular** (the wide slot under the clock) | `110 pushups to go`, the week strip as dots, and the next lift. |
+| **Inline** (the one line above the clock) | `110 pushups to go`. |
+
 ## What it shows
+
+**Pushups today leads everything**, because that is the number you can still
+act on. `110 to go of 165`, or a green ✓ once the day is done, or `Rest day`
+on Sunday. The week total moved down to the large widget.
+
+Underneath it, **a dot per day, Monday first**:
+
+| Mark | Means |
+|---|---|
+| ● filled green | that day's target was met |
+| ◐ amber | started but not finished |
+| ○ hollow | hasn't happened yet |
+| ○ red | in the past, and missed |
+| · faint | nothing was planned (Sunday) |
+| ring around it | today |
+
+A missed day and a day that hasn't happened yet deliberately look different —
+otherwise every Monday morning reads as a week of failure.
 
 | | |
 |---|---|
-| **Starter** | `Peaks 5:28 PM · in 50m` while it is climbing, `Feed it · fed 9h ago` once it is due, the build-day count while it is still being built. The dot is green/amber/red to match the app. |
-| **Pushups** | Done, then `of 990 · 1,045 planned` — the same done / planned-now / planned-this-week the app shows, collapsing to one number when the week's workouts match the plan. |
+| **Next lift** | `Lift today · Leg Press · Leg Curl · RDL` on a gym day, `Next lift Wednesday` otherwise. Worked out from the plan, so it follows a change to the split rather than assuming Mon/Wed. |
+| **Starter** | `Peaks 5:28 PM · in 50m` while it is climbing, `Feed it · fed 9h ago` once it is due, the build-day count while it is still being built. The dot is green/amber/red to match the app. Small drops the header and keeps one line — pushups took that space. |
+| **Pushups this week** | Large only now. Done, then `of 990 · 1,045 planned`. |
 | **Water** | Today's ounces against the goal. |
 
 ## Things worth knowing
+
+**The pushup targets come from the plan, not a constant.** Saturday is 220
+because the plan runs four sets there; Sunday is 0. Change the plan and the
+dots follow it.
+
+**Lock Screen widgets are tinted near-monochrome by iOS**, so the ring and
+the dots are drawn to read by shape and brightness rather than colour. That
+is why the rectangular slot uses text marks (● ✕ ○) instead of the drawn
+dot strip the home screen gets.
 
 **Refresh is iOS's decision, not the widget's.** Roughly every 15–60
 minutes, and iOS throttles widgets you never interact with. The script asks

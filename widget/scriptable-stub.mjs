@@ -42,7 +42,8 @@ export function makeScriptable({ body, statusCode = 200, family = 'medium', draw
     set borderColor(v) {} set url(v) {}
   }
   class ListWidget extends Stack {
-    set refreshAfterDate(v) {} presentSmall() {} presentMedium() {} presentLarge() {}
+    set refreshAfterDate(v) {} set addAccessoryWidgetBackground(v) {}
+    presentSmall() {} presentMedium() {} presentLarge() {}
     presentAccessoryRectangular() {} presentAccessoryInline() {} presentAccessoryCircular() {}
   }
   class Path {

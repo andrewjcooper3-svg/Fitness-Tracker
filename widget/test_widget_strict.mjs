@@ -25,8 +25,48 @@ const good = JSON.stringify({
   summary: {
     updatedAt: now.toISOString(),
     starter: { stage: 'active', level: 'ok', location: 'counter', fedAt: iso(-4), dueAt: iso(+5), peakAt: iso(+0.85) },
-    pushups: { done: 730, plannedNow: 990, plannedWeek: 1045, deficit: -315 },
+    pushups: {
+      done: 730, plannedNow: 990, plannedWeek: 1045, deficit: -315,
+      today: 55, todayTarget: 165,
+      // Mon done, Tue MISSED, Wed done, today partial, then the future.
+      days: [
+        { done: 165, target: 165, today: false, future: false },
+        { done: 0,   target: 165, today: false, future: false },
+        { done: 165, target: 165, today: false, future: false },
+        { done: 55,  target: 165, today: true,  future: false },
+        { done: 0,   target: 165, today: false, future: true },
+        { done: 0,   target: 220, today: false, future: true },
+        { done: 0,   target: 0,   today: false, future: true }
+      ]
+    },
+    lift: { today: false, day: 'Wednesday', inDays: 6, count: 13 },
     water: { oz: 64, goal: 100 }
+  }
+});
+
+// Today's work finished, so the headline should flip from a gap to a tick.
+const doneToday = JSON.stringify({
+  status: 'success',
+  summary: {
+    updatedAt: now.toISOString(),
+    starter: { stage: 'none' },
+    pushups: { done: 900, plannedNow: 990, plannedWeek: 1045, deficit: -100,
+      today: 165, todayTarget: 165,
+      days: [{ done: 165, target: 165, today: true, future: false }] },
+    lift: { today: true, day: 'Monday', count: 12, headline: 'Leg Press · Leg Curl · RDL' }
+  }
+});
+
+// Sunday: nothing was asked for, which is not the same as nothing done.
+const restDay = JSON.stringify({
+  status: 'success',
+  summary: {
+    updatedAt: now.toISOString(),
+    starter: { stage: 'none' },
+    pushups: { done: 1045, plannedNow: 1045, plannedWeek: 1045, deficit: 0,
+      today: 0, todayTarget: 0,
+      days: [{ done: 0, target: 0, today: true, future: false }] },
+    lift: { today: false, day: 'Monday', inDays: 1, count: 12 }
   }
 });
 
@@ -45,12 +85,73 @@ const good = JSON.stringify({
   }
 
   console.log('\n=== The widget draws at every size, bars included ===');
+  // Small no longer gives the starter a header - pushups took that space,
+  // and the starter drops to a single coloured line at the bottom.
+  const EXPECT = { small: { starter: /Peaks|Feed it|No starter|Day \d/, imgs: 1 },
+                   medium: { starter: /STARTER/, imgs: 2 },
+                   large:  { starter: /STARTER/, imgs: 3 } };
   for (const family of ['small', 'medium', 'large']) {
     const out = await draw(good, { family });
     console.log(`  ${family}: ${out}`);
-    check(`${family} renders`, /STARTER/.test(out));
-    if (family !== 'small') check(`${family} drew its bars`, (out.match(/\[img\]/g) || []).length === 2,
+    check(`${family} still shows the starter`, EXPECT[family].starter.test(out), out);
+    // small: dot strip. medium: dots + water bar. large: dots + pushup +
+    // water bars.
+    check(`${family} drew ${EXPECT[family].imgs} image(s)`,
+      (out.match(/\[img\]/g) || []).length === EXPECT[family].imgs,
       String((out.match(/\[img\]/g) || []).length));
+  }
+
+  console.log('\n=== Today leads, not the week ===');
+  for (const family of ['small', 'medium', 'large']) {
+    const out = await draw(good, { family });
+    check(`${family} shows the gap left today`, /110/.test(out) && /to go of 165/.test(out), out);
+    check(`${family} labels it as today`, /PUSHUPS TODAY/.test(out), out);
+  }
+  {
+    const out = await draw(doneToday, { family: 'small' });
+    console.log('  done:', out);
+    check('a finished day shows a tick, not a zero', /✓/.test(out) && /165 done/.test(out), out);
+    const rest = await draw(restDay, { family: 'small' });
+    console.log('  rest:', rest);
+    check('a rest day says so rather than showing 0 to go', /Rest day/.test(rest), rest);
+  }
+
+  console.log('\n=== The week strip and the next lift ===');
+  {
+    const out = await draw(good, { family: 'medium' });
+    // Dots are a drawn image on the home screen, so what is checkable here
+    // is that it drew one - the Lock Screen variant below is text.
+    check('the dot strip is drawn', (out.match(/\[img\]/g) || []).length >= 2, out);
+    check('the next lift is named', /Next lift Wednesday/.test(out), out);
+    const today = await draw(doneToday, { family: 'medium' });
+    check('and on a lifting day it says so', /Lift today/.test(today), today);
+    check('with the session headline', /Leg Press/.test(today), today);
+  }
+
+  console.log('\n=== Lock Screen ===');
+  for (const family of ['accessoryCircular', 'accessoryRectangular', 'accessoryInline']) {
+    const out = await draw(good, { family });
+    console.log(`  ${family}: ${out}`);
+    check(`${family} renders`, out.length > 0, out);
+  }
+  {
+    const inline = await draw(good, { family: 'accessoryInline' });
+    check('inline states the gap', /110 pushups to go/.test(inline), inline);
+    check('inline says done when it is', /Pushups done/.test(await draw(doneToday, { family: 'accessoryInline' })));
+    check('inline handles the rest day', /rest day/.test(await draw(restDay, { family: 'accessoryInline' })));
+
+    const circ = await draw(good, { family: 'accessoryCircular' });
+    check('the circular ring drew and carries the number', /\[img\]/.test(circ) && /110/.test(circ), circ);
+    check('a finished day shows a tick in the ring', /✓/.test(await draw(doneToday, { family: 'accessoryCircular' })));
+
+    const rect = await draw(good, { family: 'accessoryRectangular' });
+    console.log('  rect:', rect);
+    check('rectangular leads with the gap', /110 pushups to go/.test(rect), rect);
+    // Filled, missed and not-yet must be three different marks, or a
+    // Monday morning looks identical to a week of skipped days.
+    check('its dots distinguish done, missed and future',
+      /● ✕ ● .* ○ ○ ·/.test(rect.replace(/\s+/g, ' ')), rect);
+    check('rectangular names the next lift', /Next lift Wednesday/.test(rect), rect);
   }
 
   console.log('\n=== Starter states ===');

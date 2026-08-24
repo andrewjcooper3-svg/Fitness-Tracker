@@ -6120,6 +6120,56 @@ function saveShoppingList(items) { localStorage.setItem(STORAGE_SHOPPING_LIST_KE
    15-60 minutes, and it throttles ones you ignore), so any relative
    phrasing baked in here would be wrong by the time it is read. The widget
    turns those timestamps into countdowns itself, at draw time. */
+const WIDGET_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const WIDGET_DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+// Reads the pushup target straight off the week's plan rather than
+// assuming 165 - the plan is the thing that changes (Saturday runs four
+// sets, Sunday runs none), and a widget quietly using a stale constant
+// would be worse than showing nothing.
+function planPushupsForDay_(dayKey) {
+  const list = (typeof WEEKLY_PLAN_DATA === 'object' && WEEKLY_PLAN_DATA[dayKey]) || [];
+  let total = 0;
+  list.forEach(ex => {
+    if (!/pushup|push[- ]?up/i.test(ex.name || '')) return;
+    (ex.rows || []).forEach(r => {
+      const n = parseInt(String(r[2] || '').replace(/[^0-9]/g, ''), 10);
+      if (n > 0) total += n;
+    });
+  });
+  return total;
+}
+
+// A lifting day is one carrying real gym work, which is any day whose plan
+// holds something that is not pushups, a walk or the sauna. Derived rather
+// than hardcoded to Mon/Wed so it follows the plan if the split changes.
+function isLiftDay_(dayKey) {
+  const list = (typeof WEEKLY_PLAN_DATA === 'object' && WEEKLY_PLAN_DATA[dayKey]) || [];
+  return list.some(ex => !/pushup|push[- ]?up|^walk$|sauna|stretch|mobility/i.test(ex.name || ''));
+}
+
+function nextLiftSummary_(now) {
+  const todayIdx = (now.getDay() + 6) % 7;          // 0 = Monday
+  if (isLiftDay_(WIDGET_DAY_KEYS[todayIdx])) {
+    const list = WEEKLY_PLAN_DATA[WIDGET_DAY_KEYS[todayIdx]] || [];
+    const lifts = list.filter(ex => !/pushup|push[- ]?up|^walk$|sauna|stretch|mobility/i.test(ex.name || ''));
+    return {
+      today: true,
+      day: WIDGET_DAY_NAMES[todayIdx],
+      count: lifts.length,
+      headline: lifts.slice(0, 3).map(e => e.name).join(' · ')
+    };
+  }
+  for (let i = 1; i <= 7; i++) {
+    const idx = (todayIdx + i) % 7;
+    if (isLiftDay_(WIDGET_DAY_KEYS[idx])) {
+      return { today: false, day: WIDGET_DAY_NAMES[idx], inDays: i,
+               count: (WEEKLY_PLAN_DATA[WIDGET_DAY_KEYS[idx]] || []).length };
+    }
+  }
+  return null;
+}
+
 function buildWidgetSummary_() {
   const now = new Date();
   const out = { updatedAt: now.toISOString() };
@@ -6152,13 +6202,40 @@ function buildWidgetSummary_() {
   try {
     const pu = computePushupStats();
     const week = computeWeekStats().totals;
+    const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+    const monday = getWeekMonday();
+    const todayKey = dateKey(now);
+
+    /* The week total was the wrong number to put on a home screen. What
+       actually goes wrong is a skipped Tuesday that Saturday then pays for
+       at 455 reps, and a weekly figure hides that until Friday. Today's
+       gap, and a dot per day, put it where it can still be acted on. */
+    const days = WIDGET_DAY_KEYS.map((key, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const k = dateKey(d);
+      return {
+        key: k,
+        target: planPushupsForDay_(key),
+        done: ledger[k] || 0,
+        today: k === todayKey,
+        future: k > todayKey
+      };
+    });
+    const today = days.find(d => d.today) || null;
+
     out.pushups = {
       done: pu.week.actual,
       plannedNow: week.pushupTarget,
       plannedWeek: week.pushupBaseline,
-      deficit: pu.deficit
+      deficit: pu.deficit,
+      today: today ? today.done : 0,
+      todayTarget: today ? today.target : 0,
+      days: days.map(d => ({ done: d.done, target: d.target, today: d.today, future: d.future }))
     };
   } catch (e) { /* the tracker panels are not in the DOM yet - skip this half */ }
+
+  try { out.lift = nextLiftSummary_(now); } catch (e) {}
 
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
   out.water = { oz: Math.round(ledger[dateKey(now)] || 0), goal: WATER_DAILY_GOAL };
@@ -11411,7 +11488,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-wed-plan';
+const APP_BUILD_VERSION = '2026-08-24-widget-today';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
