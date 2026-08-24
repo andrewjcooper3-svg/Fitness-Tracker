@@ -1002,7 +1002,8 @@
     background: none; border: none; border-radius: 11px; padding: 9px 4px; cursor: pointer; }
   .hx-seg-btn.active { background: var(--surface2); color: var(--accent); }
   /* Range chips apply to the whole tab, the way Hevy's 3M/1Y/All do. */
-  .hx-range { display: flex; gap: 6px; margin-bottom: 12px; }
+  .hx-range { display: flex; gap: 6px; margin-bottom: 12px; align-items: center; }
+  .hx-range-right { margin-left: auto; }
   .hx-range-btn { font-family: var(--font); font-size: 11.5px; font-weight: 700; color: var(--muted);
     background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
     padding: 5px 14px; cursor: pointer; }
@@ -2387,6 +2388,12 @@
     <button class="hx-range-btn" data-range="90" onclick="setHistoryRange(90)">3M</button>
     <button class="hx-range-btn" data-range="365" onclick="setHistoryRange(365)">1Y</button>
     <button class="hx-range-btn active" data-range="0" onclick="setHistoryRange(0)">All</button>
+    <!-- 165 pushups a day against 30 reps of leg press is not a fair
+         comparison, and every total on this tab was being decided by the
+         pushups. Off by default; the Pushups card below still shows them
+         in full, as do the widget and the Trainer deficit. -->
+    <button class="hx-range-btn hx-range-right" id="hxPushupToggle"
+            onclick="toggleHistoryPushups()">+ Pushups</button>
   </div>
   <div class="hx-status" id="hxStatus"></div>
 
@@ -4571,8 +4578,49 @@ function setHistoryRange(days) {
 
 // The range applies to every section at once, which is what makes the
 // chips feel like a filter rather than a per-chart control.
+/* Pushups are a daily 165-rep grind against a 30-rep leg press, so left in
+   they decide every total on this tab - reps, sets, the workout count and
+   most of the muscle chart. Excluded by default so the gym work is
+   readable; the chip in the range row puts them back.
+
+   Filtered here because this is the single funnel every section reads
+   through, so the toggle can never apply to one card and not another. */
+const STORAGE_HISTORY_PUSHUPS_KEY = 'WORKOUT_HISTORY_INCLUDE_PUSHUPS';
+let historyIncludePushups_ = false;
+
+function isPushupRow_(r) {
+  return /pushup|push[- ]?up/i.test(r.exercise || '');
+}
+
+function initHistoryPushups_() {
+  try { historyIncludePushups_ = localStorage.getItem(STORAGE_HISTORY_PUSHUPS_KEY) === '1'; } catch (e) {}
+  syncPushupToggle_();
+}
+
+function syncPushupToggle_() {
+  const btn = document.getElementById('hxPushupToggle');
+  if (!btn) return;
+  btn.classList.toggle('active', historyIncludePushups_);
+  btn.textContent = historyIncludePushups_ ? '\u2713 Pushups' : '+ Pushups';
+}
+
+function toggleHistoryPushups() {
+  historyIncludePushups_ = !historyIncludePushups_;
+  try { localStorage.setItem(STORAGE_HISTORY_PUSHUPS_KEY, historyIncludePushups_ ? '1' : '0'); } catch (e) {}
+  syncPushupToggle_();
+  // The open drill-downs may be showing something the filter just removed.
+  hxMuscleOpen_ = null;
+  if (historyExercise_ && !historyIncludePushups_ && /pushup|push[- ]?up/i.test(historyExercise_)) {
+    closeHistoryExercise();
+  }
+  renderHistoryTab();
+  renderMuscleBalance_();
+  updateViewportHeight('stats', true);
+}
+
 function historyInRange_() {
-  const rows = historyRows_ || [];
+  let rows = historyRows_ || [];
+  if (!historyIncludePushups_) rows = rows.filter(r => !isPushupRow_(r));
   if (!historyRangeDays_) return rows;
   const cutoff = new Date(Date.now() - historyRangeDays_ * 86400000).toISOString().slice(0, 10);
   return rows.filter(r => r.date >= cutoff);
@@ -5506,7 +5554,13 @@ function renderHistoryTiles_(rows) {
   }).join('');
 
   const note = document.getElementById('hxTilesNote');
-  if (note) note.textContent = sinceLabel;
+  if (note) {
+    // A number that silently changed is a mystery; say what is left out.
+    const excl = historyIncludePushups_
+      ? 'Pushups included'
+      : 'Pushups left out \u2014 tap \u201c+ Pushups\u201d to include them';
+    note.textContent = sinceLabel ? `${sinceLabel} \u00b7 ${excl}` : excl;
+  }
 }
 
 function historyByWeek_(rows) {
@@ -11429,7 +11483,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-drop-nagging';
+const APP_BUILD_VERSION = '2026-08-24-no-pushup-skew';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -16100,6 +16154,7 @@ setInterval(() => {
 initViewportHeightObserver();
 initChartResizeObserver_();
 initHistoryRange_();
+initHistoryPushups_();
 initMuscleWindow_();
 initMuscleMode_();
 initInbody_();
