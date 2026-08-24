@@ -304,6 +304,10 @@
   #ovEditBtn { font-family: var(--font); font-size: 13px; font-weight: 700; padding: 6px 6px; }
   #ovEditBtn.active { color: var(--accent); }
   .ov-build-stamp { font-family: var(--font); font-size: 9px; color: var(--muted); opacity: 0.3; text-align: right; margin: -10px 2px 10px; }
+  .ov-archive-notice { font-family: var(--font); font-size: 12px; line-height: 1.4; color: var(--text);
+    background: color-mix(in srgb, var(--green) 14%, transparent); border: 1px solid color-mix(in srgb, var(--green) 40%, transparent);
+    border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; cursor: pointer; }
+  .ov-archive-notice:empty { display: none; }
 
   /* Big activity-ring hero (Apple Fitness style) - sits directly on the
      page background, no card box, so it reads as clearly primary versus
@@ -1630,6 +1634,9 @@
     </div>
   </div>
   <div class="ov-build-stamp" id="ovBuildStamp"></div>
+  <!-- Shown once after a week rolls over, so the archive is visible
+       rather than something you have to trust happened. -->
+  <div class="ov-archive-notice" id="ovArchiveNotice" onclick="dismissArchiveNotice_()"></div>
 
   <!-- Every block on this page lives in one grid so any of them can be
        moved anywhere in the order - the two big cards span all the columns
@@ -3026,7 +3033,7 @@ const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday',
 // identical, not retyped by hand), so these are exactly the values that
 // were already live. Sunday has no entry - it's a fixed rest day with
 // no exercise list at all, same as before.
-const WEEKLY_PLAN_DATA = {"mon":[{"name":"Leg Press","meta":"245 lb · 3 × 10","rows":[["245 lb","Reps","10",null],["245 lb","Reps","10",null],["245 lb","Reps","10",null]]},{"name":"Leg Extension","meta":"110 lb · 3 × 12","rows":[["110 lb","Reps","12","Progressed from 105 - clean completion last week"],["110 lb","Reps","12",null],["110 lb","Reps","12",null]]},{"name":"Leg Curl","meta":"75 lb · 3 × 12","rows":[["75 lb","Reps","12","Backed off from 85 - dropped to 75 across sets last week"],["75 lb","Reps","12",null],["75 lb","Reps","12",null]]},{"name":"Machine Chest Press","meta":"85 lb · 2 × 10","rows":[["85 lb","Reps","10","Minimal (pushups cover)"],["85 lb","Reps","10",null]]},{"name":"Glute Kickback","meta":"30 lb · 4 × 10","rows":[["30 lb","Reps","10","Each leg - backed off from 35 to 30, lower back was bothering last week"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"]]},{"name":"Tricep Pushdown","meta":"40 lb · 3 × 12","rows":[["40 lb","Reps","12","Backed off from 45 - felt more bicep"],["40 lb","Reps","12",null],["40 lb","Reps","12",null]]},{"name":"Cable Bicep Curl","meta":"40 lb · 3 × 12","rows":[["40 lb","Reps","12","Backed off from 45"],["40 lb","Reps","12",null],["40 lb","Reps","12",null]]},{"name":"Single Arm DB Row (Left Emphasis)","meta":"45 lb · 3 × 10","rows":[["45 lb","Reps","10","LEFT catch-up"],["45 lb","Reps","10","LEFT catch-up"],["45 lb","Reps","10","LEFT catch-up"]]},{"name":"Lateral Raise","meta":"15 lb · 3 × 12","rows":[["15 lb","Reps","12","Shoulder health - no 17.5s available, 15 is the real target"],["15 lb","Reps","12",null],["15 lb","Reps","12",null]]},{"name":"Reverse Crunch","meta":"BW · 3 × 20","rows":[["BW","Reps","20","Skipped last week - make time"],["BW","Reps","20",null],["BW","Reps","20",null]]},{"name":"Plank","meta":"BW · 3 × 70s","rows":[["BW","Time","70s","Skipped last week - make time"],["BW","Time","70s",null],["BW","Time","70s",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"tue":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"wed":[{"name":"Leg Press","meta":"245 lb · 4 × 10","rows":[["245 lb","Reps","10",null],["245 lb","Reps","10",null],["245 lb","Reps","10",null],["245 lb","Reps","10",null]]},{"name":"Leg Curl","meta":"80 lb · 4 × 12","rows":[["80 lb","Reps","12","Slightly higher than Monday - ramping back up gradually after last week's dip"],["80 lb","Reps","12",null],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Machine Chest Press","meta":"90 lb · 3 × 10","rows":[["90 lb","Reps","10","Progressed from 85 - clean completion last week"],["90 lb","Reps","10",null],["90 lb","Reps","10",null]]},{"name":"Lat Pulldown","meta":"100 lb · 3 × 10","rows":[["100 lb","Reps","10",null],["100 lb","Reps","10",null],["100 lb","Reps","10",null]]},{"name":"Tricep Pulldown","meta":"45 lb · 3 × 10","rows":[["45 lb","Reps","10",null],["45 lb","Reps","10",null],["45 lb","Reps","10",null]]},{"name":"Cable Bicep Curl","meta":"45 lb · 3 × 12","rows":[["45 lb","Reps","12","Testing 45 again - held 40 clean both days last week"],["45 lb","Reps","12",null],["45 lb","Reps","12",null]]},{"name":"Cable Crunch","meta":"70 lb · 3 × 15","rows":[["70 lb","Reps","15","Progressed from 65 - clean completion last week"],["70 lb","Reps","15",null],["70 lb","Reps","15",null]]},{"name":"CS DB Row (Left Arm Focus)","meta":"45 lb ea · 4 × 10","rows":[["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"]]},{"name":"Inclined Dumbbell Chest Press","meta":"45 lb · 3 × 10","rows":[["45 lb","Reps","10",null],["45 lb","Reps","10",null],["45 lb","Reps","10",null]]},{"name":"Hanging Knee Raise","meta":"BW · 3 × 17","rows":[["BW","Reps","17","Backed off from 19 - dropped to 15 on sets 2-3 last week"],["BW","Reps","17",null],["BW","Reps","17",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]}],"thu":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"fri":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"sat":[{"name":"Pushups","meta":"BW · 4 × 55 · Rest 60s","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55","Catch-up set for the year deficit"]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]},{"name":"Sauna","meta":"BW · 1 × 10-20 min","rows":[["BW","Time","10-20 min","Post-workout, not counted in workout time"]]}]};
+const WEEKLY_PLAN_DATA = {"mon":[{"name":"Leg Press","meta":"255 lb · 3 × 10","rows":[["255 lb","Reps","10","Up from 245 - all three sets clean last week"],["255 lb","Reps","10",null],["255 lb","Reps","10",null]]},{"name":"Leg Extension","meta":"110 lb · 3 × 12","rows":[["110 lb","Reps","12","Holding 110 - sets 2 and 3 were tough last week"],["110 lb","Reps","12",null],["110 lb","Reps","12",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 12","rows":[["80 lb","Reps","12","Up from 75 - clean all week, and Wednesday already holds 80"],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Machine Chest Press","meta":"90 lb · 2 × 10","rows":[["90 lb","Reps","10","Up from 85 - clean. Still minimal here, pushups cover the volume"],["90 lb","Reps","10",null]]},{"name":"Glute Kickback","meta":"30 lb · 4 × 10","rows":[["30 lb","Reps","10","Each leg - holding 30, three of four sets were tough"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"]]},{"name":"Tricep Pushdown","meta":"40 lb · 3 × 12","rows":[["40 lb","Reps","12","Holding 40 - last set was tough again"],["40 lb","Reps","12",null],["40 lb","Reps","12",null]]},{"name":"Cable Bicep Curl","meta":"40 lb · 3 × 12","rows":[["40 lb","Reps","12","Holding 40 - sets 2 and 3 tough"],["40 lb","Reps","12",null],["40 lb","Reps","12",null]]},{"name":"Single Arm DB Row (Left Emphasis)","meta":"50 lb · 3 × 10","rows":[["50 lb","Reps","10","Up from 45 - all clean. LEFT catch-up"],["50 lb","Reps","10",null],["50 lb","Reps","10",null]]},{"name":"Lateral Raise","meta":"15 lb · 3 × 12","rows":[["15 lb","Reps","12","Holding 15 - shoulder health, last set tough"],["15 lb","Reps","12",null],["15 lb","Reps","12",null]]},{"name":"Reverse Crunch","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Cut from 20 - skipped two weeks running, make it small enough to actually do"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Plank","meta":"BW · 3 × 60s","rows":[["BW","Time","60s","Cut from 70s for the same reason - get it logged, then build back"],["BW","Time","60s",null],["BW","Time","60s",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"tue":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Nothing logged on Tuesday last week - this is the gap the weekend keeps paying for"],["BW","Reps","55",null],["BW","Reps","55",null]]}],"wed":[{"name":"Leg Press","meta":"255 lb · 4 × 10","rows":[["255 lb","Reps","10","Up from 245 - all four sets clean"],["255 lb","Reps","10",null],["255 lb","Reps","10",null],["255 lb","Reps","10",null]]},{"name":"Leg Curl","meta":"80 lb · 4 × 12","rows":[["80 lb","Reps","12","Holding 80 - sets 3 and 4 tough"],["80 lb","Reps","12",null],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Machine Chest Press","meta":"95 lb · 3 × 10","rows":[["95 lb","Reps","10","Up from 90 - all clean"],["95 lb","Reps","10",null],["95 lb","Reps","10",null]]},{"name":"Lat Pulldown","meta":"110 lb · 3 × 10","rows":[["110 lb","Reps","10","Up from 100 - all clean"],["110 lb","Reps","10",null],["110 lb","Reps","10",null]]},{"name":"Tricep Pulldown","meta":"45 lb · 3 × 10","rows":[["45 lb","Reps","10","Holding 45 - sets 2 and 3 tough"],["45 lb","Reps","10",null],["45 lb","Reps","10",null]]},{"name":"Cable Bicep Curl","meta":"45 lb · 3 × 12","rows":[["45 lb","Reps","12","Holding 45 - sets 2 and 3 tough, same as last week"],["45 lb","Reps","12",null],["45 lb","Reps","12",null]]},{"name":"Cable Crunch","meta":"55 lb · 3 × 12","rows":[["55 lb","Reps","12","Backed off hard from 70 - all three sets were marked too tough. Reps down to 12 as well"],["55 lb","Reps","12",null],["55 lb","Reps","12",null]]},{"name":"CS DB Row (Left Arm Focus)","meta":"45 lb ea · 4 × 10","rows":[["45 lb ea","Reps","10","Holding 45 - back half of the sets was tough. LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"]]},{"name":"Inclined Dumbbell Chest Press","meta":"45 lb · 3 × 10","rows":[["45 lb","Reps","10","Holding 45 - every set was tough last week"],["45 lb","Reps","10",null],["45 lb","Reps","10",null]]},{"name":"Hanging Knee Raise","meta":"BW · 3 × 12","rows":[["BW","Reps","12","Cut from 17 - only one of three sets got finished"],["BW","Reps","12",null],["BW","Reps","12",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]}],"thu":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Nothing logged on Thursday last week either"],["BW","Reps","55",null],["BW","Reps","55",null]]}],"fri":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","One set of 55 last week - the other two are the easiest 110 of the week"],["BW","Reps","55",null],["BW","Reps","55",null]]}],"sat":[{"name":"Pushups","meta":"BW · 4 × 55 · Rest 60s","rows":[["BW","Reps","55","455 on Saturday last week. Impressive, but it is covering for Tue/Thu"],["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55","Catch-up set for the year deficit"]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]},{"name":"Sauna","meta":"BW · 1 × 10-20 min","rows":[["BW","Time","10-20 min","Post-workout, not counted in workout time"]]}]};
 
 function escapeAttr_(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
 function escapeText_(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -8125,10 +8132,22 @@ function serializeDay(day) {
         reps: inputs[1] ? inputs[1].value : '',
         notes: inputs[2] ? inputs[2].value : '',
         checked: row.querySelector('.set-checkbox').classList.contains('checked'),
-        quality: activeQuality ? activeQuality.dataset.quality : ''
+        quality: activeQuality ? activeQuality.dataset.quality : '',
+        // The targets live in the inputs' placeholders, which come from the
+        // week's plan - and the plan is replaced the moment a new week
+        // starts. Without them here, the end-of-week archive would have no
+        // "target vs actual" to write, since by then the DOM is showing the
+        // NEW week's numbers. Cheap to carry, impossible to recover later.
+        targetWeight: inputs[0] ? inputs[0].placeholder : '',
+        targetReps: inputs[1] ? inputs[1].placeholder : ''
       };
     });
-    return { id: card.dataset.exId, custom: !!nameInput, name: nameInput ? nameInput.value : '', sets: sets };
+    // name is recorded for prescribed exercises too, not just custom ones.
+    // restoreDay only reads it for customs, but the end-of-week archive has
+    // no other source: by the time it runs, the DOM holds the NEW week's
+    // exercises, so a prescribed card would otherwise archive nameless.
+    return { id: card.dataset.exId, custom: !!nameInput, name: getExerciseName(card),
+             meta: (card.querySelector('.exercise-meta') || {}).textContent || '', sets: sets };
   });
 
   const checkItems = Array.from(panel.querySelectorAll('.check-item')).map(item => ({
@@ -8599,6 +8618,11 @@ function restoreState() {
 
   if (!saved || saved.week !== getWeekLabel()) {
     // No saved state, or the week has rolled over - start this week fresh.
+    // Anything from the finished week goes to the Sheet BEFORE it is
+    // discarded; this is the only place the wipe happens, and it covers
+    // both cases (the app left open across the rollover, and the app
+    // opened fresh on Monday).
+    if (saved) archiveFinishedWeek_(saved);
     saveState();
     return;
   }
@@ -8606,6 +8630,117 @@ function restoreState() {
   isRestoringState = true;
   dayKeys.forEach(day => restoreDay(day, saved.days[day]));
   isRestoringState = false;
+}
+
+/* ---------- End-of-week archive ----------
+   The tracker resets every Monday, and until now anything you had not
+   pushed with "Generate Session Summary" went with it. A week's work
+   should not depend on remembering to tap a button on the right day, so
+   the wipe now writes first.
+
+   Queued rather than sent: queuePendingLog() is a synchronous localStorage
+   write, so the data is safe the instant this runs even with no signal,
+   and flushPendingLogs() (on load, and on the 'online' event) delivers it.
+   Sending directly would mean a failed request at exactly the wrong moment
+   loses the week.
+
+   Days already logged are skipped, so this never duplicates rows in the
+   Sheet - submitWorkout() records each success against its own week, and
+   the record is keyed by week label so the same weekday next week is a
+   different entry. */
+const STORAGE_LOGGED_DAYS_KEY = 'WORKOUT_LOGGED_DAYS';
+
+function loggedDays_() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_LOGGED_DAYS_KEY) || '{}'); } catch (e) { return {}; }
+}
+
+function markDayLogged_(week, day) {
+  const all = loggedDays_();
+  all[week] = all[week] || {};
+  all[week][day] = true;
+  // Only the last few weeks are worth keeping - this is duplicate
+  // protection, not history.
+  const weeks = Object.keys(all);
+  if (weeks.length > 6) weeks.slice(0, weeks.length - 6).forEach(w => delete all[w]);
+  localStorage.setItem(STORAGE_LOGGED_DAYS_KEY, JSON.stringify(all));
+}
+
+function isDayLogged_(week, day) {
+  return !!(loggedDays_()[week] || {})[day];
+}
+
+// Rebuilds the same payload shape buildPayload() produces, but from saved
+// state rather than the DOM - by the time this runs the DOM is showing the
+// new week.
+function payloadFromSavedDay_(week, day, savedDay) {
+  const exercises = (savedDay.exercises || []).map(ex => ({
+    name: ex.name || '',
+    sets: (ex.sets || []).map((s, i) => ({
+      setNum: i + 1,
+      targetWeight: asNumberOrString(s.targetWeight || s.weight || ''),
+      targetReps: s.targetReps || s.reps || '',
+      actualWeight: asNumberOrString(s.weight || s.targetWeight || ''),
+      actualReps: s.reps || s.targetReps || '',
+      completed: !!s.checked,
+      quality: s.quality || '',
+      notes: s.notes || ''
+    }))
+  })).filter(ex => ex.name && ex.sets.length);
+
+  return {
+    day: dayNames[day],
+    week: week,                       // last week's tab, not the new one
+    exercises: exercises,
+    notes: savedDay.dayNotes || '',
+    timestamp: new Date().toISOString()
+  };
+}
+
+// Only days with something actually completed. An untouched rest day, or a
+// day whose sets were all left unchecked, is not worth a row.
+function savedDayHasWork_(savedDay) {
+  return (savedDay && savedDay.exercises || []).some(ex =>
+    (ex.sets || []).some(s => s.checked));
+}
+
+function archiveFinishedWeek_(saved) {
+  const week = saved.week;
+  if (!week) return;
+  let queued = 0;
+  dayKeys.forEach(day => {
+    const savedDay = (saved.days || {})[day];
+    if (!savedDayHasWork_(savedDay)) return;
+    if (isDayLogged_(week, day)) return;
+    queuePendingLog(day, payloadFromSavedDay_(week, day, savedDay));
+    markDayLogged_(week, day);
+    queued++;
+  });
+  if (queued) {
+    // Read on the next render so the week that just ended does not simply
+    // vanish without a word.
+    localStorage.setItem(STORAGE_ARCHIVE_NOTICE_KEY, JSON.stringify({ week, days: queued }));
+    flushPendingLogs();
+  }
+}
+
+// The archive runs during startup, before Overview has rendered, so the
+// result is left in localStorage and picked up here.
+const STORAGE_ARCHIVE_NOTICE_KEY = 'WORKOUT_ARCHIVE_NOTICE';
+
+function renderArchiveNotice_() {
+  const el = document.getElementById('ovArchiveNotice');
+  if (!el) return;
+  let notice = null;
+  try { notice = JSON.parse(localStorage.getItem(STORAGE_ARCHIVE_NOTICE_KEY) || 'null'); } catch (e) {}
+  if (!notice || !notice.days) { el.textContent = ''; return; }
+  el.textContent = `\u2713 New week. ${notice.days} ${notice.days === 1 ? 'day' : 'days'} from ${notice.week} `
+    + 'were written to the Sheet before the tracker reset. Tap to dismiss.';
+}
+
+function dismissArchiveNotice_() {
+  localStorage.removeItem(STORAGE_ARCHIVE_NOTICE_KEY);
+  renderArchiveNotice_();
+  updateViewportHeight('overview', true);
 }
 
 /* ---------- Weekly Overview tab ---------- */
@@ -8990,7 +9125,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-22-widget-summary';
+const APP_BUILD_VERSION = '2026-08-24-week-plan-archive';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -9005,6 +9140,7 @@ function renderOverview() {
   document.getElementById('ovWeekLabel').textContent = getWeekLabel();
   const stampEl = document.getElementById('ovBuildStamp');
   if (stampEl) stampEl.textContent = 'Build ' + APP_BUILD_VERSION;
+  renderArchiveNotice_();
 
   renderOverviewPushupMini();
   renderOverviewWeightPreview();
@@ -13374,6 +13510,9 @@ function submitWorkout(day, payload) {
     .then(data => {
       if (data && data.status === 'success') {
         setLogStatus(day, 'ok', '✓ Logged to Sheet', false);
+        // Recorded so the end-of-week archive skips this day instead of
+        // writing a second copy of it.
+        markDayLogged_(payload.week || getWeekLabel(), day);
       } else {
         queuePendingLog(day, payload);
         setLogStatus(day, 'error', '⚠ Sheet rejected the entry — saved locally.', true);

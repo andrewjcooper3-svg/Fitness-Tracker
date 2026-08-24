@@ -303,6 +303,10 @@
     #ovEditBtn { font-family: var(--font); font-size: 13px; font-weight: 700; padding: 6px 6px; }
     #ovEditBtn.active { color: var(--accent); }
     .ov-build-stamp { font-family: var(--font); font-size: 9px; color: var(--muted); opacity: 0.3; text-align: right; margin: -10px 2px 10px; }
+    .ov-archive-notice { font-family: var(--font); font-size: 12px; line-height: 1.4; color: var(--text);
+      background: color-mix(in srgb, var(--green) 14%, transparent); border: 1px solid color-mix(in srgb, var(--green) 40%, transparent);
+      border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; cursor: pointer; }
+    .ov-archive-notice:empty { display: none; }
   
     /* Big activity-ring hero (Apple Fitness style) - sits directly on the
        page background, no card box, so it reads as clearly primary versus
@@ -1644,7 +1648,7 @@
              never strands a control. -->
         <div class="app-bar-title" id="appBarTitle">Overview</div>
         <div class="app-bar-right" id="appBarRight">
-          <span class="app-bar-meta" id="appBarMeta">Aug 17 - Aug 23</span>
+          <span class="app-bar-meta" id="appBarMeta">Aug 24 - Aug 30</span>
           <span class="app-bar-actions" id="appBarActions"><div class="ov-page-head-actions">
             <button class="ov-gear-btn" id="ovEditBtn" title="Rearrange the blocks on this page">Edit</button>
             <button class="ov-gear-btn" aria-label="Refresh" title="Force a fresh reload">↻</button>
@@ -1655,12 +1659,15 @@
       <div id="view-overview" class="app-view active">
         <div class="ov-page-head">
           <div>
-            <div class="ov-page-week" id="ovWeekLabel">Week of Aug 17 - Aug 23, 2026</div>
+            <div class="ov-page-week" id="ovWeekLabel">Week of Aug 24 - Aug 30, 2026</div>
             <div class="ov-page-title">Overview</div>
           </div>
           
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-22-starter-check-log</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-24-week-plan-archive</div>
+        <!-- Shown once after a week rolls over, so the archive is visible
+             rather than something you have to trust happened. -->
+        <div class="ov-archive-notice" id="ovArchiveNotice"></div>
       
         <!-- Every block on this page lives in one grid so any of them can be
              moved anywhere in the order - the two big cards span all the columns
@@ -1689,11 +1696,11 @@
             <div class="ov-hero-card-number" id="ovPushupNumber">0</div>
             <div class="ov-hero-card-sub" id="ovPushupSub" title="">of 1,045</div>
             <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovPushupBar" style="width:0%"></div></div>
-            <div class="ov-hero-card-status" id="ovPushupStatus">−2,552 deficit · behind · 0/7 days logged</div>
+            <div class="ov-hero-card-status" id="ovPushupStatus">−2,963 deficit · behind · 0/7 days logged</div>
           </div>
           <div class="ov-pu-chart-wrap" id="ovPushupChartWrap" data-restored="1">
             <svg class="ov-pu-chart" id="ovPushupChart" viewBox="0 0 320 46" preserveAspectRatio="none"><rect x="0.00" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="0.00" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="0.00" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="0.00" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="46.57" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="46.57" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="46.57" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="46.57" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="93.14" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="93.14" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="93.14" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="93.14" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="139.71" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="139.71" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="139.71" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="139.71" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="186.29" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="186.29" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="186.29" y="11.5" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="186.29" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="232.86" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="232.86" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="232.86" y="0.0" width="40.57" height="1.5" fill="var(--muted)" opacity="0.55"></rect><rect x="232.86" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect><rect x="279.43" y="0" width="40.57" height="46" rx="2" fill="var(--surface2)" opacity="0.5"></rect><rect x="279.43" y="45.0" width="40.57" height="1.0" rx="2" fill="var(--surface2)"></rect><rect x="279.43" y="0" width="40.57" height="46" fill="transparent" style="cursor:pointer;"></rect></svg>
-            <div class="ov-pu-chart-labels" id="ovPushupChartLabels"><span class="">M</span><span class="">T</span><span class="">W</span><span class="">T</span><span class="today">F</span><span class="">S</span><span class="">S</span></div>
+            <div class="ov-pu-chart-labels" id="ovPushupChartLabels"><span class="today">M</span><span class="">T</span><span class="">W</span><span class="">T</span><span class="">F</span><span class="">S</span><span class="">S</span></div>
             <div class="ov-pu-chart-detail" id="ovPushupChartDetail">Tap or hover a day for the count</div>
           </div>
         <div class="ov-block-controls"><button type="button" class="ov-block-move" data-dir="-1" aria-label="Move up" disabled="">↑</button><button type="button" class="ov-block-move" data-dir="1" aria-label="Move down">↓</button></div></div>
