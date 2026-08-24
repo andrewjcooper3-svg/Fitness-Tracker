@@ -536,6 +536,78 @@ const mock = rows => route => {
         return el ? el.getAttribute('title') : null;
       });
 
+      console.log('\n  -- Body: the InBody scans --');
+      await page.evaluate(() => showHistorySection('body'));
+      await page.waitForTimeout(700);
+      const ib = await page.evaluate(() => ({
+        visible: document.getElementById('hxSectionBody').style.display !== 'none',
+        rangeHidden: document.getElementById('hxRange').style.display === 'none',
+        statusHidden: document.getElementById('hxStatus').style.display === 'none',
+        scans: document.querySelectorAll('#ibScanPicker option').length,
+        picked: document.getElementById('ibScanPicker').value,
+        when: document.getElementById('ibScanWhen').textContent,
+        tiles: [...document.querySelectorAll('#ibTiles > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()),
+        comp: document.querySelectorAll('#ibCompChart path[fill^="var"]').length,
+        trendDots: document.querySelectorAll('#ibTrendChart .chart-dot').length,
+        regions: document.querySelectorAll('#ibBodyDiagram [data-seg]').length,
+        segs: [...document.querySelectorAll('#ibSegRows .hx-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
+        extras: document.querySelectorAll('#ibExtras .hx-rec').length,
+        goals: document.getElementById('ibGoals').innerText.replace(/\s+/g, ' ').trim()
+      }));
+      console.log('   when  :', ib.when);
+      console.log('   tiles :', ib.tiles.join(' | '));
+      console.log('   goals :', ib.goals);
+      check('the Body segment shows', ib.visible);
+      check('all three scans are selectable', ib.scans === 3, String(ib.scans));
+      check('it opens on the most recent', ib.picked === '2' && /July 14, 2026/.test(ib.when), ib.when);
+      check('the workout range chips are hidden here', ib.rangeHidden && ib.statusHidden,
+        `${ib.rangeHidden}/${ib.statusHidden}`);
+      check('four tiles with deltas', ib.tiles.length === 4 && /▲|▼/.test(ib.tiles.join()), ib.tiles.join(' | '));
+      check('the muscle tile shows the gain', /68\.3 lb.*MUSCLE.*▲/is.test(ib.tiles[1]), ib.tiles[1]);
+      check('body fat shows as an improvement', /▼/.test(ib.tiles[2]), ib.tiles[2]);
+      // Two stacked segments per scan = 6 filled columns across 3 scans.
+      check('the stacked lean/fat chart drew both parts', ib.comp === 6, String(ib.comp));
+      check('the trend line has a point per scan', ib.trendDots === 3, String(ib.trendDots));
+      check('the figure is shaded by segment', ib.regions >= 15, String(ib.regions));
+      check('five segments listed', ib.segs.length === 5, String(ib.segs.length));
+      check('right and left are reported separately',
+        /Right arm/.test(ib.segs[0]) && /Left arm/.test(ib.segs[1]), ib.segs.slice(0, 2).join(' | '));
+      check('every number from the sheet is somewhere', ib.extras === 12, String(ib.extras));
+      check('the control targets are shown', /2\.0 lb/.test(ib.goals) && /6\.8 lb/.test(ib.goals), ib.goals);
+
+      // Switching scan must move every number, not just the header.
+      await page.evaluate(() => setInbodyScan(0));
+      await page.waitForTimeout(500);
+      const older = await page.evaluate(() => ({
+        when: document.getElementById('ibScanWhen').textContent,
+        tiles: [...document.querySelectorAll('#ibTiles > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()),
+        firstSeg: document.querySelector('#ibSegRows .hx-row').innerText.replace(/\s+/g, ' ').trim()
+      }));
+      console.log('   oldest:', older.tiles.join(' | '));
+      check('picking the first scan moves the numbers',
+        /September 3, 2025/.test(older.when) && /137\.8/.test(older.tiles[0]), older.when + ' ' + older.tiles[0]);
+      check('and the first scan has no delta to show', /first scan/.test(older.tiles[0]), older.tiles[0]);
+      check('the segment rows follow too', /5\.89/.test(older.firstSeg), older.firstSeg);
+
+      // The metric picker must re-plot rather than relabel.
+      await page.evaluate(() => { setInbodyScan(2); setInbodyMetric('vfa'); });
+      await page.waitForTimeout(500);
+      const vfa = await page.evaluate(() => {
+        const el = document.getElementById('ibTrendSummary');
+        const chip = el.querySelector('.hx-delta');
+        return { text: el.innerText.replace(/\s+/g, ' ').trim(), cls: chip ? chip.className : '' };
+      });
+      console.log('   vfa   :', vfa.text, '|', vfa.cls);
+      check('visceral fat re-plots', /43\.7 cm² → 40\.9 cm²/.test(vfa.text), vfa.text);
+      // Down is good here, the opposite of muscle - the colour has to know.
+      check('a falling visceral fat number reads as an improvement',
+        /hx-up/.test(vfa.cls), vfa.cls);
+      await page.evaluate(() => setInbodyMetric('smm'));
+      await page.waitForTimeout(300);
+
+      await page.evaluate(() => showHistorySection('overview'));
+      await page.waitForTimeout(400);
+
       console.log('\n  -- Stats cards still there --');
       const kept = await page.evaluate(() => ({
         pushup: !!document.getElementById('statsPushupChart'),

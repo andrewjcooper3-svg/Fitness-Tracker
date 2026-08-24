@@ -1482,8 +1482,9 @@
        (the tiles, say) leaves a hole underneath it. Columns pack the cards
        against each other instead, which is what kills the ragged gaps on a
        wide screen. */
-    #hxSectionOverview, #hxDayList { columns: 2; column-gap: 12px; }
+    #hxSectionOverview, #hxSectionBody, #hxDayList { columns: 2; column-gap: 12px; }
     #hxSectionOverview > .stats-card,
+    #hxSectionBody > .stats-card,
     #hxDayList > .hx-wk { break-inside: avoid; }
     #hxSectionWorkouts, #hxSectionExercises { display: block; }
 
@@ -1518,6 +1519,8 @@
      fat and the page very long. */
   @media (min-width: 1200px) {
     #hxSectionOverview, #hxDayList, #hxExerciseList { columns: 3; }
+    /* Two, not three: these cards carry wide charts and a figure. */
+    #hxSectionBody { columns: 2; }
   }
 
   @media (min-width: 768px) {
@@ -2378,6 +2381,7 @@
     <button class="hx-seg-btn active" data-hx="overview" onclick="showHistorySection('overview')">Overview</button>
     <button class="hx-seg-btn" data-hx="exercises" onclick="showHistorySection('exercises')">Exercises</button>
     <button class="hx-seg-btn" data-hx="workouts" onclick="showHistorySection('workouts')">Workouts</button>
+    <button class="hx-seg-btn" data-hx="body" onclick="showHistorySection('body')">Body</button>
   </div>
   <div class="hx-range" id="hxRange">
     <button class="hx-range-btn" data-range="90" onclick="setHistoryRange(90)">3M</button>
@@ -2515,6 +2519,64 @@
   <!-- ---- Workouts: the feed of session cards ---- -->
   <div class="hx-section" id="hxSectionWorkouts" style="display:none;">
     <div id="hxDayList"></div>
+  </div>
+
+  <!-- ---- Body: the InBody 770 scans ---- -->
+  <div class="hx-section" id="hxSectionBody" style="display:none;">
+    <div class="stats-card">
+      <div class="hx-card-head">
+        <div class="stats-card-title" style="margin:0;">Scan</div>
+        <select class="config-input" id="ibScanPicker" onchange="setInbodyScan(+this.value)"
+                style="width:auto; max-width:220px;"></select>
+      </div>
+      <div class="hx-card-note" id="ibScanWhen"></div>
+      <div class="hx-tiles" id="ibTiles"></div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">Muscle and fat</div>
+      <svg viewBox="0 0 320 176" class="stats-chart" id="ibCompChart" preserveAspectRatio="none"></svg>
+      <div class="stats-chart-detail" id="ibCompDetail"></div>
+      <div class="hx-legend">
+        <span class="hx-key"><span class="hx-swatch" style="background:var(--accent)"></span>Lean body mass</span>
+        <span class="hx-key"><span class="hx-swatch" style="background:var(--amber)"></span>Body fat</span>
+      </div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">Trend</div>
+      <select class="config-input" id="ibMetricPicker" onchange="setInbodyMetric(this.value)"
+              style="width:100%; box-sizing:border-box; margin-bottom:8px;"></select>
+      <svg viewBox="0 0 320 176" class="stats-chart" id="ibTrendChart" preserveAspectRatio="none"></svg>
+      <div class="stats-chart-detail" id="ibTrendDetail"></div>
+      <div class="hx-card-note" id="ibTrendSummary" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">Segmental lean</div>
+      <div class="hx-card-note">Lean mass in each segment against the InBody ideal for your height. Facing you, so screen-left is your right side.</div>
+      <div class="hx-body-wrap" id="ibBodyDiagram"></div>
+      <div class="hx-body-legend">
+        <span>80%</span>
+        <i style="background:color-mix(in srgb, var(--accent) 10%, var(--surface2))"></i>
+        <i style="background:color-mix(in srgb, var(--accent) 31%, var(--surface2))"></i>
+        <i style="background:color-mix(in srgb, var(--accent) 52%, var(--surface2))"></i>
+        <i style="background:color-mix(in srgb, var(--accent) 74%, var(--surface2))"></i>
+        <i style="background:color-mix(in srgb, var(--accent) 95%, var(--surface2))"></i>
+        <span>105% of ideal</span>
+      </div>
+      <div id="ibSegRows"></div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">To reach the ideal</div>
+      <div class="hx-ratios" id="ibGoals"></div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">Everything else on the sheet</div>
+      <div id="ibExtras"></div>
+    </div>
   </div>
 
   <div class="ov-note" id="hxLegacyNote">Pushup totals come from your daily ledger. Weight trend appears once you've logged at least two weigh-ins - tap the Weight Trend card to log one.</div>
@@ -4483,7 +4545,7 @@ async function loadWorkoutHistory(force) {
 
 function showHistorySection(name) {
   historySection_ = name;
-  ['overview', 'exercises', 'workouts'].forEach(k => {
+  ['overview', 'exercises', 'workouts', 'body'].forEach(k => {
     const el = document.getElementById('hxSection' + k.charAt(0).toUpperCase() + k.slice(1));
     if (el) el.style.display = k === name ? '' : 'none';
   });
@@ -4491,6 +4553,12 @@ function showHistorySection(name) {
   // so they hide with it. Their footnote sits outside and needs telling.
   const note = document.getElementById('hxLegacyNote');
   if (note) note.style.display = name === 'overview' ? '' : 'none';
+  // The range chips and the sheet-status line scope the workout history.
+  // On the Body segment they describe nothing that is on screen.
+  ['hxRange', 'hxStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = name === 'body' ? 'none' : '';
+  });
   document.querySelectorAll('#hxSeg .hx-seg-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.hx === name));
   renderHistoryTab();
@@ -4709,13 +4777,13 @@ const BODY_PARTS = {
     { side: 'L', p: [[59, 41], [49, 43], [42, 48], [40, 57], [44, 68], [54, 71], [59, 68]], r: 6, m: 'Chest' },
     { side: 'C', p: [[46, 70], [74, 70], [72, 86], [68, 100], [66, 114], [54, 114], [52, 100], [48, 86]], r: 7, m: 'Core' },
     { side: 'L', p: [[42, 62], [35, 63], [31, 72], [31, 86], [35, 96], [41, 95], [43, 80]], r: 6, m: 'Biceps' },
-    { side: 'L', p: [[41, 96], [33, 97], [28, 108], [27, 120], [31, 131], [36, 130], [38, 116], [40, 106]], r: 5 },
-    { side: 'L', p: [[36, 130], [29, 132], [28, 142], [33, 148], [37, 143], [38, 135]], r: 4 },
-    { side: 'C', p: [[50, 112], [70, 112], [73, 126], [47, 126]], r: 7 },
+    { side: 'L', p: [[41, 96], [33, 97], [28, 108], [27, 120], [31, 131], [36, 130], [38, 116], [40, 106]], r: 5, seg: 'arm' },
+    { side: 'L', p: [[36, 130], [29, 132], [28, 142], [33, 148], [37, 143], [38, 135]], r: 4, seg: 'arm' },
+    { side: 'C', p: [[50, 112], [70, 112], [73, 126], [47, 126]], r: 7, seg: 'trunk' },
     { side: 'L', p: [[47, 122], [41, 132], [40, 150], [43, 168], [47, 180], [56, 180], [57, 155], [57, 128]], r: 8, m: 'Quads' },
-    { side: 'L', p: [[47, 178], [57, 178], [57, 190], [47, 190]], r: 5 },
+    { side: 'L', p: [[47, 178], [57, 178], [57, 190], [47, 190]], r: 5, seg: 'leg' },
     { side: 'L', p: [[52, 188], [46, 194], [43, 205], [45, 218], [49, 230], [54, 229], [55, 212], [55, 195]], r: 7, m: 'Calves' },
-    { side: 'L', p: [[47, 228], [58, 228], [59, 240], [44, 240]], r: 4 }
+    { side: 'L', p: [[47, 228], [58, 228], [59, 240], [44, 240]], r: 4, seg: 'leg' }
   ],
   Back: [
     { side: 'C', t: 'ellipse', cx: 60, cy: 16, rx: 9, ry: 11.5 },
@@ -4725,13 +4793,13 @@ const BODY_PARTS = {
     { side: 'L', p: [[59, 58], [46, 60], [38, 70], [41, 82], [50, 92], [59, 94]], r: 7, m: 'Back' },
     { side: 'C', p: [[52, 90], [68, 90], [69, 108], [51, 108]], r: 6, m: 'Back' },
     { side: 'L', p: [[42, 62], [35, 63], [31, 72], [31, 86], [35, 96], [41, 95], [43, 80]], r: 6, m: 'Triceps' },
-    { side: 'L', p: [[41, 96], [33, 97], [28, 108], [27, 120], [31, 131], [36, 130], [38, 116], [40, 106]], r: 5 },
-    { side: 'L', p: [[36, 130], [29, 132], [28, 142], [33, 148], [37, 143], [38, 135]], r: 4 },
+    { side: 'L', p: [[41, 96], [33, 97], [28, 108], [27, 120], [31, 131], [36, 130], [38, 116], [40, 106]], r: 5, seg: 'arm' },
+    { side: 'L', p: [[36, 130], [29, 132], [28, 142], [33, 148], [37, 143], [38, 135]], r: 4, seg: 'arm' },
     { side: 'L', p: [[59, 106], [47, 108], [41, 116], [44, 128], [54, 133], [59, 130]], r: 8, m: 'Glutes' },
     { side: 'L', p: [[47, 130], [41, 140], [41, 158], [45, 174], [49, 180], [56, 180], [57, 155], [57, 133]], r: 8, m: 'Hamstrings' },
-    { side: 'L', p: [[47, 178], [57, 178], [57, 190], [47, 190]], r: 5 },
+    { side: 'L', p: [[47, 178], [57, 178], [57, 190], [47, 190]], r: 5, seg: 'leg' },
     { side: 'L', p: [[52, 188], [46, 194], [43, 205], [45, 218], [49, 230], [54, 229], [55, 212], [55, 195]], r: 7, m: 'Calves' },
-    { side: 'L', p: [[47, 228], [58, 228], [59, 240], [44, 240]], r: 4 }
+    { side: 'L', p: [[47, 228], [58, 228], [59, 240], [44, 240]], r: 4, seg: 'leg' }
   ]
 };
 
@@ -4834,6 +4902,371 @@ function renderBodyDiagram_(el, byMuscle, maxSets) {
 function muscleSetsLabel_(n) {
   const r = Math.round(n * 10) / 10;
   return (Number.isInteger(r) ? r : r.toFixed(1)) + ' set' + (r === 1 ? '' : 's');
+}
+
+/* ---------- InBody scans ----------
+   Transcribed from the InBody 770 result sheets. These arrive as printed
+   PDFs a few times a year, so they live in the file rather than behind a
+   thirty-field entry form nobody would fill in on a phone - a new scan is
+   one more object in this array.
+
+   Every number on the sheet is here, including the ones nothing currently
+   charts, so a later chart never needs the paper again. */
+const INBODY_HEIGHT_IN = 69;   // 5 ft 9 in, constant across all scans
+
+const INBODY_SCANS = [
+  {
+    date: '2025-09-03', time: '08:33', age: 23,
+    weight: 137.8, smm: 63.1, bmi: 20.3, pbf: 19.2,
+    icw: 51.8, ecw: 29.5, dlm: 30.0, bfm: 26.5, tbw: 81.4, lbm: 111.3,
+    ecwTbw: 0.364, vfa: 43.7, bmr: 1461, legLean: 36.6, tbwLbm: 73.1,
+    smi: 7.1, phase: 6.5, controlFat: -4.2, controlLean: 15.4,
+    seg: {
+      rightArm: { lean: 5.89, pct: 89.8, fat: 1.3, fatPct: 97.2, phase: 6.3, ecwTbw: 0.364 },
+      leftArm:  { lean: 5.64, pct: 86.1, fat: 1.3, fatPct: 105.9, phase: 6.1, ecwTbw: 0.366 },
+      trunk:    { lean: 50.2, pct: 95.9, fat: 13.0, fatPct: 136.8, phase: 7.5, ecwTbw: 0.365 },
+      rightLeg: { lean: 18.34, pct: 100.6, fat: 4.2, fatPct: 111.6, phase: 6.7, ecwTbw: 0.363 },
+      leftLeg:  { lean: 18.28, pct: 100.3, fat: 4.2, fatPct: 111.6, phase: 7.0, ecwTbw: 0.362 }
+    }
+  },
+  {
+    date: '2026-01-20', time: '09:57', age: 23,
+    weight: 143.5, smm: 66.6, bmi: 21.2, pbf: 18.5,
+    icw: 54.5, ecw: 30.9, dlm: 31.5, bfm: 26.7, tbw: 85.3, lbm: 116.8,
+    ecwTbw: 0.362, vfa: 45.4, bmr: 1516, legLean: 36.6, tbwLbm: 73.0,
+    smi: 7.3, phase: 6.6, controlFat: -4.2, controlLean: 9.7,
+    seg: {
+      rightArm: { lean: 6.53, pct: 95.4, fat: 1.3, fatPct: 92.3, phase: 6.3, ecwTbw: 0.367 },
+      leftArm:  { lean: 6.17, pct: 90.5, fat: 1.3, fatPct: 103.1, phase: 6.2, ecwTbw: 0.367 },
+      trunk:    { lean: 53.5, pct: 98.2, fat: 13.4, fatPct: 143.2, phase: 7.7, ecwTbw: 0.362 },
+      rightLeg: { lean: 18.34, pct: 96.6, fat: 4.0, fatPct: 104.8, phase: 6.9, ecwTbw: 0.360 },
+      leftLeg:  { lean: 18.28, pct: 96.3, fat: 4.0, fatPct: 104.9, phase: 7.2, ecwTbw: 0.359 }
+    }
+  },
+  {
+    date: '2026-07-14', time: '08:31', age: 24,
+    weight: 144.1, smm: 68.3, bmi: 21.3, pbf: 16.8,
+    icw: 55.8, ecw: 31.7, dlm: 32.4, bfm: 24.2, tbw: 87.5, lbm: 119.9,
+    ecwTbw: 0.362, vfa: 40.9, bmr: 1544, legLean: 36.9, tbwLbm: 73.1,
+    smi: 7.4, phase: 6.6, controlFat: -2.0, controlLean: 6.8,
+    seg: {
+      rightArm: { lean: 6.75, pct: 98.5, fat: 1.1, fatPct: 79.3, phase: 6.2, ecwTbw: 0.368 },
+      leftArm:  { lean: 6.46, pct: 94.1, fat: 1.1, fatPct: 89.5, phase: 6.1, ecwTbw: 0.368 },
+      trunk:    { lean: 54.7, pct: 100.1, fat: 12.3, fatPct: 129.8, phase: 7.6, ecwTbw: 0.362 },
+      rightLeg: { lean: 18.43, pct: 96.7, fat: 3.7, fatPct: 95.7, phase: 7.0, ecwTbw: 0.360 },
+      leftLeg:  { lean: 18.48, pct: 96.9, fat: 3.7, fatPct: 96.0, phase: 7.2, ecwTbw: 0.359 }
+    }
+  }
+];
+
+/* Which way the number should be going. InBody's own sheet does not say,
+   and "visceral fat went up" reads very differently from "muscle went up",
+   so the direction is part of the metric rather than something the reader
+   is left to work out. */
+const INBODY_METRICS = {
+  weight: { label: 'Weight', unit: ' lb', dp: 1, good: 0 },
+  smm:    { label: 'Skeletal muscle mass', unit: ' lb', dp: 1, good: 1 },
+  lbm:    { label: 'Lean body mass', unit: ' lb', dp: 1, good: 1 },
+  pbf:    { label: 'Body fat', unit: '%', dp: 1, good: -1 },
+  bfm:    { label: 'Body fat mass', unit: ' lb', dp: 1, good: -1 },
+  vfa:    { label: 'Visceral fat area', unit: ' cm²', dp: 1, good: -1 },
+  bmi:    { label: 'BMI', unit: '', dp: 1, good: 0 },
+  smi:    { label: 'Skeletal muscle index', unit: ' kg/m²', dp: 1, good: 1 },
+  bmr:    { label: 'Basal metabolic rate', unit: ' kcal', dp: 0, good: 1 },
+  phase:  { label: 'Phase angle', unit: '°', dp: 1, good: 1 },
+  tbw:    { label: 'Total body water', unit: ' lb', dp: 1, good: 0 },
+  icw:    { label: 'Intracellular water', unit: ' lb', dp: 1, good: 1 },
+  ecw:    { label: 'Extracellular water', unit: ' lb', dp: 1, good: 0 },
+  dlm:    { label: 'Dry lean mass', unit: ' lb', dp: 1, good: 1 },
+  ecwTbw: { label: 'ECW / TBW', unit: '', dp: 3, good: -1 },
+  legLean:{ label: 'Leg lean mass', unit: ' lb', dp: 1, good: 1 }
+};
+
+const INBODY_SEGMENTS = [
+  ['rightArm', 'Right arm'], ['leftArm', 'Left arm'], ['trunk', 'Trunk'],
+  ['rightLeg', 'Right leg'], ['leftLeg', 'Left leg']
+];
+
+const STORAGE_INBODY_METRIC_KEY = 'WORKOUT_INBODY_METRIC';
+let inbodyMetric_ = 'smm';
+let inbodyScanIdx_ = INBODY_SCANS.length - 1;
+
+function initInbody_() {
+  try {
+    const m = localStorage.getItem(STORAGE_INBODY_METRIC_KEY);
+    if (m && INBODY_METRICS[m]) inbodyMetric_ = m;
+  } catch (e) {}
+  const scanSel = document.getElementById('ibScanPicker');
+  if (scanSel) {
+    scanSel.innerHTML = INBODY_SCANS.map((s, i) =>
+      `<option value="${i}">${escapeHtml_(inbodyDate_(s, true))}</option>`).reverse().join('');
+    scanSel.value = String(inbodyScanIdx_);
+  }
+  const metricSel = document.getElementById('ibMetricPicker');
+  if (metricSel) {
+    metricSel.innerHTML = Object.keys(INBODY_METRICS).map(k =>
+      `<option value="${k}">${escapeHtml_(INBODY_METRICS[k].label)}</option>`).join('');
+    metricSel.value = inbodyMetric_;
+  }
+}
+
+function inbodyFmt_(metric, v) {
+  const M = INBODY_METRICS[metric];
+  return v == null ? '–' : v.toFixed(M.dp) + M.unit;
+}
+
+function inbodyDate_(scan, long) {
+  return new Date(scan.date + 'T00:00:00').toLocaleDateString('en-US',
+    long ? { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }
+         : { month: 'short', day: 'numeric', year: '2-digit' });
+}
+
+// A delta is only meaningful with a direction attached, so the class comes
+// from change x whether-up-is-good rather than from the sign alone.
+function inbodyDelta_(metric, cur, prev) {
+  if (prev == null) return { text: 'first scan', cls: 'hx-flat' };
+  const M = INBODY_METRICS[metric];
+  const d = Math.round((cur - prev) * Math.pow(10, M.dp)) / Math.pow(10, M.dp);
+  if (d === 0) return { text: 'no change', cls: 'hx-flat' };
+  const arrow = d > 0 ? '▲ +' : '▼ ';
+  const cls = M.good === 0 ? 'hx-flat' : (d > 0) === (M.good > 0) ? 'hx-up' : 'hx-down';
+  return { text: arrow + Math.abs(d).toFixed(M.dp) + M.unit, cls };
+}
+
+function setInbodyMetric(metric) {
+  inbodyMetric_ = metric;
+  try { localStorage.setItem(STORAGE_INBODY_METRIC_KEY, metric); } catch (e) {}
+  renderInbodyTab_();
+}
+
+function setInbodyScan(idx) {
+  inbodyScanIdx_ = Math.max(0, Math.min(INBODY_SCANS.length - 1, idx));
+  renderInbodyTab_();
+  updateViewportHeight('stats', true);
+}
+
+/* Lean and fat stacked to the scan's total weight. This is the one chart
+   that shows recomposition directly: the column keeps its height while the
+   dark part grows and the pale part shrinks. Two separate lines would show
+   the same numbers and hide the relationship. */
+function renderInbodyCompChart_() {
+  const svg = document.getElementById('ibCompChart');
+  if (!svg) return;
+  const box = fitChartBox_(svg, 320, 176);
+  const scans = INBODY_SCANS;
+  const scale = chartScale_(0, Math.max(...scans.map(s => s.weight)), true);
+  const F = chartFrame_(box, scale, v => chartCompact_(v));
+
+  const band = (F.x1 - F.x0) / scans.length;
+  const barW = Math.max(3, Math.min(CHART_MAX_BAR + 6, band - CHART_MIN_GAP * 2));
+  let out = F.svg;
+
+  scans.forEach((s, i) => {
+    const cx = F.x0 + band * (i + 0.5);
+    const x = cx - barW / 2;
+    const yFat = F.yFor(s.weight);
+    const yLean = F.yFor(s.lbm);
+    out += `<g class="chart-band">`;
+    out += `<rect class="chart-band-bg" x="${(cx - band / 2 + 1).toFixed(1)}" y="2" width="${(band - 2).toFixed(1)}" height="${(F.y1 + 4).toFixed(1)}" rx="7"></rect>`;
+    // Lean sits on the baseline; fat rides on top with a 2px surface gap.
+    out += `<path d="${chartColumnPath_(x, yLean, barW, F.y1)}" fill="var(--accent)"></path>`;
+    out += `<path d="${chartColumnPath_(x, yFat, barW, yLean - CHART_MIN_GAP)}" fill="var(--amber)"></path>`;
+    out += chartAxisText_(cx, Math.max(11, yFat - 6), s.weight.toFixed(1), 'middle', 'chart-value');
+    out += chartAxisText_(cx, box.h - 7, inbodyDate_(s), 'middle', 'chart-tick');
+    out += `<rect class="chart-hit" x="${(cx - band / 2).toFixed(1)}" y="0" width="${band.toFixed(1)}" height="${box.h}"></rect>`;
+    out += `</g>`;
+  });
+  svg.innerHTML = out;
+
+  bindChartHits_(svg, scans.map(s => ({
+    label: inbodyDate_(s),
+    tip: `<b>${escapeHtml_(inbodyDate_(s, true))}</b><br>`
+       + `${s.weight.toFixed(1)} lb total<br>`
+       + `<span class="k">${s.lbm.toFixed(1)} lb lean · ${s.bfm.toFixed(1)} lb fat (${s.pbf.toFixed(1)}%)</span>`,
+    detail: `${inbodyDate_(s, true)} — ${s.lbm.toFixed(1)} lb lean, ${s.bfm.toFixed(1)} lb fat (${s.pbf.toFixed(1)}%)`
+  })), 'ibCompDetail', (p, i) => setInbodyScan(i));
+}
+
+function renderInbodyTrend_() {
+  const M = INBODY_METRICS[inbodyMetric_];
+  const points = INBODY_SCANS.map(s => {
+    const v = s[inbodyMetric_];
+    return {
+      label: inbodyDate_(s),
+      value: v,
+      tip: `<b>${escapeHtml_(inbodyDate_(s, true))}</b><br>${escapeHtml_(M.label)} ${inbodyFmt_(inbodyMetric_, v)}`,
+      detail: `${inbodyDate_(s, true)} — ${M.label} ${inbodyFmt_(inbodyMetric_, v)}`
+    };
+  });
+  renderLineChart_('ibTrendChart', points, {
+    detailId: 'ibTrendDetail',
+    fmtTick: v => v.toFixed(M.dp === 3 ? 3 : M.dp === 0 ? 0 : 1),
+    fmtValue: v => v.toFixed(M.dp)
+  });
+  const first = points[0].value, last = points[points.length - 1].value;
+  const d = inbodyDelta_(inbodyMetric_, last, first);
+  const sum = document.getElementById('ibTrendSummary');
+  if (sum) {
+    sum.innerHTML = `${escapeHtml_(M.label)} ${inbodyFmt_(inbodyMetric_, first)} → ${inbodyFmt_(inbodyMetric_, last)}`
+      + ` <span class="hx-delta ${d.cls}">${escapeHtml_(d.text)}</span> across ${points.length} scans`;
+  }
+}
+
+/* The segmental figure. InBody reports five segments, and which side of
+   the screen is which side of the body depends on the view - facing you,
+   screen-left is your right arm. Getting that backwards would quietly
+   swap two numbers that differ by a real margin, so it is explicit. */
+const INBODY_PART_SEGMENT = {
+  Shoulders: 'arm', Biceps: 'arm', Triceps: 'arm',
+  Chest: 'trunk', Back: 'trunk', Core: 'trunk',
+  Quads: 'leg', Hamstrings: 'leg', Glutes: 'leg', Calves: 'leg'
+};
+
+function inbodySegShade_(pct) {
+  if (pct == null) return 'var(--surface2)';
+  const t = Math.max(0, Math.min(1, (pct - 80) / 25));   // 80% .. 105%
+  return `color-mix(in srgb, var(--accent) ${(10 + t * 85).toFixed(0)}%, var(--surface2))`;
+}
+
+function renderInbodySegments_(scan) {
+  const el = document.getElementById('ibBodyDiagram');
+  if (!el) return;
+  const parts = BODY_PARTS.Front;
+  let out = `<svg viewBox="0 0 ${BODY_W} ${BODY_H + 16}" class="hx-body-svg" style="max-width:190px;" role="img"`
+    + ` aria-label="Body segments shaded by lean mass against the ideal for this height">`;
+
+  const segFor = (p, mirrored) => {
+    const kind = p.m ? INBODY_PART_SEGMENT[p.m] : p.seg;
+    if (!kind) return null;
+    if (kind === 'trunk') return 'trunk';
+    // Front view: the un-mirrored copy is drawn on screen-left, which is
+    // the subject's RIGHT.
+    const side = mirrored ? 'left' : 'right';
+    return side + (kind === 'arm' ? 'Arm' : 'Leg');
+  };
+
+  [false, true].forEach(mirrored => {
+    parts.forEach(p => {
+      if (mirrored && p.side !== 'L') return;
+      const key = segFor(p, mirrored);
+      const data = scan.seg[key];
+      const fill = key ? inbodySegShade_(data ? data.pct : null) : 'var(--surface2)';
+      const attrs = key ? ` data-seg="${key}"` : '';
+      const cls = key ? 'hx-body-part' : 'hx-body-inert';
+      const shape = p.t === 'ellipse'
+        ? `<ellipse cx="${p.cx}" cy="${p.cy}" rx="${p.rx}" ry="${p.ry}" class="${cls}" fill="${fill}"${attrs}></ellipse>`
+        : `<path d="${hxBlob_(p.p, p.r)}" class="${cls}" fill="${fill}"${attrs}></path>`;
+      out += mirrored ? `<g transform="translate(${BODY_W},0) scale(-1,1)">${shape}</g>` : shape;
+    });
+  });
+  (BODY_LINES.Front || []).forEach(l => {
+    const d = 'M' + l.pts.map(pt => pt.join(' ')).join('L');
+    out += `<path d="${d}" class="hx-body-line"></path>`;
+    if (l.side === 'L') out += `<g transform="translate(${BODY_W},0) scale(-1,1)"><path d="${d}" class="hx-body-line"></path></g>`;
+  });
+  out += chartAxisText_(BODY_W / 2, BODY_H + 12, 'Facing you', 'middle', 'chart-tick');
+  out += `</svg>`;
+  el.innerHTML = out;
+
+  const label = Object.fromEntries(INBODY_SEGMENTS);
+  [...el.querySelectorAll('.hx-body-part')].forEach(node => {
+    const key = node.dataset.seg;
+    const d = scan.seg[key];
+    if (!d) return;
+    const show = e => showChartTip_(e, `<b>${escapeHtml_(label[key])}</b><br>`
+      + `${d.lean.toFixed(2)} lb lean <span class="k">· ${d.pct.toFixed(1)}% of ideal</span><br>`
+      + `<span class="k">${d.fat.toFixed(1)} lb fat · phase angle ${d.phase.toFixed(1)}°</span>`);
+    node.addEventListener('pointerenter', show);
+    node.addEventListener('pointermove', show);
+    node.addEventListener('pointerleave', hideChartTip_);
+  });
+}
+
+function renderInbodyScanDetail_() {
+  const scan = INBODY_SCANS[inbodyScanIdx_];
+  const prev = inbodyScanIdx_ > 0 ? INBODY_SCANS[inbodyScanIdx_ - 1] : null;
+
+  const picker = document.getElementById('ibScanPicker');
+  if (picker && picker.value !== String(inbodyScanIdx_)) picker.value = String(inbodyScanIdx_);
+
+  const tiles = [['weight', 'Weight'], ['smm', 'Muscle'], ['pbf', 'Body fat'], ['lbm', 'Lean mass']];
+  const tilesEl = document.getElementById('ibTiles');
+  if (tilesEl) {
+    tilesEl.innerHTML = tiles.map(([k, short]) => {
+      const d = inbodyDelta_(k, scan[k], prev ? prev[k] : null);
+      return `<div><div class="hx-tile-value">${escapeHtml_(inbodyFmt_(k, scan[k]))}</div>`
+        + `<div class="hx-tile-label">${escapeHtml_(short)}</div>`
+        + `<div class="hx-tile-delta ${d.cls}">${escapeHtml_(d.text)}</div></div>`;
+    }).join('');
+  }
+
+  renderInbodySegments_(scan);
+
+  const segEl = document.getElementById('ibSegRows');
+  if (segEl) {
+    segEl.innerHTML = INBODY_SEGMENTS.map(([key, name]) => {
+      const d = scan.seg[key];
+      const p = prev && prev.seg[key];
+      const diff = p ? Math.round((d.lean - p.lean) * 100) / 100 : null;
+      const cls = diff === null ? 'hx-flat' : diff > 0 ? 'hx-up' : diff < 0 ? 'hx-down' : 'hx-flat';
+      const arrow = diff === null ? '' : diff > 0 ? '▲ +' + diff : diff < 0 ? '▼ ' + diff : '— same';
+      return `<div class="hx-row">
+        <div class="hx-row-main">
+          <div class="hx-row-title">${escapeHtml_(name)}</div>
+          <div class="hx-row-sub">${d.pct.toFixed(1)}% of ideal · ${d.fat.toFixed(1)} lb fat · ${d.phase.toFixed(1)}° phase</div>
+        </div>
+        <div class="hx-row-value">${d.lean.toFixed(2)}<span class="hx-delta ${cls}">${escapeHtml_(arrow)}</span></div>
+      </div>`;
+    }).join('');
+  }
+
+  // InBody's own recommendation, stated the way the sheet states it.
+  const goal = document.getElementById('ibGoals');
+  if (goal) {
+    goal.innerHTML = `<div class="hx-ratio">
+        <div class="hx-ratio-label">Fat to lose</div>
+        <div class="hx-ratio-value">${Math.abs(scan.controlFat).toFixed(1)} lb</div>
+        <div class="hx-ratio-note">InBody's target from this scan</div>
+      </div>
+      <div class="hx-ratio">
+        <div class="hx-ratio-label">Lean to gain</div>
+        <div class="hx-ratio-value">${scan.controlLean.toFixed(1)} lb</div>
+        <div class="hx-ratio-note">toward the ideal for 5&#39;9&quot;</div>
+      </div>`;
+  }
+
+  const extras = [
+    ['Visceral fat area', scan.vfa.toFixed(1) + ' cm²'],
+    ['Basal metabolic rate', scan.bmr + ' kcal'],
+    ['Skeletal muscle index', scan.smi.toFixed(1) + ' kg/m²'],
+    ['Whole-body phase angle', scan.phase.toFixed(1) + '°'],
+    ['BMI', scan.bmi.toFixed(1)],
+    ['Total body water', scan.tbw.toFixed(1) + ' lb'],
+    ['Intracellular water', scan.icw.toFixed(1) + ' lb'],
+    ['Extracellular water', scan.ecw.toFixed(1) + ' lb'],
+    ['Dry lean mass', scan.dlm.toFixed(1) + ' lb'],
+    ['ECW / TBW', scan.ecwTbw.toFixed(3)],
+    ['TBW / LBM', scan.tbwLbm.toFixed(1) + '%'],
+    ['Leg lean mass', scan.legLean.toFixed(1) + ' lb']
+  ];
+  const extrasEl = document.getElementById('ibExtras');
+  if (extrasEl) {
+    extrasEl.innerHTML = extras.map(([k, v]) =>
+      `<div class="hx-rec"><span class="hx-rec-label">${escapeHtml_(k)}</span>`
+      + `<span class="hx-rec-value">${escapeHtml_(v)}</span></div>`).join('');
+  }
+
+  const when = document.getElementById('ibScanWhen');
+  if (when) when.textContent = `${inbodyDate_(scan, true)} at ${scan.time} · age ${scan.age}`;
+}
+
+function renderInbodyTab_() {
+  if (!document.getElementById('ibTiles')) return;
+  const picker = document.getElementById('ibMetricPicker');
+  if (picker && picker.value !== inbodyMetric_) picker.value = inbodyMetric_;
+  renderInbodyScanDetail_();
+  renderInbodyCompChart_();
+  renderInbodyTrend_();
 }
 
 /* ---------- Muscle balance modal ----------
@@ -5586,7 +6019,8 @@ function renderHistoryTab() {
   if (historySection_ === 'overview') renderHistoryOverview_(rows);
   else if (historySection_ === 'exercises') {
     if (historyExercise_) renderHistoryExercise(); else renderHistoryExerciseList();
-  } else renderHistoryWorkouts_(rows);
+  } else if (historySection_ === 'body') renderInbodyTab_();
+  else renderHistoryWorkouts_(rows);
 }
 
 function renderStatsTab() {
@@ -5637,7 +6071,8 @@ function initChartResizeObserver_() {
     });
   });
   ['statsPushupChart', 'statsWeightChart', 'sdChart',
-   'hxFreqChart', 'hxVolumeChart', 'hxCompletionChart', 'hxExerciseChart'].forEach(id => {
+   'hxFreqChart', 'hxVolumeChart', 'hxCompletionChart', 'hxExerciseChart',
+   'ibCompChart', 'ibTrendChart'].forEach(id => {
     const el = document.getElementById(id);
     if (el && el.parentElement) ro.observe(el.parentElement);
   });
@@ -10943,7 +11378,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-body-diagram';
+const APP_BUILD_VERSION = '2026-08-24-inbody';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -15615,6 +16050,7 @@ initChartResizeObserver_();
 initHistoryRange_();
 initMuscleWindow_();
 initMuscleMode_();
+initInbody_();
 initTabBarViewportPin();
 // Local order first, so the page is already arranged on this device
 // before any network call. loadRemoteOverviewLayoutState() re-applies it
