@@ -116,7 +116,7 @@ const mock = rows => route => {
       check('back picked up Lat Pulldown', muscles.rows.some(m => /^Back/.test(m)), muscles.rows.join(' | '));
       check('chest picked up Pushups', muscles.rows.some(m => /^Chest/.test(m)), muscles.rows.join(' | '));
       check('the note totals the sets and names the window',
-        /\d+ completed sets?, (all time|3 months|1 year|\w{3} \d+ . \w{3} \d+)/.test(muscles.note), muscles.note);
+        /[\d.]+ sets?, (all time|3 months|1 year|\w{3} \d+ . \w{3} \d+)/.test(muscles.note), muscles.note);
       // An inline span ignores width; the bars must actually be drawn.
       const fills = await page.evaluate(() =>
         [...document.querySelectorAll('#hxMuscles .hx-muscle-fill')].map(f => Math.round(f.getBoundingClientRect().width)));
@@ -163,6 +163,71 @@ const mock = rows => route => {
       check('the range button relabels with the tab chip', rangeBtnLabel === '3 months', rangeBtnLabel);
       await page.evaluate(() => { setHistoryRange(0); setMuscleWindow('range'); });
       await page.waitForTimeout(300);
+
+      console.log('\n  -- Muscle balance modal --');
+      await page.evaluate(() => setMuscleWindow('range'));
+      await page.waitForTimeout(200);
+      const opened = await page.evaluate(() => {
+        document.querySelector('.hx-title-btn').click();
+        return document.getElementById('muscleBalanceOverlay').classList.contains('open');
+      });
+      await page.waitForTimeout(400);
+      check('the chart title opens the modal', opened);
+
+      const primary = await page.evaluate(() => ({
+        mode: document.querySelector('#hxModeSeg button.active').textContent,
+        regions: document.querySelectorAll('#hxBodyDiagram .hx-body-part').length,
+        views: [...document.querySelectorAll('#hxBodyDiagram text')].map(t => t.textContent),
+        cards: [...document.querySelectorAll('.hx-balance-card')].map(c => c.innerText.replace(/\s+/g, ' ').trim()),
+        ratios: [...document.querySelectorAll('.hx-ratio')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
+        note: document.getElementById('hxBalanceNote').textContent,
+        window: document.getElementById('hxBalanceWindow').textContent
+      }));
+      console.log('   views:', primary.views.join(' / '), '| regions:', primary.regions);
+      console.log('   ratios:', primary.ratios.join('  ||  '));
+      console.log('   cards :', primary.cards.slice(0, 3).join(' | '));
+      check('a front and a back figure are drawn',
+        primary.views.join(',') === 'Front,Back' && primary.regions >= 20,
+        `${primary.views} / ${primary.regions}`);
+      check('it opens in Primary only', primary.mode === 'Primary only', primary.mode);
+      check('the window matches the card', primary.window === 'all time', primary.window);
+      check('push:pull is reported', /PUSH : PULL/.test(primary.ratios[0]) && /\d[\d.]* : 1/.test(primary.ratios[0]),
+        primary.ratios[0]);
+      check('upper:lower is reported', /UPPER : LOWER/.test(primary.ratios[1]), primary.ratios[1]);
+      check('one card per muscle group', primary.cards.length >= 4, String(primary.cards.length));
+      check('the mode explains what it is counting', /each set counts once/i.test(primary.note), primary.note);
+
+      // Weighted has to actually change the numbers, or the toggle is a lie.
+      await page.evaluate(() => setMuscleMode(true));
+      await page.waitForTimeout(400);
+      const weighted = await page.evaluate(() => ({
+        mode: document.querySelector('#hxModeSeg button.active').textContent,
+        cards: [...document.querySelectorAll('.hx-balance-card')].map(c => c.innerText.replace(/\s+/g, ' ').trim()),
+        ratios: [...document.querySelectorAll('.hx-ratio')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
+        note: document.getElementById('hxBalanceNote').textContent,
+        cardNote: document.getElementById('hxMuscleNote').textContent,
+        groups: [...document.querySelectorAll('#hxMuscles .hx-muscle-name')].map(n => n.textContent)
+      }));
+      console.log('   weighted cards:', weighted.cards.slice(0, 3).join(' | '));
+      check('Weighted becomes the active mode', weighted.mode === 'Weighted', weighted.mode);
+      check('and the numbers actually change',
+        weighted.cards.join('|') !== primary.cards.join('|'), 'identical');
+      check('spreading the compounds reaches more groups',
+        weighted.cards.length >= primary.cards.length,
+        `${weighted.cards.length} vs ${primary.cards.length}`);
+      check('the note says what weighting means', /split across/i.test(weighted.note), weighted.note);
+      // The card behind the modal must not disagree with it.
+      check('the card follows the same mode', /weighted/.test(weighted.cardNote), weighted.cardNote);
+      check('Pushups now count towards Triceps on the card',
+        weighted.groups.includes('Triceps'), weighted.groups.join(','));
+
+      const savedMode = await page.evaluate(() => localStorage.getItem('WORKOUT_HISTORY_MUSCLE_MODE'));
+      check('the mode is remembered', savedMode === 'weighted', String(savedMode));
+
+      await page.evaluate(() => { setMuscleMode(false); closeMuscleBalanceModal(); });
+      await page.waitForTimeout(300);
+      check('it closes again', await page.evaluate(() =>
+        !document.getElementById('muscleBalanceOverlay').classList.contains('open')));
 
       const stalling = await page.evaluate(() =>
         [...document.querySelectorAll('#hxStalling .hx-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()));

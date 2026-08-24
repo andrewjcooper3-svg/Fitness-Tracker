@@ -75,5 +75,76 @@ check('no exercise is unclassified', orphans.length === 0, orphans.join(', '));
 check('an unknown exercise still gets a home', muscleFor_('Zercher Widowmaker') === 'Other',
   muscleFor_('Zercher Widowmaker'));
 
+/* ---- Weighted attribution ---- */
+// A `const` does not escape a sloppy eval, though a function declaration
+// does - so muscleSplit_ lands here on its own, while the three tables have
+// to be handed back out through the eval's completion value.
+const { MUSCLE_SPLIT_OVERRIDES, MUSCLE_SPLIT_DEFAULTS, BODY_PARTS } = eval(
+  src.match(/const MUSCLE_SPLIT_OVERRIDES = \[[\s\S]*?\n\];/)[0]
+  + '\n' + src.match(/const MUSCLE_SPLIT_DEFAULTS = \{[\s\S]*?\n\};/)[0]
+  + '\n' + src.match(/function muscleSplit_\(name\) \{[\s\S]*?\n\}/)[0]
+  + '\n' + src.match(/const BODY_PARTS = \{[\s\S]*?\n\};/)[0]
+  + '\n;({ MUSCLE_SPLIT_OVERRIDES, MUSCLE_SPLIT_DEFAULTS, BODY_PARTS })');
+
+console.log('\n=== Every split adds up to exactly one set ===');
+// If a split summed to 1.2, weighted mode would silently inflate the
+// totals and the two modes would stop being comparable.
+const near1 = o => Math.abs(Object.values(o).reduce((a, b) => a + b, 0) - 1) < 1e-9;
+const badOverride = MUSCLE_SPLIT_OVERRIDES.filter(([, o]) => !near1(o))
+  .map(([re, o]) => `${re} = ${Object.values(o).reduce((a, b) => a + b, 0)}`);
+check('every override sums to 1', badOverride.length === 0, badOverride.join('; '));
+const badDefault = Object.entries(MUSCLE_SPLIT_DEFAULTS).filter(([, o]) => !near1(o))
+  .map(([k, o]) => `${k} = ${Object.values(o).reduce((a, b) => a + b, 0)}`);
+check('every default sums to 1', badDefault.length === 0, badDefault.join('; '));
+
+const everyName = Object.values(expect).flat();
+const badResolved = everyName.filter(n => !near1(muscleSplit_(n)));
+check('and so does every resolved exercise', badResolved.length === 0, badResolved.join(', '));
+
+console.log('\n=== Splits only name groups that exist ===');
+const known = new Set([...Object.keys(expect), 'Other']);
+const unknownGroups = new Set();
+[...MUSCLE_SPLIT_OVERRIDES.map(([, o]) => o), ...Object.values(MUSCLE_SPLIT_DEFAULTS)]
+  .forEach(o => Object.keys(o).forEach(g => { if (!known.has(g)) unknownGroups.add(g); }));
+check('no split invents a muscle group', unknownGroups.size === 0, [...unknownGroups].join(', '));
+
+console.log('\n=== Weighted actually spreads the compounds ===');
+const spread = [
+  ['Bench Press', 'Chest', ['Triceps', 'Shoulders']],
+  ['Pushups', 'Chest', ['Triceps', 'Shoulders']],
+  ['Barbell Row', 'Back', ['Biceps']],
+  ['Pull Up', 'Back', ['Biceps']],
+  ['Squat', 'Quads', ['Glutes', 'Hamstrings']],
+  ['Deadlift', 'Hamstrings', ['Glutes', 'Back']],
+  ['Romanian Deadlift', 'Hamstrings', ['Glutes']]
+];
+spread.forEach(([name, primary, alsoHits]) => {
+  const split = muscleSplit_(name);
+  const top = Object.keys(split).sort((a, b) => split[b] - split[a])[0];
+  const missing = alsoHits.filter(g => !(split[g] > 0));
+  check(`${name} leads with ${primary} and also hits ${alsoHits.join(' + ')}`,
+    top === primary && missing.length === 0,
+    `top ${top}${missing.length ? ', missing ' + missing.join(',') : ''}`);
+});
+
+console.log('\n=== Isolation work stays on one muscle ===');
+[['Leg Extension', 'Quads'], ['Leg Curl', 'Hamstrings'], ['Bicep Curl', 'Biceps'],
+ ['Tricep Pushdown', 'Triceps'], ['Lateral Raise', 'Shoulders'], ['Calf Raise', 'Calves'],
+ ['Cable Crunch', 'Core'], ['Chest Fly', 'Chest']].forEach(([name, group]) => {
+  const split = muscleSplit_(name);
+  check(`${name} is all ${group}`, split[group] === 1 && Object.keys(split).length === 1,
+    JSON.stringify(split));
+});
+
+console.log('\n=== The body diagram covers every group ===');
+const drawn = new Set();
+Object.values(BODY_PARTS).forEach(parts => parts.forEach(p => { if (p.m) drawn.add(p.m); }));
+// Cardio has no muscle to shade; everything else must be somewhere on the body.
+const needed = Object.keys(expect).filter(g => g !== 'Cardio & other');
+const notDrawn = needed.filter(g => !drawn.has(g));
+check('every muscle group has a region', notDrawn.length === 0, notDrawn.join(', '));
+const phantom = [...drawn].filter(g => !known.has(g));
+check('no region maps to a group that cannot occur', phantom.length === 0, phantom.join(', '));
+
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

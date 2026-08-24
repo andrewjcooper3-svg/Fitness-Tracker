@@ -1020,6 +1020,40 @@
 
   /* Sets per muscle group. Hevy draws a body diagram; a ranked bar says the
      same thing without pretending to anatomy the data does not have. */
+  /* The chart title doubles as the way into the balance modal, so it has
+     to look pressable without becoming a button-shaped lump. */
+  .hx-title-btn { background: none; border: none; padding: 0; cursor: pointer; color: var(--text);
+    font-family: var(--font); font-size: 13px; font-weight: 700; text-align: left; }
+  .hx-title-caret { color: var(--accent); font-weight: 800; }
+
+  .hx-balance-sheet { max-width: 560px; }
+  .hx-body-wrap { display: flex; justify-content: center; }
+  .hx-body-svg { width: 100%; max-width: 320px; height: auto; display: block; }
+  .hx-body-part { stroke: var(--surface); stroke-width: 1.5; cursor: pointer; }
+  .hx-body-inert { fill: color-mix(in srgb, var(--muted) 26%, var(--surface2)); stroke: var(--surface); stroke-width: 1.5; }
+  @media (hover: hover) { .hx-body-part:hover { stroke: var(--accent); stroke-width: 2; } }
+  .hx-body-legend { display: flex; align-items: center; justify-content: center; gap: 4px;
+    font-family: var(--font); font-size: 10px; color: var(--muted); margin: 6px 0 16px; }
+  .hx-body-legend i { width: 22px; height: 8px; border-radius: 2px; display: block; }
+  .hx-body-legend span:first-child { margin-right: 4px; }
+  .hx-body-legend span:last-child { margin-left: 4px; }
+
+  .hx-ratios { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .hx-ratio { background: var(--surface2); border-radius: 14px; padding: 10px 12px; }
+  .hx-ratio-label { font-family: var(--font); font-size: 10px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.3px; }
+  .hx-ratio-value { font-family: var(--font); font-size: 20px; font-weight: 800; letter-spacing: -0.3px; margin: 2px 0; }
+  .hx-ratio-note { font-family: var(--font); font-size: 10.5px; color: var(--muted); line-height: 1.35; }
+
+  .hx-balance-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+  .hx-balance-card { background: var(--surface2); border-radius: 12px; padding: 9px 10px; }
+  .hx-balance-name { font-family: var(--font); font-size: 11px; font-weight: 700; color: var(--muted); }
+  .hx-balance-value { font-family: var(--font); font-size: 18px; font-weight: 800; letter-spacing: -0.3px; }
+  .hx-balance-share { font-family: var(--font); font-size: 10.5px; color: var(--muted); }
+  .hx-balance-track { height: 4px; border-radius: 2px; margin-top: 6px; overflow: hidden;
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+  .hx-balance-track > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+
   .hx-card-head { display: flex; align-items: center; justify-content: space-between;
     gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   .hx-mini-seg { display: flex; gap: 3px; background: var(--surface2); border-radius: 10px; padding: 3px; }
@@ -2366,7 +2400,8 @@
 
     <div class="stats-card">
       <div class="hx-card-head">
-        <div class="stats-card-title" style="margin:0;">Muscle distribution</div>
+        <button class="stats-card-title hx-title-btn" style="margin:0;" onclick="openMuscleBalanceModal()"
+                title="Open the body diagram and balance ratios">Muscle distribution <span class="hx-title-caret">›</span></button>
         <!-- Its own window, deliberately. Balance is the one thing worth
              checking a week at a time, while every other chart on this tab
              wants months - so this card gets to disagree with the range
@@ -2999,6 +3034,38 @@
     <div class="event-modal-relative" id="weekDetailTotal" style="margin-bottom:14px;"></div>
     <div id="weekDetailDays"></div>
     <button class="event-modal-close" onclick="closeWeekDetailModal(event)">Close</button>
+  </div>
+</div>
+
+<div class="event-modal-overlay" id="muscleBalanceOverlay" onclick="closeMuscleBalanceModal(event)">
+  <div class="event-modal-sheet hx-balance-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-title" style="margin-bottom:2px;">Muscle balance</div>
+    <div class="event-modal-relative" style="margin-bottom:12px;">
+      Showing <span id="hxBalanceWindow">all time</span>
+    </div>
+
+    <!-- Primary vs weighted. The same two numbers, counted two ways. -->
+    <div class="hx-mini-seg" id="hxModeSeg" style="margin-bottom:14px;">
+      <button data-mode="primary" class="active" onclick="setMuscleMode(false)">Primary only</button>
+      <button data-mode="weighted" onclick="setMuscleMode(true)">Weighted</button>
+    </div>
+
+    <div class="hx-body-wrap" id="hxBodyDiagram"></div>
+    <div class="hx-body-legend">
+      <span>less</span>
+      <i style="background:color-mix(in srgb, var(--accent) 10%, var(--surface2))"></i>
+      <i style="background:color-mix(in srgb, var(--accent) 31%, var(--surface2))"></i>
+      <i style="background:color-mix(in srgb, var(--accent) 52%, var(--surface2))"></i>
+      <i style="background:color-mix(in srgb, var(--accent) 74%, var(--surface2))"></i>
+      <i style="background:color-mix(in srgb, var(--accent) 95%, var(--surface2))"></i>
+      <span>more sets</span>
+    </div>
+
+    <div class="hx-ratios" id="hxBalanceRatios"></div>
+    <div class="hx-balance-grid" id="hxBalanceCards"></div>
+    <div class="hx-card-note" id="hxBalanceNote" style="margin-top:12px;"></div>
+    <button class="event-modal-close" onclick="closeMuscleBalanceModal(event)">Close</button>
   </div>
 </div>
 
@@ -4494,6 +4561,315 @@ function muscleFor_(name) {
    without reading the source. */
 let hxMuscleOpen_ = null;
 
+/* ---------- Weighted muscle attribution ----------
+   muscleFor_ answers "which single group does this exercise belong to",
+   which is what a ranked bar chart needs. It is also a lie about the
+   exercise: a bench press is not 100% chest, a row is not 100% back, and
+   filing a squat entirely under Quads is why the glutes looked neglected.
+
+   So there are two modes. PRIMARY gives each set to one group - simple,
+   and the right way to answer "what did I train on Tuesday". WEIGHTED
+   spreads each set across the groups the movement actually works, weights
+   summing to 1 so a set is still a set and the two modes stay comparable.
+
+   The weights are rules of thumb, not physiology, and deliberately coarse.
+   The point is that pressing shows up against triceps and shoulders at
+   all - not that 0.25 is exactly the right share. */
+
+// Exercises whose split is not implied by their primary group.
+const MUSCLE_SPLIT_OVERRIDES = [
+  [/close[- ]?grip bench/i,                 { Triceps: 0.5, Chest: 0.35, Shoulders: 0.15 }],
+  [/\bdips?\b/i,                            { Chest: 0.5, Triceps: 0.35, Shoulders: 0.15 }],
+  [/\bflye?s?\b|pec ?deck|cable cross/i,    { Chest: 1 }],
+  [/overhead press|\bohp\b|military|push press|arnold/i,
+                                            { Shoulders: 0.6, Triceps: 0.3, Chest: 0.1 }],
+  [/face ?pull/i,                           { Shoulders: 0.6, Back: 0.4 }],
+  [/lateral raise|lat raise|front raise|rear ?delt|reverse ?fly|shrug|upright row/i,
+                                            { Shoulders: 1 }],
+  [/pullover/i,                             { Back: 0.7, Chest: 0.3 }],
+  [/pull[- ]?up|chin[- ]?up/i,              { Back: 0.55, Biceps: 0.3, Core: 0.15 }],
+  [/pull ?down/i,                           { Back: 0.65, Biceps: 0.35 }],
+  [/\brows?\b|t-? ?bar|seal row/i,          { Back: 0.6, Biceps: 0.25, Shoulders: 0.15 }],
+  [/back ?extension|hyperextension/i,       { Back: 0.5, Glutes: 0.3, Hamstrings: 0.2 }],
+  [/leg ?extension/i,                       { Quads: 1 }],
+  [/leg ?curl|nordic/i,                     { Hamstrings: 1 }],
+  [/lunge|split squat|step[- ]?up/i,        { Quads: 0.45, Glutes: 0.4, Hamstrings: 0.15 }],
+  [/squat/i,                                { Quads: 0.55, Glutes: 0.3, Hamstrings: 0.1, Core: 0.05 }],
+  [/romanian|\brdl\b|good ?morning/i,       { Hamstrings: 0.55, Glutes: 0.3, Back: 0.15 }],
+  [/deadlift/i,                             { Hamstrings: 0.35, Glutes: 0.3, Back: 0.25, Quads: 0.1 }],
+  [/hip ?thrust|\bbridge\b/i,               { Glutes: 0.8, Hamstrings: 0.2 }],
+  [/hip ?abduct|abductor|kickback/i,        { Glutes: 1 }],
+  [/plank|pallof|hollow|dead ?bug/i,        { Core: 0.85, Shoulders: 0.15 }]
+];
+
+// Otherwise: what a typical movement for that primary group also trains.
+const MUSCLE_SPLIT_DEFAULTS = {
+  Chest:      { Chest: 0.6, Triceps: 0.25, Shoulders: 0.15 },
+  Back:       { Back: 0.65, Biceps: 0.35 },
+  Shoulders:  { Shoulders: 0.8, Triceps: 0.2 },
+  Quads:      { Quads: 0.6, Glutes: 0.3, Hamstrings: 0.1 },
+  Hamstrings: { Hamstrings: 0.6, Glutes: 0.3, Back: 0.1 },
+  Glutes:     { Glutes: 0.75, Hamstrings: 0.25 }
+};
+
+function muscleSplit_(name) {
+  for (const [re, split] of MUSCLE_SPLIT_OVERRIDES) if (re.test(name)) return split;
+  const primary = muscleFor_(name);
+  return MUSCLE_SPLIT_DEFAULTS[primary] || { [primary]: 1 };
+}
+
+/* One breakdown routine for the card, the modal and the diagram, so the
+   three can never drift apart. Returns group -> { sets, ex } where sets is
+   fractional in weighted mode. */
+function muscleBreakdown_(rows, weighted) {
+  const out = {};
+  rows.forEach(r => {
+    if (!r.done) return;
+    const split = weighted ? muscleSplit_(r.exercise) : { [muscleFor_(r.exercise)]: 1 };
+    Object.keys(split).forEach(g => {
+      const share = r.done * split[g];
+      if (!(share > 0)) return;
+      const e = out[g] = out[g] || { sets: 0, ex: {} };
+      e.sets += share;
+      e.ex[r.exercise] = (e.ex[r.exercise] || 0) + share;
+    });
+  });
+  return out;
+}
+
+function muscleRanked_(rows, weighted) {
+  const by = muscleBreakdown_(rows, weighted);
+  return Object.keys(by).map(k => ({ name: k, sets: by[k].sets, ex: by[k].ex }))
+    .filter(m => m.sets > 0.05).sort((a, b) => b.sets - a.sets);
+}
+
+// The two ratios worth watching. Push-heavy training with no matching pull
+// is the imbalance that actually causes trouble, and it is invisible in a
+// ranked list because it is spread across three rows.
+const MUSCLE_PUSH = ['Chest', 'Shoulders', 'Triceps'];
+const MUSCLE_PULL = ['Back', 'Biceps'];
+const MUSCLE_LOWER = ['Quads', 'Hamstrings', 'Glutes', 'Calves'];
+
+function muscleRatios_(list) {
+  const sum = names => list.filter(m => names.includes(m.name)).reduce((n, m) => n + m.sets, 0);
+  const push = sum(MUSCLE_PUSH), pull = sum(MUSCLE_PULL), lower = sum(MUSCLE_LOWER);
+  const upper = push + pull;
+  const fmt = (a, b) => !b ? (a ? '—' : '0 : 0') : (a / b).toFixed(2).replace(/\.?0+$/, '') + ' : 1';
+  return {
+    push, pull, upper, lower,
+    pushPull: fmt(push, pull),
+    upperLower: fmt(upper, lower),
+    // A verdict, so the numbers mean something without a coaching lookup.
+    pushPullNote: !pull ? 'no pull work logged'
+      : push / pull >= 1.5 ? 'push-heavy — worth adding pull volume'
+      : push / pull <= 0.67 ? 'pull-heavy'
+      : 'balanced'
+  };
+}
+
+/* ---------- The body diagram ----------
+   A flat, diagrammatic figure rather than an anatomical render: it matches
+   the rest of the app, and every visible piece IS a muscle region, so
+   there is no decorative outline to keep in sync with the data. Head,
+   neck, forearms, hands and feet are inert filler.
+
+   One hue, light to dark, because this encodes magnitude - a rainbow here
+   would invent categories that are not in the data. */
+const BODY_PARTS = {
+  Front: [
+    { t: 'circle', cx: 60, cy: 18, r: 12 },
+    { t: 'rect', x: 54, y: 27, w: 12, h: 12, rx: 4 },
+    { t: 'rect', x: 45, y: 37, w: 30, h: 8, rx: 4 },
+    { t: 'ellipse', cx: 38, cy: 50, rx: 11, ry: 11, m: 'Shoulders' },
+    { t: 'ellipse', cx: 82, cy: 50, rx: 11, ry: 11, m: 'Shoulders' },
+    { t: 'rect', x: 45, y: 42, w: 14.5, h: 30, rx: 7, m: 'Chest' },
+    { t: 'rect', x: 60.5, y: 42, w: 14.5, h: 30, rx: 7, m: 'Chest' },
+    { t: 'rect', x: 48, y: 71, w: 24, h: 49, rx: 8, m: 'Core' },
+    { t: 'rect', x: 28, y: 56, w: 12, h: 40, rx: 6, m: 'Biceps' },
+    { t: 'rect', x: 80, y: 56, w: 12, h: 40, rx: 6, m: 'Biceps' },
+    { t: 'rect', x: 26, y: 93, w: 11, h: 35, rx: 5 },
+    { t: 'rect', x: 83, y: 93, w: 11, h: 35, rx: 5 },
+    { t: 'rect', x: 47, y: 117, w: 26, h: 17, rx: 6 },
+    { t: 'rect', x: 45, y: 130, w: 13, h: 57, rx: 6, m: 'Quads' },
+    { t: 'rect', x: 62, y: 130, w: 13, h: 57, rx: 6, m: 'Quads' },
+    { t: 'rect', x: 46, y: 183, w: 11, h: 10, rx: 4 },
+    { t: 'rect', x: 63, y: 183, w: 11, h: 10, rx: 4 },
+    { t: 'rect', x: 46, y: 188, w: 11, h: 44, rx: 5, m: 'Calves' },
+    { t: 'rect', x: 63, y: 188, w: 11, h: 44, rx: 5, m: 'Calves' },
+    { t: 'rect', x: 44, y: 229, w: 13, h: 10, rx: 3 },
+    { t: 'rect', x: 63, y: 229, w: 13, h: 10, rx: 3 }
+  ],
+  Back: [
+    { t: 'circle', cx: 60, cy: 18, r: 12 },
+    { t: 'rect', x: 54, y: 27, w: 12, h: 12, rx: 4 },
+    { t: 'rect', x: 45, y: 36, w: 30, h: 14, rx: 6, m: 'Shoulders' },
+    { t: 'ellipse', cx: 38, cy: 50, rx: 11, ry: 11, m: 'Shoulders' },
+    { t: 'ellipse', cx: 82, cy: 50, rx: 11, ry: 11, m: 'Shoulders' },
+    { t: 'rect', x: 45, y: 48, w: 30, h: 44, rx: 8, m: 'Back' },
+    { t: 'rect', x: 48, y: 88, w: 24, h: 24, rx: 7, m: 'Back' },
+    { t: 'rect', x: 28, y: 56, w: 12, h: 40, rx: 6, m: 'Triceps' },
+    { t: 'rect', x: 80, y: 56, w: 12, h: 40, rx: 6, m: 'Triceps' },
+    { t: 'rect', x: 26, y: 93, w: 11, h: 35, rx: 5 },
+    { t: 'rect', x: 83, y: 93, w: 11, h: 35, rx: 5 },
+    { t: 'rect', x: 46, y: 108, w: 28, h: 26, rx: 8, m: 'Glutes' },
+    { t: 'rect', x: 45, y: 130, w: 13, h: 57, rx: 6, m: 'Hamstrings' },
+    { t: 'rect', x: 62, y: 130, w: 13, h: 57, rx: 6, m: 'Hamstrings' },
+    { t: 'rect', x: 46, y: 183, w: 11, h: 10, rx: 4 },
+    { t: 'rect', x: 63, y: 183, w: 11, h: 10, rx: 4 },
+    { t: 'rect', x: 46, y: 188, w: 11, h: 44, rx: 5, m: 'Calves' },
+    { t: 'rect', x: 63, y: 188, w: 11, h: 44, rx: 5, m: 'Calves' },
+    { t: 'rect', x: 44, y: 229, w: 13, h: 10, rx: 3 },
+    { t: 'rect', x: 63, y: 229, w: 13, h: 10, rx: 3 }
+  ]
+};
+
+// 8% is "trained a little", not "not trained" - an untouched group stays
+// flat surface so the difference between none and some is unmistakable.
+function muscleShade_(share) {
+  if (!(share > 0)) return 'var(--surface2)';
+  return `color-mix(in srgb, var(--accent) ${(10 + share * 85).toFixed(0)}%, var(--surface2))`;
+}
+
+function renderBodyDiagram_(el, byMuscle, maxSets) {
+  if (!el) return;
+  const views = Object.keys(BODY_PARTS);
+  const W = 120, H = 252, GAP = 18;
+  let out = `<svg viewBox="0 0 ${W * 2 + GAP} ${H + 16}" class="hx-body-svg" role="img" aria-label="Muscle groups shaded by how much they were trained">`;
+  views.forEach((view, vi) => {
+    const dx = vi * (W + GAP);
+    out += `<g transform="translate(${dx},0)">`;
+    BODY_PARTS[view].forEach(p => {
+      const sets = p.m && byMuscle[p.m] ? byMuscle[p.m].sets : 0;
+      const fill = p.m ? muscleShade_(maxSets ? sets / maxSets : 0) : 'var(--surface2)';
+      const attrs = p.t === 'circle' ? `cx="${p.cx}" cy="${p.cy}" r="${p.r}"`
+        : p.t === 'ellipse' ? `cx="${p.cx}" cy="${p.cy}" rx="${p.rx}" ry="${p.ry}"`
+        : `x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.rx}"`;
+      const cls = p.m ? 'hx-body-part' : 'hx-body-inert';
+      const data = p.m ? ` data-muscle="${escapeHtml_(p.m)}" data-sets="${sets.toFixed(1)}"` : '';
+      out += `<${p.t} ${attrs} class="${cls}" fill="${fill}"${data}></${p.t}>`;
+    });
+    out += `<text x="${W / 2}" y="${H + 12}" text-anchor="middle" class="chart-tick">${view}</text>`;
+    out += `</g>`;
+  });
+  out += `</svg>`;
+  el.innerHTML = out;
+
+  const total = Object.keys(byMuscle).reduce((n, k) => n + byMuscle[k].sets, 0);
+  [...el.querySelectorAll('.hx-body-part')].forEach(node => {
+    const m = node.dataset.muscle;
+    const sets = byMuscle[m] ? byMuscle[m].sets : 0;
+    const show = e => showChartTip_(e, `<b>${escapeHtml_(m)}</b><br>`
+      + (sets ? `${muscleSetsLabel_(sets)} <span class="k">· ${Math.round(sets / total * 100)}% of your sets</span>`
+              : `<span class="k">nothing logged in this window</span>`));
+    node.addEventListener('pointerenter', show);
+    node.addEventListener('pointermove', show);
+    node.addEventListener('pointerleave', hideChartTip_);
+  });
+}
+
+// Weighted mode produces fractions; a "3.4 sets" reading is honest but a
+// "3 sets" reading is a lie, so round only where nothing was split.
+function muscleSetsLabel_(n) {
+  const r = Math.round(n * 10) / 10;
+  return (Number.isInteger(r) ? r : r.toFixed(1)) + ' set' + (r === 1 ? '' : 's');
+}
+
+/* ---------- Muscle balance modal ----------
+   Opened from the chart's title. The card answers "what did I train"; this
+   answers "am I training it evenly", which needs the body, the ratios and
+   the attribution mode all in one place. */
+const STORAGE_MUSCLE_MODE_KEY = 'WORKOUT_HISTORY_MUSCLE_MODE';
+let hxMuscleWeighted_ = false;
+
+function initMuscleMode_() {
+  try { hxMuscleWeighted_ = localStorage.getItem(STORAGE_MUSCLE_MODE_KEY) === 'weighted'; } catch (e) {}
+}
+
+function setMuscleMode(weighted) {
+  hxMuscleWeighted_ = !!weighted;
+  try { localStorage.setItem(STORAGE_MUSCLE_MODE_KEY, weighted ? 'weighted' : 'primary'); } catch (e) {}
+  // The card follows the modal. Two views of the same numbers disagreeing
+  // about what a set counts for would be worse than either on its own.
+  renderHistoryMuscles_(historyInRange_());
+  renderMuscleBalance_();
+}
+
+function openMuscleBalanceModal() {
+  document.getElementById('muscleBalanceOverlay').classList.add('open');
+  renderMuscleBalance_();
+}
+
+function closeMuscleBalanceModal(event) {
+  if (event) event.stopPropagation();
+  hideChartTip_();
+  document.getElementById('muscleBalanceOverlay').classList.remove('open');
+}
+
+function renderMuscleBalance_() {
+  const overlay = document.getElementById('muscleBalanceOverlay');
+  if (!overlay || !overlay.classList.contains('open')) return;
+
+  document.querySelectorAll('#hxModeSeg button').forEach(b =>
+    b.classList.toggle('active', (b.dataset.mode === 'weighted') === hxMuscleWeighted_));
+
+  // Same window the card is showing, so the two always agree.
+  const win = hxMuscleWindowBounds_();
+  const rows = win
+    ? historyInRange_().filter(r => r.date >= win.from && r.date < win.toExclusive)
+    : historyInRange_();
+  const rangeLabel = historyRangeDays_ === 90 ? 'last 3 months' : historyRangeDays_ === 365 ? 'last year' : 'all time';
+  const fmtDay = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  document.getElementById('hxBalanceWindow').textContent =
+    win ? `${fmtDay(win.monday)} – ${fmtDay(win.sunday)}` : rangeLabel;
+
+  const list = muscleRanked_(rows, hxMuscleWeighted_);
+  const byMuscle = {};
+  list.forEach(m => { byMuscle[m.name] = m; });
+  const total = list.reduce((n, m) => n + m.sets, 0);
+  const max = list.length ? list[0].sets : 0;
+
+  const body = document.getElementById('hxBodyDiagram');
+  const cards = document.getElementById('hxBalanceCards');
+  const ratios = document.getElementById('hxBalanceRatios');
+  const note = document.getElementById('hxBalanceNote');
+
+  if (!total) {
+    body.innerHTML = '';
+    cards.innerHTML = '<div class="hx-empty">No completed sets in this window.</div>';
+    ratios.innerHTML = '';
+    note.textContent = '';
+    return;
+  }
+
+  renderBodyDiagram_(body, byMuscle, max);
+
+  const r = muscleRatios_(list);
+  const verdictClass = r.pushPullNote === 'balanced' ? 'hx-up'
+    : r.pushPullNote === 'no pull work logged' ? 'hx-down' : 'hx-down';
+  ratios.innerHTML = `
+    <div class="hx-ratio">
+      <div class="hx-ratio-label">Push : Pull</div>
+      <div class="hx-ratio-value">${escapeHtml_(r.pushPull)}</div>
+      <div class="hx-ratio-note ${verdictClass}">${escapeHtml_(r.pushPullNote)}</div>
+    </div>
+    <div class="hx-ratio">
+      <div class="hx-ratio-label">Upper : Lower</div>
+      <div class="hx-ratio-value">${escapeHtml_(r.upperLower)}</div>
+      <div class="hx-ratio-note">${muscleSetsLabel_(r.upper)} up, ${muscleSetsLabel_(r.lower)} down</div>
+    </div>`;
+
+  cards.innerHTML = list.map(m => `<div class="hx-balance-card">
+      <div class="hx-balance-name">${escapeHtml_(m.name)}</div>
+      <div class="hx-balance-value">${muscleSetsLabel_(m.sets).replace(/ sets?$/, '')}</div>
+      <div class="hx-balance-share">${Math.round(m.sets / total * 100)}% of sets</div>
+      <div class="hx-balance-track"><span style="width:${(m.sets / max * 100).toFixed(1)}%"></span></div>
+    </div>`).join('');
+
+  note.textContent = hxMuscleWeighted_
+    ? 'Weighted: each set is split across the muscles the movement actually trains, so a bench press counts partly towards triceps and shoulders. Shares are estimates, not physiology.'
+    : 'Primary only: each set counts once, towards the movement\'s main muscle. Simple, but it files a squat entirely under quads.';
+}
+
 /* This card carries its own time window on top of the tab's range chips.
    A week is the unit balance is actually judged in - "did I skip legs
    again this week" - while the trend charts want months, so forcing both
@@ -4551,23 +4927,16 @@ function renderHistoryMuscles_(rows) {
   const win = hxMuscleWindowBounds_();
   const scoped = win ? rows.filter(r => r.date >= win.from && r.date < win.toExclusive) : rows;
 
-  const byMuscle = {};
-  scoped.forEach(r => {
-    if (!r.done) return;
-    const m = muscleFor_(r.exercise);
-    const g = byMuscle[m] = byMuscle[m] || { sets: 0, ex: {} };
-    g.sets += r.done;
-    g.ex[r.exercise] = (g.ex[r.exercise] || 0) + r.done;
-  });
-  const list = Object.keys(byMuscle).map(k => ({ name: k, sets: byMuscle[k].sets, ex: byMuscle[k].ex }))
-    .filter(m => m.sets > 0).sort((a, b) => b.sets - a.sets);
+  // Same breakdown the modal and the body diagram use, so the card can
+  // never disagree with them about what a set counts for.
+  const list = muscleRanked_(scoped, hxMuscleWeighted_);
   const total = list.reduce((n, m) => n + m.sets, 0);
 
   const fmtDay = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const when = win ? `${fmtDay(win.monday)} – ${fmtDay(win.sunday)}` : rangeLabel.toLowerCase();
   if (note) {
     note.textContent = total
-      ? `${total} completed set${total === 1 ? '' : 's'}, ${when} — tap a group to see what is in it`
+      ? `${muscleSetsLabel_(total)}, ${when}${hxMuscleWeighted_ ? ', weighted' : ''} — tap a group to see what is in it`
       : `Nothing completed ${win ? when : 'in this range'} yet.`;
   }
   if (!list.length) {
@@ -4582,12 +4951,12 @@ function renderHistoryMuscles_(rows) {
     const open = hxMuscleOpen_ === m.name;
     const parts = Object.keys(m.ex).sort((a, b) => m.ex[b] - m.ex[a]);
     const breakdown = open ? `<div class="hx-muscle-ex">` + parts.map(n =>
-      `<div><span>${escapeHtml_(n)}</span><span>${m.ex[n]} set${m.ex[n] === 1 ? '' : 's'}</span></div>`).join('') + `</div>` : '';
+      `<div><span>${escapeHtml_(n)}</span><span>${muscleSetsLabel_(m.ex[n])}</span></div>`).join('') + `</div>` : '';
     return `<div class="hx-muscle${open ? ' open' : ''}" onclick="toggleHistoryMuscle('${escapeHtml_(escapeJsAttr_(m.name))}')"
-        title="${escapeHtml_(parts.slice(0, 6).map(n => n + ' ' + m.ex[n]).join(' · '))}">
+        title="${escapeHtml_(parts.slice(0, 6).map(n => n + ' ' + (Math.round(m.ex[n] * 10) / 10)).join(' · '))}">
       <span class="hx-muscle-name">${escapeHtml_(m.name)}</span>
       <span class="hx-muscle-track"><span class="hx-muscle-fill" style="width:${(m.sets / max * 100).toFixed(1)}%"></span></span>
-      <span class="hx-muscle-val">${m.sets} · ${Math.round(m.sets / total * 100)}%</span>
+      <span class="hx-muscle-val">${Math.round(m.sets * 10) / 10} · ${Math.round(m.sets / total * 100)}%</span>
     </div>${breakdown}`;
   }).join('');
 }
@@ -10512,7 +10881,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-muscle-window';
+const APP_BUILD_VERSION = '2026-08-24-muscle-balance';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -15183,6 +15552,7 @@ initViewportHeightObserver();
 initChartResizeObserver_();
 initHistoryRange_();
 initMuscleWindow_();
+initMuscleMode_();
 initTabBarViewportPin();
 // Local order first, so the page is already arranged on this device
 // before any network call. loadRemoteOverviewLayoutState() re-applies it
