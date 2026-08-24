@@ -4617,15 +4617,34 @@ function starterCalibration_(st) {
 // not the peak, it is a floor under the peak. Treating it as the peak made
 // the curve shrink to meet it - so reporting growth made the chart go
 // DOWN, which is the opposite of what happened in the jar.
+// The height of this feed's peak, but ONLY when the reading actually is a
+// peak. Every other reading is a height at some other moment:
+//
+//   still rising   below the peak, on the way up
+//   falling        below the peak, on the way back down
+//   collapsed      well below the peak
+//
+// Counting any of those as "the peak" biases the typical rise downwards,
+// and it does so exactly when you were not there to watch - a starter you
+// find collapsed at 1.6x had a peak well above 1.6x, not equal to it.
+// Those readings still say something, and sdRiseFloor_ below uses them for
+// what they are: a lower bound.
 function sdPeakRiseX_(f) {
   if (!f || !f.riseX) return null;
   // A peak that was actually watched counts even if a LATER look found it
-  // on the way up again after a feed, or simply came in afterwards - the
-  // height was still reached. Only discard the reading when the newest
-  // state is "rising" and no peak was ever seen for this feed.
+  // on the way down - the height was still reached.
   if (f.peakAt) return f.riseX;
-  if (f.checkState === 'rising') return null;   // not there yet
-  return f.riseX;
+  if (f.checkState === 'rising' || f.checkState === 'falling' || f.checkState === 'collapsed') return null;
+  return f.riseX;   // a bare height with no state - right height, unknown when
+}
+
+// The highest reading taken at a moment that was NOT the peak. Whatever the
+// peak was, it was at least this.
+function sdRiseFloor_(f) {
+  const heights = sdFeedChecks_(f)
+    .filter(c => c.riseX && c.state && c.state !== 'peak')
+    .map(c => c.riseX);
+  return heights.length ? Math.max(...heights) : 0;
 }
 
 // Amplitude to draw a feed's curve at: a known peak if there is one,
@@ -4854,8 +4873,17 @@ function renderStarterActive_(st) {
 
   // Meta strip: age, how it is performing, how well the model knows it.
   const ageDays = st.bornOn ? Math.max(0, Math.round((now - new Date(st.bornOn)) / 86400000)) : null;
-  const rises = (st.feeds || []).map(sdPeakRiseX_).filter(Boolean).slice(-5);
-  const avgRise = rises.length ? (rises.reduce((a, b) => a + b, 0) / rises.length) : null;
+  // Shown from the same source the chart uses, so the tile can never
+  // disagree with the curve - and the sub-line says what it is actually
+  // counting, since "typical rise" reading lower than a peak you know you
+  // saw is otherwise impossible to explain.
+  const recentFeeds = (st.feeds || []).slice(-5);
+  const rises = recentFeeds.map(sdPeakRiseX_).filter(Boolean);
+  const riseFloors = recentFeeds.map(sdRiseFloor_).filter(Boolean);
+  const avgRise = (rises.length || riseFloors.length) ? starterTypicalRise_(st) : null;
+  const riseSub = rises.length
+    ? 'from ' + rises.length + (rises.length === 1 ? ' peak' : ' peaks')
+    : (riseFloors.length ? 'at least this - no peak caught yet' : 'log a rise');
   const cal = starterCalibration_(st);
   const calInfo = starterCalibrationInfo_(st);
   // Three genuinely different states, and they used to read the same:
@@ -4870,7 +4898,7 @@ function renderStarterActive_(st) {
       <div class="sd-meta-sub">${ageDays === null ? 'unknown' : 'days old'}</div></div>
     <div class="sd-meta"><div class="sd-meta-label">Typical rise</div>
       <div class="sd-meta-value">${avgRise ? avgRise.toFixed(1) + '×' : '—'}</div>
-      <div class="sd-meta-sub">${rises.length ? 'last ' + rises.length + ' feeds' : 'log a rise'}</div></div>
+      <div class="sd-meta-sub">${escapeHtml_(riseSub)}</div></div>
     <div class="sd-meta"><div class="sd-meta-label">Peak model</div>
       <div class="sd-meta-value">${calInfo.learning ? (cal < 0.95 ? 'Fast' : cal > 1.05 ? 'Slow' : 'On') : (calInfo.checks ? 'On' : 'Book')}</div>
       <div class="sd-meta-sub">${escapeHtml_(calSub)}</div></div>`;
@@ -5106,12 +5134,17 @@ function sdRiseAt_(hoursSinceFeed, peakH, peakX) {
 }
 
 function starterTypicalRise_(st) {
-  // Only heights that are actually peaks - a "still rising" reading would
-  // drag the average down with a number the starter had not finished
-  // reaching.
-  const rises = (st.feeds || []).map(sdPeakRiseX_).filter(Boolean).slice(-5);
-  if (!rises.length) return 2.2;
-  return rises.reduce((a, b) => a + b, 0) / rises.length;
+  const recent = (st.feeds || []).slice(-5);
+  // Only heights that are actually peaks - see sdPeakRiseX_. A reading
+  // taken while it was climbing, or after it had dropped, is not one.
+  const rises = recent.map(sdPeakRiseX_).filter(Boolean);
+  // ...but those readings are still a floor: it got at least that high.
+  // The floor only ever raises the answer, so a starter you keep finding
+  // already collapsed cannot drag the figure below what you have seen.
+  const floors = recent.map(sdRiseFloor_).filter(Boolean);
+  const floor = floors.length ? Math.max(...floors) : 0;
+  if (!rises.length) return Math.max(2.2, floor);
+  return Math.max(rises.reduce((a, b) => a + b, 0) / rises.length, floor);
 }
 
 function renderStarterChart_(st) {
@@ -9125,7 +9158,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-week-plan-archive';
+const APP_BUILD_VERSION = '2026-08-24-rise-floor';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
