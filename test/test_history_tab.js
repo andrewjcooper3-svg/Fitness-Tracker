@@ -1,0 +1,380 @@
+// The History tab, laid out the way Hevy lays it out: Overview / Exercises
+// / Workouts, a range that applies to the whole tab, an exercise list that
+// drills into records + charts, and a feed of workout cards.
+const { chromium } = require('playwright');
+const path = require('path');
+const URL = 'file://' + path.resolve('/home/user/Fitness-Tracker/Workout_Tracker_AutoLog.html');
+let fails = 0;
+const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}${x ? '  ' + x : ''}`); if (!ok) fails++; };
+
+// Six weeks shaped like the real log: Leg Press climbing clean, Cable
+// Crunch going red, Plank never finished, Pushups on reps only. Plus one
+// old session well outside 3M, to prove the range chips actually filter.
+function history() {
+  const rows = [];
+  const weeks = [
+    ['2026-07-13', 'Week of Jul 13 - Jul 19, 2026'],
+    ['2026-07-20', 'Week of Jul 20 - Jul 26, 2026'],
+    ['2026-07-27', 'Week of Jul 27 - Aug 2, 2026'],
+    ['2026-08-03', 'Week of Aug 3 - Aug 9, 2026'],
+    ['2026-08-10', 'Week of Aug 10 - Aug 16, 2026'],
+    ['2026-08-17', 'Week of Aug 17 - Aug 23, 2026']
+  ];
+  const epley = (w, r) => w * (1 + r / 30);
+  weeks.forEach(([monday, week], i) => {
+    const lp = 225 + i * 5;                       // climbing, clean
+    rows.push({ date: monday, day: 'Monday', exercise: 'Leg Press', sets: 3, done: 3,
+      topWeight: lp, topSetReps: 10, volume: lp * 30, bestSetVolume: lp * 10,
+      est1RM: epley(lp, 10), targetReps: 10, totalReps: 30, green: 3, yellow: 0, red: 0, week });
+    // Cable Crunch: stuck at 70 and going red in the last three weeks.
+    rows.push({ date: monday, day: 'Monday', exercise: 'Cable Crunch', sets: 3, done: 3,
+      topWeight: 70, topSetReps: 15, volume: 70 * 45, bestSetVolume: 70 * 15,
+      est1RM: epley(70, 15), targetReps: 15, totalReps: 45,
+      green: i < 3 ? 3 : 0, yellow: 0, red: i < 3 ? 0 : 3, week });
+    // Plank: planned every week, barely done.
+    rows.push({ date: monday, day: 'Monday', exercise: 'Plank', sets: 3, done: 0,
+      topWeight: 0, topSetReps: 0, volume: 0, bestSetVolume: 0, est1RM: 0,
+      targetReps: '60s', totalReps: 0, green: 0, yellow: 0, red: 0, week });
+    // Pushups, bodyweight - reps only, no weight to plot.
+    rows.push({ date: monday, day: 'Monday', exercise: 'Pushups', sets: 3, done: 3,
+      topWeight: 0, topSetReps: 0, volume: 0, bestSetVolume: 0, est1RM: 0,
+      targetReps: 55, totalReps: 165, green: 2, yellow: 1, red: 0, week });
+    // A second day in the week.
+    const wed = new Date(monday + 'T00:00:00'); wed.setDate(wed.getDate() + 2);
+    const lat = 90 + i * 5;
+    rows.push({ date: wed.toISOString().slice(0, 10), day: 'Wednesday', exercise: 'Lat Pulldown',
+      sets: 3, done: 3, topWeight: lat, topSetReps: 10, volume: lat * 30, bestSetVolume: lat * 10,
+      est1RM: epley(lat, 10), targetReps: 10, totalReps: 30, green: 3, yellow: 0, red: 0, week });
+  });
+  // Ancient history: only visible on "All".
+  rows.push({ date: '2025-01-06', day: 'Monday', exercise: 'Leg Press', sets: 3, done: 3,
+    topWeight: 135, topSetReps: 10, volume: 4050, bestSetVolume: 1350, est1RM: epley(135, 10),
+    targetReps: 10, totalReps: 30, green: 3, yellow: 0, red: 0, week: 'Week of Jan 6 - Jan 12, 2025' });
+  return rows;
+}
+
+const mock = rows => route => {
+  const req = route.request();
+  const J = o => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(o) });
+  if (req.url().includes('action=loadWorkoutHistory')) return J({ status: 'success', history: rows });
+  if (req.method() === 'POST') return J({ status: 'success' });
+  return J({ status: 'error' });
+};
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const rows = history();
+
+  for (const [w, h, tag] of [[430, 932, 'portrait'], [1400, 900, 'desktop']]) {
+    console.log(`\n=== ${tag} ===`);
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: 'dark' });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => { console.log('  PAGEERROR', String(e)); fails++; });
+    await page.route('https://script.google.com/**', mock(rows));
+    await page.goto(URL);
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => showAppView('stats'));
+    await page.waitForTimeout(1500);
+
+    if (tag === 'portrait') {
+      const tabLabel = await page.evaluate(() =>
+        document.querySelector('.app-tab[data-view="stats"] .app-tab-label').textContent);
+      check('tab is called History', tabLabel === 'History', tabLabel);
+
+      console.log('\n  -- Overview --');
+      const tiles = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxTiles > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()));
+      console.log('   tiles:', tiles.join(' | '));
+      check('four summary tiles', tiles.length === 4, String(tiles.length));
+      check('workouts tile counts distinct days', /^13 workouts$/i.test(tiles[0]), tiles[0]);
+      check('volume tile is abbreviated, not raw', /k lb volume$/i.test(tiles[1]), tiles[1]);
+
+      const muscles = await page.evaluate(() => ({
+        rows: [...document.querySelectorAll('#hxMuscles .hx-muscle')].map(m => m.innerText.replace(/\s+/g, ' ').trim()),
+        note: document.getElementById('hxMuscleNote').textContent
+      }));
+      muscles.rows.forEach(m => console.log('   ', m));
+      console.log('   note:', muscles.note);
+      check('muscle groups ranked by sets', muscles.rows.length >= 3, String(muscles.rows.length));
+      check('quads picked up Leg Press', muscles.rows.some(m => /^Quads/.test(m)), muscles.rows.join(' | '));
+      check('back picked up Lat Pulldown', muscles.rows.some(m => /^Back/.test(m)), muscles.rows.join(' | '));
+      check('chest picked up Pushups', muscles.rows.some(m => /^Chest/.test(m)), muscles.rows.join(' | '));
+      check('the note totals the sets', /\d+ completed sets in this range/.test(muscles.note), muscles.note);
+      // An inline span ignores width; the bars must actually be drawn.
+      const fills = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxMuscles .hx-muscle-fill')].map(f => Math.round(f.getBoundingClientRect().width)));
+      console.log('   fill widths:', fills.join(', '));
+      check('the top group\'s bar fills its track', fills[0] > 100, String(fills[0]));
+      check('bars shrink down the ranking', fills.every((w, i) => i === 0 || w <= fills[i - 1]) && fills[fills.length - 1] > 0,
+        fills.join(','));
+
+      const stalling = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxStalling .hx-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim()));
+      stalling.forEach(t => console.log('   ', t));
+      check('Cable Crunch flagged for reds', stalling.some(t => /Cable Crunch.*too tough/i.test(t)), stalling.join(' | '));
+      check('Plank flagged for unfinished sets', stalling.some(t => /Plank.*not finished/i.test(t)), stalling.join(' | '));
+      check('Leg Press is NOT flagged (it is progressing)', !stalling.some(t => /Leg Press/.test(t)));
+
+      const bars = await page.evaluate(() => ({
+        freq: document.querySelectorAll('#hxFreqChart rect').length,
+        volume: document.querySelectorAll('#hxVolumeChart rect').length,
+        completion: document.querySelectorAll('#hxCompletionChart rect').length
+      }));
+      console.log('   charts:', JSON.stringify(bars));
+      check('workouts-per-week chart drew', bars.freq >= 6 * 2, String(bars.freq));
+      check('volume chart drew', bars.volume >= 6 * 2, String(bars.volume));
+      check('completion chart drew', bars.completion >= 6 * 2, String(bars.completion));
+      const details = await page.evaluate(() => ({
+        freq: document.getElementById('hxFreqDetail').textContent,
+        vol: document.getElementById('hxVolumeDetail').textContent,
+        comp: document.getElementById('hxCompletionDetail').textContent
+      }));
+      check('no stale "no sessions" line under a filled chart',
+        !Object.values(details).some(t => /No sessions/.test(t)), JSON.stringify(details));
+
+      await page.evaluate(() => showHistoryWeekDetail('hxVolumeDetail', 'Week of Aug 17 - Aug 23, 2026'));
+      const detail = await page.evaluate(() => document.getElementById('hxVolumeDetail').textContent);
+      console.log('   week detail:', detail);
+      check('week detail reports volume and sets', /lb volume · \d+\/\d+ sets · 2 days/.test(detail), detail);
+
+      console.log('\n  -- Range chips filter the whole tab --');
+      await page.evaluate(() => setHistoryRange(90));
+      await page.waitForTimeout(400);
+      const ranged = await page.evaluate(() => ({
+        tiles: document.querySelector('#hxTiles > div').innerText.replace(/\s+/g, ' ').trim(),
+        active: document.querySelector('#hxRange .hx-range-btn.active').textContent
+      }));
+      console.log('   3M:', JSON.stringify(ranged));
+      check('3M drops the 2025 session', /^12 workouts$/i.test(ranged.tiles), ranged.tiles);
+      check('the 3M chip is the active one', ranged.active === '3M', ranged.active);
+      const persisted = await page.evaluate(() => localStorage.getItem('WORKOUT_HISTORY_RANGE'));
+      check('the range is remembered', persisted === '90', String(persisted));
+      await page.evaluate(() => setHistoryRange(0));
+      await page.waitForTimeout(300);
+
+      console.log('\n  -- Exercises --');
+      await page.evaluate(() => showHistorySection('exercises'));
+      await page.waitForTimeout(500);
+      const list = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxExerciseList .hx-ex-item')].map(e => e.innerText.replace(/\s+/g, ' ').trim()));
+      list.forEach(l => console.log('   ', l));
+      check('every exercise is listed', list.length === 5, String(list.length));
+      check('rows carry a session count and a last date', /\d+ sessions · last \w+ \d+/.test(list[0]), list[0]);
+
+      const filtered = await page.evaluate(() => {
+        const s = document.getElementById('hxExerciseSearch');
+        s.value = 'press'; renderHistoryExerciseList();
+        return [...document.querySelectorAll('#hxExerciseList .hx-ex-item')].map(e => e.innerText.split('\n')[0]);
+      });
+      console.log('   search "press":', filtered.join(', '));
+      check('search narrows the list', filtered.length === 1 && /Leg Press/.test(filtered[0]), filtered.join(','));
+      await page.evaluate(() => { document.getElementById('hxExerciseSearch').value = ''; renderHistoryExerciseList(); });
+
+      console.log('\n  -- One exercise: records + chart + history --');
+      await page.evaluate(() => openHistoryExercise('Leg Press'));
+      await page.waitForTimeout(500);
+      const ex = await page.evaluate(() => ({
+        listHidden: document.getElementById('hxExerciseListCard').style.display === 'none',
+        name: document.getElementById('hxExerciseName').textContent,
+        records: [...document.querySelectorAll('#hxRecords .hx-rec')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
+        summary: document.getElementById('hxExerciseSummary').textContent,
+        rows: [...document.querySelectorAll('#hxExerciseRows .hx-row')].map(r => r.innerText.replace(/\s+/g, ' ').trim())
+      }));
+      console.log('   name:', ex.name);
+      ex.records.forEach(r => console.log('    rec:', r));
+      console.log('   summary:', ex.summary);
+      ex.rows.slice(0, 2).forEach(r => console.log('   ', r));
+      check('the list gives way to the detail view', ex.listHidden && ex.name === 'Leg Press');
+      check('records include the heaviest weight with its reps',
+        ex.records.some(r => /Heaviest weight 250 lb × 10/.test(r)), ex.records.join(' | '));
+      check('records include an estimated 1RM',
+        ex.records.some(r => /Best est\. 1RM 333 lb/.test(r)), ex.records.join(' | '));
+      check('records include best set volume',
+        ex.records.some(r => /Best set volume 2,500 lb/.test(r)), ex.records.join(' | '));
+      check('summary shows the progression', /135 lb → 250 lb \(\+115\)/.test(ex.summary), ex.summary);
+      check('newest session first', /Aug 17/.test(ex.rows[0]), ex.rows[0]);
+      check('per-session delta shown', /▲ \+5/.test(ex.rows[0]), ex.rows[0]);
+      check('the best-ever session is starred', /★/.test(ex.rows[0]), ex.rows[0]);
+
+      // Records are all-time, so the 2025 session must not erase them, and
+      // narrowing the range must not change them either.
+      await page.evaluate(() => setHistoryRange(90));
+      await page.waitForTimeout(400);
+      const stillPR = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxRecords .hx-rec')].map(r => r.innerText.replace(/\s+/g, ' ').trim()));
+      check('records survive a range change (a PR is all-time)',
+        stillPR.some(r => /Heaviest weight 250 lb/.test(r)), stillPR.join(' | '));
+      await page.evaluate(() => setHistoryRange(0));
+      await page.waitForTimeout(300);
+
+      const metric = await page.evaluate(() => {
+        const p = document.getElementById('hxMetricPicker');
+        p.value = 'est1RM'; renderHistoryExercise();
+        return document.getElementById('hxExerciseSummary').textContent;
+      });
+      console.log('   est1RM view:', metric);
+      check('the metric picker re-plots the chart', /estimated 1rm 180 lb → 333 lb/i.test(metric), metric);
+
+      // Bodyweight work has no weight to plot; the picker must not offer it.
+      await page.evaluate(() => openHistoryExercise('Pushups'));
+      await page.waitForTimeout(400);
+      const pu = await page.evaluate(() => ({
+        summary: document.getElementById('hxExerciseSummary').textContent,
+        visible: [...document.getElementById('hxMetricPicker').options].filter(o => !o.hidden).map(o => o.value),
+        records: [...document.querySelectorAll('#hxRecords .hx-rec')].map(r => r.innerText.replace(/\s+/g, ' ').trim())
+      }));
+      console.log('   pushups:', JSON.stringify(pu));
+      check('bodyweight charts reps, not weight', /reps 165 → 165/.test(pu.summary), pu.summary);
+      check('no weight metrics offered for bodyweight work',
+        pu.visible.length === 1 && pu.visible[0] === 'totalReps', pu.visible.join(','));
+      check('bodyweight records are rep records',
+        pu.records.every(r => !/lb/.test(r)) && pu.records.length === 2, pu.records.join(' | '));
+
+      // A red session must colour its bar red.
+      await page.evaluate(() => openHistoryExercise('Cable Crunch'));
+      await page.waitForTimeout(400);
+      const cc = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxExerciseChart rect')].map(r => r.getAttribute('fill')));
+      check('red sessions are coloured red', cc.filter(f => f === 'var(--red)').length === 3,
+        cc.filter(f => f && f.startsWith('var')).join(','));
+
+      await page.evaluate(() => closeHistoryExercise());
+      await page.waitForTimeout(300);
+      check('back returns to the list', await page.evaluate(() =>
+        document.getElementById('hxExerciseListCard').style.display !== 'none'
+        && document.getElementById('hxExerciseDetailWrap').style.display === 'none'));
+
+      console.log('\n  -- Workouts feed --');
+      await page.evaluate(() => showHistorySection('workouts'));
+      await page.waitForTimeout(400);
+      const wk = await page.evaluate(() => ({
+        count: document.querySelectorAll('#hxDayList .hx-wk').length,
+        first: document.querySelector('#hxDayList .hx-wk').innerText.replace(/\s+/g, ' ').trim(),
+        stats: [...document.querySelectorAll('#hxDayList .hx-wk:first-child .hx-wk-stat-label')].map(s => s.textContent)
+      }));
+      console.log('   cards:', wk.count);
+      console.log('   first:', wk.first);
+      check('one card per session, newest first', wk.count === 13 && /August 19/.test(wk.first),
+        `${wk.count} ${wk.first.slice(0, 60)}`);
+      check('cards carry volume / sets / exercises', wk.stats.join(',') === 'Volume lb,Sets,Exercises', wk.stats.join(','));
+      check('exercise lines read "N × Name"', /\d+ × Lat Pulldown/.test(wk.first), wk.first.slice(0, 120));
+
+      // Tapping an exercise on a card jumps to that exercise.
+      await page.evaluate(() => document.querySelector('#hxDayList .hx-wk-ex').click());
+      await page.waitForTimeout(500);
+      check('tapping a card exercise opens it', await page.evaluate(() =>
+        document.getElementById('hxExerciseName').textContent === 'Lat Pulldown'
+        && document.getElementById('hxSectionExercises').style.display !== 'none'));
+      await page.evaluate(() => { closeHistoryExercise(); showHistorySection('overview'); });
+      await page.waitForTimeout(300);
+
+      console.log('\n  -- Stats cards still there --');
+      const kept = await page.evaluate(() => ({
+        pushup: !!document.getElementById('statsPushupChart'),
+        weight: !!document.getElementById('statsWeightChart')
+      }));
+      check('pushup + weight cards absorbed, not lost', kept.pushup && kept.weight, JSON.stringify(kept));
+    }
+
+    if (tag === 'desktop') {
+      const cols = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('#hxSectionOverview > .stats-card')].map(c => {
+          const r = c.getBoundingClientRect();
+          return { top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width) };
+        });
+        return cards;
+      });
+      console.log('  overview cards:', JSON.stringify(cols.slice(0, 4)));
+      check('overview pairs up into two columns on desktop',
+        cols.length >= 2 && Math.abs(cols[0].top - cols[1].top) < 4 && cols[0].left !== cols[1].left,
+        JSON.stringify(cols.slice(0, 2)));
+      const scale = await page.evaluate(() => {
+        const svg = document.getElementById('hxVolumeChart');
+        const m = svg.getScreenCTM();
+        return { x: Math.round(m.a * 1000) / 1000, y: Math.round(m.d * 1000) / 1000 };
+      });
+      console.log('  chart scale:', JSON.stringify(scale));
+
+      // The feed and the exercise detail are each a single child of their
+      // section, so without their own grid they'd sit in one column with
+      // the other half of the screen blank.
+      await page.evaluate(() => showHistorySection('workouts'));
+      await page.waitForTimeout(400);
+      const feed = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxDayList .hx-wk')].slice(0, 2).map(c => {
+          const r = c.getBoundingClientRect();
+          return { top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width) };
+        }));
+      console.log('  feed cards:', JSON.stringify(feed));
+      check('the workouts feed goes two-up on desktop',
+        feed.length === 2 && Math.abs(feed[0].top - feed[1].top) < 4 && feed[0].left !== feed[1].left,
+        JSON.stringify(feed));
+
+      await page.evaluate(() => { showHistorySection('exercises'); openHistoryExercise('Leg Press'); });
+      await page.waitForTimeout(500);
+      const det = await page.evaluate(() =>
+        [...document.querySelectorAll('#hxExerciseDetailWrap > .stats-card')].map(c => {
+          const r = c.getBoundingClientRect();
+          return { top: Math.round(r.top), left: Math.round(r.left), w: Math.round(r.width) };
+        }));
+      console.log('  detail cards:', JSON.stringify(det));
+      check('the exercise header spans the full width', det[0].w > det[1].w + 100,
+        `${det[0].w} vs ${det[1].w}`);
+      check('records and charts sit side by side',
+        Math.abs(det[1].top - det[2].top) < 4 && det[1].left !== det[2].left, JSON.stringify(det.slice(1, 3)));
+      await page.evaluate(() => { closeHistoryExercise(); showHistorySection('overview'); });
+      await page.waitForTimeout(300);
+      check('history charts draw 1:1, not stretched',
+        Math.abs(scale.x - 1) < 0.02 && Math.abs(scale.x - scale.y) < 0.02, JSON.stringify(scale));
+    }
+
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    check(`${tag}: no horizontal overflow`, !overflow);
+    await page.evaluate(() => showHistorySection('overview'));
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `hx_${tag}.png`, fullPage: tag === 'portrait' });
+    await ctx.close();
+  }
+
+  console.log('\n=== Empty and error states ===');
+  {
+    const ctx = await browser.newContext({ viewport: { width: 430, height: 932 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => { console.log('  PAGEERROR', String(e)); fails++; });
+    await page.route('https://script.google.com/**', route => {
+      const req = route.request();
+      const J = o => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(o) });
+      // A deployment that predates the endpoint answers with its status page.
+      if (req.url().includes('action=loadWorkoutHistory')) return J({ status: 'ok', backendVersion: '2026-08-22-widget-summary' });
+      if (req.method() === 'POST') return J({ status: 'success' });
+      return J({ status: 'error' });
+    });
+    await page.goto(URL);
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => showAppView('stats'));
+    await page.waitForTimeout(1500);
+    const status = await page.evaluate(() => document.getElementById('hxStatus').textContent);
+    console.log('  status:', status);
+    check('a stale deployment says so', /no history endpoint yet.*redeploy/i.test(status), status);
+    const empty = await page.evaluate(() => ({
+      stalling: document.getElementById('hxStalling').textContent,
+      muscles: document.getElementById('hxMuscles').textContent,
+      tiles: document.getElementById('hxTiles').innerText.replace(/\s+/g, ' ').trim()
+    }));
+    console.log('  empty:', JSON.stringify(empty));
+    check('empty state is a sentence, not a blank card', /Nothing stalling/.test(empty.stalling), empty.stalling);
+    check('muscle card explains itself when empty', /No completed sets/.test(empty.muscles), empty.muscles);
+    check('tiles read zero rather than NaN', !/NaN/.test(empty.tiles), empty.tiles);
+
+    await page.evaluate(() => showHistorySection('workouts'));
+    await page.waitForTimeout(300);
+    const noWk = await page.evaluate(() => document.getElementById('hxDayList').textContent);
+    check('the workouts feed says it is empty', /Nothing logged in this range/.test(noWk), noWk);
+    await ctx.close();
+  }
+
+  console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);
+  await browser.close();
+  process.exit(fails ? 1 : 0);
+})();

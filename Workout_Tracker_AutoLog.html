@@ -959,6 +959,59 @@
   .hx-seg-btn { flex: 1; min-width: 0; font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--muted);
     background: none; border: none; border-radius: 11px; padding: 9px 4px; cursor: pointer; }
   .hx-seg-btn.active { background: var(--surface2); color: var(--accent); }
+  /* Range chips apply to the whole tab, the way Hevy's 3M/1Y/All do. */
+  .hx-range { display: flex; gap: 6px; margin-bottom: 12px; }
+  .hx-range-btn { font-family: var(--font); font-size: 11.5px; font-weight: 700; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    padding: 5px 14px; cursor: pointer; }
+  .hx-range-btn.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+  /* Headline numbers, Hevy's profile stat row. */
+  .hx-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .hx-tile-value { font-family: var(--font); font-size: 21px; font-weight: 800; letter-spacing: -0.4px; }
+  .hx-tile-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+
+  /* Sets per muscle group. Hevy draws a body diagram; a ranked bar says the
+     same thing without pretending to anatomy the data does not have. */
+  .hx-muscle { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+  .hx-muscle-name { font-family: var(--font); font-size: 12px; flex: 0 0 92px; }
+  .hx-muscle-track { flex: 1; height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+  /* display:block matters - a bare inline span ignores width and height,
+     so the track would render empty at every percentage. */
+  .hx-muscle-fill { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .hx-muscle-val { font-family: var(--font); font-size: 11.5px; color: var(--muted); white-space: nowrap; flex: 0 0 54px; text-align: right; }
+
+  /* Exercise list -> detail, Hevy's drill-in. */
+  .hx-ex-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .hx-ex-item:last-child { border-bottom: none; }
+  .hx-ex-item:active { opacity: 0.7; }
+  .hx-ex-chevron { color: var(--muted); font-size: 15px; flex-shrink: 0; }
+  .hx-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .hx-back { font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--accent);
+    background: none; border: none; padding: 2px 0; cursor: pointer; flex-shrink: 0; }
+  .hx-detail-title { font-family: var(--font); font-size: 15px; font-weight: 800; flex: 1; min-width: 0; }
+
+  /* Records list - Hevy's PR block. */
+  .hx-rec { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .hx-rec:last-child { border-bottom: none; }
+  .hx-rec-label { font-family: var(--font); font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
+  .hx-rec-value { font-family: var(--font); font-size: 13.5px; font-weight: 800; white-space: nowrap; }
+  .hx-rec-when { font-family: var(--font); font-size: 10.5px; color: var(--muted); }
+  .hx-pr { color: var(--amber); font-size: 11px; margin-left: 4px; }
+
+  /* Workout card - Hevy's feed entry. */
+  .hx-wk { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px; margin-bottom: 10px; }
+  .hx-wk-title { font-family: var(--font); font-size: 14.5px; font-weight: 800; }
+  .hx-wk-sub { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .hx-wk-stats { display: flex; gap: 16px; margin: 10px 0 8px; }
+  .hx-wk-stat-value { font-family: var(--font); font-size: 14px; font-weight: 800; }
+  .hx-wk-stat-label { font-family: var(--font); font-size: 9.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  .hx-wk-ex { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .hx-wk-ex-name { font-family: var(--font); font-size: 12px; flex: 1; min-width: 0; }
+  .hx-wk-ex-best { font-family: var(--font); font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .hx-wk-more { font-family: var(--font); font-size: 11.5px; color: var(--accent); background: none; border: none; padding: 6px 0 0; cursor: pointer; }
+
   .hx-status { font-family: var(--font); font-size: 11.5px; color: var(--muted); padding: 0 2px 10px; }
   .hx-status:empty { display: none; }
   .hx-status.err { color: var(--red); font-weight: 600; }
@@ -981,14 +1034,6 @@
   .hx-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 10px; color: var(--muted); }
   .hx-swatch { width: 9px; height: 9px; border-radius: 2px; }
 
-  .hx-day { border-bottom: 1px solid var(--border); }
-  .hx-day:last-child { border-bottom: none; }
-  .hx-day-head { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; }
-  .hx-day-head .hx-row-main { flex: 1; min-width: 0; }
-  .hx-day-body { padding: 0 0 10px 12px; border-left: 2px solid var(--border); margin: 0 0 8px 3px; }
-  .hx-day-ex { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
-  .hx-day-ex-name { font-family: var(--font); font-size: 11.5px; flex: 1; min-width: 0; }
-  .hx-day-ex-val { font-family: var(--font); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
   .hx-empty { font-family: var(--font); font-size: 12px; color: var(--muted); padding: 6px 0; }
 
   .stats-card-clickable { cursor: pointer; transition: background 0.15s; }
@@ -1334,6 +1379,24 @@
       display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: 12px; align-items: start;
     }
+    /* The Workouts feed is a single child of its section, so the grid above
+       would leave it in one column with the other half empty. Deal the
+       cards themselves two-up instead. */
+    #hxSectionWorkouts { display: block; }
+    #hxDayList {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 12px; align-items: start;
+    }
+    /* Same for the exercise detail: it is one child holding four cards, so
+       it takes the full width and deals its own cards two-up. The header
+       card spans both so the exercise name stays on its own line. */
+    #hxExerciseDetailWrap {
+      grid-column: 1 / -1; display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 12px; align-items: start;
+    }
+    #hxExerciseDetailWrap > .stats-card:first-child,
+    #hxExerciseDetailWrap > .stats-card:last-child { grid-column: 1 / -1; }
   }
 
   @media (min-width: 768px) {
@@ -2187,15 +2250,40 @@
   <!-- Absorbed Stats: the pushup and weight cards below were this tab
        already, and the history sections sit above them rather than
        duplicating the same numbers on two tabs. -->
+  <!-- Laid out the way Hevy does it: a range applying to the whole tab, a
+       Profile-style overview, an exercise list that opens into records +
+       charts, and a feed of workout cards. -->
   <div class="hx-seg" id="hxSeg">
-    <button class="hx-seg-btn active" data-hx="trends" onclick="showHistorySection('trends')">Trends</button>
-    <button class="hx-seg-btn" data-hx="exercise" onclick="showHistorySection('exercise')">By exercise</button>
-    <button class="hx-seg-btn" data-hx="days" onclick="showHistorySection('days')">By day</button>
+    <button class="hx-seg-btn active" data-hx="overview" onclick="showHistorySection('overview')">Overview</button>
+    <button class="hx-seg-btn" data-hx="exercises" onclick="showHistorySection('exercises')">Exercises</button>
+    <button class="hx-seg-btn" data-hx="workouts" onclick="showHistorySection('workouts')">Workouts</button>
+  </div>
+  <div class="hx-range" id="hxRange">
+    <button class="hx-range-btn" data-range="90" onclick="setHistoryRange(90)">3M</button>
+    <button class="hx-range-btn" data-range="365" onclick="setHistoryRange(365)">1Y</button>
+    <button class="hx-range-btn active" data-range="0" onclick="setHistoryRange(0)">All</button>
   </div>
   <div class="hx-status" id="hxStatus"></div>
 
-  <!-- ---- Trends: the whole-picture view ---- -->
-  <div class="hx-section" id="hxSectionTrends">
+  <!-- ---- Overview: the Profile screen ---- -->
+  <div class="hx-section" id="hxSectionOverview">
+    <div class="stats-card">
+      <div class="hx-tiles" id="hxTiles"></div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">Workouts per week</div>
+      <svg viewBox="0 0 320 140" class="stats-chart" id="hxFreqChart" preserveAspectRatio="none"></svg>
+      <div class="stats-chart-labels" id="hxFreqLabels"></div>
+      <div class="stats-chart-detail" id="hxFreqDetail"></div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">Muscle distribution</div>
+      <div class="stats-chart-detail" id="hxMuscleNote" style="text-align:left; margin:0 0 8px;"></div>
+      <div id="hxMuscles"></div>
+    </div>
+
     <div class="stats-card">
       <div class="stats-card-title">Needs attention</div>
       <div id="hxStalling"></div>
@@ -2216,34 +2304,58 @@
     </div>
   </div>
 
-  <!-- ---- By exercise: pick one, see it progress ---- -->
-  <div class="hx-section" id="hxSectionExercise" style="display:none;">
-    <div class="stats-card">
-      <div class="stats-card-title">Exercise</div>
-      <select class="config-input" id="hxExercisePicker" onchange="renderHistoryExercise()" style="width:100%; box-sizing:border-box;"></select>
-      <div class="hx-ex-summary" id="hxExerciseSummary"></div>
-      <svg viewBox="0 0 320 140" class="stats-chart" id="hxExerciseChart" preserveAspectRatio="none"></svg>
-      <div class="stats-chart-labels" id="hxExerciseLabels"></div>
-      <div class="stats-chart-detail" id="hxExerciseDetail"></div>
-      <div class="hx-legend">
-        <span class="hx-key"><span class="hx-swatch" style="background:var(--accent)"></span>Top weight</span>
-        <span class="hx-key"><span class="hx-swatch" style="background:var(--green)"></span>All clean</span>
-        <span class="hx-key"><span class="hx-swatch" style="background:var(--amber)"></span>Some tough</span>
-        <span class="hx-key"><span class="hx-swatch" style="background:var(--red)"></span>Too tough</span>
-      </div>
+  <!-- ---- Exercises: the list, then one exercise's records + charts ---- -->
+  <div class="hx-section" id="hxSectionExercises" style="display:none;">
+    <div class="stats-card" id="hxExerciseListCard">
+      <input type="text" class="config-input" id="hxExerciseSearch" placeholder="Search exercises"
+             oninput="renderHistoryExerciseList()" style="width:100%; box-sizing:border-box; margin-bottom:4px;">
+      <div id="hxExerciseList"></div>
     </div>
-    <div class="stats-card">
-      <div class="stats-card-title">Every session</div>
-      <div id="hxExerciseRows"></div>
+
+    <div id="hxExerciseDetailWrap" style="display:none;">
+      <div class="stats-card">
+        <div class="hx-detail-head">
+          <button class="hx-back" onclick="closeHistoryExercise()">‹ All exercises</button>
+          <div class="hx-detail-title" id="hxExerciseName"></div>
+        </div>
+        <div class="hx-ex-summary" id="hxExerciseSummary"></div>
+      </div>
+
+      <div class="stats-card">
+        <div class="stats-card-title">Records</div>
+        <div id="hxRecords"></div>
+      </div>
+
+      <div class="stats-card">
+        <div class="stats-card-title">Charts</div>
+        <select class="config-input" id="hxMetricPicker" onchange="renderHistoryExercise()" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
+          <option value="topWeight">Heaviest weight</option>
+          <option value="est1RM">Estimated 1RM</option>
+          <option value="bestSetVolume">Best set volume</option>
+          <option value="volume">Session volume</option>
+          <option value="totalReps">Total reps</option>
+        </select>
+        <svg viewBox="0 0 320 140" class="stats-chart" id="hxExerciseChart" preserveAspectRatio="none"></svg>
+        <div class="stats-chart-labels" id="hxExerciseLabels"></div>
+        <div class="stats-chart-detail" id="hxExerciseDetail"></div>
+        <div class="hx-legend">
+          <span class="hx-key"><span class="hx-swatch" style="background:var(--green)"></span>All clean</span>
+          <span class="hx-key"><span class="hx-swatch" style="background:var(--amber)"></span>Some tough</span>
+          <span class="hx-key"><span class="hx-swatch" style="background:var(--red)"></span>Too tough</span>
+          <span class="hx-key"><span class="hx-swatch" style="background:var(--accent)"></span>Untagged</span>
+        </div>
+      </div>
+
+      <div class="stats-card">
+        <div class="stats-card-title">History</div>
+        <div id="hxExerciseRows"></div>
+      </div>
     </div>
   </div>
 
-  <!-- ---- By day: the full log, newest first ---- -->
-  <div class="hx-section" id="hxSectionDays" style="display:none;">
-    <div class="stats-card">
-      <div class="stats-card-title">Day by day</div>
-      <div id="hxDayList"></div>
-    </div>
+  <!-- ---- Workouts: the feed of session cards ---- -->
+  <div class="hx-section" id="hxSectionWorkouts" style="display:none;">
+    <div id="hxDayList"></div>
   </div>
 
   <div class="hx-legacy">
@@ -3936,16 +4048,23 @@ function renderStatsWeightChart() {
 }
 
 /* ---------- History tab ----------
+   Laid out the way Hevy does it, because the shape is right: a range that
+   applies to the whole tab, a profile-style overview, an exercise list that
+   opens into records and charts, and a feed of workout cards.
+
    Reads the Workout History sheet, which the backend rolls up once at log
    time (see writeHistoryRollup_ in code.gs). One read, already aggregated -
-   deriving these trends from the per-week tabs would mean re-walking every
-   sheet on every open, and that gets slower every week.
+   deriving this from the per-week tabs would mean re-walking every sheet on
+   every open, and that gets slower every week.
 
    Cached locally so switching tabs is instant and so the tab still shows
    something useful with no signal; the refresh button forces a re-fetch. */
 const STORAGE_HISTORY_KEY = 'WORKOUT_HISTORY_CACHE';
+const STORAGE_HISTORY_RANGE_KEY = 'WORKOUT_HISTORY_RANGE';
 let historyRows_ = null;
-let historySection_ = 'trends';
+let historySection_ = 'overview';
+let historyExercise_ = null;
+let historyRangeDays_ = 0;   // 0 = all time
 
 function loadHistoryCache_() {
   try {
@@ -3984,9 +4103,6 @@ async function loadWorkoutHistory(force) {
     historyRows_ = data.history || [];
     localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify({ rows: historyRows_, at: new Date().toISOString() }));
     if (historyRows_.length) {
-      // The backend builds the rollup from the existing week tabs the first
-      // time it is asked and finds nothing - worth saying so once, since
-      // several weeks appearing at once is otherwise a surprise.
       setHistoryStatus_(data.backfilled
         ? `Built from ${data.backfilled} day${data.backfilled === 1 ? '' : 's'} already in your Sheet.`
         : '');
@@ -4002,7 +4118,7 @@ async function loadWorkoutHistory(force) {
 
 function showHistorySection(name) {
   historySection_ = name;
-  ['trends', 'exercise', 'days'].forEach(k => {
+  ['overview', 'exercises', 'workouts'].forEach(k => {
     const el = document.getElementById('hxSection' + k.charAt(0).toUpperCase() + k.slice(1));
     if (el) el.style.display = k === name ? '' : 'none';
   });
@@ -4012,14 +4128,99 @@ function showHistorySection(name) {
   updateViewportHeight('stats', true);
 }
 
-// Rows grouped by the week they belong to, oldest first.
+function setHistoryRange(days) {
+  historyRangeDays_ = days;
+  try { localStorage.setItem(STORAGE_HISTORY_RANGE_KEY, String(days)); } catch (e) {}
+  document.querySelectorAll('#hxRange .hx-range-btn').forEach(b =>
+    b.classList.toggle('active', Number(b.dataset.range) === days));
+  renderHistoryTab();
+  updateViewportHeight('stats', true);
+}
+
+// The range applies to every section at once, which is what makes the
+// chips feel like a filter rather than a per-chart control.
+function historyInRange_() {
+  const rows = historyRows_ || [];
+  if (!historyRangeDays_) return rows;
+  const cutoff = new Date(Date.now() - historyRangeDays_ * 86400000).toISOString().slice(0, 10);
+  return rows.filter(r => r.date >= cutoff);
+}
+
+/* Sets per muscle group. Hevy reads this off its own exercise library;
+   here it is matched on the exercise name, longest pattern first so
+   "Leg Curl" is not caught by "Leg". Anything unmatched is counted as
+   Other rather than silently dropped - a muscle chart that quietly
+   ignores exercises is worse than one that admits the gap. */
+const MUSCLE_PATTERNS = [
+  [/incline.*(chest|press)|chest press|bench|pushup|push-up|dip\b/i, 'Chest'],
+  [/lat pulldown|pulldown|pull-?up|chin-?up|\brow\b|lat /i, 'Back'],
+  [/lateral raise|shoulder|overhead press|ohp|delt|front raise|shrug/i, 'Shoulders'],
+  [/bicep|curl(?!.*leg)/i, 'Biceps'],
+  [/tricep|pushdown|pulldown rope|skull/i, 'Triceps'],
+  [/leg curl|hamstring|deadlift|rdl|good morning/i, 'Hamstrings'],
+  [/leg press|squat|leg extension|lunge|quad|split squat/i, 'Quads'],
+  [/glute|hip thrust|kickback|abduct/i, 'Glutes'],
+  [/calf|calve/i, 'Calves'],
+  [/crunch|plank|ab\b|abs\b|knee raise|leg raise|core|oblique|sit-?up/i, 'Core'],
+  [/walk|run|bike|row erg|cardio|treadmill|sauna|stretch|mobility/i, 'Cardio & other']
+];
+
+function muscleFor_(name) {
+  for (const [re, group] of MUSCLE_PATTERNS) if (re.test(name)) return group;
+  return 'Other';
+}
+
+function renderHistoryMuscles_(rows) {
+  const el = document.getElementById('hxMuscles');
+  const note = document.getElementById('hxMuscleNote');
+  if (!el) return;
+  const byMuscle = {};
+  rows.forEach(r => {
+    const m = muscleFor_(r.exercise);
+    byMuscle[m] = (byMuscle[m] || 0) + r.done;
+  });
+  const list = Object.keys(byMuscle).map(k => ({ name: k, sets: byMuscle[k] }))
+    .filter(m => m.sets > 0).sort((a, b) => b.sets - a.sets);
+  const total = list.reduce((n, m) => n + m.sets, 0);
+
+  if (note) note.textContent = total ? `${total} completed sets in this range` : '';
+  if (!list.length) { el.innerHTML = '<div class="hx-empty">No completed sets in this range.</div>'; return; }
+
+  const max = list[0].sets;
+  el.innerHTML = list.map(m => `<div class="hx-muscle">
+    <span class="hx-muscle-name">${escapeHtml_(m.name)}</span>
+    <span class="hx-muscle-track"><span class="hx-muscle-fill" style="width:${(m.sets / max * 100).toFixed(1)}%"></span></span>
+    <span class="hx-muscle-val">${m.sets} · ${Math.round(m.sets / total * 100)}%</span>
+  </div>`).join('');
+}
+
+function renderHistoryTiles_(rows) {
+  const el = document.getElementById('hxTiles');
+  if (!el) return;
+  const days = new Set(rows.map(r => r.date)).size;
+  const volume = rows.reduce((n, r) => n + r.volume, 0);
+  const sets = rows.reduce((n, r) => n + r.done, 0);
+  const reps = rows.reduce((n, r) => n + r.totalReps, 0);
+  const fmt = n => n >= 1000000 ? (n / 1000000).toFixed(1) + 'M'
+                 : n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(Math.round(n));
+  // Hevy's fourth tile is time spent training; nothing here records
+  // duration, so reps takes that slot rather than inventing a number.
+  const tiles = [
+    ['Workouts', String(days)], ['Volume', fmt(volume) + ' lb'],
+    ['Sets', String(sets)], ['Reps', fmt(reps)]
+  ];
+  el.innerHTML = tiles.map(([label, value]) =>
+    `<div><div class="hx-tile-value">${escapeHtml_(value)}</div><div class="hx-tile-label">${escapeHtml_(label)}</div></div>`).join('');
+}
+
 function historyByWeek_(rows) {
   const byWeek = {};
   rows.forEach(r => {
-    byWeek[r.week] = byWeek[r.week] || { week: r.week, date: r.date, volume: 0, reps: 0, sets: 0, done: 0 };
+    byWeek[r.week] = byWeek[r.week] || { week: r.week, date: r.date, volume: 0, reps: 0, sets: 0, done: 0, days: {} };
     const w = byWeek[r.week];
     if (r.date < w.date) w.date = r.date;
     w.volume += r.volume; w.reps += r.totalReps; w.sets += r.sets; w.done += r.done;
+    w.days[r.date] = true;
   });
   return Object.keys(byWeek).map(k => byWeek[k]).sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -4035,11 +4236,6 @@ function qualityMixBar_(g, y, r) {
     + `</span>`;
 }
 
-/* Exercises worth looking at: the top weight has not moved across the last
-   three sessions AND the sets were tough, or anything with a red. That is
-   the same judgement used to write each week's plan by hand - stalled and
-   straining means change something; stalled and clean just means it is
-   time to add weight. */
 function historyStalling_(rows) {
   const byEx = {};
   rows.forEach(r => { (byEx[r.exercise] = byEx[r.exercise] || []).push(r); });
@@ -4055,8 +4251,6 @@ function historyStalling_(rows) {
     const clean = recent.reduce((n, r) => n + r.green, 0);
     const missed = recent.reduce((n, r) => n + (r.sets - r.done), 0);
 
-    // Bodyweight work has no weight to stall on - every session would read
-    // as "same load" forever - so reps are what progress means there.
     const loaded = sessions.some(x => x.topWeight > 0);
     const values = recent.map(r => loaded ? r.topWeight : r.totalReps);
     const stalled = values.every(v => v === values[0]);
@@ -4086,22 +4280,21 @@ function renderHistoryStalling_(rows) {
     return;
   }
   const colour = { red: 'var(--red)', amber: 'var(--amber)', green: 'var(--green)' };
-  el.innerHTML = items.map(i => `<div class="hx-row">
+  el.innerHTML = items.map(i => `<div class="hx-row" onclick="openHistoryExercise('${escapeHtml_(escapeJsAttr_(i.name))}')" style="cursor:pointer;">
     <span class="hx-qmix" style="width:4px;height:26px;border-radius:2px;background:${colour[i.level]}"></span>
     <div class="hx-row-main">
       <div class="hx-row-title">${escapeHtml_(i.name)}</div>
       <div class="hx-row-sub">${escapeHtml_(i.why)}</div>
-    </div></div>`).join('');
+    </div>
+    <span class="hx-ex-chevron">›</span></div>`).join('');
 }
 
-// Weekly bars, shared by volume and completion - same shape, different
-// number, so one renderer rather than two that drift apart.
 function renderHistoryWeekBars_(svgId, labelsId, detailId, weeks, valueFor, format, colourFor) {
   const svg = document.getElementById(svgId);
   const labelsEl = document.getElementById(labelsId);
   if (!svg) return;
   const box = fitChartBox_(svg, 320, 140);
-  const shown = weeks.slice(-8);
+  const shown = weeks.slice(-10);
 
   const detailEl = document.getElementById(detailId);
   if (!shown.length) {
@@ -4110,9 +4303,6 @@ function renderHistoryWeekBars_(svgId, labelsId, detailId, weeks, valueFor, form
     if (detailEl) detailEl.textContent = 'No sessions logged yet.';
     return;
   }
-  // Cleared on every render with data: the first render happens before the
-  // fetch returns, and its "no sessions" message used to survive underneath
-  // a chart that had since filled in.
   if (detailEl) detailEl.textContent = '';
 
   const topMargin = 18, barGap = 6;
@@ -4132,7 +4322,7 @@ function renderHistoryWeekBars_(svgId, labelsId, detailId, weeks, valueFor, form
       out += `<rect x="${x.toFixed(1)}" y="${(topMargin + chartH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${colourFor ? colourFor(w) : 'var(--accent)'}"></rect>`;
       out += `<text x="${(x + barW / 2).toFixed(1)}" y="${Math.max(11, topMargin + chartH - h - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">${escapeHtml_(format(v, w))}</text>`;
     }
-    out += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${box.h}" fill="transparent" style="cursor:pointer;" onclick="showHistoryWeekDetail('${detailId}','${escapeHtml_(w.week)}')"></rect>`;
+    out += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${box.h}" fill="transparent" style="cursor:pointer;" onclick="showHistoryWeekDetail('${detailId}','${escapeHtml_(escapeJsAttr_(w.week))}')"></rect>`;
   });
   svg.innerHTML = out;
 
@@ -4150,8 +4340,8 @@ function renderHistoryWeekBars_(svgId, labelsId, detailId, weeks, valueFor, form
 
 function showHistoryWeekDetail(detailId, week) {
   const el = document.getElementById(detailId);
-  if (!el || !historyRows_) return;
-  const rows = historyRows_.filter(r => r.week === week);
+  if (!el) return;
+  const rows = historyInRange_().filter(r => r.week === week);
   if (!rows.length) { el.textContent = week; return; }
   const volume = rows.reduce((n, r) => n + r.volume, 0);
   const done = rows.reduce((n, r) => n + r.done, 0);
@@ -4160,62 +4350,166 @@ function showHistoryWeekDetail(detailId, week) {
   el.textContent = `${week} — ${volume.toLocaleString()} lb volume · ${done}/${sets} sets · ${days} day${days === 1 ? '' : 's'}`;
 }
 
-function renderHistoryTrends_(rows) {
+function renderHistoryOverview_(rows) {
   const weeks = historyByWeek_(rows);
+  renderHistoryTiles_(rows);
+  renderHistoryMuscles_(rows);
   renderHistoryStalling_(rows);
+
+  renderHistoryWeekBars_('hxFreqChart', 'hxFreqLabels', 'hxFreqDetail', weeks,
+    w => Object.keys(w.days).length, v => String(v));
   renderHistoryWeekBars_('hxVolumeChart', 'hxVolumeLabels', 'hxVolumeDetail', weeks,
     w => w.volume, v => (v >= 1000 ? Math.round(v / 1000) + 'k' : String(Math.round(v))));
-  // Green once at least 90% of the planned sets got done, amber otherwise -
-  // the number that would have flagged the skipped Plank weeks.
   renderHistoryWeekBars_('hxCompletionChart', 'hxCompletionLabels', 'hxCompletionDetail', weeks,
     w => (w.sets ? Math.round(w.done / w.sets * 100) : 0), v => v + '%',
     w => (w.sets && w.done / w.sets >= 0.9) ? 'var(--green)' : 'var(--amber)');
+
+  const f = document.getElementById('hxFreqDetail');
+  if (f && !f.textContent) f.textContent = 'Days trained each week';
   const d = document.getElementById('hxVolumeDetail');
   if (d && !d.textContent) d.textContent = 'Tap a week for the breakdown';
   const c = document.getElementById('hxCompletionDetail');
   if (c && !c.textContent) c.textContent = 'Completed sets against what was planned';
 }
 
-function renderHistoryExercise() {
-  const rows = historyRows_ || [];
-  const picker = document.getElementById('hxExercisePicker');
-  if (!picker) return;
+/* ---- Exercises: list, then one exercise ---- */
 
-  const names = [...new Set(rows.map(r => r.exercise))].sort();
-  if (picker.options.length !== names.length || picker.dataset.built !== names.join('|')) {
-    const keep = picker.value;
-    picker.innerHTML = names.map(n => `<option value="${escapeHtml_(n)}">${escapeHtml_(n)}</option>`).join('');
-    picker.dataset.built = names.join('|');
-    if (names.includes(keep)) picker.value = keep;
+const HX_METRICS = {
+  topWeight:     { label: 'Heaviest weight', unit: ' lb', fmt: v => Math.round(v) },
+  est1RM:        { label: 'Estimated 1RM',   unit: ' lb', fmt: v => Math.round(v) },
+  bestSetVolume: { label: 'Best set volume', unit: ' lb', fmt: v => Math.round(v) },
+  volume:        { label: 'Session volume',  unit: ' lb', fmt: v => Math.round(v) },
+  totalReps:     { label: 'Total reps',      unit: '',    fmt: v => Math.round(v) }
+};
+
+function renderHistoryExerciseList() {
+  const el = document.getElementById('hxExerciseList');
+  if (!el) return;
+  const rows = historyInRange_();
+  const search = (document.getElementById('hxExerciseSearch') || {}).value || '';
+  const byEx = {};
+  rows.forEach(r => { (byEx[r.exercise] = byEx[r.exercise] || []).push(r); });
+
+  const items = Object.keys(byEx)
+    .filter(n => !search || n.toLowerCase().includes(search.toLowerCase()))
+    .map(name => {
+      const s = byEx[name].sort((a, b) => a.date.localeCompare(b.date));
+      const last = s[s.length - 1];
+      const loaded = s.some(x => x.topWeight > 0);
+      return { name, sessions: s.length, last, loaded, best: Math.max(...s.map(x => loaded ? x.topWeight : x.totalReps)) };
+    })
+    .sort((a, b) => b.last.date.localeCompare(a.last.date));
+
+  if (!items.length) {
+    el.innerHTML = `<div class="hx-empty">${search ? 'No exercise matches that.' : 'Nothing logged yet.'}</div>`;
+    return;
   }
-  const name = picker.value || names[0];
-  const sessions = rows.filter(r => r.exercise === name).sort((a, b) => a.date.localeCompare(b.date));
+  el.innerHTML = items.map(i => {
+    const d = new Date(i.last.date + 'T00:00:00');
+    return `<div class="hx-ex-item" onclick="openHistoryExercise('${escapeHtml_(escapeJsAttr_(i.name))}')">
+      <div class="hx-row-main">
+        <div class="hx-row-title">${escapeHtml_(i.name)}</div>
+        <div class="hx-row-sub">${i.sessions} session${i.sessions === 1 ? '' : 's'} · last ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+      </div>
+      <div class="hx-row-value">${i.best}${i.loaded ? ' lb' : ' reps'}<span class="hx-delta hx-flat">best</span></div>
+      <span class="hx-ex-chevron">›</span>
+    </div>`;
+  }).join('');
+}
 
+function openHistoryExercise(name) {
+  historyExercise_ = name;
+  if (historySection_ !== 'exercises') showHistorySection('exercises');
+  document.getElementById('hxExerciseListCard').style.display = 'none';
+  document.getElementById('hxExerciseDetailWrap').style.display = '';
+  renderHistoryExercise();
+  updateViewportHeight('stats', true);
+}
+
+function closeHistoryExercise() {
+  historyExercise_ = null;
+  document.getElementById('hxExerciseListCard').style.display = '';
+  document.getElementById('hxExerciseDetailWrap').style.display = 'none';
+  renderHistoryExerciseList();
+  updateViewportHeight('stats', true);
+}
+
+// Hevy's PR block: the best each record has ever been, and when. Computed
+// over ALL history rather than the selected range - a personal record is
+// not something a date filter should be able to erase.
+function renderHistoryRecords_(name) {
+  const el = document.getElementById('hxRecords');
+  if (!el) return;
+  const all = (historyRows_ || []).filter(r => r.exercise === name);
+  if (!all.length) { el.innerHTML = '<div class="hx-empty">No sessions yet.</div>'; return; }
+
+  const loaded = all.some(r => r.topWeight > 0);
+  const defs = loaded ? [
+    ['Heaviest weight', r => r.topWeight, v => Math.round(v) + ' lb', r => r.topSetReps ? ` × ${r.topSetReps}` : ''],
+    ['Best est. 1RM', r => r.est1RM, v => Math.round(v) + ' lb', () => ''],
+    ['Best set volume', r => r.bestSetVolume, v => Math.round(v).toLocaleString() + ' lb', () => ''],
+    ['Best session volume', r => r.volume, v => Math.round(v).toLocaleString() + ' lb', () => ''],
+    ['Most reps in a session', r => r.totalReps, v => String(v), () => '']
+  ] : [
+    ['Most reps in a session', r => r.totalReps, v => String(v), () => ''],
+    ['Most sets in a session', r => r.done, v => String(v), () => '']
+  ];
+
+  el.innerHTML = defs.map(([label, pick, fmt, extra]) => {
+    let best = null;
+    all.forEach(r => { if (pick(r) > 0 && (!best || pick(r) > pick(best))) best = r; });
+    if (!best) return '';
+    const d = new Date(best.date + 'T00:00:00');
+    return `<div class="hx-rec">
+      <span class="hx-rec-label">${escapeHtml_(label)}</span>
+      <span class="hx-rec-value">${escapeHtml_(fmt(pick(best)) + extra(best))}</span>
+      <span class="hx-rec-when">${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+    </div>`;
+  }).join('') || '<div class="hx-empty">Nothing to rank yet.</div>';
+}
+
+function renderHistoryExercise() {
+  const name = historyExercise_;
+  if (!name) return;
+  const nameEl = document.getElementById('hxExerciseName');
+  if (nameEl) nameEl.textContent = name;
+  renderHistoryRecords_(name);
+
+  const sessions = historyInRange_().filter(r => r.exercise === name)
+    .sort((a, b) => a.date.localeCompare(b.date));
   const summary = document.getElementById('hxExerciseSummary');
   const rowsEl = document.getElementById('hxExerciseRows');
+  const svg = document.getElementById('hxExerciseChart');
+
   if (!sessions.length) {
-    if (summary) summary.textContent = '';
-    if (rowsEl) rowsEl.innerHTML = '<div class="hx-empty">Nothing logged yet.</div>';
-    const svg = document.getElementById('hxExerciseChart');
+    if (summary) summary.textContent = 'Nothing in this range.';
+    if (rowsEl) rowsEl.innerHTML = '<div class="hx-empty">Nothing in this range.</div>';
     if (svg) svg.innerHTML = '';
     return;
   }
 
-  // Bodyweight work has no weight to plot, so it charts reps instead -
-  // otherwise Pushups would be a flat line at zero.
-  const usesWeight = sessions.some(s => s.topWeight > 0);
-  const valueFor = s => usesWeight ? s.topWeight : s.totalReps;
-  const unit = usesWeight ? ' lb' : ' reps';
+  const loaded = sessions.some(s => s.topWeight > 0);
+  const picker = document.getElementById('hxMetricPicker');
+  // Bodyweight work has no weight to plot - offering "Heaviest weight" for
+  // Pushups would be a chart of zeroes.
+  if (picker) {
+    const allowed = loaded ? Object.keys(HX_METRICS) : ['totalReps'];
+    [...picker.options].forEach(o => { o.hidden = !allowed.includes(o.value); });
+    if (!allowed.includes(picker.value)) picker.value = allowed[0];
+    picker.style.display = allowed.length > 1 ? '' : 'none';
+  }
+  const metric = (picker && picker.value) || (loaded ? 'topWeight' : 'totalReps');
+  const M = HX_METRICS[metric];
+  const valueFor = s => s[metric] || 0;
 
   const first = valueFor(sessions[0]), last = valueFor(sessions[sessions.length - 1]);
-  const delta = last - first;
+  const delta = Math.round((last - first) * 10) / 10;
   if (summary) {
     summary.textContent = `${sessions.length} session${sessions.length === 1 ? '' : 's'} · `
-      + `${usesWeight ? 'top weight ' + first + unit + ' → ' + last + unit : 'reps ' + first + ' → ' + last}`
+      + `${M.label.toLowerCase()} ${M.fmt(first)}${M.unit} → ${M.fmt(last)}${M.unit}`
       + (delta === 0 ? ' (no change)' : ` (${delta > 0 ? '+' : ''}${delta})`);
   }
 
-  const svg = document.getElementById('hxExerciseChart');
   const box = fitChartBox_(svg, 320, 140);
   const shown = sessions.slice(-12);
   const topMargin = 18, barGap = 6;
@@ -4229,16 +4523,14 @@ function renderHistoryExercise() {
   shown.forEach((sn, i) => {
     const x = offsetX + i * (barW + barGap);
     const v = valueFor(sn);
-    // Bar colour IS the quality signal: any red is red, any yellow amber,
-    // all green is green.
     const colour = sn.red ? 'var(--red)' : sn.yellow ? 'var(--amber)' : sn.green ? 'var(--green)' : 'var(--accent)';
     out += `<rect x="${x.toFixed(1)}" y="${topMargin}" width="${barW.toFixed(1)}" height="${chartH.toFixed(1)}" rx="4" fill="var(--surface2)" opacity="0.45"></rect>`;
     if (v > 0) {
       const h = Math.max(3, (v / maxVal) * chartH);
       out += `<rect x="${x.toFixed(1)}" y="${(topMargin + chartH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${colour}"></rect>`;
-      out += `<text x="${(x + barW / 2).toFixed(1)}" y="${Math.max(11, topMargin + chartH - h - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">${v}</text>`;
+      out += `<text x="${(x + barW / 2).toFixed(1)}" y="${Math.max(11, topMargin + chartH - h - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">${M.fmt(v)}</text>`;
     }
-    out += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${box.h}" fill="transparent" style="cursor:pointer;" onclick="showHistorySessionDetail('${sn.date}','${escapeHtml_(name)}')"></rect>`;
+    out += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${box.h}" fill="transparent" style="cursor:pointer;" onclick="showHistorySessionDetail('${sn.date}')"></rect>`;
   });
   svg.innerHTML = out;
 
@@ -4256,48 +4548,57 @@ function renderHistoryExercise() {
   const detail = document.getElementById('hxExerciseDetail');
   if (detail) detail.textContent = 'Tap a session for its numbers';
 
+  // Record-setting sessions get a marker, the way Hevy badges a PR.
+  const bestEver = Math.max(...(historyRows_ || []).filter(r => r.exercise === name).map(valueFor));
+
   if (rowsEl) {
     rowsEl.innerHTML = sessions.slice().reverse().map((sn, i, arr) => {
       const prev = arr[i + 1];
       const v = valueFor(sn), pv = prev ? valueFor(prev) : null;
-      const diff = pv === null ? null : v - pv;
+      const diff = pv === null ? null : Math.round((v - pv) * 10) / 10;
       const cls = diff === null ? '' : diff > 0 ? 'hx-up' : diff < 0 ? 'hx-down' : 'hx-flat';
       const arrow = diff === null ? '' : diff > 0 ? '▲ +' + diff : diff < 0 ? '▼ ' + diff : '— same';
       const d = new Date(sn.date + 'T00:00:00');
+      const pr = (v > 0 && v === bestEver) ? '<span class="hx-pr" title="Best ever">★</span>' : '';
       return `<div class="hx-row">
         <div class="hx-row-main">
-          <div class="hx-row-title">${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+          <div class="hx-row-title">${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${pr}</div>
           <div class="hx-row-sub">${sn.done}/${sn.sets} sets · ${sn.totalReps} reps${sn.volume ? ' · ' + sn.volume.toLocaleString() + ' lb volume' : ''}</div>
         </div>
         ${qualityMixBar_(sn.green, sn.yellow, sn.red)}
-        <div class="hx-row-value">${v}${usesWeight ? '' : ''}<span class="hx-delta ${cls}">${arrow}</span></div>
+        <div class="hx-row-value">${M.fmt(v)}<span class="hx-delta ${cls}">${arrow}</span></div>
       </div>`;
     }).join('');
   }
 }
 
-function showHistorySessionDetail(date, name) {
+function showHistorySessionDetail(date) {
   const el = document.getElementById('hxExerciseDetail');
-  if (!el || !historyRows_) return;
-  const r = historyRows_.find(x => x.date === date && x.exercise === name);
+  if (!el || !historyExercise_) return;
+  const r = (historyRows_ || []).find(x => x.date === date && x.exercise === historyExercise_);
   if (!r) return;
   const d = new Date(date + 'T00:00:00');
   const q = [r.green && r.green + ' clean', r.yellow && r.yellow + ' tough', r.red && r.red + ' too tough']
     .filter(Boolean).join(', ');
   el.textContent = `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} — `
     + `${r.done}/${r.sets} sets · ${r.totalReps} reps`
-    + (r.topWeight ? ` · top ${r.topWeight} lb · ${r.volume.toLocaleString()} lb volume` : '')
+    + (r.topWeight ? ` · top ${r.topWeight} lb${r.topSetReps ? ' × ' + r.topSetReps : ''} · ${r.volume.toLocaleString()} lb volume` : '')
+    + (r.est1RM ? ` · est 1RM ${Math.round(r.est1RM)} lb` : '')
     + (q ? ` · ${q}` : '');
 }
 
-function renderHistoryDays_(rows) {
+/* ---- Workouts: Hevy's feed of session cards ---- */
+function renderHistoryWorkouts_(rows) {
   const el = document.getElementById('hxDayList');
   if (!el) return;
   const byDate = {};
   rows.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
   const dates = Object.keys(byDate).sort().reverse();
 
-  if (!dates.length) { el.innerHTML = '<div class="hx-empty">Nothing logged yet.</div>'; return; }
+  if (!dates.length) {
+    el.innerHTML = '<div class="stats-card"><div class="hx-empty">Nothing logged in this range.</div></div>';
+    return;
+  }
 
   el.innerHTML = dates.map(date => {
     const list = byDate[date].slice().sort((a, b) => b.volume - a.volume);
@@ -4309,29 +4610,45 @@ function renderHistoryDays_(rows) {
     const y = list.reduce((n, r) => n + r.yellow, 0);
     const rd = list.reduce((n, r) => n + r.red, 0);
     const d = new Date(date + 'T00:00:00');
-    return `<div class="hx-day">
-      <div class="hx-day-head" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? '' : 'none'; updateViewportHeight('stats', true);">
-        <div class="hx-row-main">
-          <div class="hx-row-title">${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
-          <div class="hx-row-sub">${list.length} exercise${list.length === 1 ? '' : 's'} · ${done}/${sets} sets · ${reps} reps${volume ? ' · ' + volume.toLocaleString() + ' lb' : ''}</div>
-        </div>
-        ${qualityMixBar_(g, y, rd)}
+    const shown = list.slice(0, 6);
+    const rest = list.length - shown.length;
+
+    return `<div class="hx-wk">
+      <div class="hx-wk-title">${escapeHtml_(list[0].day)} workout</div>
+      <div class="hx-wk-sub">${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+      <div class="hx-wk-stats">
+        <div><div class="hx-wk-stat-value">${volume ? volume.toLocaleString() : reps}</div><div class="hx-wk-stat-label">${volume ? 'Volume lb' : 'Reps'}</div></div>
+        <div><div class="hx-wk-stat-value">${done}/${sets}</div><div class="hx-wk-stat-label">Sets</div></div>
+        <div><div class="hx-wk-stat-value">${list.length}</div><div class="hx-wk-stat-label">Exercises</div></div>
+        <div style="display:flex; align-items:flex-end; padding-bottom:2px;">${qualityMixBar_(g, y, rd)}</div>
       </div>
-      <div class="hx-day-body" style="display:none;">
-        ${list.map(r => `<div class="hx-day-ex">
-          <span class="hx-day-ex-name">${escapeHtml_(r.exercise)}</span>
-          <span class="hx-day-ex-val">${r.done}/${r.sets} × ${r.totalReps}${r.topWeight ? ' @ ' + r.topWeight + ' lb' : ''}</span>
-        </div>`).join('')}
-      </div>
+      ${shown.map(r => `<div class="hx-wk-ex" onclick="openHistoryExercise('${escapeHtml_(escapeJsAttr_(r.exercise))}')" style="cursor:pointer;">
+        <span class="hx-wk-ex-name">${r.done} × ${escapeHtml_(r.exercise)}</span>
+        <span class="hx-wk-ex-best">${r.topWeight ? r.topWeight + ' lb × ' + (r.topSetReps || '?') : r.totalReps + ' reps'}</span>
+      </div>`).join('')}
+      ${rest > 0 ? `<div class="hx-wk-more">+ ${rest} more</div>` : ''}
     </div>`;
   }).join('');
 }
 
+// The chosen range is a preference, not a session thing - reopening the
+// app on 3M should still be on 3M. Applied before the first render so the
+// chips and the charts start out agreeing.
+function initHistoryRange_() {
+  let saved = 0;
+  try { saved = Number(localStorage.getItem(STORAGE_HISTORY_RANGE_KEY) || 0) || 0; } catch (e) {}
+  if (![0, 90, 365].includes(saved)) saved = 0;
+  historyRangeDays_ = saved;
+  document.querySelectorAll('#hxRange .hx-range-btn').forEach(b =>
+    b.classList.toggle('active', Number(b.dataset.range) === saved));
+}
+
 function renderHistoryTab() {
-  const rows = historyRows_ || [];
-  if (historySection_ === 'trends') renderHistoryTrends_(rows);
-  else if (historySection_ === 'exercise') renderHistoryExercise();
-  else renderHistoryDays_(rows);
+  const rows = historyInRange_();
+  if (historySection_ === 'overview') renderHistoryOverview_(rows);
+  else if (historySection_ === 'exercises') {
+    if (historyExercise_) renderHistoryExercise(); else renderHistoryExerciseList();
+  } else renderHistoryWorkouts_(rows);
 }
 
 function renderStatsTab() {
@@ -4360,7 +4677,7 @@ function initChartResizeObserver_() {
     });
   });
   ['statsPushupChart', 'statsWeightChart', 'sdChart',
-   'hxVolumeChart', 'hxCompletionChart', 'hxExerciseChart'].forEach(id => {
+   'hxFreqChart', 'hxVolumeChart', 'hxCompletionChart', 'hxExerciseChart'].forEach(id => {
     const el = document.getElementById(id);
     if (el && el.parentElement) ro.observe(el.parentElement);
   });
@@ -9666,7 +9983,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-history-autobackfill';
+const APP_BUILD_VERSION = '2026-08-24-history-hevy';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -13146,7 +13463,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-24-history-autobackfill';
+const EXPECTED_BACKEND_VERSION = '2026-08-24-history-records';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
@@ -14335,6 +14652,7 @@ setInterval(() => {
 }, 60000);
 initViewportHeightObserver();
 initChartResizeObserver_();
+initHistoryRange_();
 initTabBarViewportPin();
 // Local order first, so the page is already arranged on this device
 // before any network call. loadRemoteOverviewLayoutState() re-applies it

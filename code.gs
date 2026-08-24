@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-24-history-autobackfill';
+const BACKEND_BUILD_VERSION = '2026-08-24-history-records';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1192,12 +1192,24 @@ function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
    writeSessionRows_ is the single funnel they share. */
 const HISTORY_SHEET_NAME = 'Workout History';
 const HISTORY_HEADERS = ['Date', 'Day', 'Exercise', 'Sets', 'Sets Done', 'Top Weight',
-                         'Volume', 'Target Reps', 'Total Reps', 'Green', 'Yellow', 'Red', 'Week'];
+                         'Volume', 'Target Reps', 'Total Reps', 'Green', 'Yellow', 'Red', 'Week',
+                         'Top Set Reps', 'Best Set Volume', 'Est 1RM'];
+
+// A rollup written before a column was added cannot answer for it, and
+// half-filled rows are worse than none. The sheet is rebuilt whenever its
+// header no longer matches, and the empty-sheet backfill below repopulates
+// it from the week tabs on the same request.
+function historySheetIsCurrent_(sheet) {
+  if (sheet.getLastRow() < 1) return false;
+  const header = sheet.getRange(1, 1, 1, HISTORY_HEADERS.length).getValues()[0];
+  return HISTORY_HEADERS.every((h, i) => header[i] === h);
+}
 
 function getOrCreateHistorySheet_() {
   const ss = getOrCreateSpreadsheet_();
   let sheet = ss.getSheetByName(HISTORY_SHEET_NAME);
-  if (sheet) return sheet;
+  if (sheet && historySheetIsCurrent_(sheet)) return sheet;
+  if (sheet) ss.deleteSheet(sheet);
 
   sheet = ss.insertSheet(HISTORY_SHEET_NAME);
   sheet.appendRow(HISTORY_HEADERS);
@@ -1237,13 +1249,18 @@ function numeric_(v) {
 function rollupExercise_(ex) {
   const sets = Array.isArray(ex.sets) ? ex.sets : [];
   const done = sets.filter(s => s.completed);
-  let topWeight = 0, volume = 0, totalReps = 0;
+  let topWeight = 0, topSetReps = 0, volume = 0, totalReps = 0, bestSetVolume = 0, est1RM = 0;
   const q = { green: 0, yellow: 0, red: 0 };
 
   done.forEach(s => {
     const w = numeric_(s.actualWeight != null && s.actualWeight !== '' ? s.actualWeight : s.targetWeight);
     const r = numeric_(s.actualReps != null && s.actualReps !== '' ? s.actualReps : s.targetReps);
-    if (w > topWeight) topWeight = w;
+    if (w > topWeight) { topWeight = w; topSetReps = r; }
+    if (w * r > bestSetVolume) bestSetVolume = w * r;
+    // Epley. Records are per SET, and the best estimate often comes from a
+    // lighter set taken for more reps rather than the heaviest one - which
+    // is exactly why it cannot be recomputed from the rollup afterwards.
+    if (w > 0 && r > 0) est1RM = Math.max(est1RM, w * (1 + r / 30));
     volume += w * r;
     totalReps += r;
     if (q[s.quality] !== undefined) q[s.quality]++;
@@ -1255,7 +1272,10 @@ function rollupExercise_(ex) {
     sets: sets.length,
     done: done.length,
     topWeight: topWeight,
+    topSetReps: topSetReps,
     volume: volume,
+    bestSetVolume: bestSetVolume,
+    est1RM: Math.round(est1RM * 10) / 10,
     targetReps: first.targetReps != null ? first.targetReps : '',
     totalReps: totalReps,
     green: q.green, yellow: q.yellow, red: q.red
@@ -1286,7 +1306,8 @@ function writeHistoryRollup_(weekLabel, day, exercises, timestamp) {
 
   const rows = list.map(rollupExercise_).filter(r => r.name).map(r => [
     dateStr, day, r.name, r.sets, r.done, r.topWeight, r.volume,
-    r.targetReps, r.totalReps, r.green, r.yellow, r.red, weekLabel
+    r.targetReps, r.totalReps, r.green, r.yellow, r.red, weekLabel,
+    r.topSetReps, r.bestSetVolume, r.est1RM
   ]);
   if (!rows.length) return;
   sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, HISTORY_HEADERS.length).setValues(rows);
@@ -1305,7 +1326,8 @@ function getWorkoutHistory_() {
     topWeight: Number(r[5]) || 0, volume: Number(r[6]) || 0,
     targetReps: r[7], totalReps: Number(r[8]) || 0,
     green: Number(r[9]) || 0, yellow: Number(r[10]) || 0, red: Number(r[11]) || 0,
-    week: r[12]
+    week: r[12],
+    topSetReps: Number(r[13]) || 0, bestSetVolume: Number(r[14]) || 0, est1RM: Number(r[15]) || 0
   })).filter(r => r.exercise);
 }
 

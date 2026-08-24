@@ -87,7 +87,9 @@ global.Logger = { log: m => console.log('  [Logger]', m) };
 
 const src = fs.readFileSync('/home/user/Fitness-Tracker/code.gs', 'utf8');
 // Everything except the doGet/doPost entry points, which need a request.
-eval(src.replace(/^function doGet[\s\S]*$/m, ''));
+// Function declarations leak out of a sloppy eval; const does not, so the
+// header list is handed back explicitly.
+const { HISTORY_HEADERS } = eval(src.replace(/^function doGet[\s\S]*$/m, '') + '\n;({ HISTORY_HEADERS })');
 
 console.log('=== backfillWorkoutHistory() on one real-shaped week tab ===');
 const days = backfillWorkoutHistory();
@@ -100,7 +102,7 @@ const body = hx.rows.slice(1);
 console.log('  header:', header.join(' | '));
 body.forEach(r => console.log('   ', r.join(' | ')));
 
-check('header matches HISTORY_HEADERS', header[0] === 'Date' && header[2] === 'Exercise' && header[6] === 'Volume');
+check('header matches HISTORY_HEADERS', header.join('|') === HISTORY_HEADERS.join('|'), header.join('|'));
 check('a row per exercise per day', body.length === 5, String(body.length));
 
 const lp = body.find(r => r[2] === 'Leg Press');
@@ -119,6 +121,22 @@ check('reds counted', cc && cc[11] === 2, cc && String(cc[11]));
 const sat = body.find(r => r[2] === 'Pushups' && r[1] === 'Saturday');
 check('Saturday pushups dated to the 22nd', sat && sat[0] === '2026-08-22', sat && sat[0]);
 check('bodyweight reps summed, no volume', sat && sat[8] === 135 && sat[6] === 0, sat && `${sat[8]}/${sat[6]}`);
+
+console.log('\n=== Per-set records the rollup has to capture up front ===');
+{
+  // Heaviest set and best estimated 1RM come from DIFFERENT sets - the
+  // whole reason these are computed at write time, not derived later.
+  const r = rollupExercise_({ name:'Bench', sets:[
+    { actualWeight:225, actualReps:3,  completed:true, quality:'yellow' },
+    { actualWeight:185, actualReps:12, completed:true, quality:'green' }
+  ]});
+  console.log('  ', JSON.stringify(r));
+  check('top weight is the heaviest set', r.topWeight === 225, String(r.topWeight));
+  check('and its reps are kept', r.topSetReps === 3, String(r.topSetReps));
+  check('best set volume is the 185x12', r.bestSetVolume === 2220, String(r.bestSetVolume));
+  check('est 1RM comes from the lighter, longer set',
+    Math.abs(r.est1RM - 259) < 1, String(r.est1RM));   // 185*(1+12/30)=259
+}
 
 console.log('\n=== Re-running does not duplicate ===');
 const before = hx.rows.length;
@@ -142,6 +160,21 @@ const after = getWorkoutHistory_().filter(r => r.exercise === 'Leg Press');
 console.log('  ' + JSON.stringify(after));
 check('one Leg Press row, not two', after.length === 1, String(after.length));
 check('it holds the new weight', after[0].topWeight === 255, String(after[0].topWeight));
+
+console.log('\n=== A history sheet from an older column set rebuilds itself ===');
+{
+  const stale = new Sheet('Workout History', [
+    ['Date','Day','Exercise','Sets','Sets Done','Top Weight','Volume','Target Reps','Total Reps','Green','Yellow','Red','Week'],
+    ['2026-08-17','Monday','Leg Press',3,3,245,7350,10,30,3,0,0,'Week of Aug 17 - Aug 23, 2026']
+  ]);
+  const ss2 = new SS([monWeek, stale]);
+  ss2.deleteSheet = function (sh) { this.sheets = this.sheets.filter(x => x !== sh); };
+  global.SpreadsheetApp = { openById: () => ss2, create: () => ss2, BorderStyle: { SOLID_MEDIUM: 1 } };
+  const fresh = getOrCreateHistorySheet_();
+  console.log('  header now:', fresh.rows[0].join(' | '));
+  check('the stale sheet was replaced', fresh.rows[0].join('|') === HISTORY_HEADERS.join('|'));
+  check('and it starts empty so the backfill refills it', fresh.rows.length === 1, String(fresh.rows.length));
+}
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
