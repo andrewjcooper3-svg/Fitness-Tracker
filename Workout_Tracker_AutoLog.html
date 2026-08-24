@@ -948,12 +948,50 @@
 
   .stats-card { background: var(--surface); border-radius: 18px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
   .stats-card-title { font-family: var(--font); font-size: 13px; font-weight: 700; margin-bottom: 12px; }
-  .stats-chart { width: 100%; height: 140px; display: block; overflow: visible; }
+  /* Tall enough for the x-axis band the chart now draws itself - sizing to
+     the plot alone is what leaves axis labels half-cropped. */
+  .stats-chart { width: 100%; height: 176px; display: block; overflow: visible; }
   /* No data to draw - collapse instead of leaving an empty box with the
      explanation stranded below it. */
   .stats-chart.stats-chart-empty { height: 0; }
   .stats-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; }
-  .stats-chart-detail { font-family: var(--font); font-size: 12px; color: var(--text); text-align: center; margin-top: 6px; min-height: 15px; }
+  .stats-chart-labels:empty { display: none; }
+  .stats-chart-detail { font-family: var(--font); font-size: 12px; color: var(--muted); text-align: center; margin-top: 6px; min-height: 15px; }
+
+  /* ---- Chart chrome ----
+     Recessive by construction: the grid is a hairline one step off the
+     surface, every piece of text wears a text token rather than the series
+     colour, and only the marks carry hue. */
+  .chart-grid { stroke: var(--border); stroke-width: 1; shape-rendering: crispEdges; }
+  .chart-base { stroke: var(--muted); opacity: 0.45; }
+  .chart-tick { font-family: var(--font); font-size: 10px; fill: var(--muted);
+    font-variant-numeric: tabular-nums; }
+  .chart-value { font-family: var(--font); font-size: 10.5px; font-weight: 700; fill: var(--text); }
+  .chart-target { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.5; }
+  .chart-target-label { font-family: var(--font); font-size: 9.5px; fill: var(--muted); }
+  .chart-zero { fill: var(--muted); opacity: 0.35; }
+  .chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .chart-area { opacity: 0.1; stroke: none; }
+  /* The 2px surface ring keeps a dot legible where it sits on its own line. */
+  .chart-dot { stroke: var(--surface); stroke-width: 2; }
+  .chart-cross { stroke: var(--muted); stroke-width: 1; opacity: 0; }
+  .chart-band-bg { fill: var(--surface2); opacity: 0; }
+  .chart-hit { fill: transparent; cursor: pointer; }
+  @media (hover: hover) {
+    .chart-band:hover .chart-band-bg { opacity: 0.6; }
+    .chart-band:hover .chart-cross { opacity: 0.5; }
+    .chart-band:hover .chart-dot { r: 6; }
+  }
+  .chart-tip {
+    position: fixed; z-index: 400; pointer-events: none; opacity: 0;
+    transition: opacity 0.12s; background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px;
+    font-family: var(--font); font-size: 11.5px; line-height: 1.45;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.28); max-width: 240px; white-space: nowrap;
+  }
+  .chart-tip.on { opacity: 1; }
+  .chart-tip b { font-size: 12px; }
+  .chart-tip .k { color: var(--muted); }
   /* ---- History tab ---- */
   .hx-seg { display: flex; gap: 4px; background: var(--surface); border-radius: 14px; padding: 4px; margin-bottom: 12px; }
   .hx-seg-btn { flex: 1; min-width: 0; font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--muted);
@@ -967,7 +1005,11 @@
   .hx-range-btn.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
   /* Headline numbers, Hevy's profile stat row. */
-  .hx-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .hx-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 12px; }
+  .hx-tile-delta { font-family: var(--font); font-size: 10.5px; font-weight: 700; margin-top: 3px; }
+  .hx-tile-delta.hx-up { color: var(--green); }
+  .hx-tile-delta.hx-down { color: var(--red); }
+  .hx-tile-delta.hx-flat { color: var(--muted); }
   .hx-tile-value { font-family: var(--font); font-size: 21px; font-weight: 800; letter-spacing: -0.4px; }
   .hx-tile-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted);
     text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
@@ -976,7 +1018,10 @@
      same thing without pretending to anatomy the data does not have. */
   .hx-muscle { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
   .hx-muscle-name { font-family: var(--font); font-size: 12px; flex: 0 0 92px; }
-  .hx-muscle-track { flex: 1; height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+  /* Meter spec: the unfilled track is a lighter step of the fill's own ramp,
+     so the state reads across the whole bar rather than only where it stops. */
+  .hx-muscle-track { flex: 1; height: 8px; border-radius: 4px; overflow: hidden;
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface2)); }
   /* display:block matters - a bare inline span ignores width and height,
      so the track would render empty at every percentage. */
   .hx-muscle-fill { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
@@ -2287,6 +2332,7 @@
   <div class="hx-section" id="hxSectionOverview">
     <div class="stats-card">
       <div class="hx-tiles" id="hxTiles"></div>
+      <div class="stats-chart-detail" id="hxTilesNote" style="margin-top:10px; min-height:0;"></div>
     </div>
 
     <div class="stats-card">
@@ -2319,6 +2365,10 @@
       <svg viewBox="0 0 320 140" class="stats-chart" id="hxCompletionChart" preserveAspectRatio="none"></svg>
       <div class="stats-chart-labels" id="hxCompletionLabels"></div>
       <div class="stats-chart-detail" id="hxCompletionDetail"></div>
+      <div class="hx-legend">
+        <span class="hx-key"><span class="hx-swatch" style="background:var(--green)"></span>90% or more of the plan</span>
+        <span class="hx-key"><span class="hx-swatch" style="background:var(--amber)"></span>Under 90%</span>
+      </div>
     </div>
 
     <!-- Absorbed from the old Stats tab. They live inside the Overview
@@ -3816,58 +3866,259 @@ function fitChartBox_(svg, fallbackW, fallbackH) {
   return { w, h };
 }
 
-// Bars keep a sane width instead of becoming huge slabs on a wide screen,
-// and the row is centred in whatever space is left.
-const STATS_MAX_BAR_W = 64;
+/* ---------- Chart primitives ----------
+   Every chart on the History tab draws through these two renderers, so they
+   share one set of proportions instead of each one inventing its own: thin
+   marks, a hairline grid with round-numbered ticks, a value label only where
+   it earns its place, and a hover read-out. Plain inline SVG, no library.
+
+   Three rules from the mark spec are load-bearing and easy to lose:
+     - a column is capped at CHART_MAX_BAR and centred in its slot; letting
+       it fill the slot is what made the old charts read as blocks
+     - the cap is rounded and the foot is square, so a short column doesn't
+       float off the baseline like a pill
+     - labels are selective. A number over every column is noise; the axis,
+       the tooltip and the detail line carry the rest. */
+const CHART_PAD = { top: 20, bottom: 24, right: 8 };
+const CHART_MAX_BAR = 24;
+const CHART_MIN_GAP = 2;      // the surface gap between touching marks
+const CHART_RADIUS = 4;
+const CHART_TICKS = 3;        // intervals, so four gridlines including zero
+
+// Ticks land on round numbers: 0 / 5k / 10k / 15k reads instantly where
+// 0 / 4.7k / 9.4k / 14.1k does not.
+function chartNiceStep_(rough) {
+  if (!(rough > 0)) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  return ([1, 2, 2.5, 5, 10].find(m => m * mag >= rough) || 10) * mag;
+}
+
+function chartScale_(lo, hi, zeroBased) {
+  if (zeroBased) lo = 0;
+  if (!(hi > lo)) hi = lo + 1;
+  const step = chartNiceStep_((hi - lo) / CHART_TICKS);
+  const base = zeroBased ? 0 : Math.floor(lo / step) * step;
+  let top = base;
+  while (top < hi) top += step;
+  const values = [];
+  for (let v = base; v <= top + step / 2; v += step) values.push(Math.round(v * 1000) / 1000);
+  return { lo: base, hi: top, values };
+}
+
+function chartCompact_(n) {
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  if (a >= 1000) return (n / 1000).toFixed(a >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'k';
+  return String(Math.round(n * 10) / 10);
+}
+
+// Rounded cap, square foot.
+function chartColumnPath_(x, y, w, base) {
+  const r = Math.min(CHART_RADIUS, w / 2, Math.max(0, base - y));
+  const f = n => n.toFixed(1);
+  return `M${f(x)} ${f(base)}V${f(y + r)}Q${f(x)} ${f(y)} ${f(x + r)} ${f(y)}`
+       + `H${f(x + w - r)}Q${f(x + w)} ${f(y)} ${f(x + w)} ${f(y + r)}`
+       + `V${f(base)}Z`;
+}
+
+/* One tooltip element for the whole app, parked on <body> so it is never
+   clipped by a card's rounded corners or its overflow. */
+let chartTipEl_ = null;
+function showChartTip_(evt, html) {
+  if (!chartTipEl_) {
+    chartTipEl_ = document.createElement('div');
+    chartTipEl_.className = 'chart-tip';
+    document.body.appendChild(chartTipEl_);
+  }
+  chartTipEl_.innerHTML = html;
+  chartTipEl_.classList.add('on');
+  const r = chartTipEl_.getBoundingClientRect();
+  const x = Math.min(window.innerWidth - r.width - 8, Math.max(8, evt.clientX - r.width / 2));
+  const above = evt.clientY - r.height - 14;
+  chartTipEl_.style.left = x + 'px';
+  chartTipEl_.style.top = (above < 8 ? evt.clientY + 18 : above) + 'px';
+}
+function hideChartTip_() { if (chartTipEl_) chartTipEl_.classList.remove('on'); }
+
+// A tooltip must never be the only way to read a value, so every chart also
+// writes its hovered point into the card's detail line.
+function bindChartHits_(svg, points, detailId, onPick) {
+  const detail = detailId && document.getElementById(detailId);
+  const rest = detail && detail.textContent;
+  [...svg.querySelectorAll('.chart-hit')].forEach((hit, i) => {
+    const p = points[i];
+    if (!p) return;
+    const show = e => {
+      showChartTip_(e, p.tip || `<b>${escapeHtml_(p.label)}</b>`);
+      if (detail && p.detail) detail.textContent = p.detail;
+    };
+    hit.addEventListener('pointerenter', show);
+    hit.addEventListener('pointermove', show);
+    hit.addEventListener('pointerleave', () => {
+      hideChartTip_();
+      if (detail && rest) detail.textContent = rest;
+    });
+    if (onPick) hit.addEventListener('click', () => onPick(p, i));
+  });
+}
+
+function chartAxisText_(x, y, str, anchor, cls) {
+  return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" class="${cls}">${escapeHtml_(String(str))}</text>`;
+}
+
+/* Shared frame: gridlines, y ticks, baseline. Returns the plot rectangle so
+   each renderer only has to think about its own marks. */
+function chartFrame_(box, scale, fmtTick) {
+  // String(), not the raw return: a formatter that hands back a number
+  // (Math.round(v)) has no .length, and an undefined width silently turns
+  // the whole plot geometry into NaN - every mark then lands on x=NaN and
+  // the chart collapses to a smear at the left edge.
+  const ticks = scale.values.map(v => String(fmtTick(v)));
+  const gutter = Math.max(26, Math.max(...ticks.map(t => t.length)) * 6.2 + 8);
+  const x0 = gutter, x1 = box.w - CHART_PAD.right;
+  const y0 = CHART_PAD.top, y1 = box.h - CHART_PAD.bottom;
+  const yFor = v => y1 - ((v - scale.lo) / (scale.hi - scale.lo)) * (y1 - y0);
+
+  let svg = '';
+  scale.values.forEach((v, i) => {
+    const y = yFor(v);
+    svg += `<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y.toFixed(1)}" class="chart-grid${i === 0 ? ' chart-base' : ''}"></line>`;
+    svg += chartAxisText_(x0 - 7, y + 3.5, ticks[i], 'end', 'chart-tick');
+  });
+  return { svg, x0, x1, y0, y1, yFor };
+}
+
+/* Columns. points: { label, value, color, tip, detail, mark } - `mark`
+   forces a direct label on a point the caller cares about. */
+function renderColumnChart_(svgId, points, opts) {
+  opts = opts || {};
+  const svg = document.getElementById(svgId);
+  if (!svg) return null;
+  const box = fitChartBox_(svg, 320, 176);
+  if (!points.length) { svg.innerHTML = ''; return null; }
+
+  const raw = Math.max(opts.minTop || 0, ...points.map(p => p.value));
+  const scale = chartScale_(0, raw, true);
+  const fmtTick = opts.fmtTick || chartCompact_;
+  const fmtValue = opts.fmtValue || chartCompact_;
+  const F = chartFrame_(box, scale, fmtTick);
+
+  const band = (F.x1 - F.x0) / points.length;
+  const barW = Math.max(3, Math.min(CHART_MAX_BAR, band - CHART_MIN_GAP * 2));
+  const everyLabel = points.length <= 4;
+  const peak = points.reduce((b, p, i) => (p.value > points[b].value ? i : b), 0);
+
+  // Only the peak, the latest, and anything the caller flagged. A number
+  // over every column is the single fastest way to make a chart unreadable.
+  const labelled = new Set(everyLabel ? points.map((_, i) => i)
+                                      : [peak, points.length - 1]);
+  points.forEach((p, i) => { if (p.mark) labelled.add(i); });
+
+  let out = F.svg;
+  if (opts.targetValue != null && opts.targetValue <= scale.hi) {
+    const ty = F.yFor(opts.targetValue);
+    out += `<line x1="${F.x0}" y1="${ty.toFixed(1)}" x2="${F.x1.toFixed(1)}" y2="${ty.toFixed(1)}" class="chart-target"></line>`;
+    out += chartAxisText_(F.x1 - 2, ty - 5, opts.targetLabel || 'target', 'end', 'chart-target-label');
+  }
+
+  points.forEach((p, i) => {
+    const cx = F.x0 + band * (i + 0.5);
+    const x = cx - barW / 2;
+    const y = F.yFor(p.value);
+    out += `<g class="chart-band">`;
+    out += `<rect class="chart-band-bg" x="${(cx - band / 2 + 1).toFixed(1)}" y="${F.y0 - CHART_PAD.top + 2}" width="${(band - 2).toFixed(1)}" height="${(F.y1 - F.y0 + CHART_PAD.top + 4).toFixed(1)}" rx="7"></rect>`;
+    if (p.value > 0) {
+      out += `<path d="${chartColumnPath_(x, y, barW, F.y1)}" fill="${p.color || 'var(--accent)'}"></path>`;
+    } else {
+      // An empty period gets a stub on the baseline, not a full-height
+      // block pretending to be a track.
+      out += `<rect x="${x.toFixed(1)}" y="${(F.y1 - 2).toFixed(1)}" width="${barW.toFixed(1)}" height="2" rx="1" class="chart-zero"></rect>`;
+    }
+    if (labelled.has(i) && p.value > 0) {
+      out += chartAxisText_(cx, Math.max(11, y - 6), fmtValue(p.value, p), 'middle', 'chart-value');
+    }
+    out += chartAxisText_(cx, box.h - 7, p.label, 'middle', 'chart-tick');
+    out += `<rect class="chart-hit" x="${(cx - band / 2).toFixed(1)}" y="0" width="${band.toFixed(1)}" height="${box.h}"></rect>`;
+    out += `</g>`;
+  });
+
+  svg.innerHTML = out;
+  bindChartHits_(svg, points, opts.detailId, opts.onPick);
+  return F;
+}
+
+/* A line, because a progression over time is a line. Same frame, same
+   tooltip. Dots carry a second channel (session quality) and get a surface
+   ring so they stay legible where they sit on the line. */
+function renderLineChart_(svgId, points, opts) {
+  opts = opts || {};
+  const svg = document.getElementById(svgId);
+  if (!svg) return null;
+  const box = fitChartBox_(svg, 320, 176);
+  if (points.length < 2) { svg.innerHTML = ''; return null; }
+
+  const vals = points.map(p => p.value);
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.15 || Math.max(1, hi * 0.05);
+  const scale = chartScale_(opts.zeroBased ? 0 : lo - pad, hi + pad, !!opts.zeroBased);
+  const fmtTick = opts.fmtTick || chartCompact_;
+  const fmtValue = opts.fmtValue || chartCompact_;
+  const F = chartFrame_(box, scale, fmtTick);
+
+  const band = (F.x1 - F.x0) / points.length;
+  const xFor = i => F.x0 + band * (i + 0.5);
+  const xy = points.map((p, i) => [xFor(i), F.yFor(p.value)]);
+  const d = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
+
+  let out = F.svg;
+  out += `<path d="${d}L${xy[xy.length - 1][0].toFixed(1)} ${F.y1.toFixed(1)}L${xy[0][0].toFixed(1)} ${F.y1.toFixed(1)}Z" class="chart-area" fill="${opts.color || 'var(--accent)'}"></path>`;
+  out += `<path d="${d}" class="chart-line" stroke="${opts.color || 'var(--accent)'}"></path>`;
+
+  const peak = vals.reduce((b, v, i) => (v > vals[b] ? i : b), 0);
+  const labelled = new Set([peak, points.length - 1]);
+
+  points.forEach((p, i) => {
+    const [x, y] = xy[i];
+    out += `<g class="chart-band">`;
+    out += `<line class="chart-cross" x1="${x.toFixed(1)}" y1="${F.y0 - 6}" x2="${x.toFixed(1)}" y2="${F.y1.toFixed(1)}"></line>`;
+    out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${p.color || opts.color || 'var(--accent)'}" class="chart-dot"></circle>`;
+    if (labelled.has(i)) out += chartAxisText_(x, Math.max(11, y - 10), fmtValue(p.value, p), 'middle', 'chart-value');
+    if (points.length <= 14 || i % 2 === 0) out += chartAxisText_(x, box.h - 7, p.label, 'middle', 'chart-tick');
+    out += `<rect class="chart-hit" x="${(x - band / 2).toFixed(1)}" y="0" width="${band.toFixed(1)}" height="${box.h}"></rect>`;
+    out += `</g>`;
+  });
+
+  svg.innerHTML = out;
+  bindChartHits_(svg, points, opts.detailId, opts.onPick);
+  return F;
+}
 
 function renderStatsPushupChart() {
   const weeks = computeWeeklyPushupHistory(8);
-  const svg = document.getElementById('statsPushupChart');
-  const labelsEl = document.getElementById('statsPushupLabels');
   const weeklyTarget = PUSHUP_DAILY_BASELINE * 6;
-  const maxVal = Math.max(weeklyTarget, ...weeks.map(w => w.total), 1);
+  const labelsEl = document.getElementById('statsPushupLabels');
+  if (labelsEl) labelsEl.innerHTML = '';   // the chart draws its own axis now
 
-  const box = fitChartBox_(svg, 320, 140);
-  const topMargin = 20, barGap = 6;
-  const chartH = box.h - topMargin - 8;
-  const barW = Math.min(STATS_MAX_BAR_W, (box.w - barGap * (weeks.length - 1)) / weeks.length);
-  const groupW = barW * weeks.length + barGap * (weeks.length - 1);
-  const offsetX = Math.max(0, (box.w - groupW) / 2);
-  const targetY = topMargin + chartH - (weeklyTarget / maxVal) * chartH;
-
-  // The weekly target as a line across the chart - the bar colours already
-  // encode hit/missed, but with the bars spread out on a wide screen there
-  // was nothing showing WHERE the bar had to reach.
-  let bars = `<line x1="0" y1="${targetY.toFixed(1)}" x2="${box.w}" y2="${targetY.toFixed(1)}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 4" opacity="0.45"></line>`;
-
-  weeks.forEach((w, i) => {
-    const x = offsetX + i * (barW + barGap);
-    const cx = x + barW / 2;
-    // An empty week used to draw a 2px sliver that read as a stray rule
-    // under its "0". A faint full-height track says "nothing here" without
-    // pretending to be a bar.
-    bars += `<rect x="${x.toFixed(1)}" y="${topMargin}" width="${barW.toFixed(1)}" height="${chartH.toFixed(1)}" rx="4" fill="var(--surface2)" opacity="0.45"></rect>`;
-    if (w.total > 0) {
-      const h = Math.max(3, (w.total / maxVal) * chartH);
-      const y = topMargin + (chartH - h);
-      const color = w.total >= weeklyTarget ? 'var(--green)' : 'var(--accent)';
-      bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${color}"></rect>`;
-      bars += `<text x="${cx.toFixed(1)}" y="${Math.max(11, y - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">${w.total.toLocaleString()}</text>`;
-    }
-    bars += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${box.h}" fill="transparent" style="cursor:pointer;" onclick="openWeekDetailModal('${dateKey(w.weekStart)}')"></rect>`;
+  const points = weeks.map(w => {
+    const pct = weeklyTarget ? Math.round(w.total / weeklyTarget * 100) : 0;
+    return {
+      label: w.weekStart.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+      value: w.total,
+      // Status, not identity: green means the week's target was met.
+      color: w.total >= weeklyTarget ? 'var(--green)' : 'var(--accent)',
+      key: dateKey(w.weekStart),
+      tip: `<b>Week of ${escapeHtml_(w.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))}</b><br>`
+         + `${w.total.toLocaleString()} reps <span class="k">· ${pct}% of ${weeklyTarget.toLocaleString()}</span>`
+    };
   });
-  svg.innerHTML = bars;
 
-  // Labels take the bars' exact geometry - same width, same gap, same
-  // offset - rather than flexing evenly across the row. Sharing the row
-  // evenly is subtly wrong: the bars are spaced by barW+barGap while equal
-  // flex children are spaced by barW+(7/8)barGap, so the two drift further
-  // apart at every column and the last label sits ~3px off its bar.
-  labelsEl.style.justifyContent = 'flex-start';
-  labelsEl.style.gap = barGap + 'px';
-  labelsEl.style.paddingLeft = offsetX + 'px';
-  labelsEl.style.paddingRight = offsetX + 'px';
-  labelsEl.innerHTML = weeks.map(w => `<span style="flex:0 0 ${barW.toFixed(1)}px; text-align:center; cursor:pointer;" onclick="openWeekDetailModal('${dateKey(w.weekStart)}')">${w.weekStart.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</span>`).join('');
+  renderColumnChart_('statsPushupChart', points, {
+    minTop: weeklyTarget,
+    targetValue: weeklyTarget,
+    targetLabel: 'weekly target',
+    fmtValue: v => v.toLocaleString(),
+    onPick: p => openWeekDetailModal(p.key)
+  });
 }
 
 function openWeekDetailModal(weekStartKey) {
@@ -3995,8 +4246,8 @@ function renderWeightLineChart(svgId, labelsId, maxEntries, detailId) {
 
   if (log.length < 2) {
     svg.innerHTML = '';
-    // Collapsed rather than left as an empty 140px box with the message
-    // stranded underneath it.
+    // Collapsed rather than left as an empty box with the message stranded
+    // underneath it.
     svg.classList.add('stats-chart-empty');
     labelsEl.innerHTML = '<span class="ov-mini-empty">Log at least 2 weigh-ins to see a trend.</span>';
     WEIGHT_CHART_ENTRIES_[svgId] = [];
@@ -4004,50 +4255,42 @@ function renderWeightLineChart(svgId, labelsId, maxEntries, detailId) {
     return;
   }
   svg.classList.remove('stats-chart-empty');
+  labelsEl.innerHTML = '';   // the chart draws its own axis now
 
   const entries = log.slice(-maxEntries);
   WEIGHT_CHART_ENTRIES_[svgId] = entries;
   const weights = entries.map(e => e.weight);
   const minW = Math.min(...weights), maxW = Math.max(...weights);
-  const pad = Math.max(1, (maxW - minW) * 0.15);
-  const lo = minW - pad, hi = maxW + pad;
-  // Drawn in real pixels (see fitChartBox_) so the line weight and the
-  // dots stay round at any width. The inset keeps the end dots from being
-  // clipped in half by the edges.
-  const box = fitChartBox_(svg, 320, 140);
-  const INSET = 6;
-  const chartW = Math.max(1, box.w - INSET * 2);
-  const chartH = Math.max(1, box.h - INSET * 2);
-  const stepX = entries.length > 1 ? chartW / (entries.length - 1) : 0;
-  const yFor = w => INSET + chartH - ((w - lo) / (hi - lo)) * chartH;
 
-  const points = entries.map((e, i) => `${(INSET + i * stepX).toFixed(1)},${yFor(e.weight).toFixed(1)}`).join(' ');
-  const minIdx = weights.indexOf(minW), maxIdx = weights.indexOf(maxW);
-  const dots = entries.map((e, i) => {
-    const isExtreme = i === minIdx || i === maxIdx;
-    const r = isExtreme ? 4.5 : 3.5;
-    const color = isExtreme ? 'var(--accent)' : 'var(--teal)';
-    const cx = (INSET + i * stepX).toFixed(1), cy = yFor(e.weight).toFixed(1);
-    let hit = '';
-    if (detailId) {
-      // A visible dot is a tiny, fiddly tap target on a phone - a
-      // wider invisible circle on top is the actual hit area, same
-      // approach as the Water widget's hourly chart bars. Stops
-      // propagation since this chart can sit inside a card that's
-      // ALSO clickable (opens the full Weight modal) - tapping a
-      // point should show that point's detail, not open the modal.
-      hit = `<circle cx="${cx}" cy="${cy}" r="14" fill="transparent" style="cursor:pointer;" onclick="event.stopPropagation(); showWeightPointDetail_('${svgId}', ${i}, '${detailId}')"></circle>`;
-    }
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"></circle>${hit}`;
-  }).join('');
-  svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--teal)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>${dots}`;
+  const points = entries.map((e, i) => {
+    const d = new Date(e.date + 'T00:00:00');
+    const prev = i ? entries[i - 1].weight : null;
+    const diff = prev === null ? null : Math.round((e.weight - prev) * 10) / 10;
+    // The extremes take the accent; the rest of the run stays quiet, so the
+    // high and low water marks are what the eye lands on.
+    const extreme = e.weight === minW || e.weight === maxW;
+    const long = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return {
+      label: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+      value: e.weight,
+      color: extreme ? 'var(--accent)' : 'var(--teal)',
+      tip: `<b>${escapeHtml_(long)}</b><br>${e.weight.toFixed(1)} lb`
+         + (e.bodyFat != null ? ` <span class="k">· ${e.bodyFat}% BF</span>` : '')
+         + (diff === null ? '' : ` <span class="k">· ${diff > 0 ? '+' : ''}${diff} since last</span>`),
+      detail: `${long} — ${e.weight.toFixed(1)} lb` + (e.bodyFat != null ? ` · ${e.bodyFat}% BF` : '')
+    };
+  });
 
-  const fmtDate = ds => new Date(ds + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-  labelsEl.innerHTML = `<span>${fmtDate(entries[0].date)} · ${entries[0].weight.toFixed(1)} lb</span><span>${fmtDate(entries[entries.length - 1].date)} · ${entries[entries.length - 1].weight.toFixed(1)} lb</span>`;
+  renderLineChart_(svgId, points, {
+    color: 'var(--teal)',
+    detailId: detailId,
+    fmtTick: v => v.toFixed(0),
+    fmtValue: v => v.toFixed(1)
+  });
 
   if (detailId) {
     const detailEl = document.getElementById(detailId);
-    if (detailEl) detailEl.textContent = 'Tap a point to see that date\'s weight';
+    if (detailEl) detailEl.textContent = 'Tap or hover a point for that weigh-in';
   }
 }
 
@@ -4218,23 +4461,62 @@ function renderHistoryMuscles_(rows) {
   </div>`).join('');
 }
 
+/* The stat-tile contract is label + value + an optional delta against a
+   named period. The delta is what turns a tile from a readout into a
+   comparison, so it is worth the extra pass over the rows.
+
+   The comparison window is the one immediately before the selected range
+   and the same length, which is the only honest reading of "3M" - on All
+   there is no earlier window, so the tiles show the value alone. */
+function historyTileTotals_(rows) {
+  return {
+    days: new Set(rows.map(r => r.date)).size,
+    volume: rows.reduce((n, r) => n + r.volume, 0),
+    sets: rows.reduce((n, r) => n + r.done, 0),
+    reps: rows.reduce((n, r) => n + r.totalReps, 0)
+  };
+}
+
 function renderHistoryTiles_(rows) {
   const el = document.getElementById('hxTiles');
   if (!el) return;
-  const days = new Set(rows.map(r => r.date)).size;
-  const volume = rows.reduce((n, r) => n + r.volume, 0);
-  const sets = rows.reduce((n, r) => n + r.done, 0);
-  const reps = rows.reduce((n, r) => n + r.totalReps, 0);
-  const fmt = n => n >= 1000000 ? (n / 1000000).toFixed(1) + 'M'
-                 : n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(Math.round(n));
-  // Hevy's fourth tile is time spent training; nothing here records
-  // duration, so reps takes that slot rather than inventing a number.
+  const now = historyTileTotals_(rows);
+
+  let before = null, sinceLabel = '';
+  if (historyRangeDays_) {
+    const day = 86400000;
+    const start = new Date(Date.now() - historyRangeDays_ * day).toISOString().slice(0, 10);
+    const prevStart = new Date(Date.now() - historyRangeDays_ * 2 * day).toISOString().slice(0, 10);
+    const prevRows = (historyRows_ || []).filter(r => r.date >= prevStart && r.date < start);
+    if (prevRows.length) {
+      before = historyTileTotals_(prevRows);
+      sinceLabel = historyRangeDays_ === 90 ? 'vs previous 3 months' : 'vs previous year';
+    }
+  }
+
   const tiles = [
-    ['Workouts', String(days)], ['Volume', fmt(volume) + ' lb'],
-    ['Sets', String(sets)], ['Reps', fmt(reps)]
+    ['Workouts', String(now.days), 'days', now.days, before && before.days],
+    ['Volume', chartCompact_(now.volume) + ' lb', 'volume', now.volume, before && before.volume],
+    ['Sets', chartCompact_(now.sets), 'sets', now.sets, before && before.sets],
+    ['Reps', chartCompact_(now.reps), 'reps', now.reps, before && before.reps]
   ];
-  el.innerHTML = tiles.map(([label, value]) =>
-    `<div><div class="hx-tile-value">${escapeHtml_(value)}</div><div class="hx-tile-label">${escapeHtml_(label)}</div></div>`).join('');
+
+  el.innerHTML = tiles.map(([label, value, , cur, prev]) => {
+    let delta = '';
+    if (prev != null && prev > 0) {
+      const pct = Math.round((cur - prev) / prev * 100);
+      // More training is the good direction for every one of these, so the
+      // sign and the sentiment line up and one class covers both.
+      const cls = pct > 0 ? 'hx-up' : pct < 0 ? 'hx-down' : 'hx-flat';
+      const arrow = pct > 0 ? '▲ +' : pct < 0 ? '▼ ' : '— ';
+      delta = `<div class="hx-tile-delta ${cls}">${arrow}${Math.abs(pct)}%</div>`;
+    }
+    return `<div><div class="hx-tile-value">${escapeHtml_(value)}</div>`
+         + `<div class="hx-tile-label">${escapeHtml_(label)}</div>${delta}</div>`;
+  }).join('');
+
+  const note = document.getElementById('hxTilesNote');
+  if (note) note.textContent = sinceLabel;
 }
 
 function historyByWeek_(rows) {
@@ -4249,11 +4531,16 @@ function historyByWeek_(rows) {
   return Object.keys(byWeek).map(k => byWeek[k]).sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/* Green/amber/red are only ~ΔE 6-7 apart under deuteranopia, so the strip
+   can never be the only place these counts live: every one carries the
+   numbers as hover text, and the row beside it repeats them in words. */
 function qualityMixBar_(g, y, r) {
   const total = g + y + r;
   if (!total) return '<span class="hx-qmix"></span>';
   const pct = n => (n / total * 100).toFixed(1) + '%';
-  return `<span class="hx-qmix">`
+  const words = [g && `${g} clean`, y && `${y} tough`, r && `${r} too tough`]
+    .filter(Boolean).join(' · ');
+  return `<span class="hx-qmix" title="${escapeHtml_(words)}" aria-label="${escapeHtml_(words)}">`
     + (g ? `<i style="width:${pct(g)};background:var(--green)"></i>` : '')
     + (y ? `<i style="width:${pct(y)};background:var(--amber)"></i>` : '')
     + (r ? `<i style="width:${pct(r)};background:var(--red)"></i>` : '')
@@ -4313,53 +4600,47 @@ function renderHistoryStalling_(rows) {
     <span class="hx-ex-chevron">›</span></div>`).join('');
 }
 
-function renderHistoryWeekBars_(svgId, labelsId, detailId, weeks, valueFor, format, colourFor) {
+/* One weekly-column chart, fed by whichever measure the caller wants. All
+   three Overview charts share the frame, so the eye can compare them
+   without re-learning the axis each time. */
+function renderHistoryWeekBars_(svgId, labelsId, detailId, weeks, valueFor, format, colourFor, opts) {
   const svg = document.getElementById(svgId);
   const labelsEl = document.getElementById(labelsId);
   if (!svg) return;
-  const box = fitChartBox_(svg, 320, 140);
+  if (labelsEl) labelsEl.innerHTML = '';   // the chart draws its own axis now
   const shown = weeks.slice(-10);
-
   const detailEl = document.getElementById(detailId);
+
   if (!shown.length) {
     svg.innerHTML = '';
-    if (labelsEl) labelsEl.innerHTML = '';
     if (detailEl) detailEl.textContent = 'No sessions logged yet.';
     return;
   }
   if (detailEl) detailEl.textContent = '';
 
-  const topMargin = 18, barGap = 6;
-  const chartH = box.h - topMargin - 8;
-  const barW = Math.min(STATS_MAX_BAR_W, (box.w - barGap * (shown.length - 1)) / shown.length);
-  const groupW = barW * shown.length + barGap * (shown.length - 1);
-  const offsetX = Math.max(0, (box.w - groupW) / 2);
-  const maxVal = Math.max(1, ...shown.map(valueFor));
-
-  let out = '';
-  shown.forEach((w, i) => {
-    const x = offsetX + i * (barW + barGap);
-    const v = valueFor(w);
-    out += `<rect x="${x.toFixed(1)}" y="${topMargin}" width="${barW.toFixed(1)}" height="${chartH.toFixed(1)}" rx="4" fill="var(--surface2)" opacity="0.45"></rect>`;
-    if (v > 0) {
-      const h = Math.max(3, (v / maxVal) * chartH);
-      out += `<rect x="${x.toFixed(1)}" y="${(topMargin + chartH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${colourFor ? colourFor(w) : 'var(--accent)'}"></rect>`;
-      out += `<text x="${(x + barW / 2).toFixed(1)}" y="${Math.max(11, topMargin + chartH - h - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">${escapeHtml_(format(v, w))}</text>`;
-    }
-    out += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${box.h}" fill="transparent" style="cursor:pointer;" onclick="showHistoryWeekDetail('${detailId}','${escapeHtml_(escapeJsAttr_(w.week))}')"></rect>`;
+  const points = shown.map(w => {
+    const d = new Date(w.date + 'T00:00:00');
+    const days = Object.keys(w.days).length;
+    const pct = w.sets ? Math.round(w.done / w.sets * 100) : 0;
+    return {
+      label: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+      value: valueFor(w),
+      color: colourFor ? colourFor(w) : 'var(--accent)',
+      week: w.week,
+      // Every column reports the whole week, whichever chart you are on -
+      // hovering the volume chart and being told only the volume you can
+      // already see off the axis would be a wasted affordance.
+      tip: `<b>Week of ${escapeHtml_(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))}</b><br>`
+         + `${days} day${days === 1 ? '' : 's'} trained <span class="k">·</span> ${w.done}/${w.sets} sets (${pct}%)<br>`
+         + `${w.volume.toLocaleString()} lb volume <span class="k">·</span> ${w.reps.toLocaleString()} reps`,
+      detail: `${w.week} — ${w.volume.toLocaleString()} lb volume · ${w.done}/${w.sets} sets · ${days} day${days === 1 ? '' : 's'}`
+    };
   });
-  svg.innerHTML = out;
 
-  if (labelsEl) {
-    labelsEl.style.justifyContent = 'flex-start';
-    labelsEl.style.gap = barGap + 'px';
-    labelsEl.style.paddingLeft = offsetX + 'px';
-    labelsEl.style.paddingRight = offsetX + 'px';
-    labelsEl.innerHTML = shown.map(w => {
-      const d = new Date(w.date + 'T00:00:00');
-      return `<span style="flex:0 0 ${barW.toFixed(1)}px; text-align:center;">${d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</span>`;
-    }).join('');
-  }
+  renderColumnChart_(svgId, points, Object.assign({
+    detailId: detailId,
+    fmtValue: v => format(v)
+  }, opts || {}));
 }
 
 function showHistoryWeekDetail(detailId, week) {
@@ -4381,17 +4662,23 @@ function renderHistoryOverview_(rows) {
   renderHistoryStalling_(rows);
 
   renderHistoryWeekBars_('hxFreqChart', 'hxFreqLabels', 'hxFreqDetail', weeks,
-    w => Object.keys(w.days).length, v => String(v));
+    w => Object.keys(w.days).length, v => String(v), null,
+    { fmtTick: v => String(Math.round(v)) });
   renderHistoryWeekBars_('hxVolumeChart', 'hxVolumeLabels', 'hxVolumeDetail', weeks,
-    w => w.volume, v => (v >= 1000 ? Math.round(v / 1000) + 'k' : String(Math.round(v))));
+    w => w.volume, v => chartCompact_(v));
+  // Completion is the one chart where colour means good/bad rather than
+  // identity, so it wears the status tokens - and a legend, since colour on
+  // its own is exactly what a red-green reader cannot use.
   renderHistoryWeekBars_('hxCompletionChart', 'hxCompletionLabels', 'hxCompletionDetail', weeks,
     w => (w.sets ? Math.round(w.done / w.sets * 100) : 0), v => v + '%',
-    w => (w.sets && w.done / w.sets >= 0.9) ? 'var(--green)' : 'var(--amber)');
+    w => (w.sets && w.done / w.sets >= 0.9) ? 'var(--green)' : 'var(--amber)',
+    { minTop: 100, targetValue: 100, targetLabel: 'all planned sets',
+      fmtTick: v => Math.round(v) + '%' });
 
   const f = document.getElementById('hxFreqDetail');
   if (f && !f.textContent) f.textContent = 'Days trained each week';
   const d = document.getElementById('hxVolumeDetail');
-  if (d && !d.textContent) d.textContent = 'Tap a week for the breakdown';
+  if (d && !d.textContent) d.textContent = 'Weight moved each week — hover a column';
   const c = document.getElementById('hxCompletionDetail');
   if (c && !c.textContent) c.textContent = 'Completed sets against what was planned';
 }
@@ -4534,43 +4821,52 @@ function renderHistoryExercise() {
       + (delta === 0 ? ' (no change)' : ` (${delta > 0 ? '+' : ''}${delta})`);
   }
 
-  const box = fitChartBox_(svg, 320, 140);
-  const shown = sessions.slice(-12);
-  const topMargin = 18, barGap = 6;
-  const chartH = box.h - topMargin - 8;
-  const barW = Math.min(STATS_MAX_BAR_W, (box.w - barGap * (shown.length - 1)) / shown.length);
-  const groupW = barW * shown.length + barGap * (shown.length - 1);
-  const offsetX = Math.max(0, (box.w - groupW) / 2);
-  const maxVal = Math.max(1, ...shown.map(valueFor));
-
-  let out = '';
-  shown.forEach((sn, i) => {
-    const x = offsetX + i * (barW + barGap);
-    const v = valueFor(sn);
-    const colour = sn.red ? 'var(--red)' : sn.yellow ? 'var(--amber)' : sn.green ? 'var(--green)' : 'var(--accent)';
-    out += `<rect x="${x.toFixed(1)}" y="${topMargin}" width="${barW.toFixed(1)}" height="${chartH.toFixed(1)}" rx="4" fill="var(--surface2)" opacity="0.45"></rect>`;
-    if (v > 0) {
-      const h = Math.max(3, (v / maxVal) * chartH);
-      out += `<rect x="${x.toFixed(1)}" y="${(topMargin + chartH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${colour}"></rect>`;
-      out += `<text x="${(x + barW / 2).toFixed(1)}" y="${Math.max(11, topMargin + chartH - h - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">${M.fmt(v)}</text>`;
-    }
-    out += `<rect x="${x.toFixed(1)}" y="0" width="${barW.toFixed(1)}" height="${box.h}" fill="transparent" style="cursor:pointer;" onclick="showHistorySessionDetail('${sn.date}')"></rect>`;
-  });
-  svg.innerHTML = out;
-
+  /* A progression over time is a line, not a row of bars - bars invite you
+     to compare heights, a line shows you the trajectory, which is the whole
+     question here. The dots keep the second channel the bars used to carry:
+     how the session felt. Position is the metric, dot colour is the quality
+     tag, and the legend under the chart names the colours. */
+  const shown = sessions.slice(-14);
   const labelsEl = document.getElementById('hxExerciseLabels');
-  if (labelsEl) {
-    labelsEl.style.justifyContent = 'flex-start';
-    labelsEl.style.gap = barGap + 'px';
-    labelsEl.style.paddingLeft = offsetX + 'px';
-    labelsEl.style.paddingRight = offsetX + 'px';
-    labelsEl.innerHTML = shown.map(sn => {
-      const d = new Date(sn.date + 'T00:00:00');
-      return `<span style="flex:0 0 ${barW.toFixed(1)}px; text-align:center;">${d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</span>`;
-    }).join('');
+  if (labelsEl) labelsEl.innerHTML = '';
+
+  const qualityOf = sn => sn.red ? ['var(--red)', 'a set was too tough']
+    : sn.yellow ? ['var(--amber)', 'some sets were tough']
+    : sn.green ? ['var(--green)', 'all clean'] : ['var(--accent)', 'untagged'];
+
+  const points = shown.map(sn => {
+    const d = new Date(sn.date + 'T00:00:00');
+    const [colour, mood] = qualityOf(sn);
+    return {
+      label: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+      value: valueFor(sn),
+      color: colour,
+      date: sn.date,
+      tip: `<b>${escapeHtml_(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))}</b><br>`
+         + `${M.label} ${M.fmt(valueFor(sn))}${M.unit}<br>`
+         + `<span class="k">${sn.done}/${sn.sets} sets · ${sn.totalReps} reps · ${escapeHtml_(mood)}</span>`
+    };
+  });
+
+  if (points.length >= 2) {
+    svg.classList.remove('stats-chart-empty');
+    renderLineChart_('hxExerciseChart', points, {
+      detailId: 'hxExerciseDetail',
+      fmtTick: v => M.fmt(v),
+      fmtValue: v => M.fmt(v),
+      onPick: p => showHistorySessionDetail(p.date)
+    });
+  } else {
+    // A single session is a number, not a trend - the Records block and the
+    // list below already say it, so drawing a one-point line adds nothing.
+    svg.innerHTML = '';
   }
   const detail = document.getElementById('hxExerciseDetail');
-  if (detail) detail.textContent = 'Tap a session for its numbers';
+  if (detail) {
+    detail.textContent = points.length >= 2
+      ? 'Hover or tap a session for its numbers'
+      : 'One session so far — a trend needs two.';
+  }
 
   // Record-setting sessions get a marker, the way Hevy badges a PR.
   const bestEver = Math.max(...(historyRows_ || []).filter(r => r.exercise === name).map(valueFor));
@@ -10007,7 +10303,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-history-wide';
+const APP_BUILD_VERSION = '2026-08-24-charts';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

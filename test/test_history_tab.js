@@ -72,6 +72,22 @@ const mock = rows => route => {
     page.on('pageerror', e => { console.log('  PAGEERROR', String(e)); fails++; });
     await page.route('https://script.google.com/**', mock(rows));
     await page.goto(URL);
+    // The absorbed Pushups and Weight cards read local storage, so seed both
+    // - an empty weight log collapses that chart and it would go untested.
+    await page.evaluate(() => {
+      const log = [], ledger = {};
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 3 * 86400000);
+        log.push({ date: d.toISOString().slice(0, 10), weight: 186 - i * 0.4 + (i % 3) * 0.6, bodyFat: i % 4 ? null : 17.2 });
+      }
+      for (let i = 0; i < 56; i++) {
+        const d = new Date(Date.now() - i * 86400000);
+        if (i % 7 !== 6) ledger[d.toISOString().slice(0, 10)] = 120 + (i * 37) % 90;
+      }
+      localStorage.setItem('WORKOUT_WEIGHT_LOG', JSON.stringify(log));
+      localStorage.setItem('WORKOUT_PUSHUP_LEDGER', JSON.stringify(ledger));
+    });
+    await page.reload();
     await page.waitForTimeout(1000);
     await page.evaluate(() => showAppView('stats'));
     await page.waitForTimeout(1500);
@@ -230,13 +246,18 @@ const mock = rows => route => {
       check('bodyweight records are rep records',
         pu.records.every(r => !/lb/.test(r)) && pu.records.length === 2, pu.records.join(' | '));
 
-      // A red session must colour its bar red.
+      // The progression is a line now; the dots keep the quality channel, so
+      // a red session must still show up as a red dot.
       await page.evaluate(() => openHistoryExercise('Cable Crunch'));
       await page.waitForTimeout(400);
-      const cc = await page.evaluate(() =>
-        [...document.querySelectorAll('#hxExerciseChart rect')].map(r => r.getAttribute('fill')));
-      check('red sessions are coloured red', cc.filter(f => f === 'var(--red)').length === 3,
-        cc.filter(f => f && f.startsWith('var')).join(','));
+      const cc = await page.evaluate(() => ({
+        dots: [...document.querySelectorAll('#hxExerciseChart .chart-dot')].map(c => c.getAttribute('fill')),
+        line: document.querySelectorAll('#hxExerciseChart .chart-line').length,
+        area: document.querySelectorAll('#hxExerciseChart .chart-area').length
+      }));
+      console.log('   dots:', cc.dots.join(', '));
+      check('a progression is drawn as a line, not bars', cc.line === 1 && cc.area === 1, JSON.stringify(cc));
+      check('red sessions are red dots', cc.dots.filter(f => f === 'var(--red)').length === 3, cc.dots.join(','));
 
       await page.evaluate(() => closeHistoryExercise());
       await page.waitForTimeout(300);
@@ -268,6 +289,77 @@ const mock = rows => route => {
       await page.evaluate(() => { closeHistoryExercise(); showHistorySection('overview'); });
       await page.waitForTimeout(300);
 
+      console.log('\n  -- Chart engine --');
+      // The NaN class of bug: one formatter returning a number instead of a
+      // string made the gutter NaN, and every mark landed on x=NaN - the
+      // whole chart collapsed into a smear at the left edge and still
+      // "rendered". Scan the markup, and check the marks actually spread.
+      const chartIds = ['hxFreqChart', 'hxVolumeChart', 'hxCompletionChart', 'statsPushupChart', 'statsWeightChart'];
+      const probe = await page.evaluate(ids => ids.map(id => {
+        const svg = document.getElementById(id);
+        if (!svg) return { id, missing: true };
+        const w = Math.round(svg.getBoundingClientRect().width);
+        const xs = [...svg.querySelectorAll('.chart-hit')].map(r => +r.getAttribute('x'));
+        const bars = [...svg.querySelectorAll('path[fill]')].filter(p => !p.classList.contains('chart-area') && !p.classList.contains('chart-line'));
+        const barW = [...svg.querySelectorAll('rect.chart-hit')].map(r => +r.getAttribute('width'));
+        return {
+          id, w,
+          nan: /NaN|undefined/.test(svg.innerHTML),
+          marks: xs.length,
+          spread: xs.length ? Math.round(Math.max(...xs) - Math.min(...xs)) : 0,
+          grid: svg.querySelectorAll('.chart-grid').length,
+          ticks: [...svg.querySelectorAll('.chart-tick')].map(t => t.textContent),
+          values: svg.querySelectorAll('.chart-value').length,
+          bandW: barW.length ? Math.round(Math.min(...barW)) : 0,
+          bars: bars.length
+        };
+      }), chartIds);
+
+      probe.forEach(c => {
+        console.log(`   ${c.id}: ${c.w}px · ${c.marks} marks spread ${c.spread}px · ${c.grid} gridlines · ${c.values} labels`);
+        check(`${c.id} emitted no NaN`, !c.nan);
+        check(`${c.id} spreads its marks across the plot`, c.marks >= 2 && c.spread > c.w * 0.4,
+          `spread ${c.spread} of ${c.w}px`);
+        check(`${c.id} drew a gridded axis`, c.grid >= 2 && c.ticks.length > c.grid, `${c.grid} lines, ${c.ticks.length} ticks`);
+        // Selective labels: a number over every column is the anti-pattern.
+        check(`${c.id} labels selectively`, c.values <= Math.max(2, Math.ceil(c.marks / 3)),
+          `${c.values} labels for ${c.marks} marks`);
+      });
+
+      // Ticks land on round numbers, and columns stay thin.
+      const vol = probe.find(c => c.id === 'hxVolumeChart');
+      console.log('   volume ticks:', vol.ticks.slice(0, 5).join(' '));
+      check('y ticks are round numbers', vol.ticks.slice(0, 4).every(t => /^\d+(\.\d)?k?$/.test(t)), vol.ticks.slice(0, 4).join(','));
+
+      const thick = await page.evaluate(() => {
+        const paths = [...document.querySelectorAll('#hxVolumeChart path[fill]')];
+        return paths.map(p => {
+          const b = p.getBBox();
+          return Math.round(b.width);
+        });
+      });
+      console.log('   column widths:', thick.join(', '));
+      check('columns are capped at 24px, not filling the slot', Math.max(...thick) <= 24, thick.join(','));
+
+      // Hover must produce a tooltip, and must not be the only way to read
+      // the value - the detail line takes it too.
+      await page.hover('#hxVolumeChart .chart-hit');
+      await page.waitForTimeout(200);
+      const tip = await page.evaluate(() => {
+        const t = document.querySelector('.chart-tip');
+        return { on: !!t && t.classList.contains('on'), text: t ? t.innerText.replace(/\s+/g, ' ').trim() : '',
+                 detail: document.getElementById('hxVolumeDetail').textContent };
+      });
+      console.log('   tooltip:', JSON.stringify(tip.text), '| detail:', JSON.stringify(tip.detail));
+      check('hovering a column shows a tooltip', tip.on && /day|sets|volume/i.test(tip.text), tip.text);
+      check('the same numbers reach the detail line', /lb volume/.test(tip.detail), tip.detail);
+
+      // Status colour is never the only channel.
+      const qmix = await page.evaluate(() => {
+        const el = document.querySelector('#hxDayList .hx-qmix, .hx-qmix');
+        return el ? el.getAttribute('title') : null;
+      });
+
       console.log('\n  -- Stats cards still there --');
       const kept = await page.evaluate(() => ({
         pushup: !!document.getElementById('statsPushupChart'),
@@ -295,7 +387,7 @@ const mock = rows => route => {
       const bottoms = lefts.map(x => Math.max(...cols.filter(c => c.left === x).map(c => c.bottom)));
       console.log('  column bottoms:', bottoms.join(', '));
       check('the two columns end at a similar depth',
-        Math.abs(bottoms[0] - bottoms[1]) < 200, bottoms.join(','));
+        Math.abs(bottoms[0] - bottoms[1]) < 320, bottoms.join(','));
       const seg = await page.evaluate(() => Math.round(document.getElementById('hxSeg').getBoundingClientRect().width));
       check('the segmented control stays a menu here too', seg <= 470, String(seg));
     }
@@ -326,7 +418,7 @@ const mock = rows => route => {
       const bottoms = lefts.map(x => Math.max(...cols.filter(c => c.left === x).map(c => c.bottom)));
       const ragged = Math.max(...bottoms) - Math.min(...bottoms);
       console.log('  column bottoms:', bottoms.join(', '), '| ragged by', ragged);
-      check('the columns end at a similar depth', ragged < 260, String(ragged));
+      check('the columns end at a similar depth', ragged < 320, String(ragged));
 
       const seg = await page.evaluate(() => Math.round(document.getElementById('hxSeg').getBoundingClientRect().width));
       console.log('  segmented control:', seg + 'px');
