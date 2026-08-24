@@ -1002,8 +1002,7 @@
     background: none; border: none; border-radius: 11px; padding: 9px 4px; cursor: pointer; }
   .hx-seg-btn.active { background: var(--surface2); color: var(--accent); }
   /* Range chips apply to the whole tab, the way Hevy's 3M/1Y/All do. */
-  .hx-range { display: flex; gap: 6px; margin-bottom: 12px; align-items: center; }
-  .hx-range-right { margin-left: auto; }
+  .hx-range { display: flex; gap: 6px; margin-bottom: 12px; }
   .hx-range-btn { font-family: var(--font); font-size: 11.5px; font-weight: 700; color: var(--muted);
     background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
     padding: 5px 14px; cursor: pointer; }
@@ -1014,6 +1013,8 @@
   .hx-tile-delta { font-family: var(--font); font-size: 10.5px; font-weight: 700; margin-top: 3px; }
   .hx-tile-delta.hx-up { color: var(--green); }
   .hx-tile-delta.hx-down { color: var(--red); }
+  /* Not a delta - a companion figure, so it stays in muted ink. */
+  .hx-tile-delta.hx-tile-aside { color: var(--muted); font-weight: 600; }
   .hx-tile-delta.hx-flat { color: var(--muted); }
   .hx-tile-value { font-family: var(--font); font-size: 21px; font-weight: 800; letter-spacing: -0.4px; }
   .hx-tile-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted);
@@ -2388,12 +2389,6 @@
     <button class="hx-range-btn" data-range="90" onclick="setHistoryRange(90)">3M</button>
     <button class="hx-range-btn" data-range="365" onclick="setHistoryRange(365)">1Y</button>
     <button class="hx-range-btn active" data-range="0" onclick="setHistoryRange(0)">All</button>
-    <!-- 165 pushups a day against 30 reps of leg press is not a fair
-         comparison, and every total on this tab was being decided by the
-         pushups. Off by default; the Pushups card below still shows them
-         in full, as do the widget and the Trainer deficit. -->
-    <button class="hx-range-btn hx-range-right" id="hxPushupToggle"
-            onclick="toggleHistoryPushups()">+ Pushups</button>
   </div>
   <div class="hx-status" id="hxStatus"></div>
 
@@ -4578,49 +4573,16 @@ function setHistoryRange(days) {
 
 // The range applies to every section at once, which is what makes the
 // chips feel like a filter rather than a per-chart control.
-/* Pushups are a daily 165-rep grind against a 30-rep leg press, so left in
-   they decide every total on this tab - reps, sets, the workout count and
-   most of the muscle chart. Excluded by default so the gym work is
-   readable; the chip in the range row puts them back.
-
-   Filtered here because this is the single funnel every section reads
-   through, so the toggle can never apply to one card and not another. */
-const STORAGE_HISTORY_PUSHUPS_KEY = 'WORKOUT_HISTORY_INCLUDE_PUSHUPS';
-let historyIncludePushups_ = false;
-
+// Pushups stay in every chart and every count. They are real training,
+// and a set of them is a set like any other. Reps are the one place the
+// scale genuinely breaks - 165 against 30 is not the same unit - and that
+// is handled in the tiles rather than by hiding the work.
 function isPushupRow_(r) {
   return /pushup|push[- ]?up/i.test(r.exercise || '');
 }
 
-function initHistoryPushups_() {
-  try { historyIncludePushups_ = localStorage.getItem(STORAGE_HISTORY_PUSHUPS_KEY) === '1'; } catch (e) {}
-  syncPushupToggle_();
-}
-
-function syncPushupToggle_() {
-  const btn = document.getElementById('hxPushupToggle');
-  if (!btn) return;
-  btn.classList.toggle('active', historyIncludePushups_);
-  btn.textContent = historyIncludePushups_ ? '\u2713 Pushups' : '+ Pushups';
-}
-
-function toggleHistoryPushups() {
-  historyIncludePushups_ = !historyIncludePushups_;
-  try { localStorage.setItem(STORAGE_HISTORY_PUSHUPS_KEY, historyIncludePushups_ ? '1' : '0'); } catch (e) {}
-  syncPushupToggle_();
-  // The open drill-downs may be showing something the filter just removed.
-  hxMuscleOpen_ = null;
-  if (historyExercise_ && !historyIncludePushups_ && /pushup|push[- ]?up/i.test(historyExercise_)) {
-    closeHistoryExercise();
-  }
-  renderHistoryTab();
-  renderMuscleBalance_();
-  updateViewportHeight('stats', true);
-}
-
 function historyInRange_() {
-  let rows = historyRows_ || [];
-  if (!historyIncludePushups_) rows = rows.filter(r => !isPushupRow_(r));
+  const rows = historyRows_ || [];
   if (!historyRangeDays_) return rows;
   const cutoff = new Date(Date.now() - historyRangeDays_ * 86400000).toISOString().slice(0, 10);
   return rows.filter(r => r.date >= cutoff);
@@ -5507,11 +5469,20 @@ function renderHistoryMuscles_(rows) {
    and the same length, which is the only honest reading of "3M" - on All
    there is no earlier window, so the tiles show the value alone. */
 function historyTileTotals_(rows) {
+  /* Reps are split, and only reps.
+     A set is a set whatever the exercise, and a pound is a pound - but 165
+     pushups and 30 reps of leg press are not the same unit, so adding them
+     produces a number that describes neither. The gym figure leads and the
+     pushups are named underneath; nothing is hidden and nothing is
+     averaged into meaninglessness. */
+  const gym = rows.filter(r => !isPushupRow_(r));
+  const push = rows.filter(isPushupRow_);
   return {
     days: new Set(rows.map(r => r.date)).size,
     volume: rows.reduce((n, r) => n + r.volume, 0),
     sets: rows.reduce((n, r) => n + r.done, 0),
-    reps: rows.reduce((n, r) => n + r.totalReps, 0)
+    reps: gym.reduce((n, r) => n + r.totalReps, 0),
+    pushupReps: push.reduce((n, r) => n + r.totalReps, 0)
   };
 }
 
@@ -5533,34 +5504,34 @@ function renderHistoryTiles_(rows) {
   }
 
   const tiles = [
-    ['Workouts', String(now.days), 'days', now.days, before && before.days],
-    ['Volume', chartCompact_(now.volume) + ' lb', 'volume', now.volume, before && before.volume],
-    ['Sets', chartCompact_(now.sets), 'sets', now.sets, before && before.sets],
-    ['Reps', chartCompact_(now.reps), 'reps', now.reps, before && before.reps]
+    ['Workouts', String(now.days), now.days, before && before.days, ''],
+    ['Volume', chartCompact_(now.volume) + ' lb', now.volume, before && before.volume, ''],
+    ['Sets', chartCompact_(now.sets), now.sets, before && before.sets, ''],
+    // The pushup line replaces the delta on this one tile - two small lines
+    // under a number is more than it can carry, and the split is the more
+    // useful of the two.
+    ['Gym reps', chartCompact_(now.reps), now.reps, before && before.reps,
+     now.pushupReps ? `+ ${chartCompact_(now.pushupReps)} pushups` : '']
   ];
 
-  el.innerHTML = tiles.map(([label, value, , cur, prev]) => {
-    let delta = '';
-    if (prev != null && prev > 0) {
+  el.innerHTML = tiles.map(([label, value, cur, prev, aside]) => {
+    let sub = '';
+    if (aside) {
+      sub = `<div class="hx-tile-delta hx-tile-aside">${escapeHtml_(aside)}</div>`;
+    } else if (prev != null && prev > 0) {
       const pct = Math.round((cur - prev) / prev * 100);
       // More training is the good direction for every one of these, so the
       // sign and the sentiment line up and one class covers both.
       const cls = pct > 0 ? 'hx-up' : pct < 0 ? 'hx-down' : 'hx-flat';
       const arrow = pct > 0 ? '▲ +' : pct < 0 ? '▼ ' : '— ';
-      delta = `<div class="hx-tile-delta ${cls}">${arrow}${Math.abs(pct)}%</div>`;
+      sub = `<div class="hx-tile-delta ${cls}">${arrow}${Math.abs(pct)}%</div>`;
     }
     return `<div><div class="hx-tile-value">${escapeHtml_(value)}</div>`
-         + `<div class="hx-tile-label">${escapeHtml_(label)}</div>${delta}</div>`;
+         + `<div class="hx-tile-label">${escapeHtml_(label)}</div>${sub}</div>`;
   }).join('');
 
   const note = document.getElementById('hxTilesNote');
-  if (note) {
-    // A number that silently changed is a mystery; say what is left out.
-    const excl = historyIncludePushups_
-      ? 'Pushups included'
-      : 'Pushups left out \u2014 tap \u201c+ Pushups\u201d to include them';
-    note.textContent = sinceLabel ? `${sinceLabel} \u00b7 ${excl}` : excl;
-  }
+  if (note) note.textContent = sinceLabel;
 }
 
 function historyByWeek_(rows) {
@@ -11483,7 +11454,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-no-pushup-skew';
+const APP_BUILD_VERSION = '2026-08-24-split-reps';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -16154,7 +16125,6 @@ setInterval(() => {
 initViewportHeightObserver();
 initChartResizeObserver_();
 initHistoryRange_();
-initHistoryPushups_();
 initMuscleWindow_();
 initMuscleMode_();
 initInbody_();

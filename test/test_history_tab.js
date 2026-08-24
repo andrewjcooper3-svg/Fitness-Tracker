@@ -103,18 +103,6 @@ const mock = rows => route => {
         document.querySelector('.app-tab[data-view="stats"] .app-tab-label').textContent);
       check('tab is called History', tabLabel === 'History', tabLabel);
 
-      // Pushups are excluded by default. Assert that here, then switch them
-      // on - most of what follows is specifically about how pushups are
-      // handled, and needs them present.
-      const defaults = await page.evaluate(() => ({
-        chip: document.getElementById('hxPushupToggle').textContent,
-        stored: localStorage.getItem('WORKOUT_HISTORY_INCLUDE_PUSHUPS')
-      }));
-      check('pushups start excluded', /^\+ Pushups/.test(defaults.chip), defaults.chip);
-      check('with nothing stored yet', !defaults.stored, String(defaults.stored));
-      await page.evaluate(() => toggleHistoryPushups());
-      await page.waitForTimeout(400);
-
       console.log('\n  -- Overview --');
       const tiles = await page.evaluate(() =>
         [...document.querySelectorAll('#hxTiles > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()));
@@ -143,60 +131,26 @@ const mock = rows => route => {
       check('bars shrink down the ranking', fills.every((w, i) => i === 0 || w <= fills[i - 1]) && fills[fills.length - 1] > 0,
         fills.join(','));
 
-      console.log('\n  -- Pushups are left out of the totals --');
+      console.log('\n  -- Reps are split; everything else keeps pushups --');
       {
-        await page.evaluate(() => toggleHistoryPushups());   // back to excluded
-        await page.waitForTimeout(400);
-        const off = await page.evaluate(() => ({
+        const t = await page.evaluate(() => ({
           tiles: [...document.querySelectorAll('#hxTiles > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()),
-          note: document.getElementById('hxTilesNote').textContent,
-          chip: document.getElementById('hxPushupToggle').textContent,
           groups: [...document.querySelectorAll('#hxMuscles .hx-muscle-name')].map(n => n.textContent)
         }));
-        console.log('   off:', off.tiles.join(' | '));
-        console.log('   note:', off.note, '| chip:', off.chip);
-        check('excluding them flips the chip back', /^\+ Pushups/.test(off.chip), off.chip);
-        check('and the tiles say what is missing', /Pushups left out/.test(off.note), off.note);
-        // The fixture logs 165 pushup reps a week against 105 of everything
-        // else, so leaving them in more than doubles the rep count.
-        check('Chest drops out with them gone', !off.groups.includes('Chest'), off.groups.join(','));
+        console.log('   tiles:', t.tiles.join(' | '));
+        // 6 weeks x (30 Leg Press + 45 Cable Crunch + 30 Lat Pulldown) = 630,
+        // plus the 2025 session's 30 = 660. Pushups are 6 x 330 = 1,980.
+        check('the tile is labelled gym reps', /GYM REPS/i.test(t.tiles[3]), t.tiles[3]);
+        check('and holds only the gym figure', /^660\b/.test(t.tiles[3]), t.tiles[3]);
+        check('with the pushups named alongside, not hidden',
+          /\+ 2k pushups|\+ 1\.98k pushups/i.test(t.tiles[3]), t.tiles[3]);
 
-        await page.evaluate(() => toggleHistoryPushups());
-        await page.waitForTimeout(400);
-        const on = await page.evaluate(() => ({
-          tiles: [...document.querySelectorAll('#hxTiles > div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()),
-          note: document.getElementById('hxTilesNote').textContent,
-          chip: document.getElementById('hxPushupToggle').textContent,
-          active: document.getElementById('hxPushupToggle').classList.contains('active'),
-          groups: [...document.querySelectorAll('#hxMuscles .hx-muscle-name')].map(n => n.textContent)
-        }));
-        console.log('   on :', on.tiles.join(' | '));
-        const reps = t => parseFloat(String(t).replace(/[^\d.k]/gi, '').replace('k', 'e3')) || 0;
-        check('turning them on changes the numbers', on.tiles.join('|') !== off.tiles.join('|'));
-        check('reps go up, a lot', reps(on.tiles[3]) > reps(off.tiles[3]) * 1.5,
-          `${off.tiles[3]} -> ${on.tiles[3]}`);
-        check('workouts go up too - pushup-only days now count',
-          parseInt(on.tiles[0], 10) > parseInt(off.tiles[0], 10), `${off.tiles[0]} -> ${on.tiles[0]}`);
-        check('Chest comes back', on.groups.includes('Chest'), on.groups.join(','));
-        check('the chip reads as on', on.active && /Pushups/.test(on.chip), on.chip);
-        check('the note flips too', /Pushups included/.test(on.note), on.note);
-
-        const saved = await page.evaluate(() => localStorage.getItem('WORKOUT_HISTORY_INCLUDE_PUSHUPS'));
-        check('the choice is remembered', saved === '1', String(saved));
-
-        // Every section reads the same funnel, so it must apply everywhere.
-        // Back to excluded for these.
-        await page.evaluate(() => { toggleHistoryPushups(); showHistorySection('exercises'); });
-        await page.waitForTimeout(400);
-        const list = await page.evaluate(() =>
-          [...document.querySelectorAll('#hxExerciseList .hx-row-title')].map(e => e.textContent));
-        check('the exercise list drops them as well', !list.includes('Pushups'), list.join(','));
-        await page.evaluate(() => showHistorySection('workouts'));
-        await page.waitForTimeout(400);
-        const feed = await page.evaluate(() => document.getElementById('hxDayList').innerText);
-        check('and so does the workouts feed', !/Pushups/.test(feed), feed.slice(0, 120));
-        await page.evaluate(() => { toggleHistoryPushups(); showHistorySection('overview'); });
-        await page.waitForTimeout(400);
+        // Everything else keeps them - they are training.
+        check('sets still count pushups', /^93\b/.test(t.tiles[2]), t.tiles[2]);
+        check('workouts still count pushup-only days', /^19\b/.test(t.tiles[0]), t.tiles[0]);
+        check('Chest is still in the muscle chart', t.groups.includes('Chest'), t.groups.join(','));
+        check('no exclusion chip is left behind',
+          await page.evaluate(() => !document.getElementById('hxPushupToggle')));
       }
 
       console.log('\n  -- Muscle time windows --');
@@ -353,6 +307,8 @@ const mock = rows => route => {
         [...document.querySelectorAll('#hxExerciseList .hx-ex-item')].map(e => e.innerText.replace(/\s+/g, ' ').trim()));
       list.forEach(l => console.log('   ', l));
       check('every exercise is listed', list.length === 5, String(list.length));
+      check('including Pushups - they are still an exercise you can open',
+        list.some(l => /Pushups/.test(l)), list.join(' | '));
       check('rows carry a session count and a last date', /\d+ sessions · last \w+ \d+/.test(list[0]), list[0]);
 
       const filtered = await page.evaluate(() => {
