@@ -14,6 +14,7 @@ class Sheet {
   getMaxRows() { return Math.max(this.rows.length, 100); }
   appendRow(r) { this.rows.push(r.slice()); }
   setFrozenRows() {} setColumnWidth() {}
+  getLastColumn() { return this.rows.length ? Math.max(...this.rows.map(r => r.length)) : 0; }
   getRange(r, c, nr, nc) {
     const self = this;
     nr = nr === undefined ? 1 : nr; nc = nc === undefined ? 1 : nc;
@@ -34,6 +35,11 @@ class Sheet {
         });
       },
       setValue(v) { (self.rows[r - 1] = self.rows[r - 1] || [])[c - 1] = v; },
+      // Real Sheets method the rebuild uses; the stub was missing it.
+      clearContent() {
+        for (let i = 0; i < nr; i++) if (self.rows[r - 1 + i]) self.rows[r - 1 + i] = [];
+        self.rows = self.rows.filter(x => x && x.length);
+      },
       setFontWeight() { return this; }, setBackground() { return this; },
       setFontColor() { return this; }, setBorder() { return this; },
       setNumberFormat() { return this; }, setHorizontalAlignment() { return this; }
@@ -161,8 +167,13 @@ console.log('  ' + JSON.stringify(after));
 check('one Leg Press row, not two', after.length === 1, String(after.length));
 check('it holds the new weight', after[0].topWeight === 255, String(after[0].topWeight));
 
-console.log('\n=== A history sheet from an older column set rebuilds itself ===');
+console.log('\n=== A history sheet from an older column set is widened, not wiped ===');
 {
+  // This used to assert the opposite - that the sheet came back EMPTY for
+  // the backfill to refill. That was the bug: it destroyed every
+  // accumulated rollup, and when the rebuild did not finish the rows were
+  // gone for good. Columns are only appended, so the header widens in
+  // place and the rows stay.
   const stale = new Sheet('Workout History', [
     ['Date','Day','Exercise','Sets','Sets Done','Top Weight','Volume','Target Reps','Total Reps','Green','Yellow','Red','Week'],
     ['2026-08-17','Monday','Leg Press',3,3,245,7350,10,30,3,0,0,'Week of Aug 17 - Aug 23, 2026']
@@ -172,8 +183,11 @@ console.log('\n=== A history sheet from an older column set rebuilds itself ==='
   global.SpreadsheetApp = { openById: () => ss2, create: () => ss2, BorderStyle: { SOLID_MEDIUM: 1 } };
   const fresh = getOrCreateHistorySheet_();
   console.log('  header now:', fresh.rows[0].join(' | '));
-  check('the stale sheet was replaced', fresh.rows[0].join('|') === HISTORY_HEADERS.join('|'));
-  check('and it starts empty so the backfill refills it', fresh.rows.length === 1, String(fresh.rows.length));
+  check('the header was widened', fresh.rows[0].join('|') === HISTORY_HEADERS.join('|'));
+  check('it is the same sheet, not a replacement', fresh === stale);
+  check('the existing row survived', fresh.rows.length === 2, String(fresh.rows.length - 1));
+  check('with its values intact', fresh.rows[1][5] === 245, String(fresh.rows[1][5]));
+  check('nothing was deleted', ss2.getSheets().indexOf(stale) !== -1);
 }
 
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);

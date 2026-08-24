@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-24-history-records';
+const BACKEND_BUILD_VERSION = '2026-08-24-history-rebuild';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1205,14 +1205,7 @@ function historySheetIsCurrent_(sheet) {
   return HISTORY_HEADERS.every((h, i) => header[i] === h);
 }
 
-function getOrCreateHistorySheet_() {
-  const ss = getOrCreateSpreadsheet_();
-  let sheet = ss.getSheetByName(HISTORY_SHEET_NAME);
-  if (sheet && historySheetIsCurrent_(sheet)) return sheet;
-  if (sheet) ss.deleteSheet(sheet);
-
-  sheet = ss.insertSheet(HISTORY_SHEET_NAME);
-  sheet.appendRow(HISTORY_HEADERS);
+function styleHistoryHeader_(sheet) {
   const headerRange = sheet.getRange(1, 1, 1, HISTORY_HEADERS.length);
   headerRange.setFontWeight('bold');
   headerRange.setBackground('#1a1d24');
@@ -1220,6 +1213,42 @@ function getOrCreateHistorySheet_() {
   sheet.setFrozenRows(1);
   sheet.setColumnWidth(1, 100);
   sheet.setColumnWidth(3, 200);
+}
+
+function getOrCreateHistorySheet_() {
+  const ss = getOrCreateSpreadsheet_();
+  let sheet = ss.getSheetByName(HISTORY_SHEET_NAME);
+  if (sheet && historySheetIsCurrent_(sheet)) return sheet;
+
+  if (sheet) {
+    /* MIGRATE, NEVER DELETE.
+       The first version of this deleted the sheet whenever the header did
+       not match and leaned on the backfill to rebuild it. That threw away
+       every accumulated rollup the moment a column was added - and when
+       the rebuild then did not finish, the rows were simply gone. Columns
+       are only ever appended here, so widening the header in place keeps
+       every existing row; the new columns read as 0 until a rebuild fills
+       them, which is a far better failure than an empty sheet. */
+    const width = Math.max(1, sheet.getLastColumn());
+    const existing = sheet.getRange(1, 1, 1, width).getValues()[0]
+      .filter(function (h) { return h !== '' && h !== null; });
+    const isPrefix = existing.length <= HISTORY_HEADERS.length
+      && existing.every(function (h, i) { return h === HISTORY_HEADERS[i]; });
+
+    if (isPrefix) {
+      sheet.getRange(1, 1, 1, HISTORY_HEADERS.length).setValues([HISTORY_HEADERS]);
+      styleHistoryHeader_(sheet);
+      return sheet;
+    }
+    // A genuinely different shape - park it under a dated name rather than
+    // destroy it, and start fresh alongside.
+    sheet.setName(HISTORY_SHEET_NAME + ' (old '
+      + Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd HHmm') + ')');
+  }
+
+  sheet = ss.insertSheet(HISTORY_SHEET_NAME);
+  sheet.appendRow(HISTORY_HEADERS);
+  styleHistoryHeader_(sheet);
   return sheet;
 }
 
@@ -1331,19 +1360,35 @@ function getWorkoutHistory_() {
   })).filter(r => r.exercise);
 }
 
-// One-off: the week tabs already hold everything logged so far, so history
-// does not have to start empty. Walks them once and rebuilds the rollup.
-// Safe to re-run - each day is replaced, not appended.
-function backfillWorkoutHistory() {
+/* Rebuilds the rollup from the week tabs, which are the source of truth
+   and are never pruned - so everything ever logged is recoverable from
+   them.
+
+   One pass, one write. The version this replaces called
+   getOrCreateHistorySheet_() per day and getSpreadsheetTimeZone() per
+   EXISTING ROW, then deleted matched rows one at a time: a Sheets round
+   trip inside a nested loop. On a real history that is slow enough to hit
+   the six-minute execution limit, which is exactly what went wrong - the
+   walk stopped a few days in, and because the auto-backfill only fires on
+   an empty sheet it never picked up where it left off.
+
+   Rows the week tabs no longer cover are kept, not dropped, unless a full
+   replace is asked for. */
+function rebuildHistoryFromWeekTabs_(replaceAll) {
   const ss = getOrCreateSpreadsheet_();
-  let days = 0;
-  ss.getSheets().forEach(function (sheet) {
-    const name = sheet.getSheetName();
+  const tz = ss.getSpreadsheetTimeZone();
+  const sheet = getOrCreateHistorySheet_();
+
+  const built = [];
+  const touched = {};
+
+  ss.getSheets().forEach(function (ws) {
+    const name = ws.getSheetName();
     if (!/^Week of [A-Za-z]+ \d+ - [A-Za-z]+ \d+, \d{4}$/.test(name)) return;
-    const lastRow = sheet.getLastRow();
+    const lastRow = ws.getLastRow();
     if (lastRow < 2) return;
 
-    const rows = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
+    const rows = ws.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
     const byDay = {};
     rows.forEach(function (row) {
       const day = row[1], exercise = row[2];
@@ -1359,13 +1404,52 @@ function backfillWorkoutHistory() {
     });
 
     Object.keys(byDay).forEach(function (day) {
-      const exercises = Object.keys(byDay[day]).map(k => byDay[day][k]);
-      writeHistoryRollup_(name, day, exercises, new Date());
-      days++;
+      const date = dateForWeekday_(name, day);
+      if (!date) return;
+      const dateStr = Utilities.formatDate(date, tz, 'yyyy-MM-dd');
+      touched[dateStr + '|' + day] = true;
+      Object.keys(byDay[day])
+        .map(function (k) { return rollupExercise_(byDay[day][k]); })
+        .filter(function (r) { return r.name; })
+        .forEach(function (r) {
+          built.push([dateStr, day, r.name, r.sets, r.done, r.topWeight, r.volume,
+                      r.targetReps, r.totalReps, r.green, r.yellow, r.red, name,
+                      r.topSetReps, r.bestSetVolume, r.est1RM]);
+        });
     });
   });
-  Logger.log('Backfilled ' + days + ' days into ' + HISTORY_SHEET_NAME);
+
+  const lastRow = sheet.getLastRow();
+  let keep = [];
+  if (lastRow > 1 && !replaceAll) {
+    keep = sheet.getRange(2, 1, lastRow - 1, HISTORY_HEADERS.length).getValues()
+      .filter(function (r) {
+        if (!r[2]) return false;
+        const d = r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'yyyy-MM-dd') : String(r[0]);
+        return !touched[d + '|' + r[1]];
+      });
+  }
+
+  const all = keep.concat(built).sort(function (a, b) {
+    return String(a[0]).localeCompare(String(b[0])) || String(a[1]).localeCompare(String(b[1]));
+  });
+
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, HISTORY_HEADERS.length).clearContent();
+  if (all.length) {
+    sheet.getRange(2, 1, all.length, HISTORY_HEADERS.length).setValues(all);
+    sheet.getRange(2, 1, all.length, 1).setNumberFormat('yyyy-mm-dd');
+  }
+
+  const days = Object.keys(touched).length;
+  Logger.log('Rebuilt ' + days + ' days (' + built.length + ' rows) into ' + HISTORY_SHEET_NAME
+    + (keep.length ? ', kept ' + keep.length + ' rows no week tab covers' : ''));
   return days;
+}
+
+// Kept as the name the editor's Run menu offers, and as the entry point
+// the read endpoint uses. Safe to re-run: a day is replaced, not appended.
+function backfillWorkoutHistory() {
+  return rebuildHistoryFromWeekTabs_(false);
 }
 
 function doGet(e) {
@@ -1386,6 +1470,17 @@ function doGet(e) {
   if (action === 'loadStarterState') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', starter: loadStarterState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Repair hatch. The auto-backfill below only fires on an empty sheet, so
+  // a rebuild that stopped part way could never resume on its own - which
+  // is how a partial history got stuck that way.
+  if (action === 'rebuildWorkoutHistory') {
+    const days = rebuildHistoryFromWeekTabs_(e.parameter.replaceAll === '1');
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', days: days,
+                                         history: getWorkoutHistory_() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
