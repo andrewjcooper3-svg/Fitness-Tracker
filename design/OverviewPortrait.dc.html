@@ -953,6 +953,43 @@
     .stats-chart.stats-chart-empty { height: 0; }
     .stats-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; }
     .stats-chart-detail { font-family: var(--font); font-size: 12px; color: var(--text); text-align: center; margin-top: 6px; min-height: 15px; }
+    /* ---- History tab ---- */
+    .hx-seg { display: flex; gap: 4px; background: var(--surface); border-radius: 14px; padding: 4px; margin-bottom: 12px; }
+    .hx-seg-btn { flex: 1; min-width: 0; font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--muted);
+      background: none; border: none; border-radius: 11px; padding: 9px 4px; cursor: pointer; }
+    .hx-seg-btn.active { background: var(--surface2); color: var(--accent); }
+    .hx-status { font-family: var(--font); font-size: 11.5px; color: var(--muted); padding: 0 2px 10px; }
+    .hx-status:empty { display: none; }
+    .hx-status.err { color: var(--red); font-weight: 600; }
+  
+    .hx-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .hx-row:last-child { border-bottom: none; }
+    .hx-row-main { flex: 1; min-width: 0; }
+    .hx-row-title { font-family: var(--font); font-size: 13px; font-weight: 600; }
+    .hx-row-sub { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .hx-row-value { font-family: var(--font); font-size: 13.5px; font-weight: 800; white-space: nowrap; text-align: right; }
+    .hx-row-value .hx-delta { display: block; font-size: 10.5px; font-weight: 600; }
+    .hx-up { color: var(--green); } .hx-down { color: var(--red); } .hx-flat { color: var(--muted); }
+  
+    /* Quality mix as a tiny stacked bar - the progression signal at a glance. */
+    .hx-qmix { display: flex; height: 4px; width: 46px; border-radius: 2px; overflow: hidden; background: var(--surface2); flex-shrink: 0; }
+    .hx-qmix i { display: block; height: 100%; }
+  
+    .hx-ex-summary { font-family: var(--font); font-size: 12px; color: var(--muted); margin: 8px 0 4px; line-height: 1.45; }
+    .hx-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .hx-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 10px; color: var(--muted); }
+    .hx-swatch { width: 9px; height: 9px; border-radius: 2px; }
+  
+    .hx-day { border-bottom: 1px solid var(--border); }
+    .hx-day:last-child { border-bottom: none; }
+    .hx-day-head { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; }
+    .hx-day-head .hx-row-main { flex: 1; min-width: 0; }
+    .hx-day-.app-body { padding: 0 0 10px 12px; border-left: 2px solid var(--border); margin: 0 0 8px 3px; }
+    .hx-day-ex { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+    .hx-day-ex-name { font-family: var(--font); font-size: 11.5px; flex: 1; min-width: 0; }
+    .hx-day-ex-val { font-family: var(--font); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+    .hx-empty { font-family: var(--font); font-size: 12px; color: var(--muted); padding: 6px 0; }
+  
     .stats-card-clickable { cursor: pointer; transition: background 0.15s; }
     .stats-card-clickable:active { background: var(--surface2); }
   
@@ -1289,9 +1326,13 @@
        mostly off-screen. It also keeps each chart near its natural width, so
        eight weekly bars read as bars rather than slabs. */
     @media (min-width: 768px) {
-      #view-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; align-items: start; }
-      #view-stats > .ov-page-head,
-      #view-stats > .ov-note { grid-column: 1 / -1; }
+      /* The page is one column; the blocks inside it each go two-up. Pairing
+         at the page level only worked while History was exactly two cards -
+         with the sections in place it dealt them into different rows. */
+      .hx-section, .hx-legacy {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 12px; align-items: start;
+      }
     }
   
     @media (min-width: 768px) {
@@ -1636,7 +1677,7 @@
           <div class="app-tab-label">Calendar</div>
         </div>
         <div class="app-tab" data-view="stats">
-          <div class="app-tab-label">Stats</div>
+          <div class="app-tab-label">History</div>
         </div>
       
         <!-- Landscape-tier only (hidden everywhere else): the active view's
@@ -1678,7 +1719,7 @@
             <button class="ov-gear-btn" aria-label="Settings">⚙</button>
           </div>
         </div>
-        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-24-rise-floor</div>
+        <div class="ov-build-stamp" id="ovBuildStamp">Build 2026-08-24-history-tab</div>
         <!-- Shown once after a week rolls over, so the archive is visible
              rather than something you have to trust happened. -->
         <div class="ov-archive-notice" id="ovArchiveNotice"></div>

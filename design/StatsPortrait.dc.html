@@ -953,6 +953,43 @@
     .stats-chart.stats-chart-empty { height: 0; }
     .stats-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 8px; }
     .stats-chart-detail { font-family: var(--font); font-size: 12px; color: var(--text); text-align: center; margin-top: 6px; min-height: 15px; }
+    /* ---- History tab ---- */
+    .hx-seg { display: flex; gap: 4px; background: var(--surface); border-radius: 14px; padding: 4px; margin-bottom: 12px; }
+    .hx-seg-btn { flex: 1; min-width: 0; font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--muted);
+      background: none; border: none; border-radius: 11px; padding: 9px 4px; cursor: pointer; }
+    .hx-seg-btn.active { background: var(--surface2); color: var(--accent); }
+    .hx-status { font-family: var(--font); font-size: 11.5px; color: var(--muted); padding: 0 2px 10px; }
+    .hx-status:empty { display: none; }
+    .hx-status.err { color: var(--red); font-weight: 600; }
+  
+    .hx-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .hx-row:last-child { border-bottom: none; }
+    .hx-row-main { flex: 1; min-width: 0; }
+    .hx-row-title { font-family: var(--font); font-size: 13px; font-weight: 600; }
+    .hx-row-sub { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .hx-row-value { font-family: var(--font); font-size: 13.5px; font-weight: 800; white-space: nowrap; text-align: right; }
+    .hx-row-value .hx-delta { display: block; font-size: 10.5px; font-weight: 600; }
+    .hx-up { color: var(--green); } .hx-down { color: var(--red); } .hx-flat { color: var(--muted); }
+  
+    /* Quality mix as a tiny stacked bar - the progression signal at a glance. */
+    .hx-qmix { display: flex; height: 4px; width: 46px; border-radius: 2px; overflow: hidden; background: var(--surface2); flex-shrink: 0; }
+    .hx-qmix i { display: block; height: 100%; }
+  
+    .hx-ex-summary { font-family: var(--font); font-size: 12px; color: var(--muted); margin: 8px 0 4px; line-height: 1.45; }
+    .hx-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .hx-key { display: flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 10px; color: var(--muted); }
+    .hx-swatch { width: 9px; height: 9px; border-radius: 2px; }
+  
+    .hx-day { border-bottom: 1px solid var(--border); }
+    .hx-day:last-child { border-bottom: none; }
+    .hx-day-head { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; }
+    .hx-day-head .hx-row-main { flex: 1; min-width: 0; }
+    .hx-day-.app-body { padding: 0 0 10px 12px; border-left: 2px solid var(--border); margin: 0 0 8px 3px; }
+    .hx-day-ex { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+    .hx-day-ex-name { font-family: var(--font); font-size: 11.5px; flex: 1; min-width: 0; }
+    .hx-day-ex-val { font-family: var(--font); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+    .hx-empty { font-family: var(--font); font-size: 12px; color: var(--muted); padding: 6px 0; }
+  
     .stats-card-clickable { cursor: pointer; transition: background 0.15s; }
     .stats-card-clickable:active { background: var(--surface2); }
   
@@ -1289,9 +1326,13 @@
        mostly off-screen. It also keeps each chart near its natural width, so
        eight weekly bars read as bars rather than slabs. */
     @media (min-width: 768px) {
-      #view-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; align-items: start; }
-      #view-stats > .ov-page-head,
-      #view-stats > .ov-note { grid-column: 1 / -1; }
+      /* The page is one column; the blocks inside it each go two-up. Pairing
+         at the page level only worked while History was exactly two cards -
+         with the sections in place it dealt them into different rows. */
+      .hx-section, .hx-legacy {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 12px; align-items: start;
+      }
     }
   
     @media (min-width: 768px) {
@@ -1636,7 +1677,7 @@
           <div class="app-tab-label">Calendar</div>
         </div>
         <div class="app-tab active" data-view="stats">
-          <div class="app-tab-label">Stats</div>
+          <div class="app-tab-label">History</div>
         </div>
       
         <!-- Landscape-tier only (hidden everywhere else): the active view's
@@ -1670,10 +1711,76 @@
         <div class="ov-page-head">
           <div>
             <div class="ov-page-week">Trends</div>
-            <div class="ov-page-title">Stats</div>
+            <div class="ov-page-title">History</div>
+          </div>
+          <div class="ov-page-head-actions">
+            <button class="ov-gear-btn" id="hxRefreshBtn" aria-label="Refresh history" title="Reload from the Sheet">↻</button>
           </div>
         </div>
       
+        <!-- Absorbed Stats: the pushup and weight cards below were this tab
+             already, and the history sections sit above them rather than
+             duplicating the same numbers on two tabs. -->
+        <div class="hx-seg" id="hxSeg">
+          <button class="hx-seg-btn active" data-hx="trends">Trends</button>
+          <button class="hx-seg-btn" data-hx="exercise">By exercise</button>
+          <button class="hx-seg-btn" data-hx="days">By day</button>
+        </div>
+        <div class="hx-status err" id="hxStatus">Failed to fetch</div>
+      
+        <!-- ---- Trends: the whole-picture view ---- -->
+        <div class="hx-section" id="hxSectionTrends">
+          <div class="stats-card">
+            <div class="stats-card-title">Needs attention</div>
+            <div id="hxStalling"><div class="hx-empty">Nothing stalling or straining. Two sessions of an exercise are needed before it shows up here.</div></div>
+          </div>
+      
+          <div class="stats-card">
+            <div class="stats-card-title">Weekly volume</div>
+            <svg viewBox="0 0 418 140" class="stats-chart" id="hxVolumeChart"></svg>
+            <div class="stats-chart-labels" id="hxVolumeLabels"></div>
+            <div class="stats-chart-detail" id="hxVolumeDetail">No sessions logged yet.</div>
+          </div>
+      
+          <div class="stats-card">
+            <div class="stats-card-title">Sets completed</div>
+            <svg viewBox="0 0 418 140" class="stats-chart" id="hxCompletionChart"></svg>
+            <div class="stats-chart-labels" id="hxCompletionLabels"></div>
+            <div class="stats-chart-detail" id="hxCompletionDetail">No sessions logged yet.</div>
+          </div>
+        </div>
+      
+        <!-- ---- By exercise: pick one, see it progress ---- -->
+        <div class="hx-section" id="hxSectionExercise" style="display:none;">
+          <div class="stats-card">
+            <div class="stats-card-title">Exercise</div>
+            <select class="config-input" id="hxExercisePicker" style="width:100%; box-sizing:border-box;"></select>
+            <div class="hx-ex-summary" id="hxExerciseSummary"></div>
+            <svg viewBox="0 0 320 140" class="stats-chart" id="hxExerciseChart" preserveAspectRatio="none"></svg>
+            <div class="stats-chart-labels" id="hxExerciseLabels"></div>
+            <div class="stats-chart-detail" id="hxExerciseDetail"></div>
+            <div class="hx-legend">
+              <span class="hx-key"><span class="hx-swatch" style="background:var(--accent)"></span>Top weight</span>
+              <span class="hx-key"><span class="hx-swatch" style="background:var(--green)"></span>All clean</span>
+              <span class="hx-key"><span class="hx-swatch" style="background:var(--amber)"></span>Some tough</span>
+              <span class="hx-key"><span class="hx-swatch" style="background:var(--red)"></span>Too tough</span>
+            </div>
+          </div>
+          <div class="stats-card">
+            <div class="stats-card-title">Every session</div>
+            <div id="hxExerciseRows"></div>
+          </div>
+        </div>
+      
+        <!-- ---- By day: the full log, newest first ---- -->
+        <div class="hx-section" id="hxSectionDays" style="display:none;">
+          <div class="stats-card">
+            <div class="stats-card-title">Day by day</div>
+            <div id="hxDayList"></div>
+          </div>
+        </div>
+      
+        <div class="hx-legacy">
         <div class="stats-card">
           <div class="stats-card-title">Pushups — Last 8 Weeks</div>
           <svg viewBox="0 0 418 140" class="stats-chart" id="statsPushupChart"><line x1="0" y1="20.6" x2="418" y2="20.6" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 4" opacity="0.45"></line><rect x="0.0" y="20" width="47.0" height="112.0" rx="4" fill="var(--surface2)" opacity="0.45"></rect><rect x="0.0" y="0" width="47.0" height="140" fill="transparent" style="cursor:pointer;"></rect><rect x="53.0" y="20" width="47.0" height="112.0" rx="4" fill="var(--surface2)" opacity="0.45"></rect><rect x="53.0" y="107.8" width="47.0" height="24.2" rx="4" fill="var(--accent)"></rect><text x="76.5" y="102.8" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">215</text><rect x="53.0" y="0" width="47.0" height="140" fill="transparent" style="cursor:pointer;"></rect><rect x="106.0" y="20" width="47.0" height="112.0" rx="4" fill="var(--surface2)" opacity="0.45"></rect><rect x="106.0" y="21.0" width="47.0" height="111.0" rx="4" fill="var(--accent)"></rect><text x="129.5" y="16.0" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">986</text><rect x="106.0" y="0" width="47.0" height="140" fill="transparent" style="cursor:pointer;"></rect><rect x="159.0" y="20" width="47.0" height="112.0" rx="4" fill="var(--surface2)" opacity="0.45"></rect><rect x="159.0" y="0" width="47.0" height="140" fill="transparent" style="cursor:pointer;"></rect><rect x="212.0" y="20" width="47.0" height="112.0" rx="4" fill="var(--surface2)" opacity="0.45"></rect><rect x="212.0" y="20.0" width="47.0" height="112.0" rx="4" fill="var(--green)"></rect><text x="235.5" y="15.0" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">995</text><rect x="212.0" y="0" width="47.0" height="140" fill="transparent" style="cursor:pointer;"></rect><rect x="265.0" y="20" width="47.0" height="112.0" rx="4" fill="var(--surface2)" opacity="0.45"></rect><rect x="265.0" y="20.6" width="47.0" height="111.4" rx="4" fill="var(--green)"></rect><text x="288.5" y="15.6" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="var(--font)">990</text><rect x="265.0" y="0" width="47.0" height="140" fill="transparent" style="cursor:pointer;"></rect><rect x="318.0" y="20" width="47.0" height="112.0" rx="4" fill="var(--surface2)" opacity="0.45"></rect><rect x="318.0" y="0" width="47.0" height="140" fill="transparent" style="cursor:pointer;"></rect><rect x="371.0" y="20" width="47.0" height="112.0" rx="4" fill="var(--surface2)" opacity="0.45"></rect><rect x="371.0" y="0" width="47.0" height="140" fill="transparent" style="cursor:pointer;"></rect></svg>
@@ -1689,6 +1796,7 @@
           <svg viewBox="0 0 320 140" class="stats-chart stats-chart-empty" id="statsWeightChart" preserveAspectRatio="none"></svg>
           <div class="stats-chart-labels" id="statsWeightLabels"><span class="ov-mini-empty">Log at least 2 weigh-ins to see a trend.</span></div>
           <div class="stats-chart-detail" id="statsWeightDetail"></div>
+        </div>
         </div>
       
         <div class="ov-note">Pushup totals come from your daily ledger. Weight trend appears once you've logged at least two weigh-ins - tap the Weight Trend card to log one.</div>

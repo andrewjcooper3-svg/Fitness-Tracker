@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-22-widget-summary';
+const BACKEND_BUILD_VERSION = '2026-08-24-workout-history';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1171,7 +1171,179 @@ function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
     rowsAdded = 1;
   }
 
+  // Every route into the log passes through here - the manual "Generate
+  // Session Summary" and the end-of-week archive both POST the same
+  // payload - so this is the one place a rollup needs writing.
+  writeHistoryRollup_(weekLabel, day, exercises, timestamp);
+
   return rowsAdded;
+}
+
+/* ---------- Workout history (one row per exercise per day) ----------
+   The per-week tabs hold every set, which is the right archive but the
+   wrong shape to read: answering "is Leg Press progressing" means opening
+   every week tab and re-aggregating, and that gets slower every week.
+   This is the same information rolled up once, at the moment it is
+   written, so a trend view is a single sheet read no matter how long the
+   history gets. ~30 rows a week, so ~1,500 a year.
+
+   Derived here rather than in the app deliberately: the app has two
+   logging paths and would have to remember to do it in both, whereas
+   writeSessionRows_ is the single funnel they share. */
+const HISTORY_SHEET_NAME = 'Workout History';
+const HISTORY_HEADERS = ['Date', 'Day', 'Exercise', 'Sets', 'Sets Done', 'Top Weight',
+                         'Volume', 'Target Reps', 'Total Reps', 'Green', 'Yellow', 'Red', 'Week'];
+
+function getOrCreateHistorySheet_() {
+  const ss = getOrCreateSpreadsheet_();
+  let sheet = ss.getSheetByName(HISTORY_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(HISTORY_SHEET_NAME);
+  sheet.appendRow(HISTORY_HEADERS);
+  const headerRange = sheet.getRange(1, 1, 1, HISTORY_HEADERS.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#1a1d24');
+  headerRange.setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  sheet.setColumnWidth(1, 100);
+  sheet.setColumnWidth(3, 200);
+  return sheet;
+}
+
+// The date a weekday within a given week actually falls on, so history is
+// keyed by real dates rather than "Monday of some week".
+const HISTORY_DAY_OFFSET = { Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3,
+                             Friday: 4, Saturday: 5, Sunday: 6 };
+
+function dateForWeekday_(weekLabel, day) {
+  const m = String(weekLabel || '').match(/^Week of ([A-Za-z]+ \d+) - [A-Za-z]+ \d+, (\d{4})$/);
+  const offset = HISTORY_DAY_OFFSET[day];
+  if (!m || offset === undefined) return null;
+  const monday = new Date(m[1] + ', ' + m[2]);
+  if (isNaN(monday.getTime())) return null;
+  monday.setDate(monday.getDate() + offset);
+  return monday;
+}
+
+function numeric_(v) {
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+// Volume is the standard progression measure: weight x reps, over the sets
+// actually completed. Bodyweight work has no weight, so reps alone carry
+// it - Total Reps is the column that matters there.
+function rollupExercise_(ex) {
+  const sets = Array.isArray(ex.sets) ? ex.sets : [];
+  const done = sets.filter(s => s.completed);
+  let topWeight = 0, volume = 0, totalReps = 0;
+  const q = { green: 0, yellow: 0, red: 0 };
+
+  done.forEach(s => {
+    const w = numeric_(s.actualWeight != null && s.actualWeight !== '' ? s.actualWeight : s.targetWeight);
+    const r = numeric_(s.actualReps != null && s.actualReps !== '' ? s.actualReps : s.targetReps);
+    if (w > topWeight) topWeight = w;
+    volume += w * r;
+    totalReps += r;
+    if (q[s.quality] !== undefined) q[s.quality]++;
+  });
+
+  const first = sets[0] || {};
+  return {
+    name: ex.name || '',
+    sets: sets.length,
+    done: done.length,
+    topWeight: topWeight,
+    volume: volume,
+    targetReps: first.targetReps != null ? first.targetReps : '',
+    totalReps: totalReps,
+    green: q.green, yellow: q.yellow, red: q.red
+  };
+}
+
+function writeHistoryRollup_(weekLabel, day, exercises, timestamp) {
+  const list = Array.isArray(exercises) ? exercises : [];
+  if (!list.length) return;
+  const date = dateForWeekday_(weekLabel, day);
+  if (!date) return;
+
+  const sheet = getOrCreateHistorySheet_();
+  const dateStr = Utilities.formatDate(date, getOrCreateSpreadsheet_().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+
+  // Same replace-not-append rule as the week tabs: re-logging a day
+  // updates it rather than stacking a second copy.
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    const keys = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    for (let i = keys.length - 1; i >= 0; i--) {
+      const rowDate = keys[i][0] instanceof Date
+        ? Utilities.formatDate(keys[i][0], getOrCreateSpreadsheet_().getSpreadsheetTimeZone(), 'yyyy-MM-dd')
+        : String(keys[i][0]);
+      if (rowDate === dateStr && keys[i][1] === day) sheet.deleteRow(i + 2);
+    }
+  }
+
+  const rows = list.map(rollupExercise_).filter(r => r.name).map(r => [
+    dateStr, day, r.name, r.sets, r.done, r.topWeight, r.volume,
+    r.targetReps, r.totalReps, r.green, r.yellow, r.red, weekLabel
+  ]);
+  if (!rows.length) return;
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, HISTORY_HEADERS.length).setValues(rows);
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).setNumberFormat('yyyy-mm-dd');
+}
+
+function getWorkoutHistory_() {
+  const sheet = getOrCreateHistorySheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const tz = getOrCreateSpreadsheet_().getSpreadsheetTimeZone();
+  return sheet.getRange(2, 1, lastRow - 1, HISTORY_HEADERS.length).getValues().map(r => ({
+    date: r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'yyyy-MM-dd') : String(r[0]),
+    day: r[1], exercise: r[2],
+    sets: Number(r[3]) || 0, done: Number(r[4]) || 0,
+    topWeight: Number(r[5]) || 0, volume: Number(r[6]) || 0,
+    targetReps: r[7], totalReps: Number(r[8]) || 0,
+    green: Number(r[9]) || 0, yellow: Number(r[10]) || 0, red: Number(r[11]) || 0,
+    week: r[12]
+  })).filter(r => r.exercise);
+}
+
+// One-off: the week tabs already hold everything logged so far, so history
+// does not have to start empty. Walks them once and rebuilds the rollup.
+// Safe to re-run - each day is replaced, not appended.
+function backfillWorkoutHistory() {
+  const ss = getOrCreateSpreadsheet_();
+  let days = 0;
+  ss.getSheets().forEach(function (sheet) {
+    const name = sheet.getSheetName();
+    if (!/^Week of [A-Za-z]+ \d+ - [A-Za-z]+ \d+, \d{4}$/.test(name)) return;
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+
+    const rows = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
+    const byDay = {};
+    rows.forEach(function (row) {
+      const day = row[1], exercise = row[2];
+      if (!day || !exercise) return;
+      byDay[day] = byDay[day] || {};
+      byDay[day][exercise] = byDay[day][exercise] || { name: exercise, sets: [] };
+      byDay[day][exercise].sets.push({
+        targetWeight: row[4], actualWeight: row[5],
+        targetReps: row[6], actualReps: row[7],
+        completed: row[8] === 'Yes',
+        quality: String(row[10] || '').toLowerCase()
+      });
+    });
+
+    Object.keys(byDay).forEach(function (day) {
+      const exercises = Object.keys(byDay[day]).map(k => byDay[day][k]);
+      writeHistoryRollup_(name, day, exercises, new Date());
+      days++;
+    });
+  });
+  Logger.log('Backfilled ' + days + ' days into ' + HISTORY_SHEET_NAME);
+  return days;
 }
 
 function doGet(e) {
@@ -1192,6 +1364,12 @@ function doGet(e) {
   if (action === 'loadStarterState') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', starter: loadStarterState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'loadWorkoutHistory') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', history: getWorkoutHistory_() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
