@@ -9,8 +9,10 @@ const EXEC = 'https://script.google.com/macros/s/AKfycbz123/exec';
 let fails = 0;
 const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}${x ? '\n         -> ' + x : ''}`); if (!ok) fails++; };
 
+// Match the whole line, not one exact value - the file now ships with a
+// real URL baked in, and an exact-string replace silently stopped applying.
 const source = (url = EXEC) => fs.readFileSync(SRC, 'utf8')
-  .replace("const DEPLOYMENT_URL = '';", `const DEPLOYMENT_URL = '${url}';`);
+  .replace(/^const DEPLOYMENT_URL = .*$/m, `const DEPLOYMENT_URL = '${url}';`);
 
 async function draw(body, { family = 'medium', statusCode = 200, url = EXEC } = {}) {
   const stubs = makeScriptable({ body, statusCode, family });
@@ -87,15 +89,14 @@ const restDay = JSON.stringify({
   console.log('\n=== The widget draws at every size, bars included ===');
   // Small no longer gives the starter a header - pushups took that space,
   // and the starter drops to a single coloured line at the bottom.
-  const EXPECT = { small: { starter: /Peaks|Feed it|No starter|Day \d/, imgs: 1 },
-                   medium: { starter: /STARTER/, imgs: 2 },
+  // small: dots + week bar. medium: + water bar. large: + pushup bar.
+  const EXPECT = { small: { starter: /Peaks|Feed it|No starter|Day \d/, imgs: 2 },
+                   medium: { starter: /STARTER/, imgs: 3 },
                    large:  { starter: /STARTER/, imgs: 3 } };
   for (const family of ['small', 'medium', 'large']) {
     const out = await draw(good, { family });
     console.log(`  ${family}: ${out}`);
     check(`${family} still shows the starter`, EXPECT[family].starter.test(out), out);
-    // small: dot strip. medium: dots + water bar. large: dots + pushup +
-    // water bars.
     check(`${family} drew ${EXPECT[family].imgs} image(s)`,
       (out.match(/\[img\]/g) || []).length === EXPECT[family].imgs,
       String((out.match(/\[img\]/g) || []).length));
@@ -128,6 +129,40 @@ const restDay = JSON.stringify({
     check('with the session headline', /Leg Press/.test(today), today);
   }
 
+  console.log('\n=== Today is not a miss ===');
+  {
+    // Monday morning, nothing logged yet. This drew a RED dot on the real
+    // phone - a normal day reading as failure before it had happened.
+    const fresh = JSON.stringify({
+      status: 'success',
+      summary: {
+        updatedAt: now.toISOString(), starter: { stage: 'none' },
+        pushups: { done: 0, plannedNow: 1045, plannedWeek: 1045, deficit: -2963,
+          today: 0, todayTarget: 165,
+          days: [{ done: 0, target: 165, today: true, future: false },
+                 { done: 0, target: 165, today: false, future: true }] },
+        lift: { today: true, day: 'Monday', count: 12, headline: 'Leg Press · Leg Extension · Leg Curl' }
+      }
+    });
+    const rect = await draw(fresh, { family: 'accessoryRectangular' });
+    console.log('  fresh Monday:', rect);
+    check('an untouched today is not marked missed', !/✕/.test(rect.split('|')[1] || ''), rect);
+    check('it is marked as in progress instead', /◎/.test(rect), rect);
+    check('it still shows the gap', /165 pushups to go/.test(rect), rect);
+  }
+
+  console.log('\n=== The lift headline fits its column ===');
+  {
+    const narrow = await draw(doneToday, { family: 'small' });
+    const wide = await draw(doneToday, { family: 'large' });
+    console.log('  narrow:', narrow.split(' | ').find(t => /Lift today/.test(t)));
+    console.log('  wide  :', wide.split(' | ').find(t => /Lift today/.test(t)));
+    check('the narrow column shows one lift and a count',
+      /Lift today · Leg Press \+11/.test(narrow), narrow);
+    check('the wide one shows three and counts the rest',
+      /Lift today · Leg Press · Leg Curl · RDL \+9/.test(wide), wide);
+  }
+
   console.log('\n=== Lock Screen ===');
   for (const family of ['accessoryCircular', 'accessoryRectangular', 'accessoryInline']) {
     const out = await draw(good, { family });
@@ -149,8 +184,8 @@ const restDay = JSON.stringify({
     check('rectangular leads with the gap', /110 pushups to go/.test(rect), rect);
     // Filled, missed and not-yet must be three different marks, or a
     // Monday morning looks identical to a week of skipped days.
-    check('its dots distinguish done, missed and future',
-      /● ✕ ● .* ○ ○ ·/.test(rect.replace(/\s+/g, ' ')), rect);
+    check('its dots distinguish done, missed, today and future',
+      /● ✕ ● ◎ ○ ○ ·/.test(rect.replace(/\s+/g, ' ')), rect);
     check('rectangular names the next lift', /Next lift Wednesday/.test(rect), rect);
   }
 

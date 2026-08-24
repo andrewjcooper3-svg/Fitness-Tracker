@@ -18,7 +18,7 @@
 // ---------------------------------------------------------------------------
 // PASTE YOUR DEPLOYMENT URL HERE (the same /exec URL the app uses - it is in
 // the app under Settings). It must end in /exec.
-const DEPLOYMENT_URL = '';
+const DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbzibd9VwYYvj8pcmApGKplDNW70tiZZjnT54K8kVHJJKQOxMEp21CNdWUYz2KVvPzxr/exec';
 // Opens when you tap the widget. Leave as-is to open the app on GitHub Pages,
 // or point it at wherever you open the tracker from.
 const OPEN_URL = 'https://andrewjcooper3-svg.github.io/Fitness-Tracker/Workout_Tracker_AutoLog.html';
@@ -289,35 +289,43 @@ function weekDots(w, p, width) {
 
   days.forEach((d, i) => {
     const x = i * (h + gap);
+    const body = new Rect(x + 2, 4, h - 4, h - 4);   // every dot the same size
     const hit = d.target > 0 && d.done >= d.target;
     const part = d.target > 0 && d.done > 0 && d.done < d.target;
 
-    if (d.today) {                       // a ring marks where you are
-      dc.setStrokeColor(C.text);
-      dc.setLineWidth(1);
-      dc.strokeEllipse(new Rect(x - 1, 1, h + 2, h + 2));
-    }
     if (hit) {
       dc.setFillColor(C.green);
-      dc.fillEllipse(new Rect(x, 2, h, h));
-    } else if (part) {
+      dc.fillEllipse(body);
+    } else if (part) {                   // ring plus a core, so it reads
+      dc.setStrokeColor(C.amber);        // as "started" at a glance
+      dc.setLineWidth(2);
+      dc.strokeEllipse(body);
       dc.setFillColor(C.amber);
-      dc.fillEllipse(new Rect(x + 3, 5, h - 6, h - 6));
-      dc.setStrokeColor(C.amber);
-      dc.setLineWidth(1.5);
-      dc.strokeEllipse(new Rect(x + 1, 3, h - 2, h - 2));
-    } else if (d.target === 0) {         // Sunday: nothing was asked
-      dc.setStrokeColor(new Color(C.muted.hex, 0.4));
-      dc.setLineWidth(1);
-      dc.strokeEllipse(new Rect(x + 3, 5, h - 6, h - 6));
+      dc.fillEllipse(new Rect(x + 5, 7, h - 10, h - 10));
+    } else if (d.target === 0) {         // Sunday: nothing was asked for
+      dc.setFillColor(new Color(C.muted.hex, 0.45));
+      dc.fillEllipse(new Rect(x + 5, 7, h - 10, h - 10));
+    } else if (d.today) {
+      /* Today is not a miss. It was being drawn red the moment the day
+         started, so at 8am a perfectly normal Monday read as failure.
+         It only turns red once the day is over and it is still short. */
+      dc.setStrokeColor(C.accent);
+      dc.setLineWidth(2);
+      dc.strokeEllipse(body);
     } else if (d.future) {
-      dc.setStrokeColor(new Color(C.muted.hex, 0.7));
+      dc.setStrokeColor(new Color(C.muted.hex, 0.85));
       dc.setLineWidth(1.5);
-      dc.strokeEllipse(new Rect(x + 1, 3, h - 2, h - 2));
-    } else {                             // in the past and not done
+      dc.strokeEllipse(body);
+    } else {                             // over, and short
       dc.setStrokeColor(C.red);
-      dc.setLineWidth(1.5);
-      dc.strokeEllipse(new Rect(x + 1, 3, h - 2, h - 2));
+      dc.setLineWidth(2);
+      dc.strokeEllipse(body);
+    }
+
+    if (d.today) {                       // an outer ring marks where you are
+      dc.setStrokeColor(new Color(C.text.hex, 0.55));
+      dc.setLineWidth(1);
+      dc.strokeEllipse(new Rect(x, 2, h, h));
     }
   });
 
@@ -325,7 +333,7 @@ function weekDots(w, p, width) {
   img.imageSize = new Size(width, h + 4);
 }
 
-function liftLine(w, lift, size) {
+function liftLine(w, lift, size, room) {
   if (!lift) return;
   const row = w.addStack();
   row.centerAlignContent();
@@ -333,8 +341,31 @@ function liftLine(w, lift, size) {
   dot.font = Font.systemFont(7);
   dot.textColor = lift.today ? C.accent : C.muted;
   row.addSpacer(5);
-  label(row, lift.today ? `Lift today · ${lift.headline || lift.day}`
-                        : `Next lift ${lift.day}`, size || 10, C.muted);
+
+  /* The full headline ran off the end as "Leg Press · Leg Extension · Le…".
+     A name cut mid-word is worse than a shorter list, so a narrow slot
+     gets fewer exercises and an honest count of the rest. */
+  let text;
+  if (!lift.today) {
+    text = `Next lift ${lift.day}`;
+  } else {
+    const names = (lift.headline || '').split(' · ').filter(Boolean);
+    const show = room === 'wide' ? 3 : 1;
+    const rest = Math.max(0, (lift.count || names.length) - show);
+    text = names.length
+      ? `Lift today · ${names.slice(0, show).join(' · ')}${rest ? ` +${rest}` : ''}`
+      : `Lift today · ${lift.count || ''} exercises`.trim();
+  }
+  label(row, text, size || 10, C.muted);
+}
+
+// A quiet second line so the pushup column is not half empty next to the
+// starter and water stack.
+function weekLine(w, p, width) {
+  if (!p || !p.plannedNow) return;
+  label(w, `${p.done.toLocaleString()} of ${p.plannedNow.toLocaleString()} this week`, 9, C.muted);
+  w.addSpacer(4);
+  bar(w, p.done / p.plannedNow, new Color(C.accent.hex, 0.75), width, 4);
 }
 
 /* Arcs are not in the Scriptable API, so the ring is a polyline of short
@@ -400,10 +431,11 @@ function buildAccessory(summary, family) {
     // Text dots, not a drawn image: the Lock Screen tints images flat and
     // the filled/hollow distinction is what carries the meaning here.
     const marks = p.days.map(d => {
-      if (d.target === 0) return '·';
-      if (d.done >= d.target) return '●';
+      if (d.target === 0) return '·';           // nothing asked for
+      if (d.done >= d.target) return '●';       // done, including a done today
+      if (d.today) return '◎';                  // in progress - never a miss
       if (d.future) return '○';
-      return '✕';
+      return '✕';                               // over, and short
     }).join(' ');
     const s = w.addText(marks);
     s.font = Font.systemFont(11);
@@ -426,7 +458,9 @@ function build(summary, family) {
   if (family === 'small') {
     pushupTodayBlock(w, summary.pushups, 128, false);
     w.addSpacer(6);
-    liftLine(w, summary.lift, 9);
+    liftLine(w, summary.lift, 9, 'narrow');
+    w.addSpacer(6);
+    weekLine(w, summary.pushups, 128);
     w.addSpacer();
     const L = starterLines(summary.starter, now);
     const row = w.addStack();
@@ -442,7 +476,7 @@ function build(summary, family) {
   if (family === 'large') {
     pushupTodayBlock(w, summary.pushups, 300, true);
     w.addSpacer(6);
-    liftLine(w, summary.lift, 11);
+    liftLine(w, summary.lift, 11, 'wide');
     w.addSpacer(12);
     pushupBlock(w, summary.pushups, 300);
     w.addSpacer(12);
@@ -463,8 +497,10 @@ function build(summary, family) {
   left.layoutVertically();
   left.size = new Size(150, 0);
   pushupTodayBlock(left, summary.pushups, 150, false);
-  left.addSpacer(6);
-  liftLine(left, summary.lift, 9);
+  left.addSpacer(7);
+  liftLine(left, summary.lift, 9, 'narrow');
+  left.addSpacer(10);
+  weekLine(left, summary.pushups, 150);
 
   cols.addSpacer(14);
 
