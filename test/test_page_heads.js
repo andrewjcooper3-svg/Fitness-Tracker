@@ -21,7 +21,9 @@ const VIEWS = [
   ['stats', 'History', '#view-stats', 92],
   ['bodyhealth', 'Health', '#view-bodyhealth', 70],
   ['kitchen', 'Kitchen', '#view-kitchen', 72],
-  ['overview', 'Overview', '#view-overview', 84]
+  ['overview', 'Overview', '#view-overview', 84],
+  // Trainer's header is its own markup, not .ov-page-head.
+  ['tracker', 'Trainer', '#view-tracker', 84]
 ];
 
 // bodyhealth has no tab of its own, so reveal it the way the app would.
@@ -42,7 +44,8 @@ const probe = (page, sel) => page.evaluate(s => {
     if (r.height > 0) { first = { top: Math.round(r.top), cls: el.className }; break; }
   }
   return {
-    titles: [...view.querySelectorAll(':scope > .ov-page-head .ov-page-title')].map(t => t.textContent.trim()),
+    titles: [...view.querySelectorAll(':scope > .ov-page-head .ov-page-title, :scope > .header .header-title')]
+      .map(t => t.textContent.trim()),
     first
   };
 }, sel);
@@ -68,6 +71,9 @@ const probe = (page, sel) => page.evaluate(s => {
   }
 
   console.log('\n=== The tab bar still names the tab ===');
+  // Land on a known tab first - the loop above ends on whichever view is last.
+  await show(page, 'overview');
+  await page.waitForTimeout(350);
   const tabs = await page.evaluate(() => {
     const bar = document.querySelector('.app-tabs');
     return {
@@ -118,6 +124,15 @@ const probe = (page, sel) => page.evaluate(s => {
   check('Arrange hides on segments with no cards', !(await page.isVisible('#hxLayoutBtn')));
   check('Refresh stays, since it reloads the whole tab', await page.isVisible('#hxRefreshBtn'));
   await page.evaluate(() => showHistorySection('overview'));
+
+  // Trainer's week label is the same kind of live line as Overview's.
+  await show(page, 'tracker');
+  await page.waitForTimeout(400);
+  check('Trainer keeps its live week label', await page.evaluate(() =>
+    (document.getElementById('weekLabel').textContent || '').trim().length > 0),
+    await page.evaluate(() => document.getElementById('weekLabel').textContent));
+  check('and no longer carries a tagline', !(await page.evaluate(() =>
+    !!document.querySelector('#view-tracker .header-sub'))));
 
   console.log('\n=== Modal sheets keep their titles ===');
   const modalTitle = await page.evaluate(() => {

@@ -58,10 +58,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 
-  .header { padding: 16px 2px 14px; margin-bottom: 14px; }
-  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
-  .header-title { font-family: var(--font); font-size: 30px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.05; }
-  .header-sub { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--muted); margin-top: 3px; }
+  .header { padding: 0 2px 8px; }
   .week-badge { font-family: var(--font); font-size: 12px; padding: 4px 10px; border-radius: 8px; background: var(--surface2); color: var(--muted); }
 
   .config-box { background: var(--surface); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; }
@@ -189,7 +186,7 @@
   .log-status.ok { display: flex; background: rgba(124, 154, 94, 0.14); color: var(--green); }
   .log-status.error { display: flex; background: rgba(193, 87, 58, 0.14); color: var(--red); }
   .log-retry-btn { font-family: var(--font); font-size: 12px; font-weight: 600; background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 8px; padding: 5px 10px; cursor: pointer; flex-shrink: 0; }
-  .header-week { font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--accent); margin-top: 3px; }
+  .header-week { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); }
 
   /* ===== Launch splash: the logo draws itself on ============================
      Line-drawing works by dashing the stroke with one dash exactly as long
@@ -2162,14 +2159,10 @@
 
 <div id="view-tracker" class="app-view">
 
+<!-- No title or tagline - the tab bar says Trainer. The week label stays:
+     it is live, and it is what tells you which week you are logging into. -->
 <div class="header">
-  <div class="header-top">
-    <div class="header-info">
-      <div class="header-title">TRAINER</div>
-      <div class="header-sub">Balanced Growth - 100% Lean</div>
-      <div class="header-week" id="weekLabel"></div>
-    </div>
-  </div>
+  <div class="header-week" id="weekLabel"></div>
 </div>
 
 <!-- Pushup deficit tracking - moved here from its own top-level tab,
@@ -11659,7 +11652,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-25-no-page-titles';
+const APP_BUILD_VERSION = '2026-08-25-trainer-title';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

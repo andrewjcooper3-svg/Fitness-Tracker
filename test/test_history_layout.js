@@ -33,6 +33,22 @@ const shown = page => page.evaluate(() => {
 const order = page => page.evaluate(() => [...document
   .getElementById('hxSectionOverview').querySelectorAll('[data-hxcard]')].map(c => c.dataset.hxcard));
 
+// Ready = the app has booted far enough that the layout has been applied and
+// the History tab has drawn. A fixed sleep here raced under load: the tab
+// came back empty and the assertions read a blank page as "layout lost".
+async function openHistory(page) {
+  await page.waitForFunction(() => typeof showAppView === 'function'
+    && typeof renderStatsTab === 'function'
+    && document.querySelectorAll('#hxSectionOverview [data-hxcard]').length > 0,
+    null, { timeout: 15000 });
+  await page.evaluate(() => { showAppView('stats'); renderStatsTab(); });
+  await page.waitForFunction(() => {
+    const c = document.querySelector('#hxSectionOverview [data-hxcard]:not(.hx-card-hidden)');
+    return c && c.getBoundingClientRect().height > 0;
+  }, null, { timeout: 15000 });
+  await page.waitForTimeout(250);
+}
+
 const openEditor = async page => {
   await page.evaluate(() => openHistoryLayout());
   await page.waitForTimeout(250);
@@ -53,9 +69,7 @@ const openEditor = async page => {
     }, ROWS);
 
     await page.goto(URL);
-    await page.waitForTimeout(900);
-    await page.evaluate(() => { showAppView('stats'); renderStatsTab(); });
-    await page.waitForTimeout(600);
+    await openHistory(page);
 
     const authored = await order(page);
     check('every Overview card is identified', authored.length === 7, authored.join(', '));
@@ -96,9 +110,7 @@ const openEditor = async page => {
 
     // Reload: the arrangement is the point, so it has to come back.
     await page.reload();
-    await page.waitForTimeout(900);
-    await page.evaluate(() => { showAppView('stats'); renderStatsTab(); });
-    await page.waitForTimeout(600);
+    await openHistory(page);
     const after = await shown(page);
     check('the order survives a reload', after[0] === 'weight', after.join(', '));
     check('and so does what was hidden',
@@ -138,9 +150,7 @@ const openEditor = async page => {
       }));
     });
     await page.reload();
-    await page.waitForTimeout(900);
-    await page.evaluate(() => { showAppView('stats'); renderStatsTab(); });
-    await page.waitForTimeout(600);
+    await openHistory(page);
     const rot = await shown(page);
     check('a card saved layouts never heard of still appears',
       rot.includes('muscles') && rot.includes('freq') && rot.includes('pushups'), rot.join(', '));
