@@ -1,16 +1,14 @@
-/* The tab headers, after dropping the eyebrow line and shrinking the title.
+/* No view carries a page title any more.
 
-   The assertion that matters is not "the title is 22px" - it is that the
-   CONTENT SITS HIGH. A header can lose a line and gain it back in padding,
-   which measures as a change and reclaims nothing. This was originally
-   written to diff the working tree against the previous commit; once that
-   commit landed the diff went to zero and the test passed vacuously, so the
-   budgets below are absolute - measured at the point the change shipped,
-   and they fail if a later change spends the space again.
+   The tab bar names the tab; a heading repeating it underneath was a row of
+   chrome on every screen. What this guards is the part that is easy to get
+   wrong when you delete a header: the CONTROLS it was holding. Overview's
+   gear is the only route to Settings, and History's arrange and refresh
+   buttons had no other home - so this checks each one is still on screen
+   and still clickable, not just that the titles are gone.
 
-   Also pinned: no tab lost its title or its buttons, Overview keeps its
-   week label (a live date, not a restatement of the title), and the modal
-   sheets - which share these class names - did NOT shrink with them. */
+   The budgets are absolute, measured when the change shipped, so a later
+   change that spends the space again fails here. */
 const { chromium } = require('playwright');
 const path = require('path');
 
@@ -18,36 +16,15 @@ const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html
 let fails = 0;
 const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}${x ? '  ' + x : ''}`); if (!ok) fails++; };
 
-// bodyhealth is not in viewOrder (its tab is display:none), so it is shown
-// directly rather than through the tab bar.
-/* view, title, selector, max header height, max y of the first content.
-   Overview is allowed more: its eyebrow is the live week label and stays. */
+// view, label, selector, max y of the first real content.
 const VIEWS = [
-  ['stats', 'History', '#view-stats', 52, 110],
-  ['bodyhealth', 'Health', '#view-bodyhealth', 48, 106],
-  ['kitchen', 'Kitchen', '#view-kitchen', 64, 122],
-  ['overview', 'Overview', '#view-overview', 68, 115]
+  ['stats', 'History', '#view-stats', 92],
+  ['bodyhealth', 'Health', '#view-bodyhealth', 70],
+  ['kitchen', 'Kitchen', '#view-kitchen', 72],
+  ['overview', 'Overview', '#view-overview', 84]
 ];
 
-const measure = (page, sel) => page.evaluate(s => {
-  const view = document.querySelector(s);
-  const h = view.querySelector(':scope > .ov-page-head');
-  if (!h) return null;
-  const t = h.querySelector('.ov-page-title');
-  const eyebrow = h.querySelector('.ov-page-week');
-  let next = h.nextElementSibling;
-  while (next && next.getBoundingClientRect().height === 0) next = next.nextElementSibling;
-  return {
-    height: Math.round(h.getBoundingClientRect().height),
-    title: t ? t.textContent.trim() : null,
-    titlePx: t ? Math.round(parseFloat(getComputedStyle(t).fontSize)) : null,
-    eyebrow: eyebrow ? eyebrow.textContent.trim() : null,
-    buttons: h.querySelectorAll('button').length,
-    contentTop: next ? Math.round(next.getBoundingClientRect().top) : null
-  };
-}, sel);
-
-// bodyhealth has no tab, so reveal it the way the app would if it did.
+// bodyhealth has no tab of its own, so reveal it the way the app would.
 const show = (page, view) => page.evaluate(v => {
   if (v === 'bodyhealth') {
     document.querySelectorAll('.app-view').forEach(el => el.classList.remove('active'));
@@ -56,77 +33,109 @@ const show = (page, view) => page.evaluate(v => {
   } else { showAppView(v); }
 }, view);
 
-async function sweep(browser, url) {
+const probe = (page, sel) => page.evaluate(s => {
+  const view = document.querySelector(s);
+  // The first thing in the view that actually occupies space.
+  let first = null;
+  for (const el of view.children) {
+    const r = el.getBoundingClientRect();
+    if (r.height > 0) { first = { top: Math.round(r.top), cls: el.className }; break; }
+  }
+  return {
+    titles: [...view.querySelectorAll(':scope > .ov-page-head .ov-page-title')].map(t => t.textContent.trim()),
+    first
+  };
+}, sel);
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const ctx = await browser.newContext({ viewport: { width: 430, height: 932 } });
   const page = await ctx.newPage();
   page.on('pageerror', e => { console.log('  PAGEERROR', String(e)); fails++; });
   await page.route('https://script.google.com/**', r =>
     r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' }));
-  await page.goto(url);
-  await page.waitForTimeout(900);
-  const out = {};
-  for (const [view, title, sel] of VIEWS) {
-    await show(page, view);
-    await page.waitForTimeout(350);
-    out[title] = await measure(page, sel);
-  }
-  const modalPx = await page.evaluate(() => {
-    const el = document.querySelector('#muscleBalanceOverlay .ov-page-title');
-    return el ? Math.round(parseFloat(getComputedStyle(el).fontSize)) : null;
-  });
-  await ctx.close();
-  return { out, modalPx, page: null };
-}
-
-(async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-  const now = await sweep(browser, URL);
-
-  console.log('=== The header stays out of the way ===');
-  for (const [, title, , maxH, maxTop] of VIEWS) {
-    const a = now.out[title];
-    if (!a || a.contentTop == null) { check(`${title}: measurable`, false); continue; }
-    check(`${title}: header within ${maxH}px`, a.height <= maxH, `${a.height}px`);
-    check(`${title}: content starts by y=${maxTop}`, a.contentTop <= maxTop, `y=${a.contentTop}`);
-  }
-
-  console.log('\n=== Each tab keeps its title and its controls ===');
-  for (const [, title] of VIEWS) {
-    const a = now.out[title];
-    check(`${title}: title still reads "${title}"`, a && a.title === title, a && a.title);
-    check(`${title}: title is 22px`, a && a.titlePx === 22, a && String(a.titlePx));
-  }
-
-  console.log('\n=== The eyebrow that only restated the title is gone ===');
-  ['History', 'Health', 'Kitchen'].forEach(title => {
-    check(`${title} has no eyebrow`, now.out[title].eyebrow === null, now.out[title].eyebrow);
-  });
-  // Overview's is a live week label, so removing it would cost information
-  // rather than chrome.
-  check('Overview keeps its week label', now.out.Overview.eyebrow !== null, now.out.Overview.eyebrow);
-
-  console.log('\n=== Nothing was stranded ===');
-  check('History still has both header buttons', now.out.History.buttons === 2,
-    String(now.out.History.buttons));
-
-  console.log('\n=== Modal sheets kept their own weight ===');
-  check('a sheet title is still 28px', now.modalPx === 28, String(now.modalPx));
-
-  console.log('\n=== Nothing overflows ===');
-  const ctx = await browser.newContext({ viewport: { width: 430, height: 932 } });
-  const page = await ctx.newPage();
-  await page.route('https://script.google.com/**', r =>
-    r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' }));
   await page.goto(URL);
   await page.waitForTimeout(900);
-  for (const [view, title] of VIEWS) {
+
+  console.log('=== No tab shows a page title ===');
+  for (const [view, label, sel, maxTop] of VIEWS) {
+    await show(page, view);
+    await page.waitForTimeout(350);
+    const p = await probe(page, sel);
+    check(`${label}: no title heading`, p.titles.length === 0, p.titles.join(', '));
+    check(`${label}: content starts by y=${maxTop}`, p.first && p.first.top <= maxTop,
+      p.first ? `y=${p.first.top} (${p.first.cls})` : 'nothing visible');
+  }
+
+  console.log('\n=== The tab bar still names the tab ===');
+  const tabs = await page.evaluate(() => {
+    const bar = document.querySelector('.app-tabs');
+    return {
+      visible: !!bar && bar.getBoundingClientRect().height > 0,
+      labels: [...document.querySelectorAll('.app-tab .app-tab-label')].map(t => t.textContent.trim()),
+      active: (document.querySelector('.app-tab.active .app-tab-label') || {}).textContent
+    };
+  });
+  check('the top tab bar is untouched', tabs.visible && tabs.labels.length >= 5, tabs.labels.join(', '));
+  check('and marks the tab you are on', /overview/i.test(tabs.active || ''), tabs.active);
+
+  console.log('\n=== Deleting a header stranded no control ===');
+  // Overview's gear is the ONLY way into Settings.
+  await show(page, 'overview');
+  await page.waitForTimeout(350);
+  for (const [sel, what] of [['#ovEditBtn', 'Edit']]) {
+    check(`Overview keeps ${what}`, await page.isVisible(sel));
+  }
+  const ovBtns = await page.evaluate(() =>
+    [...document.querySelectorAll('#view-overview .ov-page-head-actions button')]
+      .filter(b => b.getBoundingClientRect().height > 0)
+      .map(b => (b.getAttribute('aria-label') || b.textContent).trim()));
+  check('Overview keeps all three actions', ovBtns.length === 3, ovBtns.join(', '));
+  await page.click('#view-overview .ov-page-head-actions button[aria-label="Settings"]');
+  await page.waitForTimeout(400);
+  check('the gear still opens Settings', await page.evaluate(() =>
+    document.getElementById('settingsModalOverlay').classList.contains('open')));
+  await page.evaluate(() => closeSettingsModal());
+  await page.waitForTimeout(300);
+  check('Overview keeps its live week label', await page.evaluate(() =>
+    (document.getElementById('ovWeekLabel').textContent || '').trim().length > 0));
+
+  await show(page, 'stats');
+  await page.waitForTimeout(400);
+  check('History keeps Arrange', await page.isVisible('#hxLayoutBtn'));
+  check('History keeps Refresh', await page.isVisible('#hxRefreshBtn'));
+  check('both sit on the range row', await page.evaluate(() =>
+    !!document.querySelector('#hxRange .hx-range-actions #hxLayoutBtn')));
+  await page.click('#hxLayoutBtn');
+  await page.waitForTimeout(400);
+  check('Arrange still opens the editor', await page.evaluate(() =>
+    document.getElementById('hxLayoutOverlay').classList.contains('open')));
+  await page.evaluate(() => closeHistoryLayout());
+  await page.waitForTimeout(250);
+  // ...and it is still Overview-only.
+  await page.evaluate(() => showHistorySection('workouts'));
+  await page.waitForTimeout(300);
+  check('Arrange hides on segments with no cards', !(await page.isVisible('#hxLayoutBtn')));
+  check('Refresh stays, since it reloads the whole tab', await page.isVisible('#hxRefreshBtn'));
+  await page.evaluate(() => showHistorySection('overview'));
+
+  console.log('\n=== Modal sheets keep their titles ===');
+  const modalTitle = await page.evaluate(() => {
+    const el = document.querySelector('#muscleBalanceOverlay .ov-page-title');
+    return el ? { text: el.textContent.trim(), px: Math.round(parseFloat(getComputedStyle(el).fontSize)) } : null;
+  });
+  check('a sheet still has a heading', modalTitle && modalTitle.text.length > 0, modalTitle && modalTitle.text);
+  check('and it is still 28px', modalTitle && modalTitle.px === 28, modalTitle && String(modalTitle.px));
+
+  console.log('\n=== Nothing overflows ===');
+  for (const [view, label] of VIEWS) {
     await show(page, view);
     await page.waitForTimeout(300);
-    check(`${title} does not scroll sideways`, !(await page.evaluate(() =>
+    check(`${label} does not scroll sideways`, !(await page.evaluate(() =>
       document.documentElement.scrollWidth > document.documentElement.clientWidth)));
   }
-  await ctx.close();
 
+  await ctx.close();
   await browser.close();
   console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);
   process.exit(fails ? 1 : 0);

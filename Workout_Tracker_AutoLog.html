@@ -316,9 +316,11 @@
   /* Tab headers only. The same classes dress the modal sheets, where a
      28px title is the established weight and there is no wasted column of
      chrome to reclaim - so the shrink is scoped to the views. */
-  .app-view > .ov-page-head { align-items: center; padding: 2px 2px 10px; }
-  .app-view > .ov-page-head .ov-page-title { font-size: 22px; letter-spacing: -0.4px; margin-top: 0; }
-  .app-view > .ov-page-head .ov-page-week + .ov-page-title { margin-top: 2px; }
+  /* No view carries a page title any more - the tab bar names the tab, and
+     a heading repeating it underneath was a row of chrome on every screen.
+     What survives is Overview's toolbar: the live week label on the left,
+     its three buttons on the right, one line. */
+  .ov-page-head-bare { align-items: center; padding: 0 2px 8px; min-height: 30px; }
   .ov-edit-btn { font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
   .ov-page-head-actions { display: flex; align-items: center; gap: 10px; }
   .ov-gear-btn { font-size: 20px; line-height: 1; color: var(--muted); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
@@ -712,20 +714,11 @@
   /* Small ambient cooking animation, top-right of the Kitchen tab - pure
      CSS keyframes (no JS) since it's just a looping stir + rising steam,
      unlike the pushup figure this doesn't need a tap-to-interrupt state. */
-  /* Scaled with the title it sits beside - at 76px it set the Kitchen
-     header's height on its own, which is the wasted space the smaller
-     title was meant to reclaim. */
-  .cook-anim-svg { width: 48px; height: 48px; overflow: visible; }
-  .cook-anim-line { fill: none; stroke: var(--accent); stroke-width: 6.5; stroke-linecap: round; stroke-linejoin: round; }
-  .cook-anim-head { fill: var(--accent); }
-  .cook-anim-panarm { transform-origin: 33px 33px; animation: panToss 1.4s ease-in-out infinite; }
-  .cook-anim-pan { fill: var(--surface2); stroke: var(--accent); stroke-width: 3.5; }
-  .cook-anim-pancake { fill: var(--muted); stroke: none; transform-origin: 76px 40px; animation: pancakeFlip 1.4s ease-in-out infinite; }
-  @keyframes panToss {
-    0% { transform: rotate(6deg); }
-    50% { transform: rotate(-10deg); }
-    100% { transform: rotate(6deg); }
-  }
+
+
+
+
+
   @keyframes pancakeFlip {
     0% { transform: translateY(0) rotate(0deg); }
     50% { transform: translateY(-26px) rotate(180deg); }
@@ -1029,7 +1022,9 @@
     background: none; border: none; border-radius: 11px; padding: 9px 4px; cursor: pointer; }
   .hx-seg-btn.active { background: var(--surface2); color: var(--accent); }
   /* Range chips apply to the whole tab, the way Hevy's 3M/1Y/All do. */
-  .hx-range { display: flex; gap: 6px; margin-bottom: 12px; }
+  .hx-range { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+  /* Pushed to the row's right edge; the range chips never fill it. */
+  .hx-range-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
   .hx-range-btn { font-family: var(--font); font-size: 11.5px; font-weight: 700; color: var(--muted);
     background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
     padding: 5px 14px; cursor: pointer; }
@@ -1662,17 +1657,12 @@
        bar and filled per-view by updateTopBar_(). The source headers
        are hidden below, listed per view rather than by a blanket
        .ov-page-head rule: the modals that reuse that class (Weight,
-       Top Tracks, ...) must keep theirs, and so must #view-bodyhealth,
-       which isn't in viewOrder and so never gets a bar title to
-       replace it. Any buttons those headers owned are relocated into
+       Top Tracks, ...) must keep theirs. Only Overview and Calendar
+       still have one at all; their buttons are relocated into
        #appBarActions by the same JS, so hiding a header never strands
-       a control - Settings is only reachable via Overview's gear.
-       (Kitchen's decorative cook animation lives inside its header and
-       goes with it - aria-hidden, so no function is lost.) */
+       a control - Settings is only reachable via Overview's gear. */
     #view-tracker > .header,
     #view-overview > .ov-page-head,
-    #view-kitchen > .ov-page-head,
-    #view-stats > .ov-page-head,
     #view-calendar > .cal-header { display: none; }
 
     .app-bar-title {
@@ -1907,10 +1897,11 @@
 <div class="app-views-track" id="appViewsTrack">
 
 <div id="view-overview" class="app-view active">
-  <div class="ov-page-head">
+  <!-- No title - the tab bar already says which tab this is. What is left
+       is the live week label and the actions, on one line. -->
+  <div class="ov-page-head ov-page-head-bare">
     <div>
       <div class="ov-page-week" id="ovWeekLabel"></div>
-      <div class="ov-page-title">Overview</div>
     </div>
     <div class="ov-page-head-actions">
       <button class="ov-gear-btn" id="ovEditBtn" onclick="toggleOverviewEdit()" title="Rearrange the blocks on this page">Edit</button>
@@ -2375,11 +2366,6 @@
 </div>
 
 <div id="view-bodyhealth" class="app-view">
-  <div class="ov-page-head">
-    <div>
-      <div class="ov-page-title">Health</div>
-    </div>
-  </div>
 
   <div class="ov-hero" id="bhRecoveryHero" onclick="openBodyHealthDetailModal('recovery')">
     <div class="ov-hero-label">Recovery</div>
@@ -2413,18 +2399,6 @@
 </div>
 
 <div id="view-stats" class="app-view">
-  <div class="ov-page-head">
-    <div>
-      <div class="ov-page-title">History</div>
-    </div>
-    <div class="ov-page-head-actions">
-      <!-- Overview only: the other three segments are a list, a feed and a
-           set of scans, none of which have cards to arrange. -->
-      <button class="ov-gear-btn" id="hxLayoutBtn" onclick="openHistoryLayout()" aria-label="Arrange cards" title="Arrange or hide the Overview cards">☰</button>
-      <button class="ov-gear-btn" id="hxRefreshBtn" onclick="loadWorkoutHistory(true)" aria-label="Refresh history" title="Reload from the Sheet">↻</button>
-    </div>
-  </div>
-
   <!-- Absorbed Stats: the pushup and weight cards below were this tab
        already, and the history sections sit above them rather than
        duplicating the same numbers on two tabs. -->
@@ -2441,6 +2415,13 @@
     <button class="hx-range-btn" data-range="90" onclick="setHistoryRange(90)">3M</button>
     <button class="hx-range-btn" data-range="365" onclick="setHistoryRange(365)">1Y</button>
     <button class="hx-range-btn active" data-range="0" onclick="setHistoryRange(0)">All</button>
+    <!-- The tab's own actions ride this row rather than a header of their
+         own. Arrange is Overview-only: the other three segments are a
+         list, a feed and a set of scans, with no cards to arrange. -->
+    <span class="hx-range-actions">
+      <button class="ov-gear-btn" id="hxLayoutBtn" onclick="openHistoryLayout()" aria-label="Arrange cards" title="Arrange or hide the Overview cards">☰</button>
+      <button class="ov-gear-btn" id="hxRefreshBtn" onclick="loadWorkoutHistory(true)" aria-label="Refresh history" title="Reload from the Sheet">↻</button>
+    </span>
   </div>
   <div class="hx-status" id="hxStatus"></div>
 
@@ -2641,23 +2622,6 @@
 </div>
 
 <div id="view-kitchen" class="app-view">
-  <div class="ov-page-head">
-    <div>
-      <div class="ov-page-title">Kitchen</div>
-    </div>
-    <svg viewBox="0 0 100 100" class="cook-anim-svg" aria-hidden="true">
-      <ellipse class="cook-anim-pancake" cx="76" cy="40" rx="8" ry="3"></ellipse>
-      <g class="cook-anim-panarm">
-        <polyline class="cook-anim-line" points="33,33 48,44"></polyline>
-        <line class="cook-anim-line" x1="48" y1="44" x2="65" y2="47"></line>
-        <ellipse class="cook-anim-pan" cx="79" cy="47" rx="14" ry="4"></ellipse>
-      </g>
-      <circle class="cook-anim-head" cx="30" cy="20" r="9"></circle>
-      <polyline class="cook-anim-line" points="32,29 36,56"></polyline>
-      <line class="cook-anim-line" x1="36" y1="56" x2="24" y2="90"></line>
-      <line class="cook-anim-line" x1="36" y1="56" x2="46" y2="88"></line>
-    </svg>
-  </div>
 
   <div class="kitchen-subtabs">
     <button class="kitchen-subtab active" data-section="inventory" onclick="showKitchenSection('inventory')">Inventory</button>
@@ -11695,7 +11659,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-25-chart-system';
+const APP_BUILD_VERSION = '2026-08-25-no-page-titles';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
