@@ -1088,6 +1088,9 @@
   .hx-muscle-ex > div { display: flex; justify-content: space-between; gap: 10px;
     font-family: var(--font); font-size: 11.5px; color: var(--muted); padding: 2px 0; }
   .hx-muscle-ex > div > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* The sum behind a weighted figure: quieter than the figure itself, so
+     the count still reads first and the arithmetic is there to be checked. */
+  .hx-muscle-sum { opacity: 0.62; font-size: 10.5px; margin-left: 7px; }
 
   /* Exercise list -> detail, Hevy's drill-in. */
   .hx-ex-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
@@ -4707,8 +4710,15 @@ function muscleSplit_(name) {
 }
 
 /* One breakdown routine for the card, the modal and the diagram, so the
-   three can never drift apart. Returns group -> { sets, ex } where sets is
-   fractional in weighted mode. */
+   three can never drift apart. Returns group -> { sets, ex, raw } where
+   sets and ex are fractional in weighted mode.
+
+   `raw` is the same tally before any weighting - the sets as they were
+   actually logged. Weighted mode was read twice as the chart docking
+   credit for sets that felt hard: three sets of leg press showing as 1.8
+   looks exactly like a penalty when the reason (0.6 of a leg press is
+   quads, the rest is glutes and hamstrings) is nowhere on screen. Carrying
+   the unweighted count lets the breakdown show its own arithmetic. */
 function muscleBreakdown_(rows, weighted) {
   const out = {};
   rows.forEach(r => {
@@ -4717,9 +4727,10 @@ function muscleBreakdown_(rows, weighted) {
     Object.keys(split).forEach(g => {
       const share = r.done * split[g];
       if (!(share > 0)) return;
-      const e = out[g] = out[g] || { sets: 0, ex: {} };
+      const e = out[g] = out[g] || { sets: 0, ex: {}, raw: {} };
       e.sets += share;
       e.ex[r.exercise] = (e.ex[r.exercise] || 0) + share;
+      e.raw[r.exercise] = (e.raw[r.exercise] || 0) + r.done;
     });
   });
   return out;
@@ -4727,7 +4738,7 @@ function muscleBreakdown_(rows, weighted) {
 
 function muscleRanked_(rows, weighted) {
   const by = muscleBreakdown_(rows, weighted);
-  return Object.keys(by).map(k => ({ name: k, sets: by[k].sets, ex: by[k].ex }))
+  return Object.keys(by).map(k => ({ name: k, sets: by[k].sets, ex: by[k].ex, raw: by[k].raw }))
     .filter(m => m.sets > 0.05).sort((a, b) => b.sets - a.sets);
 }
 
@@ -5473,8 +5484,17 @@ function renderHistoryMuscles_(rows) {
   el.innerHTML = list.map(m => {
     const open = hxMuscleOpen_ === m.name;
     const parts = Object.keys(m.ex).sort((a, b) => m.ex[b] - m.ex[a]);
-    const breakdown = open ? `<div class="hx-muscle-ex">` + parts.map(n =>
-      `<div><span>${escapeHtml_(n)}</span><span>${muscleSetsLabel_(m.ex[n])}</span></div>`).join('') + `</div>` : '';
+    /* In weighted mode the line states the sum it is the result of:
+       "1.8 sets  ← 3 × 0.6". Without it, 3 logged sets reading as 1.8 is
+       indistinguishable from the chart docking credit for the two that
+       were marked tough - which is how it was read, twice. */
+    const breakdown = open ? `<div class="hx-muscle-ex">` + parts.map(n => {
+      const raw = m.raw ? m.raw[n] : 0;
+      const w = raw ? Math.round(m.ex[n] / raw * 100) / 100 : 0;
+      const sum = (hxMuscleWeighted_ && raw)
+        ? `<span class="hx-muscle-sum">${raw} × ${w}</span>` : '';
+      return `<div><span>${escapeHtml_(n)}</span><span>${muscleSetsLabel_(m.ex[n])}${sum}</span></div>`;
+    }).join('') + `</div>` : '';
     return `<div class="hx-muscle${open ? ' open' : ''}" onclick="toggleHistoryMuscle('${escapeHtml_(escapeJsAttr_(m.name))}')"
         title="${escapeHtml_(parts.slice(0, 6).map(n => n + ' ' + (Math.round(m.ex[n] * 10) / 10)).join(' · '))}">
       <span class="hx-muscle-name">${escapeHtml_(m.name)}</span>
@@ -11477,7 +11497,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-25-muscle-mode';
+const APP_BUILD_VERSION = '2026-08-25-weighted-sums';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

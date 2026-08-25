@@ -23,7 +23,11 @@ const ROWS = [
   { date: '2026-08-24', day: 'Monday', exercise: 'Pushups', sets: 3, done: 3,
     topWeight: 0, volume: 0, targetReps: 55, totalReps: 165, green: 0, yellow: 3, red: 0, week: 'Week of Aug 24 - Aug 30, 2026' },
   { date: '2026-08-24', day: 'Monday', exercise: 'Lat Pulldown', sets: 3, done: 3,
-    topWeight: 110, volume: 3300, targetReps: 10, totalReps: 30, green: 1, yellow: 1, red: 1, week: 'Week of Aug 24 - Aug 30, 2026' }
+    topWeight: 110, volume: 3300, targetReps: 10, totalReps: 30, green: 1, yellow: 1, red: 1, week: 'Week of Aug 24 - Aug 30, 2026' },
+  // Copied from the live sheet, quality mix included: this is the row that
+  // read as "1.8 sets" and got taken for a penalty on the two tough sets.
+  { date: '2026-08-24', day: 'Monday', exercise: 'Leg Press', sets: 3, done: 3,
+    topWeight: 255, volume: 7650, targetReps: 10, totalReps: 30, green: 1, yellow: 2, red: 0, week: 'Week of Aug 24 - Aug 30, 2026' }
 ];
 
 const readCard = page => page.evaluate(() => {
@@ -91,6 +95,33 @@ const readCard = page => page.evaluate(() => {
     const opened = await readCard(page);
     check('opening Chest lists Pushups inside it',
       opened.chestEx.some(t => /pushups/i.test(t)), opened.chestEx.join(' | ') || '(nothing)');
+
+    /* The leg press line, which is the one that got misread. 3 sets logged,
+       0.6 of a leg press is quads, so 1.8 - and the line has to say so,
+       because "1.8" next to a row tagged 1 green / 2 yellow reads as the
+       chart docking credit for the tough sets. */
+    await page.evaluate(() => toggleHistoryMuscle('Quads'));
+    await page.waitForTimeout(250);
+    const quads = await page.evaluate(() =>
+      [...document.querySelectorAll('#hxMuscles .hx-muscle-ex div')].map(d => d.textContent.trim()));
+    const legLine = quads.find(t => /leg press/i.test(t));
+    check('Quads opens on the leg press', !!legLine, quads.join(' | ') || '(nothing)');
+    check('it shows the weighted result', legLine && /1\.8 sets/.test(legLine), legLine);
+    check('and the sum it came from', legLine && /3 × 0\.6/.test(legLine), legLine);
+
+    // Same row in primary mode: three sets, no arithmetic to explain.
+    await page.click('#hxCardModeSeg button[data-mode="primary"]');
+    await page.waitForTimeout(300);
+    const legPrimary = await page.evaluate(() =>
+      [...document.querySelectorAll('#hxMuscles .hx-muscle-ex div')]
+        .map(d => d.textContent.trim()).find(t => /leg press/i.test(t)));
+    check('primary mode shows the three sets as logged',
+      legPrimary && /3 sets/.test(legPrimary) && !/×/.test(legPrimary), legPrimary);
+    await page.click('#hxCardModeSeg button[data-mode="weighted"]');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => toggleHistoryMuscle('Quads'));
+    await page.evaluate(() => toggleHistoryMuscle('Chest'));
+    await page.waitForTimeout(250);
 
     // Switch to primary from the card itself.
     await page.click('#hxCardModeSeg button[data-mode="primary"]');
