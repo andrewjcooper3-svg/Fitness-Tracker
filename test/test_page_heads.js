@@ -1,33 +1,32 @@
-/* The tab headers, after dropping the eyebrow line and shrinking the
-   title.
+/* The tab headers, after dropping the eyebrow line and shrinking the title.
 
    The assertion that matters is not "the title is 22px" - it is that the
-   CONTENT MOVED UP. A header can lose a line and gain it back in padding,
-   which measures as a change and reclaims nothing. So this measures the
-   same page twice, once from the previous commit and once from the working
-   tree, and compares where the first real content sits.
+   CONTENT SITS HIGH. A header can lose a line and gain it back in padding,
+   which measures as a change and reclaims nothing. This was originally
+   written to diff the working tree against the previous commit; once that
+   commit landed the diff went to zero and the test passed vacuously, so the
+   budgets below are absolute - measured at the point the change shipped,
+   and they fail if a later change spends the space again.
 
    Also pinned: no tab lost its title or its buttons, Overview keeps its
    week label (a live date, not a restatement of the title), and the modal
    sheets - which share these class names - did NOT shrink with them. */
 const { chromium } = require('playwright');
-const { execFileSync } = require('child_process');
 const path = require('path');
-const fs = require('fs');
-const os = require('os');
 
-const REPO = path.resolve(__dirname, '..');
-const URL = 'file://' + path.join(REPO, 'Workout_Tracker_AutoLog.html');
+const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
 let fails = 0;
 const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}${x ? '  ' + x : ''}`); if (!ok) fails++; };
 
 // bodyhealth is not in viewOrder (its tab is display:none), so it is shown
 // directly rather than through the tab bar.
+/* view, title, selector, max header height, max y of the first content.
+   Overview is allowed more: its eyebrow is the live week label and stays. */
 const VIEWS = [
-  ['stats', 'History', '#view-stats'],
-  ['bodyhealth', 'Health', '#view-bodyhealth'],
-  ['kitchen', 'Kitchen', '#view-kitchen'],
-  ['overview', 'Overview', '#view-overview']
+  ['stats', 'History', '#view-stats', 52, 110],
+  ['bodyhealth', 'Health', '#view-bodyhealth', 48, 106],
+  ['kitchen', 'Kitchen', '#view-kitchen', 64, 122],
+  ['overview', 'Overview', '#view-overview', 68, 115]
 ];
 
 const measure = (page, sel) => page.evaluate(s => {
@@ -80,28 +79,16 @@ async function sweep(browser, url) {
 }
 
 (async () => {
-  // The previous commit, rendered as a baseline to measure the change against.
-  const base = path.join(os.tmpdir(), 'hx-head-baseline.html');
-  execFileSync('git', ['-C', REPO, 'show', 'HEAD:Workout_Tracker_AutoLog.html'],
-    { stdio: ['ignore', fs.openSync(base, 'w'), 'inherit'], maxBuffer: 1 << 28 });
-
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-  const before = await sweep(browser, 'file://' + base);
   const now = await sweep(browser, URL);
 
-  console.log('=== The content actually moved up ===');
-  let reclaimed = 0;
-  for (const [, title] of VIEWS) {
-    const b = before.out[title], a = now.out[title];
-    if (!b || !a || b.contentTop == null || a.contentTop == null) { check(`${title}: measurable`, false); continue; }
-    const gained = b.contentTop - a.contentTop;
-    reclaimed += gained;
-    check(`${title}: content starts higher than before`, gained > 0,
-      `${b.contentTop}px -> ${a.contentTop}px (${gained > 0 ? '+' : ''}${gained}px)`);
-    check(`${title}: the header itself is shorter`, a.height < b.height,
-      `${b.height}px -> ${a.height}px`);
+  console.log('=== The header stays out of the way ===');
+  for (const [, title, , maxH, maxTop] of VIEWS) {
+    const a = now.out[title];
+    if (!a || a.contentTop == null) { check(`${title}: measurable`, false); continue; }
+    check(`${title}: header within ${maxH}px`, a.height <= maxH, `${a.height}px`);
+    check(`${title}: content starts by y=${maxTop}`, a.contentTop <= maxTop, `y=${a.contentTop}`);
   }
-  console.log(`        ${reclaimed}px reclaimed across ${VIEWS.length} tabs`);
 
   console.log('\n=== Each tab keeps its title and its controls ===');
   for (const [, title] of VIEWS) {
@@ -113,7 +100,6 @@ async function sweep(browser, url) {
   console.log('\n=== The eyebrow that only restated the title is gone ===');
   ['History', 'Health', 'Kitchen'].forEach(title => {
     check(`${title} has no eyebrow`, now.out[title].eyebrow === null, now.out[title].eyebrow);
-    check(`  (it had one before)`, before.out[title].eyebrow !== null, before.out[title].eyebrow);
   });
   // Overview's is a live week label, so removing it would cost information
   // rather than chrome.
@@ -122,12 +108,9 @@ async function sweep(browser, url) {
   console.log('\n=== Nothing was stranded ===');
   check('History still has both header buttons', now.out.History.buttons === 2,
     String(now.out.History.buttons));
-  check('and it had two before', before.out.History.buttons === 2, String(before.out.History.buttons));
 
   console.log('\n=== Modal sheets kept their own weight ===');
   check('a sheet title is still 28px', now.modalPx === 28, String(now.modalPx));
-  check('unchanged from before', now.modalPx === before.modalPx,
-    `${before.modalPx} -> ${now.modalPx}`);
 
   console.log('\n=== Nothing overflows ===');
   const ctx = await browser.newContext({ viewport: { width: 430, height: 932 } });

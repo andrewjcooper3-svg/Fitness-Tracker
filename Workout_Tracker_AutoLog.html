@@ -21,6 +21,17 @@
     --text: #eef2fb; --muted: #8b96ad; --accent: #5b8cff; --green: #34c795;
     --red: #ef5b6b; --amber: #f0b429; --blue: #5b8cff; --purple: #9c8cf5; --teal: #33c2c2;
     --nav-bg: rgba(16,20,31,0.82);
+    /* Chart ink, kept apart from the UI accents above.
+       The interface hues are picked to sit on buttons and checkmarks; on a
+       chart surface they land outside the readable lightness band, which is
+       why the same green that looks right on a tick read washed-out on a
+       dark bar. Three slots is the whole system: one identity hue, and a
+       met/under status pair. Every pair validates all-pairs for deuteran,
+       protan and tritan vision against this surface, in both themes. */
+    --chart-1: #3987e5;      /* series identity */
+    --chart-good: #199e70;   /* target met */
+    --chart-warn: #c98500;   /* under target */
+    --chart-2: #9085e9;      /* second series - caffeine/alcohol only */
     /* The monogram's own brown, lightened for the dark ground - the true
        #6B4229 goes muddy on #10141f. The light themes below use the real one. */
     --logo-ink: #C79570;
@@ -33,6 +44,7 @@
       --red: #d8434f; --amber: #c98a12; --blue: #3d6fe0; --purple: #7c6ae0; --teal: #1aa3a3;
       --nav-bg: rgba(244,246,251,0.82);
       --logo-ink: #6B4229;
+      --chart-1: #2a78d6; --chart-good: #1baf7a; --chart-warn: #eda100; --chart-2: #4a3aa7;
     }
   }
   :root[data-theme="light"] {
@@ -41,6 +53,7 @@
     --red: #d8434f; --amber: #c98a12; --blue: #3d6fe0; --purple: #7c6ae0; --teal: #1aa3a3;
     --nav-bg: rgba(244,246,251,0.82);
     --logo-ink: #6B4229;
+    --chart-1: #2a78d6; --chart-good: #1baf7a; --chart-warn: #eda100; --chart-2: #4a3aa7;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
@@ -2006,7 +2019,7 @@
       <div class="wt-chart-slots" id="wtChartSlots"></div>
       <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
       <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
-      <div class="wt-chart-detail" id="wtChartDetail">Tap or hover a bar for a breakdown</div>
+      <div class="wt-chart-detail" id="wtChartDetail"></div>
     </div>
   </div>
 
@@ -2062,7 +2075,6 @@
     </div>
   </div>
 
-  <div class="ov-note">Reflects what's checked off this week, saved on this device.<br>Automatically resets once a new week begins.</div>
 </div>
 
 <div id="view-calendar" class="app-view">
@@ -2072,7 +2084,6 @@
   </div>
   <div id="calStatus" class="cal-status"></div>
   <div id="calEventList"></div>
-  <div class="ov-note">Reads your iCloud Calendar via a small Cloudflare Worker (CalDAV bridge) - kept separate from the Sheet-logging backend since Apps Script can't make the requests CalDAV needs.</div>
 </div>
 
 <div id="view-music" class="app-view">
@@ -2156,7 +2167,6 @@
     </div>
   </div>
 
-  <div class="ov-note">Full playback control via Spotify's Web API - needs Premium and an active device (open Spotify somewhere first). Connect Spotify and set your workout playlist in Settings (gear icon, Overview tab).</div>
 </div>
 
 <div id="view-tracker" class="app-view">
@@ -2206,7 +2216,7 @@
     <div class="pu-ring-value" id="puYearValue">0 / 50,000</div>
   </div>
 </div>
-<div class="ov-note" style="margin-bottom:14px;">Baseline pace: 165/day, 6 days a week (Sunday off), toward 50,000 this year.<br>Year total starts from a 26,395 balance as of Jul 19, plus what's logged here since.</div>
+<div class="ov-note" style="margin-bottom:14px;">165/day, six days a week, toward 50,000 this year.</div>
 
 <div class="sp-shuffle-bar" onclick="shufflePlayWorkoutPlaylist()">
   <div class="sp-shuffle-icon">🔀</div>
@@ -2399,8 +2409,7 @@
     </div>
   </div>
 
-  <div class="ov-note" id="bhEmptyNote" style="display:none;">No Body Health data synced yet - once your Shortcut runs, sleep, HRV, resting heart rate, and workout data will start showing up here automatically. Nothing to enter manually.</div>
-  <div class="ov-note">Recovery and Sleep compare last night to your own rolling baseline, not a fixed scale. Strain blends real workout heart-rate data with your tracked training volume. Stress is HRV-trend based and will often track closely with Recovery.</div>
+  <div class="ov-note" id="bhEmptyNote" style="display:none;">Nothing synced yet.</div>
 </div>
 
 <div id="view-stats" class="app-view">
@@ -2490,8 +2499,8 @@
       <div class="stats-chart-labels" id="hxCompletionLabels"></div>
       <div class="stats-chart-detail" id="hxCompletionDetail"></div>
       <div class="hx-legend">
-        <span class="hx-key"><span class="hx-swatch" style="background:var(--green)"></span>90% or more of the plan</span>
-        <span class="hx-key"><span class="hx-swatch" style="background:var(--amber)"></span>Under 90%</span>
+        <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-good)"></span>90% or more of the plan</span>
+        <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-warn)"></span>Under 90%</span>
       </div>
     </div>
 
@@ -2552,10 +2561,10 @@
         <div class="stats-chart-labels" id="hxExerciseLabels"></div>
         <div class="stats-chart-detail" id="hxExerciseDetail"></div>
         <div class="hx-legend">
-          <span class="hx-key"><span class="hx-swatch" style="background:var(--green)"></span>All clean</span>
-          <span class="hx-key"><span class="hx-swatch" style="background:var(--amber)"></span>Some tough</span>
+          <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-good)"></span>All clean</span>
+          <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-warn)"></span>Some tough</span>
           <span class="hx-key"><span class="hx-swatch" style="background:var(--red)"></span>Too tough</span>
-          <span class="hx-key"><span class="hx-swatch" style="background:var(--accent)"></span>Untagged</span>
+          <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-1)"></span>Untagged</span>
         </div>
       </div>
 
@@ -2588,8 +2597,8 @@
       <svg viewBox="0 0 320 176" class="stats-chart" id="ibCompChart" preserveAspectRatio="none"></svg>
       <div class="stats-chart-detail" id="ibCompDetail"></div>
       <div class="hx-legend">
-        <span class="hx-key"><span class="hx-swatch" style="background:var(--accent)"></span>Lean body mass</span>
-        <span class="hx-key"><span class="hx-swatch" style="background:var(--amber)"></span>Body fat</span>
+        <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-1)"></span>Lean body mass</span>
+        <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-warn)"></span>Body fat</span>
       </div>
     </div>
 
@@ -2604,7 +2613,7 @@
 
     <div class="stats-card">
       <div class="stats-card-title">Segmental lean</div>
-      <div class="hx-card-note">Lean mass in each segment against the InBody ideal for your height. Facing you, so screen-left is your right side.</div>
+      <div class="hx-card-note">Facing you — screen-left is your right side.</div>
       <div class="hx-body-wrap" id="ibBodyDiagram"></div>
       <div class="hx-body-legend">
         <span>80%</span>
@@ -2629,7 +2638,6 @@
     </div>
   </div>
 
-  <div class="ov-note" id="hxLegacyNote">Pushup totals come from your daily ledger. Weight trend appears once you've logged at least two weigh-ins - tap the Weight Trend card to log one.</div>
 </div>
 
 <div id="view-kitchen" class="app-view">
@@ -2721,7 +2729,6 @@
       <input type="text" id="recipeImage" class="config-input" placeholder="Image URL (optional)" style="width:100%; box-sizing:border-box; margin-bottom:8px;">
       <textarea id="recipeInstructions" class="config-input" placeholder="Instructions" style="width:100%; box-sizing:border-box; min-height:70px; margin-bottom:10px; resize:vertical; font-family:var(--font);"></textarea>
       <div class="sp-config-label" style="margin:0 0 2px;">Ingredients</div>
-      <div class="ov-mini-empty" style="margin:0 0 8px;">Matched to your inventory by name automatically - the dropdown is only needed if a name doesn't match (e.g. recipe says "Pasta," inventory has "Fusilli").</div>
       <div id="ingredientEditorList"></div>
       <button class="kitchen-btn-sm" style="width:100%; margin-bottom:10px;" onclick="addIngredientRow()">+ Add Ingredient</button>
       <div style="display:flex; gap:8px;">
@@ -2943,7 +2950,6 @@
 
       <div class="config-box">
         <div class="config-title" style="margin-bottom:4px;">Feeding before you go out</div>
-        <div class="ov-mini-empty" style="margin:0 0 8px;">A leaner feed takes longer to peak. Say how long until you will next see it and this picks the ratio that gets the peak close to your return instead of hours before it.</div>
         <div class="sd-field-row">
           <div class="sd-field">
             <div class="sd-field-label">Back in (hours)</div>
@@ -2982,7 +2988,6 @@
     </div>
   </div>
 
-  <div class="ov-note">Inventory and recipes are saved on this device. Recipe search always pulls from TheMealDB (free, no account) - add free Spoonacular/Edamam keys in Settings (gear icon, Overview tab) for many more results.</div>
 </div>
 
 </div>
@@ -3022,7 +3027,6 @@
         <button data-pref="light" onclick="setThemePref('light')">Light</button>
         <button data-pref="dark" onclick="setThemePref('dark')">Dark</button>
       </div>
-      <div class="ov-note" style="margin-top:8px; text-align:left;">"System" follows your phone's Light/Dark setting automatically.</div>
     </div>
     <div class="config-box" style="margin-bottom:0;">
       <div class="config-title" style="margin-bottom:10px;">Pushup Goals</div>
@@ -3058,11 +3062,9 @@
         <div class="sp-config-label" style="margin:0 0 6px;">Daily goal (oz)</div>
         <input type="number" id="settingsWaterGoal" class="config-input" min="0" step="1">
       </div>
-      <div class="ov-note" style="margin:0 0 4px; text-align:left;">Per-drink amounts have their own +/- right on the Water widget now.</div>
       <button class="ov-open-btn" onclick="saveWaterGoalSetting()" style="margin-top:12px;">Save</button>
       <div class="config-status" id="waterSettingsStatus"></div>
     </div>
-    <div class="ov-note">Changes apply immediately across Overview, Pushups, and Stats.</div>
 
     <div class="config-box">
       <div class="config-title" style="margin-bottom:10px;">API Connections</div>
@@ -3122,7 +3124,7 @@
           <input type="text" id="spoonacularApiKey" class="config-input" placeholder="Spoonacular API key">
           <button class="config-save" onclick="saveSpoonacularApiKey()">Save</button>
         </div>
-        <div class="config-status" id="spoonacularConfigStatus">Optional - TheMealDB alone is a small database. A free key at spoonacular.com/food-api adds thousands more results to every search.</div>
+        <div class="config-status" id="spoonacularConfigStatus">Optional. Free key at spoonacular.com/food-api.</div>
 
         <div class="sp-config-label">Edamam</div>
         <div class="config-row">
@@ -3132,7 +3134,7 @@
           <input type="text" id="edamamAppKey" class="config-input" placeholder="Edamam App Key">
           <button class="config-save" onclick="saveEdamamKeys()">Save</button>
         </div>
-        <div class="config-status" id="edamamConfigStatus">Optional - a free App ID + App Key at edamam.com/edamam-recipe-api adds another large database. Note: Edamam only gives ingredients + a link to the source page, not full instructions.</div>
+        <div class="config-status" id="edamamConfigStatus">Optional. Free key at edamam.com/edamam-recipe-api.</div>
       </div>
     </div>
 
@@ -3160,9 +3162,6 @@
   <div class="event-modal-sheet" onclick="event.stopPropagation()">
     <div class="event-modal-handle"></div>
     <div class="ov-page-title" style="margin-bottom:2px;">Arrange Overview</div>
-    <div class="event-modal-relative" style="margin-bottom:14px;">
-      Reorder with the arrows, tap a name to show or hide it. Saved on this device.
-    </div>
     <div id="hxLayoutList"></div>
     <div class="hx-layout-actions">
       <button class="hx-layout-reset" onclick="resetHistoryLayout()">Reset to default</button>
@@ -3198,7 +3197,6 @@
 
     <div class="hx-ratios" id="hxBalanceRatios"></div>
     <div class="hx-balance-grid" id="hxBalanceCards"></div>
-    <div class="hx-card-note" id="hxBalanceNote" style="margin-top:12px;"></div>
     <button class="event-modal-close" onclick="closeMuscleBalanceModal(event)">Close</button>
   </div>
 </div>
@@ -3247,7 +3245,6 @@
       <div id="weightHistoryList"></div>
     </div>
 
-    <div class="ov-note">Enter manually, or set up an Apple Shortcut to auto-log your Fitdays weigh-in from Apple Health — see the setup steps for the URL to POST to.</div>
     <button class="event-modal-close" onclick="closeWeightDetailModal(event)" style="margin-top:10px;">Close</button>
   </div>
 </div>
@@ -3315,7 +3312,6 @@
     <div class="dj-playlist-list" id="djTopTracks"><div class="sp-playlists-empty">Connect Spotify to see your top tracks</div></div>
     <div class="dj-section-label" style="margin-top:16px;">Top Artists</div>
     <div class="dj-top-artists-row" id="djTopArtists"></div>
-    <div class="ov-note" style="margin-top:10px;">Spotify's API only offers these fixed windows (no exact "this week") and has no top-podcasts equivalent - search the Music tab to find and play a podcast episode directly instead.</div>
     <button class="event-modal-close" onclick="closeDjTopModal(event)" style="margin-top:10px;">Close</button>
   </div>
 </div>
@@ -4121,16 +4117,20 @@ const CHART_TICKS = 3;        // intervals, so four gridlines including zero
 
 // Ticks land on round numbers: 0 / 5k / 10k / 15k reads instantly where
 // 0 / 4.7k / 9.4k / 14.1k does not.
-function chartNiceStep_(rough) {
+function chartNiceStep_(rough, integer) {
   if (!(rough > 0)) return 1;
   const mag = Math.pow(10, Math.floor(Math.log10(rough)));
-  return ([1, 2, 2.5, 5, 10].find(m => m * mag >= rough) || 10) * mag;
+  const step = ([1, 2, 2.5, 5, 10].find(m => m * mag >= rough) || 10) * mag;
+  // A count cannot be half a thing. Without this a chart topping out at 1
+  // gets a 0.5 step, and since the tick formatter rounds, the axis reads
+  // "1 / 1 / 0" - two identical labels at different heights.
+  return integer ? Math.max(1, Math.round(step)) : step;
 }
 
-function chartScale_(lo, hi, zeroBased) {
+function chartScale_(lo, hi, zeroBased, integer) {
   if (zeroBased) lo = 0;
   if (!(hi > lo)) hi = lo + 1;
-  const step = chartNiceStep_((hi - lo) / CHART_TICKS);
+  const step = chartNiceStep_((hi - lo) / CHART_TICKS, integer);
   const base = zeroBased ? 0 : Math.floor(lo / step) * step;
   let top = base;
   while (top < hi) top += step;
@@ -4232,7 +4232,7 @@ function renderColumnChart_(svgId, points, opts) {
   if (!points.length) { svg.innerHTML = ''; return null; }
 
   const raw = Math.max(opts.minTop || 0, ...points.map(p => p.value));
-  const scale = chartScale_(0, raw, true);
+  const scale = chartScale_(0, raw, true, !!opts.integer);
   const fmtTick = opts.fmtTick || chartCompact_;
   const fmtValue = opts.fmtValue || chartCompact_;
   const F = chartFrame_(box, scale, fmtTick);
@@ -4262,7 +4262,7 @@ function renderColumnChart_(svgId, points, opts) {
     out += `<g class="chart-band">`;
     out += `<rect class="chart-band-bg" x="${(cx - band / 2 + 1).toFixed(1)}" y="${F.y0 - CHART_PAD.top + 2}" width="${(band - 2).toFixed(1)}" height="${(F.y1 - F.y0 + CHART_PAD.top + 4).toFixed(1)}" rx="7"></rect>`;
     if (p.value > 0) {
-      out += `<path d="${chartColumnPath_(x, y, barW, F.y1)}" fill="${p.color || 'var(--accent)'}"></path>`;
+      out += `<path d="${chartColumnPath_(x, y, barW, F.y1)}" fill="${p.color || 'var(--chart-1)'}"></path>`;
     } else {
       // An empty period gets a stub on the baseline, not a full-height
       // block pretending to be a track.
@@ -4294,7 +4294,7 @@ function renderLineChart_(svgId, points, opts) {
   const vals = points.map(p => p.value);
   const lo = Math.min(...vals), hi = Math.max(...vals);
   const pad = (hi - lo) * 0.15 || Math.max(1, hi * 0.05);
-  const scale = chartScale_(opts.zeroBased ? 0 : lo - pad, hi + pad, !!opts.zeroBased);
+  const scale = chartScale_(opts.zeroBased ? 0 : lo - pad, hi + pad, !!opts.zeroBased, !!opts.integer);
   const fmtTick = opts.fmtTick || chartCompact_;
   const fmtValue = opts.fmtValue || chartCompact_;
   const F = chartFrame_(box, scale, fmtTick);
@@ -4305,8 +4305,8 @@ function renderLineChart_(svgId, points, opts) {
   const d = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
 
   let out = F.svg;
-  out += `<path d="${d}L${xy[xy.length - 1][0].toFixed(1)} ${F.y1.toFixed(1)}L${xy[0][0].toFixed(1)} ${F.y1.toFixed(1)}Z" class="chart-area" fill="${opts.color || 'var(--accent)'}"></path>`;
-  out += `<path d="${d}" class="chart-line" stroke="${opts.color || 'var(--accent)'}"></path>`;
+  out += `<path d="${d}L${xy[xy.length - 1][0].toFixed(1)} ${F.y1.toFixed(1)}L${xy[0][0].toFixed(1)} ${F.y1.toFixed(1)}Z" class="chart-area" fill="${opts.color || 'var(--chart-1)'}"></path>`;
+  out += `<path d="${d}" class="chart-line" stroke="${opts.color || 'var(--chart-1)'}"></path>`;
 
   const peak = vals.reduce((b, v, i) => (v > vals[b] ? i : b), 0);
   const labelled = new Set([peak, points.length - 1]);
@@ -4315,7 +4315,7 @@ function renderLineChart_(svgId, points, opts) {
     const [x, y] = xy[i];
     out += `<g class="chart-band">`;
     out += `<line class="chart-cross" x1="${x.toFixed(1)}" y1="${F.y0 - 6}" x2="${x.toFixed(1)}" y2="${F.y1.toFixed(1)}"></line>`;
-    out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${p.color || opts.color || 'var(--accent)'}" class="chart-dot"></circle>`;
+    out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${p.color || opts.color || 'var(--chart-1)'}" class="chart-dot"></circle>`;
     if (labelled.has(i)) out += chartAxisText_(x, Math.max(11, y - 10), fmtValue(p.value, p), 'middle', 'chart-value');
     if (points.length <= 14 || i % 2 === 0) out += chartAxisText_(x, box.h - 7, p.label, 'middle', 'chart-tick');
     out += `<rect class="chart-hit" x="${(x - band / 2).toFixed(1)}" y="0" width="${band.toFixed(1)}" height="${box.h}"></rect>`;
@@ -4339,7 +4339,7 @@ function renderStatsPushupChart() {
       label: w.weekStart.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
       value: w.total,
       // Status, not identity: green means the week's target was met.
-      color: w.total >= weeklyTarget ? 'var(--green)' : 'var(--accent)',
+      color: w.total >= weeklyTarget ? 'var(--chart-good)' : 'var(--chart-1)',
       key: dateKey(w.weekStart),
       tip: `<b>Week of ${escapeHtml_(w.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))}</b><br>`
          + `${w.total.toLocaleString()} reps <span class="k">· ${pct}% of ${weeklyTarget.toLocaleString()}</span>`
@@ -4507,7 +4507,7 @@ function renderWeightLineChart(svgId, labelsId, maxEntries, detailId) {
     return {
       label: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
       value: e.weight,
-      color: extreme ? 'var(--accent)' : 'var(--teal)',
+      color: 'var(--chart-1)',
       tip: `<b>${escapeHtml_(long)}</b><br>${e.weight.toFixed(1)} lb`
          + (e.bodyFat != null ? ` <span class="k">· ${e.bodyFat}% BF</span>` : '')
          + (diff === null ? '' : ` <span class="k">· ${diff > 0 ? '+' : ''}${diff} since last</span>`),
@@ -4516,7 +4516,7 @@ function renderWeightLineChart(svgId, labelsId, maxEntries, detailId) {
   });
 
   renderLineChart_(svgId, points, {
-    color: 'var(--teal)',
+    color: 'var(--chart-1)',
     detailId: detailId,
     fmtTick: v => v.toFixed(0),
     fmtValue: v => v.toFixed(1)
@@ -4524,7 +4524,7 @@ function renderWeightLineChart(svgId, labelsId, maxEntries, detailId) {
 
   if (detailId) {
     const detailEl = document.getElementById(detailId);
-    if (detailEl) detailEl.textContent = 'Tap or hover a point for that weigh-in';
+    if (detailEl) detailEl.textContent = '';
   }
 }
 
@@ -4619,10 +4619,6 @@ function showHistorySection(name) {
     const el = document.getElementById('hxSection' + k.charAt(0).toUpperCase() + k.slice(1));
     if (el) el.style.display = k === name ? '' : 'none';
   });
-  // The absorbed Pushups and Weight cards live inside the Overview section,
-  // so they hide with it. Their footnote sits outside and needs telling.
-  const note = document.getElementById('hxLegacyNote');
-  if (note) note.style.display = name === 'overview' ? '' : 'none';
   // The range chips and the sheet-status line scope the workout history.
   // On the Body segment they describe nothing that is on screen.
   ['hxRange', 'hxStatus'].forEach(id => {
@@ -5313,8 +5309,8 @@ function renderInbodyCompChart_() {
     out += `<g class="chart-band">`;
     out += `<rect class="chart-band-bg" x="${(cx - band / 2 + 1).toFixed(1)}" y="2" width="${(band - 2).toFixed(1)}" height="${(F.y1 + 4).toFixed(1)}" rx="7"></rect>`;
     // Lean sits on the baseline; fat rides on top with a 2px surface gap.
-    out += `<path d="${chartColumnPath_(x, yLean, barW, F.y1)}" fill="var(--accent)"></path>`;
-    out += `<path d="${chartColumnPath_(x, yFat, barW, yLean - CHART_MIN_GAP)}" fill="var(--amber)"></path>`;
+    out += `<path d="${chartColumnPath_(x, yLean, barW, F.y1)}" fill="var(--chart-1)"></path>`;
+    out += `<path d="${chartColumnPath_(x, yFat, barW, yLean - CHART_MIN_GAP)}" fill="var(--chart-warn)"></path>`;
     out += chartAxisText_(cx, Math.max(11, yFat - 6), s.weight.toFixed(1), 'middle', 'chart-value');
     out += chartAxisText_(cx, box.h - 7, inbodyDate_(s), 'middle', 'chart-tick');
     out += `<rect class="chart-hit" x="${(cx - band / 2).toFixed(1)}" y="0" width="${band.toFixed(1)}" height="${box.h}"></rect>`;
@@ -5570,13 +5566,11 @@ function renderMuscleBalance_() {
   const body = document.getElementById('hxBodyDiagram');
   const cards = document.getElementById('hxBalanceCards');
   const ratios = document.getElementById('hxBalanceRatios');
-  const note = document.getElementById('hxBalanceNote');
 
   if (!total) {
     body.innerHTML = '';
     cards.innerHTML = '<div class="hx-empty">No completed sets in this window.</div>';
     ratios.innerHTML = '';
-    note.textContent = '';
     return;
   }
 
@@ -5604,9 +5598,6 @@ function renderMuscleBalance_() {
       <div class="hx-balance-track"><span style="width:${(m.sets / max * 100).toFixed(1)}%"></span></div>
     </div>`).join('');
 
-  note.textContent = hxMuscleWeighted_
-    ? 'Weighted: each set is split across the muscles the movement actually trains, so a bench press counts partly towards triceps and shoulders. Shares are estimates, not physiology.'
-    : 'Primary only: each set counts once, towards the movement\'s main muscle. Simple, but it files a squat entirely under quads.';
 }
 
 /* This card carries its own time window on top of the tab's range chips.
@@ -5676,16 +5667,8 @@ function renderHistoryMuscles_(rows) {
   const fmtDay = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const when = win ? `${fmtDay(win.monday)} – ${fmtDay(win.sunday)}` : rangeLabel.toLowerCase();
   if (note) {
-    /* Weighted mode is the only thing that can produce a count like "1.8
-       sets", and a reader who did not turn it on has no way to guess that -
-       the obvious wrong theory is that a set marked "tough" counts as less
-       than one. It does not: quality tags are recorded per set and never
-       touch these totals. So the note says outright where the fractions
-       come from whenever the mode is on. */
     note.textContent = total
-      ? hxMuscleWeighted_
-        ? `${muscleSetsLabel_(total)}, ${when} — weighted, so each set is split across the muscles it trains and counts are fractional. Tap a group to see what is in it.`
-        : `${muscleSetsLabel_(total)}, ${when} — tap a group to see what is in it`
+      ? `${muscleSetsLabel_(total)}, ${when}${hxMuscleWeighted_ ? ' · weighted' : ''}`
       : `Nothing completed ${win ? when : 'in this range'} yet.`;
   }
   if (!list.length) {
@@ -5814,8 +5797,8 @@ function qualityMixBar_(g, y, r) {
   const words = [g && `${g} clean`, y && `${y} tough`, r && `${r} too tough`]
     .filter(Boolean).join(' · ');
   return `<span class="hx-qmix" title="${escapeHtml_(words)}" aria-label="${escapeHtml_(words)}">`
-    + (g ? `<i style="width:${pct(g)};background:var(--green)"></i>` : '')
-    + (y ? `<i style="width:${pct(y)};background:var(--amber)"></i>` : '')
+    + (g ? `<i style="width:${pct(g)};background:var(--chart-good)"></i>` : '')
+    + (y ? `<i style="width:${pct(y)};background:var(--chart-warn)"></i>` : '')
     + (r ? `<i style="width:${pct(r)};background:var(--red)"></i>` : '')
     + `</span>`;
 }
@@ -5845,7 +5828,7 @@ function renderHistoryWeekBars_(svgId, labelsId, detailId, weeks, valueFor, form
     return {
       label: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
       value: valueFor(w),
-      color: colourFor ? colourFor(w) : 'var(--accent)',
+      color: colourFor ? colourFor(w) : 'var(--chart-1)',
       week: w.week,
       // Every column reports the whole week, whichever chart you are on -
       // hovering the volume chart and being told only the volume you can
@@ -5882,7 +5865,7 @@ function renderHistoryOverview_(rows) {
 
   renderHistoryWeekBars_('hxFreqChart', 'hxFreqLabels', 'hxFreqDetail', weeks,
     w => Object.keys(w.days).length, v => String(v), null,
-    { fmtTick: v => String(Math.round(v)) });
+    { integer: true, fmtTick: v => String(Math.round(v)) });
   renderHistoryWeekBars_('hxVolumeChart', 'hxVolumeLabels', 'hxVolumeDetail', weeks,
     w => w.volume, v => chartCompact_(v));
   // Completion is the one chart where colour means good/bad rather than
@@ -5890,14 +5873,14 @@ function renderHistoryOverview_(rows) {
   // its own is exactly what a red-green reader cannot use.
   renderHistoryWeekBars_('hxCompletionChart', 'hxCompletionLabels', 'hxCompletionDetail', weeks,
     w => (w.sets ? Math.round(w.done / w.sets * 100) : 0), v => v + '%',
-    w => (w.sets && w.done / w.sets >= 0.9) ? 'var(--green)' : 'var(--amber)',
+    w => (w.sets && w.done / w.sets >= 0.9) ? 'var(--chart-good)' : 'var(--chart-warn)',
     { minTop: 100, targetValue: 100, targetLabel: 'all planned sets',
       fmtTick: v => Math.round(v) + '%' });
 
   const f = document.getElementById('hxFreqDetail');
   if (f && !f.textContent) f.textContent = 'Days trained each week';
   const d = document.getElementById('hxVolumeDetail');
-  if (d && !d.textContent) d.textContent = 'Weight moved each week — hover a column';
+  if (d && !d.textContent) d.textContent = '';
   const c = document.getElementById('hxCompletionDetail');
   if (c && !c.textContent) c.textContent = 'Completed sets against what was planned';
 }
@@ -6085,8 +6068,8 @@ function renderHistoryExercise() {
   if (labelsEl) labelsEl.innerHTML = '';
 
   const qualityOf = sn => sn.red ? ['var(--red)', 'a set was too tough']
-    : sn.yellow ? ['var(--amber)', 'some sets were tough']
-    : sn.green ? ['var(--green)', 'all clean'] : ['var(--accent)', 'untagged'];
+    : sn.yellow ? ['var(--chart-warn)', 'some sets were tough']
+    : sn.green ? ['var(--chart-good)', 'all clean'] : ['var(--chart-1)', 'untagged'];
 
   const points = shown.map(sn => {
     const d = new Date(sn.date + 'T00:00:00');
@@ -7757,31 +7740,31 @@ function renderStarterChart_(st) {
 
       if (!c.riseX) {
         // No height, but you still looked - worth a tick on the time axis.
-        marks += `<line x1="${cx.toFixed(1)}" y1="${H - PADB - 6}" x2="${cx.toFixed(1)}" y2="${H - PADB}" stroke="var(--green)" stroke-width="2"></line>`;
+        marks += `<line x1="${cx.toFixed(1)}" y1="${H - PADB - 6}" x2="${cx.toFixed(1)}" y2="${H - PADB}" stroke="var(--chart-good)" stroke-width="2"></line>`;
         return;
       }
 
       const cy = y(Math.min(c.riseX, yMax));
       if (c.state === 'rising') {
         // Caret: at least this high at that moment, and heading up.
-        marks += `<path d="M${(cx - 4).toFixed(1)},${(cy + 3).toFixed(1)} L${cx.toFixed(1)},${(cy - 3).toFixed(1)} L${(cx + 4).toFixed(1)},${(cy + 3).toFixed(1)}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`;
+        marks += `<path d="M${(cx - 4).toFixed(1)},${(cy + 3).toFixed(1)} L${cx.toFixed(1)},${(cy - 3).toFixed(1)} L${(cx + 4).toFixed(1)},${(cy + 3).toFixed(1)}" fill="none" stroke="var(--chart-good)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`;
       } else if (c.state === 'peak') {
         // Filled dot: a peak you actually watched, at the time you saw it.
-        marks += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="var(--green)"></circle>`;
+        marks += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="var(--chart-good)"></circle>`;
       } else if (c.state === 'falling' || c.state === 'collapsed') {
         // Downward caret: it was this high and already past the top.
-        marks += `<path d="M${(cx - 4).toFixed(1)},${(cy - 3).toFixed(1)} L${cx.toFixed(1)},${(cy + 3).toFixed(1)} L${(cx + 4).toFixed(1)},${(cy - 3).toFixed(1)}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`;
+        marks += `<path d="M${(cx - 4).toFixed(1)},${(cy - 3).toFixed(1)} L${cx.toFixed(1)},${(cy + 3).toFixed(1)} L${(cx + 4).toFixed(1)},${(cy - 3).toFixed(1)}" fill="none" stroke="var(--chart-good)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`;
       } else {
         // Height with no state - right height, uncertain when.
-        marks += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="2 2"></circle>`;
+        marks += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="none" stroke="var(--chart-good)" stroke-width="1.5" stroke-dasharray="2 2"></circle>`;
       }
     });
   });
 
   const nowX = x(now).toFixed(1);
   svg.innerHTML = grid + marks
-    + (solid ? `<path d="${solid}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"></path>` : '')
-    + (dashed ? `<path d="${dashed}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 4" opacity="0.6" stroke-linejoin="round"></path>` : '')
+    + (solid ? `<path d="${solid}" fill="none" stroke="var(--chart-1)" stroke-width="2" stroke-linejoin="round"></path>` : '')
+    + (dashed ? `<path d="${dashed}" fill="none" stroke="var(--chart-1)" stroke-width="2" stroke-dasharray="4 4" opacity="0.6" stroke-linejoin="round"></path>` : '')
     + `<line x1="${nowX}" y1="${PADT - 4}" x2="${nowX}" y2="${H - PADB}" stroke="var(--text)" stroke-width="1" opacity="0.45"></line>`;
 
   // Axis labels live outside the SVG so they are not stretched by
@@ -9463,7 +9446,7 @@ function saveSpoonacularApiKey() {
   localStorage.setItem(STORAGE_SPOONACULAR_KEY, val);
   document.getElementById('spoonacularConfigStatus').textContent = val
     ? '✓ Key saved - Spoonacular results included in every search.'
-    : 'Optional - TheMealDB alone is a small database. A free key at spoonacular.com/food-api adds thousands more results to every search.';
+    : 'Optional. Free key at spoonacular.com/food-api.';
   syncApiKeysToRemote();
 }
 function loadSpoonacularApiKey() {
@@ -9493,7 +9476,7 @@ function saveEdamamKeys() {
   localStorage.setItem(STORAGE_EDAMAM_APP_KEY, appKey);
   document.getElementById('edamamConfigStatus').textContent = (appId && appKey)
     ? '✓ Keys saved - Edamam results included in every search.'
-    : 'Optional - a free App ID + App Key at edamam.com/edamam-recipe-api adds another large database. Note: Edamam only gives ingredients + a link to the source page, not full instructions.';
+    : 'Optional. Free key at edamam.com/edamam-recipe-api.';
   syncApiKeysToRemote();
 }
 function loadEdamamKeys() {
@@ -10535,20 +10518,20 @@ function renderBodyHealthLineChart_(svgId, labelsId, points) {
     return;
   }
 
-  const values = points.map(p => p.value);
-  const minV = Math.min(...values), maxV = Math.max(...values);
-  const pad = Math.max(0.1, (maxV - minV) * 0.15);
-  const lo = minV - pad, hi = maxV + pad;
-  const chartW = 320, chartH = 132;
-  const stepX = chartW / (points.length - 1);
-  const yFor = v => chartH - ((v - lo) / (hi - lo)) * chartH;
-
-  const linePoints = points.map((p, i) => `${(i * stepX).toFixed(1)},${yFor(p.value).toFixed(1)}`).join(' ');
-  const dots = points.map((p, i) => `<circle cx="${(i * stepX).toFixed(1)}" cy="${yFor(p.value).toFixed(1)}" r="3.5" fill="var(--teal)"></circle>`).join('');
-  svg.innerHTML = `<polyline points="${linePoints}" fill="none" stroke="var(--teal)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>${dots}`;
-
-  const fmt = p => new Date(p.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) + ' · ' + p.value.toFixed(0);
-  labelsEl.innerHTML = `<span>${fmt(points[0])}</span><span>${fmt(points[points.length - 1])}</span>`;
+  // Through the shared renderer rather than its own polyline: it was the
+  // last chart still drawing into a fixed 320-wide box and stretching to
+  // fit, which fattens the stroke and ovals the dots on anything wider
+  // than a phone. It also carried no axis and no hover, so it read as a
+  // different product from every other chart in the app.
+  labelsEl.innerHTML = '';
+  renderLineChart_(svgId, points.map(p => {
+    const d = new Date(p.date + 'T00:00:00');
+    return {
+      label: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }),
+      value: p.value,
+      tip: `<b>${escapeHtml_(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))}</b><br>${Math.round(p.value)}`
+    };
+  }), { color: 'var(--chart-2)', fmtTick: v => v.toFixed(0), fmtValue: v => v.toFixed(0) });
 }
 
 function openBodyHealthDetailModal(type) {
@@ -10581,7 +10564,7 @@ function openBodyHealthDetailModal(type) {
     result = computeStressScore();
     label = 'Stress';
     bodyHTML = result
-      ? `<div class="event-modal-row"><div class="event-modal-row-label">HRV Trend</div><div class="event-modal-row-value">3-day avg ${result.recentAvg.toFixed(0)} ms vs. prior ${result.priorAvg.toFixed(0)} ms</div></div><div class="ov-mini-empty">Not a fully distinct signal from Recovery yet - a truly separate Stress reading needs continuous daytime HRV, not one overnight reading.</div>`
+      ? `<div class="event-modal-row"><div class="event-modal-row-label">HRV Trend</div><div class="event-modal-row-value">3-day avg ${result.recentAvg.toFixed(0)} ms vs. prior ${result.priorAvg.toFixed(0)} ms</div></div>`
       : '<div class="ov-mini-empty">Not enough HRV history yet.</div>';
   }
 
@@ -11712,7 +11695,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-25-tighter-heads';
+const APP_BUILD_VERSION = '2026-08-25-chart-system';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -12598,15 +12581,15 @@ function renderCaffeineChart_(doses, now) {
   svg.innerHTML = `
     <line x1="${PAD}" y1="${yFor(caffThreshold, caffPeak).toFixed(1)}" x2="${W - PAD}" y2="${yFor(caffThreshold, caffPeak).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"></line>
     ${hasBac ? `<line x1="${PAD}" y1="${yFor(BAC_LEGAL_LIMIT, bacPeak).toFixed(1)}" x2="${W - PAD}" y2="${yFor(BAC_LEGAL_LIMIT, bacPeak).toFixed(1)}" stroke="var(--red)" stroke-width="1" stroke-dasharray="2 4" opacity="0.5"></line>` : ''}
-    ${series(p => p.mg, caffPeak, 'var(--amber)')}
-    ${hasBac ? series(p => p.bac, bacPeak, 'var(--purple)') : ''}
+    ${series(p => p.mg, caffPeak, 'var(--chart-warn)')}
+    ${hasBac ? series(p => p.bac, bacPeak, 'var(--chart-2)') : ''}
     <line x1="${nowX}" y1="${PAD}" x2="${nowX}" y2="${H - PAD}" stroke="var(--muted)" stroke-width="1" opacity="0.5"></line>
   `;
 
   const legend = document.getElementById('caffLegend');
   if (legend) {
-    legend.innerHTML = `<span class="caff-key"><span class="caff-key-dot" style="background:var(--amber)"></span>Caffeine (mg)</span>`
-      + (hasBac ? `<span class="caff-key"><span class="caff-key-dot" style="background:var(--purple)"></span>Alcohol (BAC)</span>` : '');
+    legend.innerHTML = `<span class="caff-key"><span class="caff-key-dot" style="background:var(--chart-warn)"></span>Caffeine (mg)</span>`
+      + (hasBac ? `<span class="caff-key"><span class="caff-key-dot" style="background:var(--chart-2)"></span>Alcohol (BAC)</span>` : '');
   }
 }
 
@@ -12740,7 +12723,9 @@ function renderWaterHourlyChart(entries) {
   });
   const slotTotals = waterChartHourEntries_.map(list => list.reduce((sum, e) => sum + e.hydrationOz, 0));
 
-  const chartW = 320, chartH = 60, barGap = opt.gap;
+  // Measured, not stretched - same reason as the pushup row above.
+  const box = fitChartBox_(svg, 320, 64);
+  const chartW = box.w, chartH = Math.max(40, box.h - 4), barGap = opt.gap;
   const barW = (chartW - barGap * (slotCount - 1)) / slotCount;
   // Finer slots hold less each, so a fixed floor would flatten the chart.
   // Scaling the floor with the slot width keeps the shape comparable
@@ -12756,7 +12741,7 @@ function renderWaterHourlyChart(entries) {
     // Theme tokens, not fixed white: the water card was originally a blue
     // gradient that white bars read well against, but it's a plain surface
     // now, so white-on-white left this chart invisible in light mode.
-    const color = oz > 0 ? 'var(--teal)' : 'var(--surface2)';
+    const color = oz > 0 ? 'var(--chart-1)' : 'var(--surface2)';
     const rx = Math.min(1.5, barW / 2);
     bars += `<rect x="${x.toFixed(2)}" y="${y.toFixed(1)}" width="${barW.toFixed(2)}" height="${hgt.toFixed(1)}" rx="${rx.toFixed(2)}" fill="${color}"></rect>`;
     const hx = Math.max(0, Math.min(chartW - hitW, x + barW / 2 - hitW / 2));
@@ -12765,7 +12750,7 @@ function renderWaterHourlyChart(entries) {
   svg.innerHTML = bars;
 
   const detailEl = document.getElementById('wtChartDetail');
-  if (detailEl) detailEl.textContent = 'Tap or hover a bar for a breakdown';
+  if (detailEl) detailEl.textContent = '';
 }
 
 // Groups an hour's entries by drink type (a busy hour might have two
@@ -13024,7 +13009,10 @@ function renderPushupWeekChart_(days) {
   if (!svg) return;
   pushupChartDays_ = days;
 
-  const chartW = 320, chartH = 46, barGap = 6;
+  // Measured, not stretched: at a fixed 320 wide this bar row scaled
+  // sideways to fit its card, which rounded the 2px corners into ovals.
+  const box = fitChartBox_(svg, 320, 46);
+  const chartW = box.w, chartH = box.h, barGap = 6;
   const barW = (chartW - barGap * (days.length - 1)) / days.length;
   // Floor of 10 keeps an all-zero week from rendering one stray rep as a
   // full-height bar; the target is in the scale so the goal line is always
@@ -13043,7 +13031,7 @@ function renderPushupWeekChart_(days) {
     // 1px sliver with nothing to show which day it belongs to.
     out += `<rect x="${x.toFixed(2)}" y="0" width="${barW.toFixed(2)}" height="${chartH}" rx="2" fill="var(--surface2)" opacity="0.5"></rect>`;
     const met = d.pushupTarget > 0 && d.pushupTotal >= d.pushupTarget;
-    const color = d.pushupTotal > 0 ? (met ? 'var(--teal)' : '#e0916f') : 'var(--surface2)';
+    const color = d.pushupTotal > 0 ? (met ? 'var(--chart-good)' : 'var(--chart-warn)') : 'var(--surface2)';
     out += `<rect x="${x.toFixed(2)}" y="${y.toFixed(1)}" width="${barW.toFixed(2)}" height="${hgt.toFixed(1)}" rx="2" fill="${color}"></rect>`;
     if (d.pushupTarget > 0) {
       const ty = chartH - (d.pushupTarget / maxVal) * chartH;
@@ -13060,7 +13048,7 @@ function renderPushupWeekChart_(days) {
     ).join('');
   }
   const detailEl = document.getElementById('ovPushupChartDetail');
-  if (detailEl) detailEl.textContent = 'Tap or hover a day for the count';
+  if (detailEl) detailEl.textContent = '';
 
   // Restore the open/closed state chosen last time, since renderOverview()
   // runs on every view switch and would otherwise leave the chevron and the

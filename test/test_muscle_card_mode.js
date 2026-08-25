@@ -76,9 +76,12 @@ const readCard = page => page.evaluate(() => {
     check('the mode control is on the card, not only in the modal', weighted.segVisible);
     check('and it shows the mode that is actually in force',
       weighted.active.join() === 'weighted', weighted.active.join() || '(none active)');
-    check('the note explains the fractions', /weighted/i.test(weighted.note) && /fractional/i.test(weighted.note),
+    /* The note names the mode and stops. The explanation of where the
+       fractions come from moved onto the lines themselves as "3 x 0.6",
+       which is where someone reading "1.8" is actually looking. */
+    check('the note names the mode', /weighted/i.test(weighted.note), weighted.note);
+    check('and does not lecture', !/tough|quality|fractional|tap |hover/i.test(weighted.note),
       weighted.note);
-    check('nothing in the note blames the quality tags', !/tough|quality/i.test(weighted.note));
 
     const chest = weighted.rows.find(r => /chest/i.test(r.name));
     check('Chest is on the chart', !!chest, weighted.rows.map(r => r.name).join(', '));
@@ -133,7 +136,7 @@ const readCard = page => page.evaluate(() => {
       primary.rows.map(r => `${r.name} ${r.value}`).join(', '));
     check('Pushups is still under Chest in primary mode',
       primary.chestEx.some(t => /pushups/i.test(t)), primary.chestEx.join(' | ') || '(nothing)');
-    check('and the note drops the weighted explanation', !/fractional/i.test(primary.note), primary.note);
+    check('and the note drops the weighted marker', !/weighted/i.test(primary.note), primary.note);
 
     // The modal is the other half of the same setting; it must agree.
     await page.evaluate(() => openMuscleBalanceModal());

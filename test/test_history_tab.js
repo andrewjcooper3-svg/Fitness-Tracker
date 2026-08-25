@@ -208,7 +208,6 @@ const mock = rows => route => {
         views: [...document.querySelectorAll('#hxBodyDiagram text')].map(t => t.textContent),
         cards: [...document.querySelectorAll('.hx-balance-card')].map(c => c.innerText.replace(/\s+/g, ' ').trim()),
         ratios: [...document.querySelectorAll('.hx-ratio')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
-        note: document.getElementById('hxBalanceNote').textContent,
         window: document.getElementById('hxBalanceWindow').textContent
       }));
       console.log('   views:', primary.views.join(' / '), '| regions:', primary.regions);
@@ -223,7 +222,10 @@ const mock = rows => route => {
         primary.ratios[0]);
       check('upper:lower is reported', /UPPER : LOWER/.test(primary.ratios[1]), primary.ratios[1]);
       check('one card per muscle group', primary.cards.length >= 4, String(primary.cards.length));
-      check('the mode explains what it is counting', /each set counts once/i.test(primary.note), primary.note);
+      // The mode is named by the segmented control; the paragraph that used
+      // to restate it underneath is gone, along with its element.
+      check('the explanatory paragraph is gone from the sheet',
+        !(await page.evaluate(() => !!document.getElementById('hxBalanceNote'))));
 
       // Weighted has to actually change the numbers, or the toggle is a lie.
       await page.evaluate(() => setMuscleMode(true));
@@ -232,7 +234,6 @@ const mock = rows => route => {
         mode: document.querySelector('#hxModeSeg button.active').textContent,
         cards: [...document.querySelectorAll('.hx-balance-card')].map(c => c.innerText.replace(/\s+/g, ' ').trim()),
         ratios: [...document.querySelectorAll('.hx-ratio')].map(r => r.innerText.replace(/\s+/g, ' ').trim()),
-        note: document.getElementById('hxBalanceNote').textContent,
         cardNote: document.getElementById('hxMuscleNote').textContent,
         groups: [...document.querySelectorAll('#hxMuscles .hx-muscle-name')].map(n => n.textContent)
       }));
@@ -243,7 +244,6 @@ const mock = rows => route => {
       check('spreading the compounds reaches more groups',
         weighted.cards.length >= primary.cards.length,
         `${weighted.cards.length} vs ${primary.cards.length}`);
-      check('the note says what weighting means', /split across/i.test(weighted.note), weighted.note);
       // The card behind the modal must not disagree with it.
       check('the card follows the same mode', /weighted/.test(weighted.cardNote), weighted.cardNote);
       check('Pushups now count towards Triceps on the card',
@@ -504,7 +504,9 @@ const mock = rows => route => {
       check('a group opens to the exercises behind it',
         drill.rows.length >= 1 && /Pushups \d+ sets/.test(drill.rows.join(' ')), drill.rows.join(' | '));
       check('and every row carries the same as hover text', !!drill.title, String(drill.title));
-      check('the note invites the drill-down', /tap a group/i.test(drill.note), drill.note);
+      check('the note states the count and window, and nothing else',
+        /^[\d.]+ sets?, [^—]+$/.test(drill.note.trim()) && !/tap|hover/i.test(drill.note),
+        drill.note);
       await page.evaluate(() => toggleHistoryMuscle('Chest'));
 
       console.log('\n  -- Chart engine --');
@@ -778,10 +780,10 @@ const mock = rows => route => {
       const legacyHidden = await page.evaluate(() => {
         const pu = document.getElementById('statsPushupChart');
         return { chartVisible: !!(pu && pu.getBoundingClientRect().height),
-                 noteShown: document.getElementById('hxLegacyNote').style.display !== 'none' };
+                 strayNote: !!document.getElementById('hxLegacyNote') };
       });
       check('Pushups and Weight do not follow you onto Workouts',
-        !legacyHidden.chartVisible && !legacyHidden.noteShown, JSON.stringify(legacyHidden));
+        !legacyHidden.chartVisible && !legacyHidden.strayNote, JSON.stringify(legacyHidden));
 
       await page.evaluate(() => { showHistorySection('exercises'); openHistoryExercise('Leg Press'); });
       await page.waitForTimeout(500);
