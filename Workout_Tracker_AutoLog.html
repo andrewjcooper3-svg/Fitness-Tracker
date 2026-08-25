@@ -290,6 +290,10 @@
   #view-music { order: 3; }
   #view-calendar { order: 4; }
   #view-stats { order: 5; }
+  /* Without this the new view defaults to order 0 and stacks on top of
+     Overview, so the tab highlights while the carousel shows the wrong
+     content. The order here has to match this view's index in viewOrder. */
+  #view-financial { order: 6; }
   /* Hidden for now - see the app-tab comment above. Still in the DOM
      with the rest of its markup/logic untouched, just taken out of the
      swipe flow entirely (order no longer matters while it's display:none). */
@@ -1110,6 +1114,79 @@
   /* The sum behind a weighted figure: quieter than the figure itself, so
      the count still reads first and the arithmetic is there to be checked. */
   .hx-muscle-sum { opacity: 0.62; font-size: 10.5px; margin-left: 7px; }
+
+
+  /* ---- Financial Future ---- */
+  .fin-window { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); }
+  .fin-pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font);
+    font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+    padding: 5px 10px; border-radius: 999px; margin-bottom: 10px;
+    background: color-mix(in srgb, var(--chart-good) 16%, transparent); color: var(--chart-good); }
+  .fin-pill.warn { background: color-mix(in srgb, var(--chart-warn) 18%, transparent); color: var(--chart-warn); }
+  .fin-pill.bad { background: color-mix(in srgb, var(--red) 16%, transparent); color: var(--red); }
+  .fin-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .fin-verdict { font-family: var(--font); font-size: 14px; line-height: 1.45; color: var(--text);
+    margin-bottom: 12px; text-wrap: pretty; }
+  .fin-verdict b { font-weight: 700; }
+  .fin-hero { font-family: var(--font); font-size: 34px; font-weight: 800; letter-spacing: -0.8px;
+    line-height: 1; color: var(--chart-1); font-variant-numeric: tabular-nums; }
+  .fin-hero.short { color: var(--red); }
+  .fin-hero-sub { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+
+  .fin-mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; margin-bottom: 12px; }
+  .fin-mix span { display: block; }
+  .fin-mix-row { display: flex; align-items: center; gap: 9px; padding: 6px 0;
+    font-family: var(--font); font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  .fin-mix-row:last-child { border-bottom: none; }
+  .fin-mix-row i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .fin-mix-row .n { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  .fin-table { width: 100%; border-collapse: collapse; font-family: var(--font); font-size: 12.5px; }
+  .fin-table th { text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--muted); padding: 0 8px 7px 0; }
+  .fin-table td { padding: 7px 8px 7px 0; border-top: 1px solid var(--border);
+    font-variant-numeric: tabular-nums; }
+  .fin-table td.num { text-align: right; padding-right: 0; }
+
+  /* The edit sheet. Same modal furniture as everywhere else. */
+  .fin-group { margin-bottom: 18px; }
+  .fin-group h4 { font-family: var(--font); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+  .fin-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px 12px; }
+  .fin-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .fin-field.wide { grid-column: 1 / -1; }
+  .fin-field label { font-family: var(--font); font-size: 11px; color: var(--muted); }
+  .fin-in { position: relative; display: flex; align-items: center; }
+  .fin-in .fx { position: absolute; font-family: var(--font); font-size: 12px; color: var(--muted); pointer-events: none; }
+  .fin-in .fx.pre { left: 10px; }
+  .fin-in .fx.post { right: 10px; }
+  .fin-field input, .fin-field select {
+    width: 100%; font-family: var(--font); font-size: 14px; color: var(--text);
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 9px;
+    padding: 9px 10px; -moz-appearance: textfield; appearance: none; }
+  .fin-field input.pre { padding-left: 22px; }
+  .fin-field input.post { padding-right: 30px; }
+  .fin-field input::-webkit-outer-spin-button,
+  .fin-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .fin-derived { font-family: var(--font); font-size: 11.5px; color: var(--chart-1); margin-top: 9px; }
+  .fin-rows { display: flex; flex-direction: column; gap: 9px; }
+  .fin-row { background: var(--surface2); border: 1px solid var(--border); border-radius: 11px;
+    padding: 11px; display: flex; flex-direction: column; gap: 9px; }
+  .fin-row-head { display: flex; align-items: center; gap: 8px; }
+  .fin-row-head input[type="text"] { background: transparent; border: none; padding: 3px 0;
+    font-weight: 700; font-size: 13.5px; }
+  .fin-tag { font-family: var(--font); font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; padding: 3px 6px; border-radius: 5px; white-space: nowrap;
+    background: color-mix(in srgb, var(--chart-1) 16%, transparent); color: var(--chart-1); }
+  .fin-tag.cost { background: color-mix(in srgb, var(--chart-warn) 18%, transparent); color: var(--chart-warn); }
+  .fin-del { margin-left: auto; background: none; border: none; color: var(--muted);
+    font-size: 18px; line-height: 1; padding: 2px 6px; cursor: pointer; }
+  .fin-del:hover { color: var(--red); }
+  .fin-note { font-family: var(--font); font-size: 10.5px; color: var(--muted); }
+  .fin-add { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .fin-add button { font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--text);
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 12px; cursor: pointer; }
 
   /* ---- Arrange Overview ---- */
   .hx-layout-row { display: flex; align-items: center; gap: 8px; padding: 7px 0;
@@ -2614,6 +2691,47 @@
 
 </div>
 
+<div id="view-financial" class="app-view">
+
+  <div class="ov-page-head ov-page-head-bare">
+    <div class="fin-window" id="finWindow"></div>
+    <div class="ov-page-head-actions">
+      <button class="ov-gear-btn" id="finEditBtn" onclick="openFinancialEdit()" aria-label="Edit assumptions" title="Edit your numbers">Edit</button>
+    </div>
+  </div>
+
+  <div class="stats-card">
+    <span class="fin-pill" id="finPill">—</span>
+    <div class="fin-verdict" id="finVerdict"></div>
+    <div class="fin-hero" id="finHero">—</div>
+    <div class="fin-hero-sub" id="finHeroSub"></div>
+  </div>
+
+  <div class="stats-card">
+    <div class="stats-card-title">Projected net worth · today's dollars</div>
+    <svg viewBox="0 0 320 200" class="stats-chart" id="finCone" role="img"
+         aria-label="Projected net worth, a median line inside a 10th to 90th percentile band"></svg>
+    <div class="stats-chart-detail" id="finReadout"></div>
+    <div class="hx-legend">
+      <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-1)"></span>Median</span>
+      <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-1); opacity:0.28"></span>10th–90th</span>
+      <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-warn)"></span>Retire</span>
+    </div>
+  </div>
+
+  <div class="stats-card">
+    <div class="stats-card-title">Where the money sits</div>
+    <div class="fin-mix" id="finMix"></div>
+    <div id="finMixRows"></div>
+  </div>
+
+  <div class="stats-card">
+    <div class="stats-card-title">Where it lands</div>
+    <div id="finTable"></div>
+  </div>
+
+</div>
+
 <div id="view-kitchen" class="app-view">
 
   <div class="kitchen-subtabs">
@@ -3115,6 +3233,15 @@
      the same card is above its neighbour on a phone and beside it on a
      desktop. The flow order IS linear, so the list edits that directly and
      every width follows from it. Buttons also beat a drag on a phone. -->
+<div class="event-modal-overlay" id="finEditOverlay" onclick="closeFinancialEdit(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-title" style="margin-bottom:14px;">Your numbers</div>
+    <div id="finEditBody"></div>
+    <button class="event-modal-close" onclick="closeFinancialEdit(event)">Done</button>
+  </div>
+</div>
+
 <div class="event-modal-overlay" id="hxLayoutOverlay" onclick="closeHistoryLayout(event)">
   <div class="event-modal-sheet" onclick="event.stopPropagation()">
     <div class="event-modal-handle"></div>
@@ -3433,6 +3560,9 @@
   <div class="app-tab" data-view="stats" onclick="showAppView('stats')">
     <div class="app-tab-label">History</div>
   </div>
+  <div class="app-tab" data-view="financial" onclick="showAppView('financial')">
+    <div class="app-tab-label">Future</div>
+  </div>
 
   <!-- Landscape-tier only (hidden everywhere else): the active view's
        title sits at the bar's left edge and its meta/date at the right,
@@ -3481,6 +3611,10 @@
   <div class="app-sidebar-item" data-view="stats" onclick="showAppView('stats')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"></path></svg>
     <div class="app-sidebar-item-label">History</div>
+  </div>
+  <div class="app-sidebar-item" data-view="financial" onclick="showAppView('financial')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 6-8"></path><path d="M15 6h4v4"></path></svg>
+    <div class="app-sidebar-item-label">Future</div>
   </div>
 </div>
 
@@ -4590,6 +4724,791 @@ function showHistorySection(name) {
   renderHistoryTab();
   updateViewportHeight('stats', true);
 }
+
+/* ================= Financial Future =================
+   A Monte Carlo net-worth projection, in today's dollars. The engine here
+   is the one audited in the prototype: 26 closed-form checks covering
+   compounding, the lognormal median, tax, drawdown order and the rest.
+
+   Three rules it is easy to get wrong and expensive to get wrong quietly:
+     - every rate is REAL, above inflation, because a nominal figure decades
+       out is an inflation artifact rather than information
+     - the series is labelled by each age's OPENING balance, so the first
+       point is today's net worth and not a year of phantom growth
+     - volatility is what produces the band; without it the chart would look
+       more confident and be less true                                     */
+const FIN_KEY = 'FINANCIAL_FUTURE_STATE';
+const FIN_PATHS = 2000;   // the phone runs this on every keystroke
+const FIN_YEAR0 = new Date().getFullYear();
+
+const FIN_MARKET = {
+  cash:      { label: 'All cash / CDs',         ret: 0.5, vol: 1  },
+  conserv:   { label: 'Conservative · 30/70',   ret: 3.0, vol: 7  },
+  balanced:  { label: 'Balanced · 60/40',       ret: 5.0, vol: 11 },
+  growth:    { label: 'Growth · 80/20',         ret: 6.0, vol: 14 },
+  equity:    { label: 'All equities',           ret: 7.0, vol: 17 },
+  muted:     { label: 'Muted forecast · 60/40', ret: 3.0, vol: 11 },
+  custom:    { label: 'Custom', ret: null, vol: null }
+};
+const FIN_RETIRE = {
+  lean:     { label: 'Lean · 55% of pay',        pct: 55 },
+  modest:   { label: 'Modest · 65%',             pct: 65 },
+  standard: { label: 'Comfortable · 75%',        pct: 75 },
+  same:     { label: 'Same as now · 85%',        pct: 85 },
+  generous: { label: 'Generous · 100%',          pct: 100 },
+  custom:   { label: 'Custom', pct: null }
+};
+// FICO band -> 30-year fixed, anchored on the Aug 2026 survey figure for
+// well-qualified 740+ borrowers.
+const FIN_MORTGAGE = [[780,6.65],[740,6.75],[700,6.95],[660,7.25],[620,7.75],[0,8.60]];
+const FIN_AUTO = [[781,4.55,6.30],[661,6.40,9.00],[601,9.50,13.50],[501,12.80,18.60],[0,16.00,21.80]];
+const FIN_HOUSE_PLANS = {
+  fha:  { label: 'FHA · 3.5% down', down: 3.5, pmi: 0.55 },
+  c5:   { label: '5% down',         down: 5,   pmi: 0.60 },
+  c10:  { label: '10% down',        down: 10,  pmi: 0.40 },
+  c20:  { label: '20% down',        down: 20,  pmi: 0 },
+  cash: { label: 'Cash purchase',   down: 100, pmi: 0 },
+  custom: { label: 'Custom', down: null, pmi: null }
+};
+const FIN_CAR_MODES = { finance: 'Finance', cash: 'Pay cash', lease: 'Lease' };
+const FIN_KID_PLANS = {
+  public:  { label: 'Daycare, public school, in-state college', care: 15000, school: 6000, college: 29910 },
+  privcol: { label: 'Daycare, public school, private college',  care: 15000, school: 6000, college: 62570 },
+  private: { label: 'Daycare, private school, private college', care: 17000, school: 20000, college: 62570 },
+  lean:    { label: 'Family care, public throughout',           care: 3000,  school: 4000, college: 29910 },
+  custom:  { label: 'Custom', care: null, school: null, college: null }
+};
+
+const FIN_DEFAULTS = {
+  age: 31, netWorth: 48000, gross: 95000, taxRate: 22, k401: 8, match: 4,
+  monthly: 3200, credit: 750,
+  inflation: 2.5, raiseNom: 3, promoNom: 8, promoMin: 1, promoMax: 1.5,
+  promoStretch: 25, promoUntil: 50,
+  pCash: 15, pBrok: 25, pRet: 60, toCash: 20, cashReal: 0.5, brokDrag: 0.4, retireTax: 15,
+  retireProfile: 'standard', retireSpend: 60000,
+  stopWork: 60, retireAge: 60, runTo: 95, ssAnnual: 0, ssAge: 67,
+  marketProfile: 'balanced', realReturn: 5, vol: 11,
+  promos: [], rewards: [], kids: [], buys: []
+};
+let FIN = JSON.parse(JSON.stringify(FIN_DEFAULTS));
+// The three ages clamp against each other, so a half-typed number must never
+// be written over its neighbour. RAW holds what was actually typed.
+let FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
+
+function finLoad_() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FIN_KEY) || 'null');
+    if (raw && typeof raw === 'object') {
+      Object.keys(FIN_DEFAULTS).forEach(k => {
+        if (raw[k] === undefined) return;
+        if (Array.isArray(FIN_DEFAULTS[k])) { if (Array.isArray(raw[k])) FIN[k] = raw[k]; }
+        else if (typeof raw[k] === typeof FIN_DEFAULTS[k]) FIN[k] = raw[k];
+      });
+    }
+  } catch (e) {}
+  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
+}
+function finSave_() { try { localStorage.setItem(FIN_KEY, JSON.stringify(FIN)); } catch (e) {} }
+
+const finClamp_ = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const finMoney_ = n => {
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n < 0 ? '-' : '') + '$' + (a / 1e6).toFixed(a >= 1e7 ? 1 : 2) + 'M';
+  if (a >= 1e3) return (n < 0 ? '-' : '') + '$' + Math.round(a / 1e3) + 'k';
+  return (n < 0 ? '-' : '') + '$' + Math.round(a);
+};
+const finFull_ = n => (n < 0 ? '-' : '') + '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+const finRate_ = (table, score, i) => (table.find(t => score >= t[0]) || table[table.length - 1])[i];
+
+let finSpare_ = null;
+function finGauss_() {
+  if (finSpare_ !== null) { const s = finSpare_; finSpare_ = null; return s; }
+  let u = 0, v = 0, s = 0;
+  do { u = Math.random() * 2 - 1; v = Math.random() * 2 - 1; s = u * u + v * v; } while (s === 0 || s >= 1);
+  const f = Math.sqrt(-2 * Math.log(s) / s);
+  finSpare_ = v * f;
+  return u * f;
+}
+function finPayment_(principal, annualRate, years) {
+  const r = annualRate / 100 / 12, n = years * 12;
+  if (n <= 0) return 0;
+  if (r === 0) return principal / n;
+  return principal * r / (1 - Math.pow(1 + r, -n));
+}
+const finHouseRate_ = b => b.rate != null ? b.rate : finRate_(FIN_MORTGAGE, FIN.credit, 1);
+const finCarRate_ = b => b.rate != null ? b.rate : finRate_(FIN_AUTO, FIN.credit, b.used ? 2 : 1);
+const finHousePlan_ = b => FIN_HOUSE_PLANS[b.plan] || FIN_HOUSE_PLANS.custom;
+const finHouseDown_ = b => { const p = finHousePlan_(b); return p.down != null ? b.price * p.down / 100 : b.down; };
+const finHousePmi_ = b => { const p = finHousePlan_(b); return p.pmi != null ? p.pmi : (b.pmi || 0); };
+const finKidCost_ = (k, f) => { const p = FIN_KID_PLANS[k.plan] || FIN_KID_PLANS.custom; return p[f] != null ? p[f] : (k[f] || 0); };
+function finRetireSpend_() {
+  const p = FIN_RETIRE[FIN.retireProfile];
+  return p && p.pct != null ? FIN.gross * p.pct / 100 : FIN.retireSpend;
+}
+
+// One simulated life. Net worth reads as one number, but inside it has to be
+// savings, investments, property and debt kept apart - otherwise a mortgage
+// cannot be told from rent.
+function finPath_(collect) {
+  const total = Math.max(0, FIN.netWorth);
+  const sum = Math.max(1, FIN.pCash + FIN.pBrok + FIN.pRet);
+  let cash = total * FIN.pCash / sum, brok = total * FIN.pBrok / sum, ret = total * FIN.pRet / sum;
+  const assets = [], loans = [], leases = [], out = [];
+  const years = FIN.runTo - FIN.age;
+  let brokeAt = null;
+  const spendTarget = finRetireSpend_();
+  let cadence = FIN.promoMin + Math.random() * Math.max(0, FIN.promoMax - FIN.promoMin);
+  let salary = FIN.gross, sincePromo = 0;
+  const lastPlanned = FIN.promos.length ? Math.max(...FIN.promos.map(p => Math.round(p.inYears || 0))) : -1;
+
+  for (let i = 0; i <= years; i++) {
+    const age = FIN.age + i, year = FIN_YEAR0 + i;
+    // The OPENING balance for this age, recorded before anything happens.
+    if (collect) out.push(Math.max(0, cash + brok + ret
+      + assets.reduce((n, a) => n + a.value, 0) - loans.reduce((n, L) => n + L.balance, 0)));
+
+    const earning = age < FIN.stopWork;
+    const retired = age >= FIN.retireAge;
+
+    // Raising cash: savings, then investments, then the retirement account
+    // grossed up for the tax due on the way out.
+    const withdraw = amount => {
+      let need = amount;
+      const c = Math.min(Math.max(0, cash), need); cash -= c; need -= c;
+      if (need <= 0) return;
+      const b = Math.min(Math.max(0, brok), need); brok -= b; need -= b;
+      if (need > 0) ret -= need / (1 - FIN.retireTax / 100);
+    };
+
+    FIN.buys.forEach(b => {
+      if (b.year !== year) return;
+      if (b.kind === 'house') {
+        const down = Math.min(b.price, Math.max(0, finHouseDown_(b)));
+        const borrowed = Math.max(0, b.price - down);
+        withdraw(down);                       // cash becomes an asset, not a hole
+        // Tax, insurance and upkeep belong to the property, not the loan: a
+        // house bought outright still costs ~1.9% of its value every year.
+        assets.push({ value: b.price, growth: (b.growth || 0) / 100, upkeep: 0.019 });
+        if (borrowed > 0) loans.push({
+          balance: borrowed, r: finHouseRate_(b) / 100 / 12,
+          pay: finPayment_(borrowed, finHouseRate_(b), b.term), monthsLeft: b.term * 12,
+          pmiMonthly: borrowed * (finHousePmi_(b) / 100) / 12, pmiStopsAt: b.price * 0.8 });
+      } else if (b.mode === 'lease') { leases.push({ monthly: b.lease }); }
+      else if (b.mode === 'cash') { withdraw(b.price); }
+      else {
+        const down = Math.max(0, b.down), borrowed = Math.max(0, b.price - down);
+        withdraw(down);
+        if (borrowed > 0) loans.push({
+          balance: borrowed, r: finCarRate_(b) / 100 / 12,
+          pay: finPayment_(borrowed, finCarRate_(b), b.term), monthsLeft: b.term * 12,
+          pmiMonthly: 0, pmiStopsAt: 0 });
+      }
+    });
+
+    // A year of loans, month by month, so principal and interest separate
+    // properly rather than being guessed at a flat share.
+    let loanCash = 0;
+    loans.forEach(L => {
+      for (let m = 0; m < 12 && L.monthsLeft > 0; m++) {
+        const interest = L.balance * L.r;
+        const principal = Math.min(L.balance, L.pay - interest);
+        L.balance -= principal; L.monthsLeft--;
+        loanCash += L.pay;
+        if (L.pmiMonthly > 0 && L.balance > L.pmiStopsAt) loanCash += L.pmiMonthly;
+      }
+    });
+    leases.forEach(L => { loanCash += L.monthly * 12; });
+    assets.forEach(a => { loanCash += a.value * (a.upkeep || 0); });
+
+    let kidCash = 0;
+    FIN.kids.forEach(k => {
+      const a = year - k.birthYear;
+      if (a < 0) return;
+      if (a < 5) kidCash += finKidCost_(k, 'care');
+      else if (a < 18) kidCash += finKidCost_(k, 'school');
+      else if (a < 22) kidCash += finKidCost_(k, 'college');
+    });
+    const rewards = FIN.rewards.reduce((n, r) => {
+      const from = r.from == null ? FIN.age : r.from, to = r.to == null ? FIN.runTo : r.to;
+      return (age >= from && age <= to) ? n + (+r.amount || 0) : n;
+    }, 0);
+
+    /* Lognormal, not a plain normal draw: a normal draw at 15% volatility can
+       come back below -100%, which no portfolio can do, and clamping it biases
+       the result upward. Investments and the retirement pot share the SAME
+       draw because they are the same market - independent draws would invent
+       diversification that is not there. */
+    const sd = FIN.vol / 100;
+    const mu = Math.log(1 + FIN.realReturn / 100) - sd * sd / 2;
+    const Z = finGauss_();
+    const grow = Math.exp(mu + sd * Z);
+    const dragged = Math.exp(Math.log(1 + Math.max(-0.99, FIN.realReturn / 100 - FIN.brokDrag / 100))
+      - sd * sd / 2 + sd * Z);
+    cash *= (1 + FIN.cashReal / 100);
+    brok *= dragged;
+    ret *= grow;
+    assets.forEach(a => { a.value *= (1 + a.growth); });
+
+    if (earning) {
+      if (i > 0) {
+        let nominal = FIN.raiseNom;
+        if (i <= lastPlanned) {
+          FIN.promos.forEach(pr => { if (Math.round(pr.inYears) === i) nominal += (+pr.pct || 0); });
+        } else if (age <= Math.min(FIN.promoUntil, FIN.stopWork) && cadence > 0) {
+          sincePromo += 1;
+          if (sincePromo >= cadence) {
+            nominal += FIN.promoNom; sincePromo -= cadence;
+            cadence *= (1 + FIN.promoStretch / 100);   // each rung is a longer climb
+          }
+        }
+        // Nominal to real - a 3% raise against 2.5% inflation is worth 0.5%.
+        salary *= (1 + nominal / 100) / (1 + FIN.inflation / 100);
+      }
+      const k = salary * FIN.k401 / 100, match = salary * FIN.match / 100;
+      const takeHome = (salary - k) * (1 - FIN.taxRate / 100);
+      const spend = (retired ? spendTarget : FIN.monthly * 12) + rewards + loanCash + kidCash;
+      const free = takeHome - spend;
+      ret += k + match;
+      if (free >= 0) { cash += free * FIN.toCash / 100; brok += free * (1 - FIN.toCash / 100); }
+      else withdraw(-free);
+    } else {
+      const income = (FIN.ssAnnual > 0 && age >= FIN.ssAge) ? FIN.ssAnnual : 0;
+      const base = retired ? spendTarget : FIN.monthly * 12;
+      const need = base + rewards + loanCash + kidCash - income;
+      if (need > 0) withdraw(need); else cash += -need;
+    }
+
+    const net = cash + brok + ret + assets.reduce((n, a) => n + a.value, 0)
+      - loans.reduce((n, L) => n + L.balance, 0);
+    /* Broke is an absorbing state. Left alone the arithmetic runs to minus
+       millions, which nobody can owe - you would have cut spending long
+       before, and "how far past broke" was never information. */
+    if (net <= 0) {
+      if (brokeAt === null) brokeAt = age;
+      cash = 0; brok = 0; ret = 0;
+      assets.length = 0; loans.length = 0; leases.length = 0;
+    }
+  }
+  return { series: out, brokeAt };
+}
+
+function finSimulate_() {
+  const years = FIN.runTo - FIN.age;
+  const cols = Array.from({ length: years + 1 }, () => new Float64Array(FIN_PATHS));
+  let survived = 0;
+  const broke = [];
+  for (let p = 0; p < FIN_PATHS; p++) {
+    const r = finPath_(true);
+    for (let i = 0; i <= years; i++) cols[i][p] = r.series[i];
+    if (r.brokeAt === null) survived++; else broke.push(r.brokeAt);
+  }
+  const pct = (arr, q) => {
+    const a = Array.from(arr).sort((x, y) => x - y);
+    return a[finClamp_(Math.floor(q * (a.length - 1)), 0, a.length - 1)];
+  };
+  broke.sort((a, b) => a - b);
+  return {
+    band: cols.map((c, i) => ({ age: FIN.age + i, p10: pct(c, 0.10), p50: pct(c, 0.50), p90: pct(c, 0.90) })),
+    success: survived / FIN_PATHS,
+    medianBroke: broke.length ? broke[Math.floor(broke.length / 2)] : null
+  };
+}
+
+/* ---------- Financial Future: drawing ---------- */
+let finLast_ = null;
+
+function finNiceStep_(rough) {
+  if (!(rough > 0)) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  return ([1, 2, 2.5, 5, 10].find(m => m * mag >= rough) || 10) * mag;
+}
+
+/* The cone. Two area edges and a median line, drawn at the element's real
+   pixel width so nothing is stretched - the same rule the rest of the app's
+   charts follow. */
+function finDrawCone_(res) {
+  const svg = document.getElementById('finCone');
+  if (!svg) return;
+  const box = fitChartBox_(svg, 320, 200);
+  const W = box.w, H = box.h;
+  const PAD = { l: 46, r: 8, t: 16, b: 24 };
+  const x0 = PAD.l, x1 = W - PAD.r, y0 = PAD.t, y1 = H - PAD.b;
+  const b = res.band;
+  if (b.length < 2) { svg.innerHTML = ''; return; }
+
+  const hi = Math.max(...b.map(d => d.p90), 1);
+  const step = finNiceStep_(hi / 4);
+  const top = Math.ceil(hi / step) * step;
+  const X = i => x0 + (x1 - x0) * (i / (b.length - 1));
+  const Y = v => y1 - (y1 - y0) * (v / (top || 1));
+
+  let out = '';
+  for (let v = 0; v <= top + step / 2; v += step) {
+    const y = Y(v);
+    out += `<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}" class="chart-grid"></line>`
+      + chartAxisText_(x0 - 6, y + 3.5, finMoney_(v), 'end', 'chart-tick');
+  }
+
+  const upper = b.map((d, i) => `${X(i).toFixed(1)},${Y(d.p90).toFixed(1)}`).join(' ');
+  const lower = b.map((d, i) => `${X(i).toFixed(1)},${Y(d.p10).toFixed(1)}`).reverse().join(' ');
+  const mid = b.map((d, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(d.p50).toFixed(1)}`).join('');
+
+  const mark = (age, label, colour) => {
+    const i = age - FIN.age;
+    if (i < 0 || i >= b.length) return '';
+    const x = X(i);
+    return `<line x1="${x.toFixed(1)}" y1="${y0}" x2="${x.toFixed(1)}" y2="${y1.toFixed(1)}"
+             stroke="${colour}" stroke-width="1" stroke-dasharray="3 3" opacity="0.75"></line>`
+      + chartAxisText_(x, y0 + 9, label, 'middle', 'chart-tick');
+  };
+  let marks = '';
+  FIN.buys.forEach(p => { marks += mark(FIN.age + (p.year - FIN_YEAR0), (p.label || '').slice(0, 8), 'var(--muted)'); });
+  if (FIN.stopWork !== FIN.retireAge) marks += mark(FIN.stopWork, 'pay ends', 'var(--red)');
+  marks += mark(FIN.retireAge, 'retire', 'var(--chart-warn)');
+
+  let ticks = '';
+  const stride = Math.max(1, Math.round((b.length - 1) / 6));
+  for (let i = 0; i < b.length; i += stride) {
+    ticks += chartAxisText_(X(i), H - 7, String(b[i].age), 'middle', 'chart-tick');
+  }
+
+  const band = (b.length - 1) ? (x1 - x0) / (b.length - 1) : x1 - x0;
+  let hits = '';
+  b.forEach((d, i) => {
+    hits += `<rect class="chart-hit" x="${(X(i) - band / 2).toFixed(1)}" y="0"
+             width="${band.toFixed(1)}" height="${H}"></rect>`;
+  });
+
+  svg.innerHTML = out + marks
+    + `<polygon points="${upper} ${lower}" fill="var(--chart-1)" opacity="0.16"
+        stroke="var(--chart-1)" stroke-opacity="0.35" stroke-width="1"></polygon>`
+    + `<path d="${mid}" class="chart-line" stroke="var(--chart-1)"></path>`
+    + ticks + hits;
+
+  finLast_ = { b, X, Y, x0, x1 };
+  bindChartHits_(svg, b.map(d => ({
+    label: String(d.age),
+    detail: `Age ${d.age} — median ${finFull_(d.p50)} · range ${finFull_(d.p10)} to ${finFull_(d.p90)}`
+  })), 'finReadout');
+}
+
+function finVerdict_(res) {
+  const at = res.band.find(d => d.age === FIN.retireAge) || res.band[res.band.length - 1];
+  const pct = Math.round(res.success * 100);
+  const hero = document.getElementById('finHero');
+  hero.textContent = finFull_(at.p50);
+  hero.classList.toggle('short', at.p50 <= 0);
+  document.getElementById('finHeroSub').textContent =
+    `median net worth at ${FIN.retireAge}, in today's dollars`;
+
+  const holds = pct >= 85, tight = pct >= 60 && pct < 85;
+  const pill = document.getElementById('finPill');
+  pill.textContent = holds ? 'Holds' : tight ? 'Tight' : 'Runs out';
+  pill.className = 'fin-pill' + (holds ? '' : tight ? ' warn' : ' bad');
+
+  const gap = FIN.retireAge - FIN.stopWork;
+  const el = document.getElementById('finVerdict');
+  if (pct >= 99) {
+    el.innerHTML = `The money lasts to <b>${FIN.runTo}</b> in essentially every run — there is slack in this plan.`;
+  } else if (holds) {
+    el.innerHTML = `Lasts to <b>${FIN.runTo}</b> in <b>${pct}%</b> of runs. The ones that fail are the bad-market draws, running dry around <b>${res.medianBroke}</b>.`;
+  } else if (tight) {
+    el.innerHTML = `Only <b>${pct}%</b> of runs reach ${FIN.runTo}; the rest run out around <b>${res.medianBroke}</b>. This works if markets cooperate, and not otherwise.`;
+  } else {
+    el.innerHTML = `<b>${100 - pct}%</b> of runs go broke, typically around <b>${res.medianBroke}</b>. `
+      + (gap > 5
+        ? `The likely culprit is that <b>income stops at ${FIN.stopWork}</b>, ${gap} years before the retirement budget starts.`
+        : `Retiring later, spending less or saving more all move this; market returns are the one lever you do not control.`);
+  }
+}
+
+function finMix_() {
+  const sum = Math.max(1, FIN.pCash + FIN.pBrok + FIN.pRet);
+  const parts = [
+    ['Savings', FIN.pCash, 'var(--muted)'],
+    ['Brokerage', FIN.pBrok, 'var(--chart-1)'],
+    ['Retirement', FIN.pRet, 'var(--chart-warn)']
+  ];
+  document.getElementById('finMix').innerHTML = parts
+    .map(([, v, c]) => `<span style="width:${(v / sum * 100).toFixed(1)}%;background:${c}"></span>`).join('');
+  document.getElementById('finMixRows').innerHTML = parts.map(([n, v, c]) =>
+    `<div class="fin-mix-row"><i style="background:${c}"></i>${n}
+      <span class="n">${finFull_(FIN.netWorth * v / sum)} · ${Math.round(v / sum * 100)}%</span></div>`).join('');
+}
+
+function finTable_(res) {
+  const want = [...new Set([FIN.age + 5, FIN.age + 10, FIN.retireAge, FIN.retireAge + 10, FIN.runTo])]
+    .filter(a => a > FIN.age && a <= FIN.runTo).sort((a, b) => a - b);
+  document.getElementById('finTable').innerHTML =
+    `<table class="fin-table"><thead><tr><th>Age</th><th style="text-align:right">Poor run</th>`
+    + `<th style="text-align:right">Median</th><th style="text-align:right">Good run</th></tr></thead><tbody>`
+    + want.map(a => {
+      const d = res.band.find(x => x.age === a);
+      if (!d) return '';
+      return `<tr><td>${a}${a === FIN.retireAge ? ' · retire' : ''}</td>`
+        + `<td class="num">${finMoney_(d.p10)}</td><td class="num">${finMoney_(d.p50)}</td>`
+        + `<td class="num">${finMoney_(d.p90)}</td></tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+let finQueued_ = false;
+function renderFinancialTab() {
+  const view = document.getElementById('view-financial');
+  if (!view) return;
+  if (finQueued_) return;
+  finQueued_ = true;
+  requestAnimationFrame(() => {
+    finQueued_ = false;
+    // Derived from RAW, never from the previous clamp, so a half-typed age
+    // cannot permanently overwrite its neighbour.
+    FIN.retireAge = finClamp_(FIN_RAW.retireAge, FIN.age + 1, 100);
+    FIN.stopWork = finClamp_(FIN_RAW.stopWork, FIN.age + 1, FIN.retireAge);
+    FIN.runTo = finClamp_(FIN_RAW.runTo, FIN.retireAge + 1, 110);
+    ['retireAge', 'stopWork', 'runTo'].forEach(k => {
+      const el = document.getElementById('fin_' + k);
+      if (el && el !== document.activeElement && +el.value !== FIN[k]) el.value = FIN[k];
+    });
+
+    const w = document.getElementById('finWindow');
+    if (w) w.textContent = `Age ${FIN.age} – ${FIN.runTo} · today's dollars`;
+    finSave_();
+    const res = finSimulate_();
+    finDrawCone_(res);
+    finVerdict_(res);
+    finMix_();
+    finTable_(res);
+    const ro = document.getElementById('finReadout');
+    const at = res.band.find(d => d.age === FIN.retireAge);
+    if (ro && at) ro.textContent = `At ${at.age}: median ${finFull_(at.p50)} · range ${finFull_(at.p10)} to ${finFull_(at.p90)}`;
+    updateViewportHeight('financial', true);
+  });
+}
+
+/* ---------- Financial Future: the edit sheet ----------
+   Everything is editable here rather than on the tab itself, so the tab
+   stays a readout and the assumptions stay visible in one place when you
+   want them. */
+function openFinancialEdit() {
+  document.getElementById('finEditOverlay').classList.add('open');
+  finBuildEdit_();
+}
+function closeFinancialEdit(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('finEditOverlay').classList.remove('open');
+  updateViewportHeight('financial', true);
+}
+
+function finNum_(key, label, o) {
+  o = o || {};
+  const id = 'fin_' + key;
+  return `<div class="fin-field${o.wide ? ' wide' : ''}"><label for="${id}">${label}</label>
+    <div class="fin-in">${o.pre ? `<span class="fx pre">${o.pre}</span>` : ''}
+      <input id="${id}" type="number" inputmode="decimal" data-fin="${key}"
+             class="${o.pre ? 'pre ' : ''}${o.post ? 'post' : ''}"
+             value="${FIN[key]}" step="${o.step || 1}" min="${o.min == null ? 0 : o.min}">
+    ${o.post ? `<span class="fx post">${o.post}</span>` : ''}</div></div>`;
+}
+function finSel_(key, label, table) {
+  const id = 'fin_' + key;
+  return `<div class="fin-field wide"><label for="${id}">${label}</label>
+    <select id="${id}" data-fin="${key}">${Object.keys(table).map(k =>
+      `<option value="${k}"${FIN[key] === k ? ' selected' : ''}>${escapeHtml_(table[k].label)}</option>`).join('')}
+    </select></div>`;
+}
+function finRowNum_(item, f, label, o) {
+  o = o || {};
+  return `<div class="fin-field"><label>${label}</label><div class="fin-in">
+    ${o.pre ? `<span class="fx pre">${o.pre}</span>` : ''}
+    <input type="number" data-f="${f}" class="${o.pre ? 'pre ' : ''}${o.post ? 'post' : ''}"
+           value="${item[f] == null ? '' : item[f]}" step="${o.step || 1}" min="${o.min == null ? 0 : o.min}">
+    ${o.post ? `<span class="fx post">${o.post}</span>` : ''}</div></div>`;
+}
+function finRowSel_(item, f, label, table) {
+  return `<div class="fin-field wide"><label>${label}</label>
+    <select data-f="${f}">${Object.keys(table).map(k =>
+      `<option value="${k}"${item[f] == k ? ' selected' : ''}>${escapeHtml_(table[k].label || table[k])}</option>`).join('')}
+    </select></div>`;
+}
+
+function finBuildEdit_() {
+  const custom = FIN.retireProfile === 'custom';
+  const mid = FIN.promoMin + Math.max(0, FIN.promoMax - FIN.promoMin) / 2;
+  const lastPlanned = FIN.promos.length ? Math.max(...FIN.promos.map(p => Math.round(p.inYears || 0))) : -1;
+  // Same two-stage rule the simulation uses, so the preview cannot disagree.
+  const payAt = target => {
+    let sal = FIN.gross, since = 0, cad = mid, n = 0;
+    for (let a = FIN.age + 1; a <= target; a++) {
+      const i = a - FIN.age;
+      let nom = FIN.raiseNom;
+      if (i <= lastPlanned) FIN.promos.forEach(pr => { if (Math.round(pr.inYears) === i) { nom += (+pr.pct || 0); n++; } });
+      else if (a <= FIN.promoUntil && cad > 0) {
+        since += 1;
+        if (since >= cad) { nom += FIN.promoNom; since -= cad; n++; cad *= (1 + FIN.promoStretch / 100); }
+      }
+      sal *= (1 + nom / 100) / (1 + FIN.inflation / 100);
+    }
+    return { sal, n };
+  };
+  const top = payAt(Math.min(FIN.promoUntil, FIN.stopWork));
+  const gap = FIN.retireAge - FIN.stopWork;
+  const sum = Math.max(1, FIN.pCash + FIN.pBrok + FIN.pRet);
+  const rp = FIN_RETIRE[FIN.retireProfile];
+
+  document.getElementById('finEditBody').innerHTML = `
+    <div class="fin-group"><h4>You, today</h4><div class="fin-fields">
+      ${finNum_('age', 'Your age')}
+      ${finNum_('netWorth', 'Net worth', { pre: '$', step: 1000 })}
+      ${finNum_('gross', 'Gross pay / year', { pre: '$', step: 1000 })}
+      ${finNum_('taxRate', 'Effective tax', { post: '%', step: 0.5 })}
+      ${finNum_('k401', 'To 401k', { post: '%', step: 0.5 })}
+      ${finNum_('match', 'Employer match', { post: '%', step: 0.5 })}
+      ${finNum_('monthly', 'Monthly spend', { pre: '$', step: 50 })}
+      ${finNum_('credit', 'Credit score', { step: 10, min: 300 })}
+    </div></div>
+
+    <div class="fin-group"><h4>Pay growth</h4><div class="fin-fields">
+      ${finNum_('raiseNom', 'Annual raise', { post: '%', step: 0.25 })}
+      ${finNum_('promoNom', 'Promotion adds', { post: '%', step: 0.5 })}
+      ${finNum_('promoMin', 'Promoted every, from', { post: 'yr', step: 0.25 })}
+      ${finNum_('promoMax', '…to', { post: 'yr', step: 0.25 })}
+      ${finNum_('promoStretch', 'Each takes longer by', { post: '%', step: 5 })}
+      ${finNum_('promoUntil', 'Promotions until age', { step: 1 })}
+      ${finNum_('inflation', 'Inflation', { post: '%', step: 0.25 })}
+      ${finNum_('stopWork', 'Last age you earn', { step: 1 })}
+    </div>
+    <div class="fin-derived">${top.n} promotions · salary reaches ${finFull_(top.sal)} by ${Math.min(FIN.promoUntil, FIN.stopWork)}
+      · income stops at ${FIN.stopWork}${gap > 0 ? ` · then ${gap} yr${gap === 1 ? '' : 's'} with no pay before the retirement budget` : ''}</div>
+    <div class="fin-rows" id="finPromoRows" style="margin-top:12px;"></div>
+    <div class="fin-add"><button onclick="finAdd_('promo')">Add a known promotion</button></div>
+    </div>
+
+    <div class="fin-group"><h4>Where the money sits</h4><div class="fin-fields">
+      ${finNum_('pCash', 'In savings', { post: '%' })}
+      ${finNum_('pBrok', 'In brokerage', { post: '%' })}
+      ${finNum_('pRet', 'In retirement', { post: '%' })}
+      ${finNum_('toCash', 'New savings kept as cash', { post: '%' })}
+      ${finNum_('cashReal', 'Savings real return', { post: '%', step: 0.1 })}
+      ${finNum_('brokDrag', 'Brokerage tax drag', { post: '%', step: 0.1 })}
+      ${finNum_('retireTax', 'Tax on withdrawals', { post: '%', step: 1 })}
+    </div>
+    <div class="fin-derived">${finFull_(FIN.netWorth * FIN.pCash / sum)} savings ·
+      ${finFull_(FIN.netWorth * FIN.pBrok / sum)} brokerage ·
+      ${finFull_(FIN.netWorth * FIN.pRet / sum)} retirement</div></div>
+
+    <div class="fin-group"><h4>Retirement</h4><div class="fin-fields">
+      ${finSel_('retireProfile', 'Spending profile', FIN_RETIRE)}
+      ${custom ? finNum_('retireSpend', 'Spending / year', { pre: '$', step: 1000 }) : ''}
+      ${finNum_('retireAge', 'Retire at')}
+      ${finNum_('runTo', 'Plan through age')}
+      ${finNum_('ssAnnual', 'Social Security / yr', { pre: '$', step: 500 })}
+      ${finNum_('ssAge', 'Starting at age')}
+    </div>
+    <div class="fin-derived">${finFull_(finRetireSpend_())} a year${rp && rp.pct != null ? `, being ${rp.pct}% of today's pay` : ', set by hand'}</div></div>
+
+    <div class="fin-group"><h4>Market</h4><div class="fin-fields">
+      ${finSel_('marketProfile', 'Portfolio', FIN_MARKET)}
+      ${finNum_('realReturn', 'Real return', { post: '%', step: 0.25 })}
+      ${finNum_('vol', 'Volatility', { post: '%', step: 1 })}
+    </div>
+    <div class="fin-derived">Volatility is what makes the band — set it to zero and the cone collapses to a single line.</div></div>
+
+    <div class="fin-group"><h4>Every year</h4>
+      <div class="fin-rows" id="finRewardRows"></div>
+      <div class="fin-add"><button onclick="finAdd_('reward')">Add a yearly cost</button></div></div>
+
+    <div class="fin-group"><h4>Children</h4>
+      <div class="fin-rows" id="finKidRows"></div>
+      <div class="fin-add"><button onclick="finAdd_('kid')">Add a child</button></div></div>
+
+    <div class="fin-group"><h4>Big purchases</h4>
+      <div class="fin-rows" id="finBuyRows"></div>
+      <div class="fin-add"><button onclick="finAdd_('house')">Add property</button>
+        <button onclick="finAdd_('car')">Add vehicle</button></div></div>
+
+    <div class="fin-group"><div class="fin-add">
+      <button onclick="finReset_()">Reset to the example numbers</button></div></div>`;
+
+  finBuildRows_();
+}
+
+const FIN_LIST = k => k === 'promo' ? FIN.promos : k === 'reward' ? FIN.rewards
+  : k === 'kid' ? FIN.kids : FIN.buys;
+
+// One source per row note, so the markup and the live refresh cannot drift.
+const FIN_NOTE = {
+  promo: pr => Math.round(pr.inYears || 0) < 1
+    ? 'Set at least 1 year out — the model steps a year at a time'
+    : `Lands at age ${FIN.age + Math.round(pr.inYears)}`,
+  reward: r => (r.to == null ? FIN.runTo : r.to) >= FIN.retireAge
+    ? `Runs past ${FIN.retireAge} — check the retirement budget does not already cover it`
+    : `Stops at ${r.to}, before the retirement budget takes over`,
+  kid: k => {
+    const p = FIN_KID_PLANS[k.plan] || FIN_KID_PLANS.custom;
+    return p.care == null ? '' :
+      `${finMoney_(p.care)}/yr to 5 · ${finMoney_(p.school)}/yr to 18 · ${finMoney_(p.college)}/yr for four years`;
+  },
+  buy: b => b.kind === 'house'
+    ? (b.plan === 'cash'
+        ? `Bought outright — no mortgage, still ~${finMoney_(b.price * 0.019)}/yr in tax, insurance and upkeep`
+        : `${finMoney_(finHouseDown_(b))} down at ${finHouseRate_(b).toFixed(2)}% — the rate a ${FIN.credit} score gets`
+          + (finHousePmi_(b) > 0 ? ` · ${finHousePmi_(b)}% mortgage insurance until 20% equity` : ''))
+    : b.mode === 'lease' ? 'A lease buys no equity, and left in the model it renews forever'
+    : b.mode === 'cash' ? 'Paid outright, then it depreciates — no interest, but the cash is gone'
+    : `${finCarRate_(b).toFixed(2)}% APR — the ${b.used ? 'used' : 'new'}-car rate for a ${FIN.credit} score`
+};
+
+function finRowShell_(kind, i, tag, label, body, note, cost) {
+  return `<div class="fin-row" data-fin-kind="${kind}" data-i="${i}">
+    <div class="fin-row-head"><span class="fin-tag${cost ? ' cost' : ''}">${tag}</span>
+      <input type="text" data-f="label" value="${escapeHtml_(label)}" aria-label="Name">
+      <button class="fin-del" data-fin-del="1" aria-label="Remove">&times;</button></div>
+    <div class="fin-fields">${body}</div>
+    ${note ? `<div class="fin-note">${escapeHtml_(note)}</div>` : ''}</div>`;
+}
+
+function finBuildRows_() {
+  const R = document.getElementById('finPromoRows');
+  if (!R) return;
+  R.innerHTML = FIN.promos.length ? FIN.promos.map((pr, i) => finRowShell_('promo', i, 'Known', pr.label,
+    finRowNum_(pr, 'inYears', 'Years from now', { step: 1, min: 1 }) + finRowNum_(pr, 'pct', 'Raise', { post: '%', step: 0.5 }),
+    FIN_NOTE.promo(pr))).join('')
+    : `<div class="fin-note">Nothing named — the modelled cadence above is doing all the work.</div>`;
+
+  document.getElementById('finRewardRows').innerHTML = FIN.rewards.length
+    ? FIN.rewards.map((r, i) => finRowShell_('reward', i, 'Yearly', r.label,
+        finRowNum_(r, 'amount', 'Cost each year', { pre: '$', step: 100 })
+        + finRowNum_(r, 'from', 'From age', { step: 1 }) + finRowNum_(r, 'to', 'Until age', { step: 1 }),
+        FIN_NOTE.reward(r), true)).join('')
+    : `<div class="fin-note">Trips, gear, gifts — the things you intend to keep doing. These come out of what you would otherwise save.</div>`;
+
+  document.getElementById('finKidRows').innerHTML = FIN.kids.length
+    ? FIN.kids.map((k, i) => finRowShell_('kid', i, 'Child', k.label,
+        finRowNum_(k, 'birthYear', 'Born', { step: 1, min: 1990 }) + finRowSel_(k, 'plan', 'Path', FIN_KID_PLANS)
+        + (k.plan === 'custom'
+            ? finRowNum_(k, 'care', 'Daycare 0–4 / yr', { pre: '$', step: 500 })
+              + finRowNum_(k, 'school', 'Ages 5–17 / yr', { pre: '$', step: 500 })
+              + finRowNum_(k, 'college', 'College / yr', { pre: '$', step: 1000 })
+            : ''),
+        FIN_NOTE.kid(k), true)).join('')
+    : `<div class="fin-note">Each stage is charged only while that child is the right age, so costs arrive and leave on their own.</div>`;
+
+  document.getElementById('finBuyRows').innerHTML = FIN.buys.length
+    ? FIN.buys.map((b, i) => b.kind === 'house'
+        ? finRowShell_('buy', i, 'Builds equity', b.label,
+            finRowNum_(b, 'year', 'Year', { step: 1 }) + finRowNum_(b, 'price', 'Price', { pre: '$', step: 5000 })
+            + finRowSel_(b, 'plan', 'Down payment', FIN_HOUSE_PLANS)
+            + (b.plan === 'custom' ? finRowNum_(b, 'down', 'Down', { pre: '$', step: 1000 })
+                + finRowNum_(b, 'pmi', 'Mortgage ins.', { post: '%', step: 0.05 }) : '')
+            + finRowNum_(b, 'term', 'Years', { step: 1 }) + finRowNum_(b, 'growth', 'Growth / yr', { post: '%', step: 0.25 }),
+            FIN_NOTE.buy(b))
+        : finRowShell_('buy', i, b.mode === 'lease' ? 'Never stops' : 'Depreciates', b.label,
+            finRowSel_(b, 'mode', 'How', FIN_CAR_MODES) + finRowNum_(b, 'year', 'Year', { step: 1 })
+            + (b.mode === 'lease' ? finRowNum_(b, 'lease', 'Monthly', { pre: '$', step: 25 })
+                : finRowNum_(b, 'price', 'Price', { pre: '$', step: 1000 })
+                  + (b.mode === 'cash' ? '' : finRowNum_(b, 'down', 'Down', { pre: '$', step: 500 })
+                      + finRowNum_(b, 'term', 'Years', { step: 1 })
+                      + finRowSel_(b, 'used', 'Condition', { 0: { label: 'New' }, 1: { label: 'Used' } }))),
+            FIN_NOTE.buy(b), true)).join('')
+    : `<div class="fin-note">No purchases planned.</div>`;
+}
+
+// Notes depend on fields other than their own, so they refresh from state
+// rather than only when a row is rebuilt - and in place, so typing is never
+// interrupted.
+function finRefreshNotes_() {
+  document.querySelectorAll('#finEditBody .fin-row').forEach(row => {
+    const el = row.querySelector('.fin-note');
+    if (!el) return;
+    const kind = row.dataset.finKind;
+    const item = FIN_LIST(kind)[+row.dataset.i];
+    if (item && FIN_NOTE[kind]) el.textContent = FIN_NOTE[kind](item);
+  });
+}
+
+function finAdd_(what) {
+  if (what === 'promo') FIN.promos.push({ label: 'Promotion',
+    inYears: (FIN.promos.length ? Math.max(...FIN.promos.map(p => p.inYears || 0)) : 0) + 1, pct: 8 });
+  else if (what === 'reward') FIN.rewards.push({ label: 'Yearly cost', amount: 1000, from: FIN.age, to: FIN.retireAge });
+  else if (what === 'kid') FIN.kids.push({ label: 'Child', birthYear: FIN_YEAR0 + 2, plan: 'public' });
+  else if (what === 'house') FIN.buys.push({ kind: 'house', label: 'Property', year: FIN_YEAR0 + 5,
+    price: 400000, plan: 'c20', down: 80000, rate: null, term: 30, growth: 1, pmi: 0 });
+  else if (what === 'car') FIN.buys.push({ kind: 'car', label: 'Vehicle', mode: 'finance', year: FIN_YEAR0 + 3,
+    price: 32000, down: 4000, rate: null, term: 5, lease: 550, used: 0 });
+  finBuildRows_(); renderFinancialTab();
+}
+
+function finReset_() {
+  if (!confirm('Clear your figures and go back to the example numbers?')) return;
+  FIN = JSON.parse(JSON.stringify(FIN_DEFAULTS));
+  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
+  try { localStorage.removeItem(FIN_KEY); } catch (e) {}
+  finBuildEdit_(); renderFinancialTab();
+}
+
+document.addEventListener('input', e => {
+  const body = e.target.closest('#finEditBody');
+  if (!body) return;
+  const row = e.target.closest('.fin-row');
+  if (row && e.target.dataset.f) {
+    const item = FIN_LIST(row.dataset.finKind)[+row.dataset.i];
+    if (!item) return;
+    item[e.target.dataset.f] = e.target.type === 'number' ? (parseFloat(e.target.value) || 0) : e.target.value;
+    renderFinancialTab(); finRefreshNotes_();
+    return;
+  }
+  const key = e.target.dataset.fin;
+  if (!key) return;
+  const v = parseFloat(e.target.value);
+  if (Number.isNaN(v)) return;
+  // A value still being typed is not an instruction: hold anything outside
+  // the plausible range rather than acting on it.
+  if (key in FIN_RAW) {
+    if (!(v > FIN.age && v <= 110)) return;
+    FIN_RAW[key] = v;
+  }
+  FIN[key] = v;
+  if (key === 'realReturn' || key === 'vol') FIN.marketProfile = 'custom';
+  if (key === 'retireSpend') FIN.retireProfile = 'custom';
+  renderFinancialTab(); finRefreshNotes_();
+});
+
+document.addEventListener('change', e => {
+  const body = e.target.closest('#finEditBody');
+  if (!body || e.target.tagName !== 'SELECT') return;
+  const row = e.target.closest('.fin-row');
+  if (row && e.target.dataset.f) {
+    const item = FIN_LIST(row.dataset.finKind)[+row.dataset.i];
+    if (!item) return;
+    const raw = e.target.value;
+    item[e.target.dataset.f] = /^-?\d+(\.\d+)?$/.test(raw) ? parseFloat(raw) : raw;
+    finBuildRows_(); renderFinancialTab();
+    return;
+  }
+  const key = e.target.dataset.fin;
+  if (!key) return;
+  FIN[key] = e.target.value;
+  if (key === 'marketProfile') {
+    const m = FIN_MARKET[FIN.marketProfile];
+    if (m && m.ret != null) { FIN.realReturn = m.ret; FIN.vol = m.vol; }
+  }
+  finBuildEdit_(); renderFinancialTab();
+});
+
+document.addEventListener('click', e => {
+  const del = e.target.closest('#finEditBody [data-fin-del]');
+  if (!del) return;
+  const row = del.closest('.fin-row');
+  FIN_LIST(row.dataset.finKind).splice(+row.dataset.i, 1);
+  finBuildRows_(); renderFinancialTab();
+});
+
+// The clamp write-back skips a focused box so it never fights your typing,
+// which means it has to run again when you leave one.
+document.addEventListener('focusout', e => {
+  if (!e.target.id || !e.target.id.startsWith('fin_')) return;
+  const k = e.target.id.slice(4);
+  if (k in FIN_RAW && +e.target.value !== FIN[k]) { e.target.value = FIN[k]; FIN_RAW[k] = FIN[k]; }
+});
 
 /* ---------- Arranging the Overview cards ----------
    Order and visibility live here, not in the markup, so the markup stays
@@ -11280,7 +12199,7 @@ function dismissArchiveNotice_() {
 // tab - it opens as a modal from the Weight Trend card on Stats instead
 // (see openWeightDetailModal), so Stats' own render call already covers
 // keeping its mini chart fresh.
-const viewOrder = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats'];
+const viewOrder = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -11291,6 +12210,7 @@ function renderActiveViewContent(view) {
   if (view === 'stats') { renderStatsTab(); renderHistoryTab(); loadWorkoutHistory(); loadRemoteWeightLog(); }
   if (view === 'kitchen') { renderKitchenTab(); loadRemoteKitchenState(); loadRemoteStarterState(); loadRemoteRecipes().then(applyPendingRecipeSeeds_); }
   if (view === 'bodyhealth') { renderBodyHealthTab(); loadRemoteBodyHealthLog(); }
+  if (view === 'financial') renderFinancialTab();
 }
 
 // All 4 views live side-by-side in a flex track (CSS `order` maps them to
@@ -11652,7 +12572,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-25-trainer-title';
+const APP_BUILD_VERSION = '2026-08-25-financial-tab';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -16174,7 +17094,8 @@ const TOP_BAR_VIEW_INFO = {
   kitchen:  { title: 'Kitchen',  meta: '' },
   music:    { title: 'Music',    meta: '' },
   calendar: { title: 'Upcoming', meta: '' },
-  stats:    { title: 'Stats',    meta: 'Trends' }
+  stats:    { title: 'Stats',    meta: 'Trends' },
+  financial:{ title: 'Future',   meta: '' }
 };
 
 // Headers that own buttons hand them to the bar while their view is
@@ -16331,6 +17252,7 @@ initHistoryRange_();
 initMuscleWindow_();
 initMuscleMode_();
 loadHistoryLayout_();
+finLoad_();
 initInbody_();
 initTabBarViewportPin();
 // Local order first, so the page is already arranged on this device
