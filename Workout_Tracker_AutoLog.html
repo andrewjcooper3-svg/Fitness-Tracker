@@ -292,9 +292,20 @@
   .ov-hero-sub { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 4px; }
 
   /* Overview page header - plain text sitting on the page, no card chrome */
+  /* The eyebrow above each tab title is gone: "Trends" over History,
+     "Body Health" over Health, "Kitchen" over Kitchen - a line of chrome
+     restating the title under it, on a screen where the tab bar already
+     says which tab you are on. The class stays for the modals and for
+     Overview's week label, which carry something the title does not. */
   .ov-page-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 4px 2px 16px; }
   .ov-page-week { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); }
   .ov-page-title { font-family: var(--font); font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-top: 2px; }
+  /* Tab headers only. The same classes dress the modal sheets, where a
+     28px title is the established weight and there is no wasted column of
+     chrome to reclaim - so the shrink is scoped to the views. */
+  .app-view > .ov-page-head { align-items: center; padding: 2px 2px 10px; }
+  .app-view > .ov-page-head .ov-page-title { font-size: 22px; letter-spacing: -0.4px; margin-top: 0; }
+  .app-view > .ov-page-head .ov-page-week + .ov-page-title { margin-top: 2px; }
   .ov-edit-btn { font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
   .ov-page-head-actions { display: flex; align-items: center; gap: 10px; }
   .ov-gear-btn { font-size: 20px; line-height: 1; color: var(--muted); background: none; border: none; padding: 6px 4px; margin-top: 4px; cursor: pointer; }
@@ -688,7 +699,10 @@
   /* Small ambient cooking animation, top-right of the Kitchen tab - pure
      CSS keyframes (no JS) since it's just a looping stir + rising steam,
      unlike the pushup figure this doesn't need a tap-to-interrupt state. */
-  .cook-anim-svg { width: 76px; height: 76px; overflow: visible; }
+  /* Scaled with the title it sits beside - at 76px it set the Kitchen
+     header's height on its own, which is the wasted space the smaller
+     title was meant to reclaim. */
+  .cook-anim-svg { width: 48px; height: 48px; overflow: visible; }
   .cook-anim-line { fill: none; stroke: var(--accent); stroke-width: 6.5; stroke-linecap: round; stroke-linejoin: round; }
   .cook-anim-head { fill: var(--accent); }
   .cook-anim-panarm { transform-origin: 33px 33px; animation: panToss 1.4s ease-in-out infinite; }
@@ -2353,7 +2367,6 @@
 <div id="view-bodyhealth" class="app-view">
   <div class="ov-page-head">
     <div>
-      <div class="ov-page-week">Body Health</div>
       <div class="ov-page-title">Health</div>
     </div>
   </div>
@@ -2393,7 +2406,6 @@
 <div id="view-stats" class="app-view">
   <div class="ov-page-head">
     <div>
-      <div class="ov-page-week">Trends</div>
       <div class="ov-page-title">History</div>
     </div>
     <div class="ov-page-head-actions">
@@ -2623,7 +2635,6 @@
 <div id="view-kitchen" class="app-view">
   <div class="ov-page-head">
     <div>
-      <div class="ov-page-week">Kitchen</div>
       <div class="ov-page-title">Kitchen</div>
     </div>
     <svg viewBox="0 0 100 100" class="cook-anim-svg" aria-hidden="true">
@@ -11701,7 +11712,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-25-overview-layout';
+const APP_BUILD_VERSION = '2026-08-25-tighter-heads';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
