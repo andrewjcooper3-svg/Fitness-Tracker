@@ -1060,6 +1060,9 @@
 
   .hx-card-head { display: flex; align-items: center; justify-content: space-between;
     gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  /* Two segments in one head: they wrap together as a block rather than
+     letting space-between strand one of them on a line of its own. */
+  .hx-head-controls { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .hx-mini-seg { display: flex; gap: 3px; background: var(--surface2); border-radius: 10px; padding: 3px; }
   .hx-mini-seg button { font-family: var(--font); font-size: 10.5px; font-weight: 700; color: var(--muted);
     background: none; border: none; border-radius: 8px; padding: 5px 9px; cursor: pointer; white-space: nowrap; }
@@ -2414,10 +2417,20 @@
              checking a week at a time, while every other chart on this tab
              wants months - so this card gets to disagree with the range
              chips, and the line under it always names the exact window. -->
-        <div class="hx-mini-seg" id="hxMuscleSeg">
-          <button data-win="week" onclick="setMuscleWindow('week')">This week</button>
-          <button data-win="lastweek" onclick="setMuscleWindow('lastweek')">Last week</button>
-          <button class="active" data-win="range" id="hxMuscleRangeBtn" onclick="setMuscleWindow('range')">All time</button>
+        <div class="hx-head-controls">
+          <div class="hx-mini-seg" id="hxMuscleSeg">
+            <button data-win="week" onclick="setMuscleWindow('week')">This week</button>
+            <button data-win="lastweek" onclick="setMuscleWindow('lastweek')">Last week</button>
+            <button class="active" data-win="range" id="hxMuscleRangeBtn" onclick="setMuscleWindow('range')">All time</button>
+          </div>
+          <!-- The attribution mode used to live only inside the modal, which
+               meant turning it on there left this card quietly showing
+               fractional sets with nothing on screen to say why. The control
+               belongs next to the numbers it changes. -->
+          <div class="hx-mini-seg" id="hxCardModeSeg">
+            <button data-mode="primary" class="active" onclick="setMuscleMode(false)">Primary</button>
+            <button data-mode="weighted" onclick="setMuscleMode(true)">Weighted</button>
+          </div>
         </div>
       </div>
       <div class="hx-card-note" id="hxMuscleNote"></div>
@@ -5423,6 +5436,8 @@ function renderHistoryMuscles_(rows) {
   if (rangeBtn) rangeBtn.textContent = rangeLabel;
   document.querySelectorAll('#hxMuscleSeg button').forEach(b =>
     b.classList.toggle('active', b.dataset.win === hxMuscleWindow_));
+  document.querySelectorAll('#hxCardModeSeg button').forEach(b =>
+    b.classList.toggle('active', (b.dataset.mode === 'weighted') === hxMuscleWeighted_));
 
   const win = hxMuscleWindowBounds_();
   const scoped = win ? rows.filter(r => r.date >= win.from && r.date < win.toExclusive) : rows;
@@ -5435,8 +5450,16 @@ function renderHistoryMuscles_(rows) {
   const fmtDay = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const when = win ? `${fmtDay(win.monday)} – ${fmtDay(win.sunday)}` : rangeLabel.toLowerCase();
   if (note) {
+    /* Weighted mode is the only thing that can produce a count like "1.8
+       sets", and a reader who did not turn it on has no way to guess that -
+       the obvious wrong theory is that a set marked "tough" counts as less
+       than one. It does not: quality tags are recorded per set and never
+       touch these totals. So the note says outright where the fractions
+       come from whenever the mode is on. */
     note.textContent = total
-      ? `${muscleSetsLabel_(total)}, ${when}${hxMuscleWeighted_ ? ', weighted' : ''} — tap a group to see what is in it`
+      ? hxMuscleWeighted_
+        ? `${muscleSetsLabel_(total)}, ${when} — weighted, so each set is split across the muscles it trains and counts are fractional. Tap a group to see what is in it.`
+        : `${muscleSetsLabel_(total)}, ${when} — tap a group to see what is in it`
       : `Nothing completed ${win ? when : 'in this range'} yet.`;
   }
   if (!list.length) {
@@ -11454,7 +11477,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-24-split-reps';
+const APP_BUILD_VERSION = '2026-08-25-muscle-mode';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

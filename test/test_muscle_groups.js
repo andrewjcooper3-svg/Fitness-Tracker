@@ -146,5 +146,110 @@ check('every muscle group has a region', notDrawn.length === 0, notDrawn.join(',
 const phantom = [...drawn].filter(g => !known.has(g));
 check('no region maps to a group that cannot occur', phantom.length === 0, phantom.join(', '));
 
+/* ---- The breakdown, end to end ----
+   Classifying "Pushups" as Chest is not the same as it SHOWING UP under
+   Chest, and the reps tile now filters pushups out of its own total - so
+   the two are checked separately, on the same rows.
+
+   The second half is here because of a real misreading: fractional set
+   counts in this chart look like a set marked "tough" is being counted as
+   less than a whole one. Quality tags are counted per row and never enter
+   the breakdown; weighted mode is the only thing that can produce a
+   fraction. Both directions are pinned. */
+// new Function, not eval: the tables above already declared muscleSplit_ and
+// friends in this scope, and a second declaration of the same name would be
+// a redeclaration error rather than the fresh copy wanted here.
+const { muscleBreakdown_, muscleRanked_, isPushupRow_, historyTileTotals_ } = new Function(
+  src.match(/const MUSCLE_PATTERNS = \[[\s\S]*?\n\];/)[0]
+  + '\n' + src.match(/function muscleFor_\(name\) \{[\s\S]*?\n\}/)[0]
+  + '\n' + src.match(/const MUSCLE_SPLIT_OVERRIDES = \[[\s\S]*?\n\];/)[0]
+  + '\n' + src.match(/const MUSCLE_SPLIT_DEFAULTS = \{[\s\S]*?\n\};/)[0]
+  + '\n' + src.match(/function muscleSplit_\(name\) \{[\s\S]*?\n\}/)[0]
+  + '\n' + src.match(/function muscleBreakdown_\(rows, weighted\) \{[\s\S]*?\n\}/)[0]
+  + '\n' + src.match(/function muscleRanked_\(rows, weighted\) \{[\s\S]*?\n\}/)[0]
+  + '\n' + src.match(/function isPushupRow_\(r\) \{[\s\S]*?\n\}/)[0]
+  + '\n' + src.match(/function historyTileTotals_\(rows\) \{[\s\S]*?\n\}/)[0]
+  + '\nreturn { muscleBreakdown_, muscleRanked_, isPushupRow_, historyTileTotals_ };')();
+
+const row = (exercise, done, over = {}) => Object.assign({
+  date: '2026-08-24', exercise, sets: done, done,
+  volume: 0, totalReps: done * 10, green: done, yellow: 0, red: 0
+}, over);
+
+console.log('\n=== Pushups reach the chart, in both modes ===');
+{
+  const rows = [
+    row('Machine Chest Press', 2),
+    row('Pushups', 3, { totalReps: 165 }),
+    row('Lat Pulldown', 3)
+  ];
+
+  const primary = muscleBreakdown_(rows, false);
+  check('Chest exists in primary mode', !!primary.Chest, Object.keys(primary).join(', '));
+  check('and Pushups is listed inside it', primary.Chest && primary.Chest.ex.Pushups === 3,
+    primary.Chest && JSON.stringify(primary.Chest.ex));
+  check('all five chest sets counted whole', primary.Chest && primary.Chest.sets === 5,
+    primary.Chest && String(primary.Chest.sets));
+
+  const weighted = muscleBreakdown_(rows, true);
+  check('Pushups is still listed under Chest when weighted',
+    weighted.Chest && weighted.Chest.ex.Pushups > 0,
+    weighted.Chest && JSON.stringify(weighted.Chest.ex));
+  // 3 sets x the Chest default split, 0.6 / 0.25 / 0.15.
+  check('at 0.6 of a set each', weighted.Chest && Math.abs(weighted.Chest.ex.Pushups - 1.8) < 1e-9,
+    weighted.Chest && String(weighted.Chest.ex.Pushups));
+  check('and they push triceps and shoulders too',
+    weighted.Triceps && weighted.Triceps.ex.Pushups > 0 && weighted.Shoulders.ex.Pushups > 0);
+
+  // The reps tile is the ONE place pushups are held out, because 165 reps
+  // next to 60 makes the gym number unreadable. Sets are not held out.
+  const t = historyTileTotals_(rows);
+  check('the reps tile keeps pushups out of the gym number', t.reps === 50, String(t.reps));
+  check('and reports them alongside instead', t.pushupReps === 165, String(t.pushupReps));
+  check('but the set count still includes them', t.sets === 8, String(t.sets));
+}
+
+console.log('\n=== Set quality does not change any count ===');
+{
+  // Same three sets, logged as clean, as tough, and as a mix. A chart that
+  // discounted a "tough" set would move here. Nothing may.
+  const shapes = [
+    ['all clean', { green: 3, yellow: 0, red: 0 }],
+    ['all tough', { green: 0, yellow: 3, red: 0 }],
+    ['one of each', { green: 1, yellow: 1, red: 1 }],
+    ['untagged', { green: 0, yellow: 0, red: 0 }]
+  ];
+  const totals = shapes.map(([, q]) =>
+    muscleRanked_([row('Machine Chest Press', 3, q)], false)[0].sets);
+  check('primary: three sets stay three, however they felt',
+    totals.every(t => t === 3), shapes.map((s, i) => `${s[0]}=${totals[i]}`).join(', '));
+
+  const w = shapes.map(([, q]) =>
+    muscleRanked_([row('Machine Chest Press', 3, q)], true)[0].sets);
+  check('weighted: 1.8 either way, and the fraction is the split, not the tag',
+    w.every(t => Math.abs(t - 1.8) < 1e-9), shapes.map((s, i) => `${s[0]}=${w[i]}`).join(', '));
+
+  // Whole numbers in primary mode is the guarantee that makes the point
+  // above visible in the UI: if you see a decimal, you are in weighted.
+  const mixed = [row('Squat', 3, { yellow: 2 }), row('Bench Press', 2, { red: 1 }),
+                 row('Pushups', 4, { yellow: 4 })];
+  const wholes = muscleRanked_(mixed, false);
+  check('primary mode never produces a fraction',
+    wholes.every(m => Number.isInteger(m.sets)),
+    wholes.map(m => `${m.name}=${m.sets}`).join(', '));
+  check('weighted mode is where the fractions come from',
+    muscleRanked_(mixed, true).some(m => !Number.isInteger(m.sets)));
+}
+
+console.log('\n=== A set that was never ticked off counts nowhere ===');
+// done is "sets with the checkbox ticked". Reps typed into a set that was
+// never completed are not a logged set, and this is the likeliest reason
+// for an exercise to be missing from the chart entirely.
+{
+  const ghost = muscleBreakdown_([row('Pushups', 0, { totalReps: 0 })], false);
+  check('an untouched exercise adds nothing', Object.keys(ghost).length === 0,
+    Object.keys(ghost).join(', '));
+}
+
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);
