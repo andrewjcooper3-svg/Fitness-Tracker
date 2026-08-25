@@ -203,5 +203,62 @@ console.log('\n=== Rows no week tab covers are kept ===');
   check('replaceAll drops it, as asked', !wiped.some(r => r.exercise === 'Ancient Lift'));
 }
 
+console.log('\n=== A stray header row in the data is not a session ===');
+{
+  /* Found in the live sheet: a second copy of the header sitting at row 2,
+     left over from widening the sheet in place. The keep-list only drops
+     rows whose date+day a week tab covers, and a header's date covers
+     nothing - so it survived every rebuild, and the app read it back as an
+     exercise called "Exercise" with zero of everything. */
+  const { ss, getOrCreateHistorySheet_, rebuildHistoryFromWeekTabs_, getWorkoutHistory_, HISTORY_HEADERS } =
+    load([...weekTabs(2)]);
+  const hist = getOrCreateHistorySheet_();
+  hist.rows.splice(1, 0, HISTORY_HEADERS.slice());          // the duplicate
+  hist.rows.push(['2024-03-04', 'Friday', 'Ancient Lift', 3, 3, 999, 1000, 10, 30, 3, 0, 0,
+                  'Week of Mar 4 - Mar 10, 2024', 10, 500, 1200]);
+
+  // Read must come good immediately, without waiting for a rebuild.
+  const before = getWorkoutHistory_();
+  check('the read skips it even before a rebuild',
+    !before.some(r => r.exercise === 'Exercise'), before.map(r => r.exercise).join(','));
+  check('and keeps the real orphan row', before.some(r => r.exercise === 'Ancient Lift'));
+
+  rebuildHistoryFromWeekTabs_(false);
+  const hx = getWorkoutHistory_();
+  check('the rebuild drops it for good', !hx.some(r => r.exercise === 'Exercise'),
+    hx.map(r => r.exercise).join(','));
+  check('it is gone from the sheet, not just the read',
+    !hist.rows.slice(1).some(r => r[2] === 'Exercise'),
+    hist.rows.slice(1).filter(r => r[2] === 'Exercise').length + ' left');
+  check('the orphan row still survived', hx.some(r => r.exercise === 'Ancient Lift'));
+  check('and the week tabs rebuilt as usual',
+    hx.filter(r => r.exercise === 'Leg Press').length === 4,
+    String(hx.filter(r => r.exercise === 'Leg Press').length));
+  check('the real header is still row 1',
+    hist.rows[0].join('|') === HISTORY_HEADERS.join('|'), hist.rows[0].join('|'));
+}
+
+console.log('\n=== Planned but unticked sets are recorded as zero, not dropped ===');
+{
+  /* The live sheet has pushup rows reading "3 sets, 0 done" - three sets
+     planned, none checked off. That row has to keep existing (the day did
+     have pushups on the card) while contributing nothing to any total, so
+     the app can tell "did not do it" apart from "was never scheduled". */
+  const { rebuildHistoryFromWeekTabs_, getWorkoutHistory_ } = load([(() => {
+    const rows = [WEEK_HEADERS.slice()];
+    for (let sn = 1; sn <= 3; sn++) {
+      rows.push(['2026-01-01', 'Monday', 'Pushups', sn, 'BW', 'BW', 55, '', 'No', '', '']);
+    }
+    rows.push(['2026-01-01', 'Monday', 'Leg Press', 1, 255, 255, 10, 10, 'Yes', '', 'Green']);
+    return new Sheet('Week of Aug 24 - Aug 30, 2026', rows);
+  })()]);
+  rebuildHistoryFromWeekTabs_(false);
+  const pu = getWorkoutHistory_().find(r => r.exercise === 'Pushups');
+  check('the row exists', !!pu);
+  check('three sets were planned', pu && pu.sets === 3, pu && String(pu.sets));
+  check('none are counted as done', pu && pu.done === 0, pu && String(pu.done));
+  check('and no reps are credited', pu && pu.totalReps === 0, pu && String(pu.totalReps));
+}
+
 console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);
 process.exit(fails ? 1 : 0);

@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-24-history-rebuild';
+const BACKEND_BUILD_VERSION = '2026-08-25-header-row-guard';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1195,6 +1195,20 @@ const HISTORY_HEADERS = ['Date', 'Day', 'Exercise', 'Sets', 'Sets Done', 'Top We
                          'Volume', 'Target Reps', 'Total Reps', 'Green', 'Yellow', 'Red', 'Week',
                          'Top Set Reps', 'Best Set Volume', 'Est 1RM'];
 
+/* A rollup row is identified by its date. Anything in the data range whose
+   first cell is not a date is not a session - in practice a second copy of
+   the header, left behind when the sheet was widened in place and then
+   preserved by every rebuild since: the keep-list only drops rows whose
+   date+day a week tab covers, and a header's date matches nothing, so it
+   survived indefinitely and surfaced in the app as a phantom exercise
+   literally named "Exercise". Checked on both write and read, because a
+   sheet already carrying one must come good without waiting for a rebuild. */
+function isHistoryDataRow_(row, tz) {
+  if (!row || !row[2]) return false;
+  if (row[0] instanceof Date) return true;
+  return /^\d{4}-\d{2}-\d{2}/.test(String(row[0]).trim());
+}
+
 // A rollup written before a column was added cannot answer for it, and
 // half-filled rows are worse than none. The sheet is rebuilt whenever its
 // header no longer matches, and the empty-sheet backfill below repopulates
@@ -1348,7 +1362,8 @@ function getWorkoutHistory_() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
   const tz = getOrCreateSpreadsheet_().getSpreadsheetTimeZone();
-  return sheet.getRange(2, 1, lastRow - 1, HISTORY_HEADERS.length).getValues().map(r => ({
+  return sheet.getRange(2, 1, lastRow - 1, HISTORY_HEADERS.length).getValues()
+    .filter(r => isHistoryDataRow_(r)).map(r => ({
     date: r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'yyyy-MM-dd') : String(r[0]),
     day: r[1], exercise: r[2],
     sets: Number(r[3]) || 0, done: Number(r[4]) || 0,
@@ -1424,7 +1439,7 @@ function rebuildHistoryFromWeekTabs_(replaceAll) {
   if (lastRow > 1 && !replaceAll) {
     keep = sheet.getRange(2, 1, lastRow - 1, HISTORY_HEADERS.length).getValues()
       .filter(function (r) {
-        if (!r[2]) return false;
+        if (!isHistoryDataRow_(r)) return false;
         const d = r[0] instanceof Date ? Utilities.formatDate(r[0], tz, 'yyyy-MM-dd') : String(r[0]);
         return !touched[d + '|' + r[1]];
       });
