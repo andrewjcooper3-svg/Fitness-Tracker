@@ -1092,6 +1092,28 @@
      the count still reads first and the arithmetic is there to be checked. */
   .hx-muscle-sum { opacity: 0.62; font-size: 10.5px; margin-left: 7px; }
 
+  /* ---- Arrange Overview ---- */
+  .hx-layout-row { display: flex; align-items: center; gap: 8px; padding: 7px 0;
+    border-bottom: 1px solid var(--border); }
+  .hx-layout-row:last-child { border-bottom: none; }
+  /* The name is the visibility toggle - a whole-row target rather than a
+     checkbox to hunt for, and it reads as "this card is on" at a glance. */
+  .hx-layout-name { flex: 1; display: flex; align-items: center; gap: 9px; min-width: 0;
+    font-family: var(--font); font-size: 13px; color: var(--text); background: none;
+    border: none; padding: 8px 0; text-align: left; cursor: pointer; }
+  .hx-layout-row.off .hx-layout-name { color: var(--muted); text-decoration: line-through; }
+  .hx-layout-eye { flex: 0 0 auto; font-size: 13px; opacity: 0.9; width: 18px; text-align: center; }
+  .hx-layout-move { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px;
+    background: var(--surface2); border: none; color: var(--text); font-size: 14px;
+    cursor: pointer; font-family: var(--font); }
+  .hx-layout-move:disabled { opacity: 0.3; cursor: default; }
+  .hx-layout-actions { display: flex; justify-content: center; margin-top: 14px; }
+  .hx-layout-reset { font-family: var(--font); font-size: 12px; font-weight: 700;
+    color: var(--muted); background: none; border: none; padding: 8px 12px; cursor: pointer; }
+  /* Hidden cards stay in the DOM so their charts keep their element
+     identity; only the flow drops them. */
+  .hx-card-hidden { display: none !important; }
+
   /* Exercise list -> detail, Hevy's drill-in. */
   .hx-ex-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
   .hx-ex-item:last-child { border-bottom: none; }
@@ -2375,6 +2397,9 @@
       <div class="ov-page-title">History</div>
     </div>
     <div class="ov-page-head-actions">
+      <!-- Overview only: the other three segments are a list, a feed and a
+           set of scans, none of which have cards to arrange. -->
+      <button class="ov-gear-btn" id="hxLayoutBtn" onclick="openHistoryLayout()" aria-label="Arrange cards" title="Arrange or hide the Overview cards">☰</button>
       <button class="ov-gear-btn" id="hxRefreshBtn" onclick="loadWorkoutHistory(true)" aria-label="Refresh history" title="Reload from the Sheet">↻</button>
     </div>
   </div>
@@ -2400,19 +2425,19 @@
 
   <!-- ---- Overview: the Profile screen ---- -->
   <div class="hx-section" id="hxSectionOverview">
-    <div class="stats-card">
+    <div class="stats-card" data-hxcard="tiles" data-hxname="Totals">
       <div class="hx-tiles" id="hxTiles"></div>
       <div class="stats-chart-detail" id="hxTilesNote" style="margin-top:10px; min-height:0;"></div>
     </div>
 
-    <div class="stats-card">
+    <div class="stats-card" data-hxcard="freq" data-hxname="Workouts per week">
       <div class="stats-card-title">Workouts per week</div>
       <svg viewBox="0 0 320 140" class="stats-chart" id="hxFreqChart" preserveAspectRatio="none"></svg>
       <div class="stats-chart-labels" id="hxFreqLabels"></div>
       <div class="stats-chart-detail" id="hxFreqDetail"></div>
     </div>
 
-    <div class="stats-card">
+    <div class="stats-card" data-hxcard="muscles" data-hxname="Muscle distribution">
       <div class="hx-card-head">
         <button class="stats-card-title hx-title-btn" style="margin:0;" onclick="openMuscleBalanceModal()"
                 title="Open the body diagram and balance ratios">Muscle distribution <span class="hx-title-caret">›</span></button>
@@ -2440,14 +2465,14 @@
       <div id="hxMuscles"></div>
     </div>
 
-    <div class="stats-card">
+    <div class="stats-card" data-hxcard="volume" data-hxname="Weekly volume">
       <div class="stats-card-title">Weekly volume</div>
       <svg viewBox="0 0 320 140" class="stats-chart" id="hxVolumeChart" preserveAspectRatio="none"></svg>
       <div class="stats-chart-labels" id="hxVolumeLabels"></div>
       <div class="stats-chart-detail" id="hxVolumeDetail"></div>
     </div>
 
-    <div class="stats-card">
+    <div class="stats-card" data-hxcard="completion" data-hxname="Sets completed">
       <div class="stats-card-title">Sets completed</div>
       <svg viewBox="0 0 320 140" class="stats-chart" id="hxCompletionChart" preserveAspectRatio="none"></svg>
       <div class="stats-chart-labels" id="hxCompletionLabels"></div>
@@ -2462,7 +2487,7 @@
          section so they join its column flow instead of forming a separate
          row underneath it, which left a hole at the foot of the short
          column - and so they stop repeating under every segment. -->
-    <div class="stats-card">
+    <div class="stats-card" data-hxcard="pushups" data-hxname="Pushups">
       <div class="stats-card-title">Pushups — Last 8 Weeks</div>
       <svg viewBox="0 0 320 140" class="stats-chart" id="statsPushupChart" preserveAspectRatio="none"></svg>
       <div class="stats-chart-labels" id="statsPushupLabels"></div>
@@ -2472,7 +2497,7 @@
          the chart's own points still show their own date/weight inline via
          showWeightPointDetail_, which stops propagation so tapping a point
          doesn't also open the modal underneath it. -->
-    <div class="stats-card stats-card-clickable" onclick="openWeightDetailModal()">
+    <div class="stats-card stats-card-clickable" data-hxcard="weight" data-hxname="Weight trend" onclick="openWeightDetailModal()">
       <div class="stats-card-title">Weight Trend</div>
       <svg viewBox="0 0 320 140" class="stats-chart" id="statsWeightChart" preserveAspectRatio="none"></svg>
       <div class="stats-chart-labels" id="statsWeightLabels"></div>
@@ -3111,6 +3136,27 @@
     <div class="event-modal-relative" id="weekDetailTotal" style="margin-bottom:14px;"></div>
     <div id="weekDetailDays"></div>
     <button class="event-modal-close" onclick="closeWeekDetailModal(event)">Close</button>
+  </div>
+</div>
+
+<!-- Arranging the Overview cards.
+     A list rather than dragging the cards themselves: Overview is a CSS
+     columns flow, so "up" on screen is not a direction the cards have -
+     the same card is above its neighbour on a phone and beside it on a
+     desktop. The flow order IS linear, so the list edits that directly and
+     every width follows from it. Buttons also beat a drag on a phone. -->
+<div class="event-modal-overlay" id="hxLayoutOverlay" onclick="closeHistoryLayout(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-title" style="margin-bottom:2px;">Arrange Overview</div>
+    <div class="event-modal-relative" style="margin-bottom:14px;">
+      Reorder with the arrows, tap a name to show or hide it. Saved on this device.
+    </div>
+    <div id="hxLayoutList"></div>
+    <div class="hx-layout-actions">
+      <button class="hx-layout-reset" onclick="resetHistoryLayout()">Reset to default</button>
+    </div>
+    <button class="event-modal-close" onclick="closeHistoryLayout(event)">Done</button>
   </div>
 </div>
 
@@ -4572,8 +4618,166 @@ function showHistorySection(name) {
     const el = document.getElementById(id);
     if (el) el.style.display = name === 'body' ? 'none' : '';
   });
+  // Only Overview has arrangeable cards.
+  const layoutBtn = document.getElementById('hxLayoutBtn');
+  if (layoutBtn) layoutBtn.style.display = name === 'overview' ? '' : 'none';
   document.querySelectorAll('#hxSeg .hx-seg-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.hx === name));
+  renderHistoryTab();
+  updateViewportHeight('stats', true);
+}
+
+/* ---------- Arranging the Overview cards ----------
+   Order and visibility live here, not in the markup, so the markup stays
+   the one description of what a card IS and this stays the description of
+   where it sits.
+
+   Two rules make it survive the app changing underneath it: an id in
+   storage that no longer exists is ignored, and a card in the markup that
+   storage has never heard of is kept, in its authored position relative to
+   the cards around it. So adding a card to the HTML later shows it to
+   everyone rather than silently hiding it from anyone who has ever opened
+   this editor - which is the usual way a saved layout rots. */
+const STORAGE_HISTORY_LAYOUT_KEY = 'WORKOUT_HISTORY_LAYOUT';
+let hxLayout_ = { order: [], hidden: [] };
+
+function hxOverviewCards_() {
+  const sec = document.getElementById('hxSectionOverview');
+  return sec ? [...sec.querySelectorAll('[data-hxcard]')] : [];
+}
+
+// The authored order, which is also the reset target.
+let hxCardsDefault_ = null;
+function hxDefaultOrder_() {
+  if (!hxCardsDefault_) hxCardsDefault_ = hxOverviewCards_().map(c => c.dataset.hxcard);
+  return hxCardsDefault_;
+}
+
+function loadHistoryLayout_() {
+  hxDefaultOrder_();
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_HISTORY_LAYOUT_KEY) || 'null');
+    if (raw && Array.isArray(raw.order)) {
+      hxLayout_.order = raw.order.filter(id => typeof id === 'string');
+      hxLayout_.hidden = Array.isArray(raw.hidden) ? raw.hidden.filter(id => typeof id === 'string') : [];
+    }
+  } catch (e) {}
+  applyHistoryLayout_();
+}
+
+function saveHistoryLayout_() {
+  try {
+    localStorage.setItem(STORAGE_HISTORY_LAYOUT_KEY, JSON.stringify(hxLayout_));
+  } catch (e) {}
+}
+
+/* The saved order, reconciled with what the markup actually offers.
+   A card storage does not know about is spliced back in next to the card
+   it was authored after, so a new card lands where it was designed to. */
+function hxResolvedOrder_() {
+  const present = hxOverviewCards_().map(c => c.dataset.hxcard);
+  /* Resolve against the AUTHORED order, never the live DOM - the DOM is
+     whatever the last arrangement left behind, so reading it back made
+     "reset" a no-op for order while still clearing the hidden list. */
+  const authored = hxDefaultOrder_().filter(id => present.includes(id))
+    .concat(present.filter(id => !hxDefaultOrder_().includes(id)));
+  const saved = hxLayout_.order.filter(id => present.includes(id));
+  if (!saved.length) return authored;
+  const out = saved.slice();
+  authored.forEach((id, i) => {
+    if (out.includes(id)) return;
+    // Anchor on the nearest earlier authored neighbour that made the cut.
+    let at = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const p = out.indexOf(authored[j]);
+      if (p >= 0) { at = p + 1; break; }
+    }
+    out.splice(at, 0, id);
+  });
+  return out;
+}
+
+function applyHistoryLayout_() {
+  const sec = document.getElementById('hxSectionOverview');
+  if (!sec) return;
+  const byId = {};
+  hxOverviewCards_().forEach(c => { byId[c.dataset.hxcard] = c; });
+  hxResolvedOrder_().forEach(id => {
+    const el = byId[id];
+    if (!el) return;
+    el.classList.toggle('hx-card-hidden', hxLayout_.hidden.includes(id));
+    sec.appendChild(el);   // moves in place; already-ordered cards are a no-op
+  });
+}
+
+function openHistoryLayout() {
+  document.getElementById('hxLayoutOverlay').classList.add('open');
+  renderHistoryLayout_();
+}
+
+function closeHistoryLayout(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('hxLayoutOverlay').classList.remove('open');
+  updateViewportHeight('stats', true);
+}
+
+function renderHistoryLayout_() {
+  const list = document.getElementById('hxLayoutList');
+  if (!list) return;
+  const byId = {};
+  hxOverviewCards_().forEach(c => { byId[c.dataset.hxcard] = c; });
+  const order = hxResolvedOrder_();
+  list.innerHTML = order.map((id, i) => {
+    const off = hxLayout_.hidden.includes(id);
+    const name = (byId[id] && byId[id].dataset.hxname) || id;
+    const esc = escapeHtml_(escapeJsAttr_(id));
+    return `<div class="hx-layout-row${off ? ' off' : ''}">
+      <button class="hx-layout-name" onclick="toggleHistoryCard('${esc}')"
+              aria-pressed="${off ? 'false' : 'true'}">
+        <span class="hx-layout-eye">${off ? '○' : '●'}</span>
+        <span>${escapeHtml_(name)}</span>
+      </button>
+      <button class="hx-layout-move" onclick="moveHistoryCard('${esc}', -1)"
+              aria-label="Move up"${i === 0 ? ' disabled' : ''}>↑</button>
+      <button class="hx-layout-move" onclick="moveHistoryCard('${esc}', 1)"
+              aria-label="Move down"${i === order.length - 1 ? ' disabled' : ''}>↓</button>
+    </div>`;
+  }).join('');
+}
+
+function moveHistoryCard(id, dir) {
+  const order = hxResolvedOrder_();
+  const i = order.indexOf(id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return;
+  order.splice(j, 0, order.splice(i, 1)[0]);
+  hxLayout_.order = order;
+  saveHistoryLayout_();
+  applyHistoryLayout_();
+  renderHistoryLayout_();
+  // A card coming back from display:none has no width to draw into until
+  // it is laid out again, so the charts are redrawn after the move.
+  renderHistoryTab();
+  updateViewportHeight('stats', true);
+}
+
+function toggleHistoryCard(id) {
+  const at = hxLayout_.hidden.indexOf(id);
+  if (at >= 0) hxLayout_.hidden.splice(at, 1);
+  else hxLayout_.hidden.push(id);
+  if (!hxLayout_.order.length) hxLayout_.order = hxResolvedOrder_();
+  saveHistoryLayout_();
+  applyHistoryLayout_();
+  renderHistoryLayout_();
+  renderHistoryTab();
+  updateViewportHeight('stats', true);
+}
+
+function resetHistoryLayout() {
+  hxLayout_ = { order: [], hidden: [] };
+  try { localStorage.removeItem(STORAGE_HISTORY_LAYOUT_KEY); } catch (e) {}
+  applyHistoryLayout_();
+  renderHistoryLayout_();
   renderHistoryTab();
   updateViewportHeight('stats', true);
 }
@@ -11497,7 +11701,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-25-weighted-sums';
+const APP_BUILD_VERSION = '2026-08-25-overview-layout';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -16170,6 +16374,7 @@ initChartResizeObserver_();
 initHistoryRange_();
 initMuscleWindow_();
 initMuscleMode_();
+loadHistoryLayout_();
 initInbody_();
 initTabBarViewportPin();
 // Local order first, so the page is already arranged on this device
