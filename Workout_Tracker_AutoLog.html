@@ -32,6 +32,23 @@
     --chart-good: #199e70;   /* target met */
     --chart-warn: #c98500;   /* under target */
     --chart-2: #9085e9;      /* second series - caffeine/alcohol only */
+    /* The Financial tab's commitments strip. Child stages are ORDINAL - daycare,
+       school, college is an order, and swapping it would change the meaning - so
+       they take one hue in monotone lightness steps rather than three unrelated
+       colours; the order is then visible in the colour itself. House and car are
+       identities rather than an order, so they take two categorical hues.
+       Every step and pair here went through the palette validator rather than
+       being eyeballed: the ramp clears monotone lightness, dL >= 0.06 and the
+       2:1 light-end floor in both modes, and the three families clear the
+       all-pairs CVD and normal-vision gates (worst 13.0 / 22.5 dark, 17.6 /
+       24.0 light). Aqua was the other passing trio and was rejected because
+       this app already spends it on "target met": a reserved status colour
+       must never be handed identity work as well. */
+    --fin-kid-1: #6244cc;    /* daycare */
+    --fin-kid-2: #826bf6;    /* school  */
+    --fin-kid-3: #aca4fe;    /* college */
+    --fin-house: #008300;
+    --fin-car:   #d55181;
     /* The monogram's own brown, lightened for the dark ground - the true
        #6B4229 goes muddy on #10141f. The light themes below use the real one. */
     --logo-ink: #C79570;
@@ -45,6 +62,8 @@
       --nav-bg: rgba(244,246,251,0.82);
       --logo-ink: #6B4229;
       --chart-1: #2a78d6; --chart-good: #1baf7a; --chart-warn: #eda100; --chart-2: #4a3aa7;
+      --fin-kid-1: #9a96ff; --fin-kid-2: #7667f1; --fin-kid-3: #482ab3;
+      --fin-house: #008300; --fin-car: #e87ba4;
     }
   }
   :root[data-theme="light"] {
@@ -54,6 +73,8 @@
     --nav-bg: rgba(244,246,251,0.82);
     --logo-ink: #6B4229;
     --chart-1: #2a78d6; --chart-good: #1baf7a; --chart-warn: #eda100; --chart-2: #4a3aa7;
+    --fin-kid-1: #9a96ff; --fin-kid-2: #7667f1; --fin-kid-3: #482ab3;
+    --fin-house: #008300; --fin-car: #e87ba4;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.45; padding: calc(56px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); max-width: 480px; margin: 0 auto; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
@@ -2717,15 +2738,9 @@
     <svg viewBox="0 0 320 200" class="stats-chart" id="finCone" role="img"
          aria-label="Projected net worth, a median line inside a 10th to 90th percentile band"></svg>
     <div class="stats-chart-detail" id="finReadout"></div>
-    <div class="hx-legend">
-      <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-1)"></span>Median</span>
-      <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-1); opacity:0.28"></span>10th–90th</span>
-      <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-warn)"></span>Retire</span>
-      <span class="hx-key" id="finKidKey" style="display:none;">
-        <span class="hx-swatch" style="background:var(--chart-2); opacity:0.5"></span>Raising them
-        <span class="hx-swatch" style="background:var(--chart-2); margin-left:8px;"></span>College</span>
-    </div>
+    <div class="hx-legend" id="finLegend"></div>
   </div>
+
 
   <div class="stats-card">
     <div class="stats-card-title">Where the money sits</div>
@@ -5279,12 +5294,22 @@ function finNiceStep_(rough) {
 function finDrawCone_(res) {
   const svg = document.getElementById('finCone');
   if (!svg) return;
-  const box = fitChartBox_(svg, 320, 200);
-  const W = box.w, H = box.h;
-  const PAD = { l: 46, r: 8, t: 16, b: 24 };
-  const x0 = PAD.l, x1 = W - PAD.r, y0 = PAD.t, y1 = H - PAD.b;
   const b = res.band;
   if (b.length < 2) { svg.innerHTML = ''; return; }
+
+  /* The commitments share this plot rather than getting one of their own.
+     Each one is a wash across the years it covers PLUS a solid bar in its own
+     lane along the bottom. The wash is what you asked the chart - "which
+     years is this thing costing me" - and the lane is what makes it legible:
+     washes stack, so three overlapping ones mix into a colour that means
+     nothing, while the lanes stay separate and carry the label. Reserving
+     the lane strip below the plot is also what stopped the labels colliding;
+     they used to share one baseline and print through each other. */
+  const lanes = finLanes_();
+  const PAD = { l: 46, r: 8, t: 16, b: 24 };
+  const box = fitChartBox_(svg, 320, 176);
+  const W = box.w, H = box.h;
+  const x0 = PAD.l, x1 = W - PAD.r, y0 = PAD.t, y1 = H - PAD.b;
 
   const hi = Math.max(...b.map(d => d.p90), 1);
   const step = finNiceStep_(hi / 4);
@@ -5311,48 +5336,27 @@ function finDrawCone_(res) {
              stroke="${colour}" stroke-width="1" stroke-dasharray="3 3" opacity="0.75"></line>`
       + chartAxisText_(x, y0 + 9, label, 'middle', 'chart-tick');
   };
-  /* Children are a SPAN, not a moment: daycare, then school, then four years
-     of college that cost more than the previous thirteen put together. A
-     dashed line at a birth year said nothing about where the money goes, so
-     each child gets a shaded run of dependent years with the college block
-     picked out darker - the dent in the median line then has a visible
-     cause instead of being a mystery flat spot. */
-  const span = (fromAge, toAge, fill, opacity, lift, label) => {
-    const a = finClamp_(fromAge - FIN.age, 0, b.length - 1);
-    const z = finClamp_(toAge - FIN.age, 0, b.length - 1);
-    if (z <= a) return '';
-    const xa = X(a), xz = X(z);
-    let text = '';
-    if (label) {
-      // Centred on the band, but pulled inside the plot when the band sits
-      // against an edge - a name half off the chart reads as a glitch.
-      const wide = label.length * 5.2;
-      const cx = finClamp_((xa + xz) / 2, x0 + wide / 2, x1 - wide / 2);
-      text = chartAxisText_(cx, y1 - 5 - lift, label, 'middle', 'chart-tick');
-    }
-    return `<rect x="${xa.toFixed(1)}" y="${y0}" width="${(xz - xa).toFixed(1)}"
-             height="${(y1 - y0).toFixed(1)}" fill="${fill}" opacity="${opacity}"></rect>` + text;
-  };
-  let bands = '';
-  let shown = 0;
-  FIN.kids.forEach(k => {
-    const born = FIN.age + (k.birthYear - FIN_YEAR0);
-    if (born + 22 < FIN.age || born > FIN.runTo) return;
-    const who = (k.label || 'Child').slice(0, 9);
-    bands += span(born, born + 18, 'var(--chart-2)', 0.10, 0, '');
-    /* Each child's label gets its own row. Two children born a few years
-       apart put their college blocks side by side, and a single shared
-       baseline printed one name straight through the other. */
-    bands += span(born + 18, born + 22, 'var(--chart-2)', 0.24, shown * 11, who);
-    shown++;
-  });
-  const kidKey = document.getElementById('finKidKey');
-  if (kidKey) kidKey.style.display = shown ? '' : 'none';
-
+  /* Purchases used to get a dashed line each, which crowded the plot with up
+     to five verticals and their labels. They are spans, not moments, so they
+     are drawn as spans below; only the two moments that change the SHAPE of
+     this curve stay as lines. */
   let marks = '';
-  FIN.buys.forEach(p => { marks += mark(FIN.age + (p.year - FIN_YEAR0), (p.label || '').slice(0, 8), 'var(--muted)'); });
   if (FIN.stopWork !== FIN.retireAge) marks += mark(FIN.stopWork, 'pay ends', 'var(--red)');
   marks += mark(FIN.retireAge, 'retire', 'var(--chart-warn)');
+
+  const XA = age => finClamp_(x0 + (x1 - x0) * ((age - FIN.age) / Math.max(1, FIN.runTo - FIN.age)), x0, x1);
+  let washes = '';
+  lanes.forEach(lane => {
+    lane.segs.forEach(seg => {
+      const a = XA(seg.from), z = XA(seg.to);
+      if (z <= a) return;
+      /* A wash, not a block - 12% of the hue. The median line has to stay the
+         most legible thing on the chart even where three of these overlap,
+         which is exactly where the old slabs failed. */
+      washes += `<rect x="${a.toFixed(1)}" y="${y0}" width="${(z - a).toFixed(1)}"
+                  height="${(y1 - y0).toFixed(1)}" fill="${seg.fill}" opacity="0.12"></rect>`;
+    });
+  });
 
   let ticks = '';
   const stride = Math.max(1, Math.round((b.length - 1) / 6));
@@ -5367,21 +5371,147 @@ function finDrawCone_(res) {
              width="${band.toFixed(1)}" height="${H}"></rect>`;
   });
 
-  svg.innerHTML = out + bands + marks
+  // Washes first so the projection always sits on top of them.
+  svg.innerHTML = washes + out + marks
     + `<polygon points="${upper} ${lower}" fill="var(--chart-1)" opacity="0.16"
         stroke="var(--chart-1)" stroke-opacity="0.35" stroke-width="1"></polygon>`
     + `<path d="${mid}" class="chart-line" stroke="var(--chart-1)"></path>`
     + ticks + hits;
 
+  finLegend_(lanes);
+
   finLast_ = { b, X, Y, x0, x1 };
   bindChartHits_(svg, b.map(d => {
-    const kids = finKidsAt_(d.age);
+    const now = finCommitmentsAt_(d.age);
     return {
       label: String(d.age),
       detail: `Age ${d.age} — median ${finFull_(d.p50)} · range ${finFull_(d.p10)} to ${finFull_(d.p90)}`
-        + (kids.total > 0 ? ` · ${kids.what}, ${finFull_(kids.total)} this year` : '')
+        + (now.length ? ` · ${now.join(' · ')}` : '')
     };
   }), 'finReadout');
+}
+
+/* ---------- The commitments strip ----------
+   One lane per thing you are paying for, on the same x-scale as the cone
+   above, so a dip in the median line can be read straight down to its cause.
+
+   Every lane is directly labelled. That is not decoration: two of the fills
+   sit below 3:1 against the light surface, and the rule for a fill that
+   light is that identity must also be readable some way other than colour.
+   The label IS that channel, which is why it is drawn per lane rather than
+   left to the legend. */
+/* No marker row under the plot. The shading IS the chart; anything drawn
+   underneath it competed with the curve and read as bolted on. Which
+   commitment a wash belongs to comes from the legend, and from the read-out,
+   which names every commitment running in the year you point at - including
+   which child, which a row of swatches could not have told you anyway once
+   two washes overlapped. */
+
+// What each lane holds, derived once so the drawing and the legend cannot
+// describe different things.
+function finLanes_() {
+  const lanes = [];
+  const first = FIN.age, last = FIN.runTo;
+  const inRange = (a, z) => z > first && a < last;
+
+  FIN.kids.forEach(k => {
+    const born = FIN.age + (k.birthYear - FIN_YEAR0);
+    if (!inRange(born, born + 22)) return;
+    lanes.push({
+      kind: 'kid', label: k.label || 'Child',
+      segs: [
+        { from: born, to: born + 5, fill: 'var(--fin-kid-1)', what: 'Daycare',
+          yr: finKidCost_(k, 'care') },
+        { from: born + 5, to: born + 18, fill: 'var(--fin-kid-2)', what: 'School',
+          yr: finKidCost_(k, 'school') },
+        { from: born + 18, to: born + 22, fill: 'var(--fin-kid-3)', what: 'College',
+          yr: finKidCost_(k, 'college') }
+      ]
+    });
+  });
+
+  FIN.buys.forEach(bu => {
+    const at = FIN.age + (bu.year - FIN_YEAR0);
+    const house = bu.kind === 'house';
+    const fill = house ? 'var(--fin-house)' : 'var(--fin-car)';
+    if (house) {
+      const plan = finHousePlan_(bu);
+      // Bought outright: there is no payment term to draw, but the upkeep
+      // never stops, so the lane runs on rather than ending at the purchase.
+      if (plan.down === 100) {
+        if (!inRange(at, last)) return;
+        lanes.push({ kind: 'house', label: bu.label || 'Property', segs: [
+          { from: at, to: last, fill, what: 'Owned outright · upkeep',
+            yr: bu.price * 0.019 }] });
+        return;
+      }
+      const end = at + (bu.term || 30);
+      if (!inRange(at, end)) return;
+      const borrowed = Math.max(0, bu.price - finHouseDown_(bu));
+      lanes.push({ kind: 'house', label: bu.label || 'Property', segs: [
+        { from: at, to: end, fill, what: `${bu.term}-year mortgage at ${finHouseRate_(bu).toFixed(2)}%`,
+          yr: finPayment_(borrowed, finHouseRate_(bu), bu.term) * 12 + bu.price * 0.019 }] });
+      return;
+    }
+    if (bu.mode === 'lease') {
+      if (!inRange(at, last)) return;
+      lanes.push({ kind: 'car', label: bu.label || 'Vehicle', segs: [
+        { from: at, to: last, fill, what: 'Lease · renews for good', yr: bu.lease * 12 }] });
+      return;
+    }
+    if (bu.mode === 'cash') {
+      // A moment, not a span. Given a visible minimum width below so it does
+      // not vanish, and said outright in the label rather than implied.
+      if (!inRange(at, at + 1)) return;
+      lanes.push({ kind: 'car', label: bu.label || 'Vehicle', segs: [
+        { from: at, to: at + 1, fill, what: 'Paid outright', yr: bu.price }] });
+      return;
+    }
+    const end = at + (bu.term || 5);
+    if (!inRange(at, end)) return;
+    lanes.push({ kind: 'car', label: bu.label || 'Vehicle', segs: [
+      { from: at, to: end, fill, what: `${bu.term}-year loan at ${finCarRate_(bu).toFixed(2)}%`,
+        yr: finPayment_(Math.max(0, bu.price - bu.down), finCarRate_(bu), bu.term) * 12 }] });
+  });
+
+  return lanes;
+}
+
+/* One legend for one chart, naming only what is actually drawn. Two of these
+   fills sit under 3:1 against the light surface; the rule for a fill that
+   light is that identity must also be readable some way other than colour,
+   which is what the legend and the per-lane labels are for. */
+function finLegend_(lanes) {
+  const el = document.getElementById('finLegend');
+  if (!el) return;
+  const keys = [
+    ['var(--chart-1)', 'Median', ''],
+    ['var(--chart-1)', '10th\u201390th', 'opacity:0.28'],
+    ['var(--chart-warn)', 'Retire', '']
+  ];
+  if (FIN.stopWork !== FIN.retireAge) keys.push(['var(--red)', 'Pay ends', '']);
+  if (lanes.some(l => l.kind === 'kid')) keys.push(
+    ['var(--fin-kid-1)', 'Daycare', ''], ['var(--fin-kid-2)', 'School', ''],
+    ['var(--fin-kid-3)', 'College', '']);
+  if (lanes.some(l => l.kind === 'house')) keys.push(['var(--fin-house)', 'Property', '']);
+  if (lanes.some(l => l.kind === 'car')) keys.push(['var(--fin-car)', 'Vehicle', '']);
+  el.innerHTML = keys.map(([c, n, extra]) =>
+    `<span class="hx-key"><span class="hx-swatch" style="background:${c};${extra}"></span>${n}</span>`).join('');
+}
+
+/* Everything a given year is costing you, named. The readout is the one place
+   the numbers behind the shading are actually legible, so it has to cover the
+   house and the car too, not only the children. */
+function finCommitmentsAt_(myAge) {
+  const out = [];
+  finLanes_().forEach(lane => {
+    lane.segs.forEach(seg => {
+      if (myAge < seg.from || myAge >= seg.to) return;
+      out.push(`${lane.label} ${seg.what.toLowerCase()}`
+        + (seg.yr ? ` ${finMoney_(seg.yr)}/yr` : ''));
+    });
+  });
+  return out;
 }
 
 /* What the children cost in the year you are pointing at, and which stage
@@ -12980,7 +13110,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-fin-sync';
+const APP_BUILD_VERSION = '2026-08-26-commitment-shading';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

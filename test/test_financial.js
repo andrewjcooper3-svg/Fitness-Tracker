@@ -292,28 +292,20 @@ const FICA = s => Math.min(s, 184500) * 0.062 + s * 0.0145 + Math.max(0, s - 200
     await page.waitForTimeout(900);
     await open(page);
 
-    const rects = await page.evaluate(() => [...document.querySelectorAll('#finCone rect')]
-      .filter(r => r.getAttribute('fill'))
-      .map(r => ({ x: +r.getAttribute('x'), w: +r.getAttribute('width'), o: +r.getAttribute('opacity') })));
-    check('the dependent years are shaded', rects.length >= 2, `${rects.length} bands`);
-    const college = rects.slice().sort((a, b) => b.o - a.o)[0];
-    const dependent = rects.slice().sort((a, b) => b.w - a.w)[0];
-    check('and the four college years are picked out darker',
-      college && dependent && college.o > dependent.o && college.w < dependent.w,
-      JSON.stringify({ college, dependent }));
-    check('the college band is labelled with the child',
-      await page.evaluate(() => [...document.querySelectorAll('#finCone text')]
-        .some(t => /Robin/.test(t.textContent))),
-      await page.evaluate(() => [...document.querySelectorAll('#finCone text')]
-        .map(t => t.textContent).join('|').slice(0, 120)));
-    // The band has to sit UNDER the data, or it paints over the median line.
-    check('the shading is behind the cone, not over it', await page.evaluate(() => {
-      const kids = [...document.getElementById('finCone').children];
-      const lastRect = kids.map((k, i) => [k, i]).filter(([k]) =>
-        k.tagName === 'rect' && k.getAttribute('fill')).pop();
-      const poly = kids.findIndex(k => k.tagName === 'polygon');
-      return lastRect && poly > -1 && lastRect[1] < poly;
-    }));
+    /* The shading itself is checked in test_financial_life.js. What belongs
+       HERE is only that a child reaches the chart at all, and that whatever
+       is painted stays behind the projection rather than over it. */
+    const shaded = await page.evaluate(() => {
+      const svg = document.getElementById('finCone');
+      const h = +svg.getAttribute('viewBox').split(' ')[3];
+      const washes = [...svg.querySelectorAll('rect:not(.chart-hit)')]
+        .filter(r => +r.getAttribute('height') > h * 0.4);
+      const line = [...svg.children].findIndex(c => c.tagName === 'path');
+      return { n: washes.length, line,
+        over: washes.some(w => [...svg.children].indexOf(w) > line) };
+    });
+    check('the child\'s years are shaded on the chart', shaded.n === 3, `${shaded.n} washes`);
+    check('and the projection is drawn on top of the shading', !shaded.over);
 
     /* The readout has to say WHY the line dips there. A shaded band with no
        number is decoration; naming the stage and the cost is the point. */
