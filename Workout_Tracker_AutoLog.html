@@ -5161,6 +5161,11 @@ function finPath_(collect) {
   // From the seeded stream too - otherwise the promotion cadence alone
   // would still make two identical plans disagree.
   let cadence = FIN.promoMin + finRand_() * Math.max(0, FIN.promoMax - FIN.promoMin);
+  /* The spouse promotes too, on the same knobs - rate, cadence bounds,
+     stretch, until-age - but their OWN draw. Two careers do not land raises
+     in sync, and sharing one draw would make them do exactly that. */
+  let spouseCadence = FIN.promoMin + finRand_() * Math.max(0, FIN.promoMax - FIN.promoMin);
+  let spouseSincePromo = 0;
   let salary = FIN.gross, sincePromo = 0;
   const lastPlanned = FIN.promos.length ? Math.max(...FIN.promos.map(p => Math.round(p.inYears || 0))) : -1;
   // Take-home at today's pay, the baseline lifestyle creep is measured from.
@@ -5320,8 +5325,19 @@ function finPath_(collect) {
       /* Their raises run from THEIR first year, not from today. The salary
          you typed is in today's money whenever they start, so a career
          beginning in five years starts at that figure rather than at five
-         years of raises on top of it. */
-      if (spouseYears > 0) spouseSalary *= (1 + FIN.raiseNom / 100) / (1 + FIN.inflation / 100);
+         years of raises on top of it. Promotions ride the same cadence you
+         set for yourself, on their own draw. */
+      if (spouseYears > 0) {
+        let sNom = FIN.raiseNom;
+        if (age <= FIN.promoUntil && spouseCadence > 0) {
+          spouseSincePromo += 1;
+          if (spouseSincePromo >= spouseCadence) {
+            sNom += FIN.promoNom; spouseSincePromo -= spouseCadence;
+            spouseCadence *= (1 + FIN.promoStretch / 100);
+          }
+        }
+        spouseSalary *= (1 + sNom / 100) / (1 + FIN.inflation / 100);
+      }
       spouseYears++;
       const sRoom = FIN_401K.elective + (age >= FIN_401K.catchUpAge ? FIN_401K.catchUp : 0);
       const sk = Math.min(spouseSalary * FIN.spouse401k / 100, sRoom);
@@ -5908,14 +5924,22 @@ function finRowSel_(item, f, label, table) {
    true answer - this is the representative one, and it is the same figure the
    edit panel shows, so the retirement budget quoted there and the budget the
    minimum is sized against can never disagree. */
-function finPayAt_(target) {
+/* One career projection, parameterised by whose it is - shared by the
+   panel preview and finFinalSalary_, so a spouse's projected pay cannot
+   silently disagree with your own. Runs on the MID cadence rather than a
+   draw: this is a preview figure, not a simulated path, and has to hold
+   still while you type. `promos` is only ever your own explicitly dated
+   ones - a spouse's raises are cadence-only, the same "simple" adjustment
+   you get without naming individual promotions. */
+function finCareerAt_(startAge, startSalary, target, promos) {
   const mid = FIN.promoMin + Math.max(0, FIN.promoMax - FIN.promoMin) / 2;
-  const lastPlanned = FIN.promos.length ? Math.max(...FIN.promos.map(p => Math.round(p.inYears || 0))) : -1;
-  let sal = FIN.gross, since = 0, cad = mid, n = 0;
-  for (let a = FIN.age + 1; a <= target; a++) {
-    const i = a - FIN.age;
+  const lastPlanned = promos && promos.length
+    ? Math.max(...promos.map(p => Math.round(p.inYears || 0))) : -1;
+  let sal = startSalary, since = 0, cad = mid, n = 0;
+  for (let a = startAge + 1; a <= target; a++) {
+    const i = a - startAge;
     let nom = FIN.raiseNom;
-    if (i <= lastPlanned) FIN.promos.forEach(pr => { if (Math.round(pr.inYears) === i) { nom += (+pr.pct || 0); n++; } });
+    if (promos && i <= lastPlanned) promos.forEach(pr => { if (Math.round(pr.inYears) === i) { nom += (+pr.pct || 0); n++; } });
     else if (a <= FIN.promoUntil && cad > 0) {
       since += 1;
       if (since >= cad) { nom += FIN.promoNom; since -= cad; n++; cad *= (1 + FIN.promoStretch / 100); }
@@ -5924,6 +5948,8 @@ function finPayAt_(target) {
   }
   return { sal, n };
 }
+function finPayAt_(target) { return finCareerAt_(FIN.age, FIN.gross, target, FIN.promos); }
+const finSpousePayAt_ = target => finCareerAt_(finSpouseStart_(), FIN.spouseGross, target, null);
 /* Household final pay: yours at the end of your career plus theirs at the
    end of theirs. The replacement rate is a share of what the HOUSEHOLD was
    living on, so leaving a second income out would size retirement for one
@@ -5934,8 +5960,7 @@ const finSpouseYears_ = () => Math.max(0, FIN.spouseStop - finSpouseStart_());
 
 const finFinalSalary_ = () => finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork)).sal
   + (FIN.spouseGross > 0 && finSpouseYears_() > 0
-      ? FIN.spouseGross * Math.pow((1 + FIN.raiseNom / 100) / (1 + FIN.inflation / 100),
-          Math.max(0, finSpouseYears_() - 1))
+      ? finSpousePayAt_(Math.min(FIN.promoUntil, FIN.spouseStop)).sal
       : 0);
 
 /* One source per group summary, refreshed in place on every keystroke.
@@ -5956,8 +5981,9 @@ const FIN_DERIVED = {
     return `${finFull_(homeOf(FIN.spouseGross, FIN.spouse401k))} take-home a year on top of `
       + `yours, ${from <= FIN.age ? 'from now' : `from when you are ${from}`} until `
       + `${FIN.spouseStop} — ${yrs} year${yrs === 1 ? '' : 's'} of it · their raises run from `
-      + `their first year, so the figure you typed is what they start on · payroll tax and the `
-      + `401k limit are counted per person, not per household`;
+      + `their first year, so the figure you typed is what they start on · gets the same `
+      + `promotion cadence as you, on its own timing · payroll tax and the 401k limit are `
+      + `counted per person, not per household`;
   },
   growth: () => {
     const top = finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork));
@@ -13449,7 +13475,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-spouse-start-date';
+const APP_BUILD_VERSION = '2026-08-26-spouse-promotions';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

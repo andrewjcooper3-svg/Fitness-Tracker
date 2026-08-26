@@ -165,6 +165,50 @@ const ZERO = {
   check('their five years of raises match hand arithmetic',
     near(grown, byHand, 2), `${money(grown)} vs ${money(byHand)}`);
 
+  console.log('\n=== The spouse promotes too, on their own timing ===');
+  /* promoMin === promoMax removes the randomness from the cadence draw
+     entirely (the draw is promoMin + rand()*0), so this is hand-checkable:
+     an 8% promotion lands every single year from their second year on. */
+  const PROMO_HAND = (() => {
+    const fica = s => Math.min(s, 184500) * 0.062 + s * 0.0145 + Math.max(0, s - 200000) * 0.009;
+    let total = 0;
+    for (let i = 0; i < 10; i++) { const sal = 50000 * Math.pow(1.08, i); total += sal - fica(sal); }
+    return { total, salAt40: 50000 * Math.pow(1.08, 10) };
+  })();
+  const promo = await page.evaluate(([z]) => {
+    Object.assign(FIN, JSON.parse(JSON.stringify(z)), {
+      gross: 0, spouseGross: 50000, promoNom: 8, promoMin: 1, promoMax: 1,
+      spouseStart: 30, spouseStop: 41, stopWork: 41, retireAge: 41, runTo: 45
+    });
+    return { total: Math.round(finPath_(true).series[10]),
+              panel: finSpousePayAt_(40).sal };
+  }, [ZERO]);
+  check('ten years of promotions match hand arithmetic',
+    near(promo.total, PROMO_HAND.total, 2), `${money(promo.total)} vs ${money(PROMO_HAND.total)}`);
+  check('and the panel preview agrees with the engine',
+    near(promo.panel, PROMO_HAND.salAt40, 1), `${money(promo.panel)} vs ${money(PROMO_HAND.salAt40)}`);
+
+  console.log('\n=== The spouse\'s cadence draw is reproducible under a reseed ===');
+  /* finPath_ is a single Monte Carlo life - calling it twice in a row is
+     SUPPOSED to draw two different lives, which is the whole point of the
+     cadence being random at all. The reproducibility already proven in
+     test_financial_stable.js is finSimulate_'s, because it reseeds before
+     every run; calling finPath_ raw has to reseed itself to mean anything.
+     What is actually being checked here: given the same seed, the spouse's
+     cadence is not silently the primary earner's cadence read twice - if it
+     were, the two careers would promote in lockstep, which is not two
+     careers. */
+  const two = await page.evaluate(([z]) => {
+    Object.assign(FIN, JSON.parse(JSON.stringify(z)), {
+      gross: 90000, spouseGross: 70000, promoNom: 8, promoMin: 1, promoMax: 2,
+      spouseStart: 30, spouseStop: 45, stopWork: 45, retireAge: 45, runTo: 50
+    });
+    finReseed_(); const a = finPath_(true).series[15];
+    finReseed_(); const b = finPath_(true).series[15];
+    return { a, b };
+  }, [ZERO]);
+  check('the same seed reproduces the same life', two.a === two.b, `${two.a} vs ${two.b}`);
+
   console.log('\n=== On the panel ===');
   await page.evaluate(() => {
     Object.assign(FIN, JSON.parse(JSON.stringify(FIN_DEFAULTS)));
@@ -188,6 +232,8 @@ const ZERO = {
     /take-home a year on top of yours/.test(on), '…' + (on.match(/.{0,60}on top of yours/) || [''])[0]);
   check('and says the tax is counted per person',
     /per person, not\s+per household/.test(on));
+  check('and mentions the promotion cadence applies to them too',
+    /same\s+promotion cadence/.test(on));
 
   /* Every group summary quotes a live figure, and they used to be built once
      with the panel - so they went stale the moment you typed and sat there
