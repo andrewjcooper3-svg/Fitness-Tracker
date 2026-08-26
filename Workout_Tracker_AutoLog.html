@@ -4913,6 +4913,9 @@ const FIN_KID_PLANS = {
 
 const FIN_DEFAULTS = {
   age: 31, netWorth: 48000, gross: 95000, taxRate: 16, k401: 8, match: 4,
+  // A second earner, off until you give them a salary. Their income stops on
+  // its own age, because two people rarely finish on the same day.
+  spouseGross: 0, spouse401k: 6, spouseMatch: 3, spouseStop: 60,
   monthly: 3200, credit: 750, creep: 50,
   inflation: 2.5, raiseNom: 3, promoNom: 8, promoMin: 1, promoMax: 1.5,
   promoStretch: 25, promoUntil: 50,
@@ -5161,15 +5164,20 @@ function finPath_(collect) {
   let salary = FIN.gross, sincePromo = 0;
   const lastPlanned = FIN.promos.length ? Math.max(...FIN.promos.map(p => Math.round(p.inYears || 0))) : -1;
   // Take-home at today's pay, the baseline lifestyle creep is measured from.
-  const homePay = s => Math.max(0, (s - Math.min(s * FIN.k401 / 100, FIN_401K.elective))
+  /* Per PERSON, not per household. Payroll tax has its own wage base for
+     each earner and its own 401k limit, so running a household total
+     through one calculation would under-tax the pair and let one person's
+     unused contribution room subsidise the other's. */
+  const homePay = (s, kPct) => Math.max(0, (s - Math.min(s * kPct / 100, FIN_401K.elective))
     * (1 - FIN.taxRate / 100) - finPayrollTax_(s));
-  const home0 = homePay(FIN.gross);
+  const home0 = homePay(FIN.gross, FIN.k401) + homePay(FIN.spouseGross, FIN.spouse401k);
   /* The retirement budget follows the pay you actually END on, not the pay
      you start on. A replacement rate is a share of pre-retirement income by
      definition, and reading it off today's salary made thirty years of
      raises free: the money grew with every promotion, the spending never
      did. Tracked as the plan runs, since the salary is path-dependent. */
-  let finalSalary = FIN.gross;
+  let finalSalary = FIN.gross + FIN.spouseGross;
+  let spouseSalary = FIN.spouseGross;
 
   for (let i = 0; i <= years; i++) {
     const age = FIN.age + i, year = FIN_YEAR0 + i;
@@ -5299,6 +5307,25 @@ function finPath_(collect) {
     ret *= grow;
     assets.forEach(a => { a.value *= (1 + a.growth); });
 
+    /* The spouse's year, worked out outside the branch below because their
+       income does not stop when yours does - that is the whole point of
+       giving it its own age. Their pay follows the same annual raise as
+       yours but no promotions: a second career modelled in that much detail
+       would be a second set of assumptions to get wrong. */
+    let spouseHome = 0, spouseK = 0;
+    const spouseEarning = FIN.spouseGross > 0 && age < FIN.spouseStop;
+    if (spouseEarning) {
+      if (i > 0) spouseSalary *= (1 + FIN.raiseNom / 100) / (1 + FIN.inflation / 100);
+      const sRoom = FIN_401K.elective + (age >= FIN_401K.catchUpAge ? FIN_401K.catchUp : 0);
+      const sk = Math.min(spouseSalary * FIN.spouse401k / 100, sRoom);
+      const sMatch = Math.min(spouseSalary * FIN.spouseMatch / 100,
+        Math.max(0, FIN_401K.combined - sk));
+      spouseK = sk + sMatch;
+      spouseHome = Math.max(0, (spouseSalary - sk) * (1 - FIN.taxRate / 100)
+        - finPayrollTax_(spouseSalary));
+    }
+    ret += spouseK;
+
     if (earning) {
       if (i > 0) {
         let nominal = FIN.raiseNom;
@@ -5314,16 +5341,19 @@ function finPath_(collect) {
         // Nominal to real - a 3% raise against 2.5% inflation is worth 0.5%.
         salary *= (1 + nominal / 100) / (1 + FIN.inflation / 100);
       }
-      finalSalary = salary;
+      finalSalary = salary + (spouseEarning ? spouseSalary : 0);
       // Capped at what the IRS actually allows to go in.
       const room = FIN_401K.elective + (age >= FIN_401K.catchUpAge ? FIN_401K.catchUp : 0);
       const k = Math.min(salary * FIN.k401 / 100, room);
       const match = Math.min(salary * FIN.match / 100, Math.max(0, FIN_401K.combined - k));
-      const takeHome = (salary - k) * (1 - FIN.taxRate / 100) - finPayrollTax_(salary);
+      const takeHome = (salary - k) * (1 - FIN.taxRate / 100) - finPayrollTax_(salary)
+        + spouseHome;
       /* Lifestyle creep. A budget frozen in real terms while real pay nearly
          doubles means every raise is banked in full, forever - which is the
          single biggest reason a projection like this runs away from what a
-         planner would tell you. Some share of a raise gets spent. */
+         planner would tell you. Some share of a raise gets spent. Measured
+         against the HOUSEHOLD's take-home, so a second income lifts the
+         standard of living rather than being banked whole. */
       const lifestyle = Math.max(0, takeHome - home0) * FIN.creep / 100;
       const spend = (retired ? finRetireTarget_(finalSalary) : FIN.monthly * 12 + lifestyle)
         + rewards + loanCash + kidCash;
@@ -5335,9 +5365,11 @@ function finPath_(collect) {
         brok += inv; basis += inv;
       } else withdraw(-free);
     } else {
-      const income = (FIN.ssAnnual > 0 && age >= FIN.ssAge) ? FIN.ssAnnual : 0;
+      // You have stopped, but they may not have - so their pay is income here.
+      const income = ((FIN.ssAnnual > 0 && age >= FIN.ssAge) ? FIN.ssAnnual : 0) + spouseHome;
       const base = retired ? finRetireTarget_(finalSalary)
-        : FIN.monthly * 12 + Math.max(0, homePay(finalSalary) - home0) * FIN.creep / 100;
+        : FIN.monthly * 12
+          + Math.max(0, homePay(finalSalary, FIN.k401) + spouseHome - home0) * FIN.creep / 100;
       const need = base + rewards + loanCash + kidCash - income;
       if (need > 0) withdraw(need); else cash += -need;
     }
@@ -5885,14 +5917,74 @@ function finPayAt_(target) {
   }
   return { sal, n };
 }
-const finFinalSalary_ = () => finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork)).sal;
+/* Household final pay: yours at the end of your career plus theirs at the
+   end of theirs. The replacement rate is a share of what the HOUSEHOLD was
+   living on, so leaving a second income out would size retirement for one
+   person and then spend for two. */
+const finFinalSalary_ = () => finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork)).sal
+  + (FIN.spouseGross > 0
+      ? FIN.spouseGross * Math.pow((1 + FIN.raiseNom / 100) / (1 + FIN.inflation / 100),
+          Math.max(0, FIN.spouseStop - FIN.age))
+      : 0);
+
+/* One source per group summary, refreshed in place on every keystroke.
+   These quote live figures - your take-home, the salary you finish on, what
+   the buckets hold - and they were only rebuilt when the whole panel was,
+   so every one of them went stale the moment you started typing. The row
+   notes were fixed this way already; these are the same bug one level up.
+   Rebuilding the panel instead would yank focus out of the field. */
+const FIN_DERIVED = {
+  you: () => `Income tax is federal and state only — payroll tax is added on top, `
+    + `${finFull_(finPayrollTax_(FIN.gross))} at this salary. `
+    + `Your take-home ${finFull_(homeOf(FIN.gross, FIN.k401))} a year.`,
+  spouse: () => FIN.spouseGross > 0
+    ? `${finFull_(homeOf(FIN.spouseGross, FIN.spouse401k))} take-home a year on top of yours, `
+      + `ending when you are ${FIN.spouseStop} · their pay follows the same annual raise, `
+      + `without the promotions · payroll tax and the 401k limit are counted per person, not `
+      + `per household`
+    : 'Leave at zero if it is just you.',
+  growth: () => {
+    const top = finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork));
+    const gap = FIN.retireAge - FIN.stopWork;
+    return `${top.n} promotions · salary reaches ${finFull_(top.sal)} by `
+      + `${Math.min(FIN.promoUntil, FIN.stopWork)} · income stops at ${FIN.stopWork}`
+      + (gap > 0 ? ` · then ${gap} yr${gap === 1 ? '' : 's'} with no pay before the retirement budget` : '');
+  },
+  buckets: () => {
+    const sum = Math.max(1, FIN.pCash + FIN.pBrok + FIN.pRet);
+    return `${finFull_(FIN.netWorth * FIN.pCash / sum)} savings · `
+      + `${finFull_(FIN.netWorth * FIN.pBrok / sum)} brokerage · `
+      + `${finFull_(FIN.netWorth * FIN.pRet / sum)} retirement`;
+  },
+  retire: () => {
+    const rp = FIN_RETIRE[FIN.retireProfile];
+    return `${finFull_(finRetireTarget_(finFinalSalary_()))} a year`
+      + (rp && rp.pct != null
+          ? `, being ${rp.pct}% of the ${finFull_(finFinalSalary_())} the household finishes on`
+            + `${FIN.spouseGross > 0 ? ' — both incomes' : ''} — not of today's pay`
+          : ', set by hand')
+      + ` · every plan runs to ${FIN_PLAN_TO}, so outliving it is not one of the ways this `
+      + `can go wrong`;
+  },
+  market: () => 'Real return is after inflation. The profiles are forward-looking assumptions, '
+    + 'roughly what the big shops publish — a point or two below the long historical average, '
+    + 'which is the single biggest lever on the number at the top.'
+};
+function finRefreshDerived_() {
+  document.querySelectorAll('#finEditBody [data-fin-derived]').forEach(el => {
+    const fn = FIN_DERIVED[el.dataset.finDerived];
+    if (fn) el.textContent = fn();
+  });
+}
+
+// The same per-person take-home the simulation runs, so the panel cannot
+// quote a number the model does not use.
+const homeOf = (sal, kPct) => Math.max(0,
+  (sal - Math.min(sal * kPct / 100, FIN_401K.elective)) * (1 - FIN.taxRate / 100)
+  - finPayrollTax_(sal));
 
 function finBuildEdit_() {
   const custom = FIN.retireProfile === 'custom';
-  const top = finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork));
-  const gap = FIN.retireAge - FIN.stopWork;
-  const sum = Math.max(1, FIN.pCash + FIN.pBrok + FIN.pRet);
-  const rp = FIN_RETIRE[FIN.retireProfile];
 
   document.getElementById('finEditBody').innerHTML = `
     <div class="fin-group"><h4>You, today</h4><div class="fin-fields">
@@ -5906,10 +5998,15 @@ function finBuildEdit_() {
       ${finNum_('creep', 'Of each raise, spent', { post: '%', step: 5 })}
       ${finNum_('credit', 'Credit score', { step: 10, min: 300 })}
     </div>
-    <div class="fin-derived">Income tax is federal and state only — payroll tax is added on top,
-      ${finFull_(finPayrollTax_(FIN.gross))} at this salary.
-      Take-home ${finFull_(Math.max(0, (FIN.gross - Math.min(FIN.gross * FIN.k401 / 100, FIN_401K.elective))
-        * (1 - FIN.taxRate / 100) - finPayrollTax_(FIN.gross)))} a year.</div></div>
+    <div class="fin-derived" data-fin-derived="you"></div></div>
+
+    <div class="fin-group"><h4>A second income</h4><div class="fin-fields">
+      ${finNum_('spouseGross', 'Their pay / year', { pre: '$', step: 1000 })}
+      ${finNum_('spouse401k', 'To 401k', { post: '%', step: 0.5 })}
+      ${finNum_('spouseMatch', 'Employer match', { post: '%', step: 0.5 })}
+      ${finNum_('spouseStop', 'Their income stops at your', { step: 1 })}
+    </div>
+    <div class="fin-derived" data-fin-derived="spouse"></div></div>
 
     <div class="fin-group"><h4>Pay growth</h4><div class="fin-fields">
       ${finNum_('raiseNom', 'Annual raise', { post: '%', step: 0.25 })}
@@ -5921,8 +6018,7 @@ function finBuildEdit_() {
       ${finNum_('inflation', 'Inflation', { post: '%', step: 0.25 })}
       ${finNum_('stopWork', 'Last age you earn', { step: 1 })}
     </div>
-    <div class="fin-derived">${top.n} promotions · salary reaches ${finFull_(top.sal)} by ${Math.min(FIN.promoUntil, FIN.stopWork)}
-      · income stops at ${FIN.stopWork}${gap > 0 ? ` · then ${gap} yr${gap === 1 ? '' : 's'} with no pay before the retirement budget` : ''}</div>
+    <div class="fin-derived" data-fin-derived="growth"></div>
     <div class="fin-rows" id="finPromoRows" style="margin-top:12px;"></div>
     <div class="fin-add"><button onclick="finAdd_('promo')">Add a known promotion</button></div>
     </div>
@@ -5937,9 +6033,7 @@ function finBuildEdit_() {
       ${finNum_('gainsTax', 'Capital gains', { post: '%', step: 1 })}
       ${finNum_('retireTax', 'Tax on withdrawals', { post: '%', step: 1 })}
     </div>
-    <div class="fin-derived">${finFull_(FIN.netWorth * FIN.pCash / sum)} savings ·
-      ${finFull_(FIN.netWorth * FIN.pBrok / sum)} brokerage ·
-      ${finFull_(FIN.netWorth * FIN.pRet / sum)} retirement</div></div>
+    <div class="fin-derived" data-fin-derived="buckets"></div></div>
 
     <div class="fin-group"><h4>Retirement</h4><div class="fin-fields">
       ${finSel_('retireProfile', 'Spending profile', FIN_RETIRE)}
@@ -5948,19 +6042,14 @@ function finBuildEdit_() {
       ${finNum_('ssAnnual', 'Social Security / yr', { pre: '$', step: 500 })}
       ${finNum_('ssAge', 'Starting at age')}
     </div>
-    <div class="fin-derived">${finFull_(finRetireTarget_(top.sal))} a year${rp && rp.pct != null
-      ? `, being ${rp.pct}% of the ${finFull_(top.sal)} you finish on — not of today's pay`
-      : ', set by hand'} · every plan runs to ${FIN_PLAN_TO}, so outliving it is not one of the
-      ways this can go wrong</div></div>
+    <div class="fin-derived" data-fin-derived="retire"></div></div>
 
     <div class="fin-group"><h4>Market</h4><div class="fin-fields">
       ${finSel_('marketProfile', 'Portfolio', FIN_MARKET)}
       ${finNum_('realReturn', 'Real return', { post: '%', step: 0.25 })}
       ${finNum_('vol', 'Volatility', { post: '%', step: 1 })}
     </div>
-    <div class="fin-derived">Real return is after inflation. The profiles are forward-looking
-      assumptions, roughly what the big shops publish — a point or two below the long historical
-      average, which is the single biggest lever on the number at the top.</div></div>
+    <div class="fin-derived" data-fin-derived="market"></div></div>
 
     <div class="fin-group"><h4>Every year</h4>
       <div class="fin-rows" id="finRewardRows"></div>
@@ -5979,6 +6068,7 @@ function finBuildEdit_() {
       <button onclick="finReset_()">Reset to the example numbers</button></div></div>`;
 
   finBuildRows_();
+  finRefreshDerived_();
 }
 
 const FIN_LIST = k => k === 'promo' ? FIN.promos : k === 'reward' ? FIN.rewards
@@ -6137,7 +6227,7 @@ document.addEventListener('input', e => {
     const item = FIN_LIST(row.dataset.finKind)[+row.dataset.i];
     if (!item) return;
     item[e.target.dataset.f] = e.target.type === 'number' ? (parseFloat(e.target.value) || 0) : e.target.value;
-    finTouched_(); renderFinancialTab(); finRefreshNotes_();
+    finTouched_(); renderFinancialTab(); finRefreshNotes_(); finRefreshDerived_();
     return;
   }
   const key = e.target.dataset.fin;
@@ -6153,7 +6243,7 @@ document.addEventListener('input', e => {
   FIN[key] = v;
   if (key === 'realReturn' || key === 'vol') FIN.marketProfile = 'custom';
   if (key === 'retireSpend') FIN.retireProfile = 'custom';
-  finTouched_(); renderFinancialTab(); finRefreshNotes_();
+  finTouched_(); renderFinancialTab(); finRefreshNotes_(); finRefreshDerived_();
 });
 
 document.addEventListener('change', e => {
@@ -13342,7 +13432,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-sell-house';
+const APP_BUILD_VERSION = '2026-08-26-second-income';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
