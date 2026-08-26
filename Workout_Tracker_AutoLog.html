@@ -2716,6 +2716,9 @@
       <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-1)"></span>Median</span>
       <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-1); opacity:0.28"></span>10th–90th</span>
       <span class="hx-key"><span class="hx-swatch" style="background:var(--chart-warn)"></span>Retire</span>
+      <span class="hx-key" id="finKidKey" style="display:none;">
+        <span class="hx-swatch" style="background:var(--chart-2); opacity:0.5"></span>Raising them
+        <span class="hx-swatch" style="background:var(--chart-2); margin-left:8px;"></span>College</span>
     </div>
   </div>
 
@@ -4787,14 +4790,39 @@ const FIN_PATHS = 2000;   // the phone runs this on every keystroke
 const FIN_YEAR0 = new Date().getFullYear();
 
 const FIN_MARKET = {
-  cash:      { label: 'All cash / CDs',         ret: 0.5, vol: 1  },
-  conserv:   { label: 'Conservative · 30/70',   ret: 3.0, vol: 7  },
-  balanced:  { label: 'Balanced · 60/40',       ret: 5.0, vol: 11 },
-  growth:    { label: 'Growth · 80/20',         ret: 6.0, vol: 14 },
-  equity:    { label: 'All equities',           ret: 7.0, vol: 17 },
-  muted:     { label: 'Muted forecast · 60/40', ret: 3.0, vol: 11 },
+  /* Real returns, after inflation, before fees.
+     These are FORWARD-LOOKING figures, in line with the published capital
+     market assumptions the big shops run (Vanguard, BlackRock, and what
+     Wealthfront's own projections use), not the long historical average.
+     The two differ by roughly 1.5-2 points a year for a balanced portfolio,
+     because today's starting yields and valuations are what they are - and
+     over thirty years that gap is most of the difference between a
+     projection and a fantasy. The historical figure is still here, named
+     for what it is, for anyone who wants it. */
+  cash:      { label: 'All cash / CDs',           ret: 0.5, vol: 1  },
+  conserv:   { label: 'Conservative · 30/70',     ret: 2.3, vol: 7  },
+  balanced:  { label: 'Balanced · 60/40',         ret: 3.2, vol: 11 },
+  growth:    { label: 'Growth · 80/20',           ret: 3.8, vol: 14 },
+  equity:    { label: 'All equities',             ret: 4.4, vol: 17 },
+  historic:  { label: 'Historic average · 60/40', ret: 5.0, vol: 11 },
   custom:    { label: 'Custom', ret: null, vol: null }
 };
+
+/* Payroll tax. It is charged on the WHOLE salary - the 401k deferral does
+   not escape it - and it is the piece an "estimated tax rate" typed as a
+   federal bracket always misses. On a $95k salary it is $7,268 a year that
+   the model used to hand back as savings. Figures are 2026. */
+const FIN_FICA = { ss: 6.2, ssBase: 184500, med: 1.45, sur: 0.9, surAt: 200000 };
+
+// IRS limits, 2026. Uncapped percentages quietly bank more than the law
+// allows once pay grows, and the effect compounds for thirty years.
+const FIN_401K = { elective: 24500, catchUp: 8000, catchUpAge: 50, combined: 72000 };
+
+function finPayrollTax_(salary) {
+  return Math.min(salary, FIN_FICA.ssBase) * FIN_FICA.ss / 100
+    + salary * FIN_FICA.med / 100
+    + Math.max(0, salary - FIN_FICA.surAt) * FIN_FICA.sur / 100;
+}
 const FIN_RETIRE = {
   lean:     { label: 'Lean · 55% of pay',        pct: 55 },
   modest:   { label: 'Modest · 65%',             pct: 65 },
@@ -4825,14 +4853,17 @@ const FIN_KID_PLANS = {
 };
 
 const FIN_DEFAULTS = {
-  age: 31, netWorth: 48000, gross: 95000, taxRate: 22, k401: 8, match: 4,
-  monthly: 3200, credit: 750,
+  age: 31, netWorth: 48000, gross: 95000, taxRate: 16, k401: 8, match: 4,
+  monthly: 3200, credit: 750, creep: 50,
   inflation: 2.5, raiseNom: 3, promoNom: 8, promoMin: 1, promoMax: 1.5,
   promoStretch: 25, promoUntil: 50,
-  pCash: 15, pBrok: 25, pRet: 60, toCash: 20, cashReal: 0.5, brokDrag: 0.4, retireTax: 15,
+  pCash: 15, pBrok: 25, pRet: 60, toCash: 20, cashReal: 0.5, brokDrag: 0.4,
+  retireTax: 15, gainsTax: 15,
   retireProfile: 'standard', retireSpend: 60000,
-  stopWork: 60, retireAge: 60, runTo: 95, ssAnnual: 0, ssAge: 67,
-  marketProfile: 'balanced', realReturn: 5, vol: 11,
+  // Social Security at zero was not a neutral default, it was a wrong one:
+  // a career at this pay claims somewhere around $3,000 a month at 67.
+  stopWork: 60, retireAge: 60, runTo: 95, ssAnnual: 36000, ssAge: 67,
+  marketProfile: 'balanced', realReturn: 3.2, vol: 11,
   promos: [], rewards: [], kids: [], buys: []
 };
 let FIN = JSON.parse(JSON.stringify(FIN_DEFAULTS));
@@ -4851,6 +4882,16 @@ function finLoad_() {
       });
     }
   } catch (e) {}
+  /* The return and volatility are stored alongside the profile that set
+     them, so a recalibrated profile would otherwise show its new label
+     over the old numbers - the dropdown saying "Balanced" while the model
+     still ran the figure it meant last year. A named profile is the
+     authority; only Custom keeps what was typed. A profile that no longer
+     exists becomes Custom rather than silently reverting to the default. */
+  const mk = FIN_MARKET[FIN.marketProfile];
+  if (!mk) FIN.marketProfile = 'custom';
+  else if (mk.ret != null) { FIN.realReturn = mk.ret; FIN.vol = mk.vol; }
+  if (!FIN_RETIRE[FIN.retireProfile]) FIN.retireProfile = 'custom';
   FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
 }
 function finSave_() { try { localStorage.setItem(FIN_KEY, JSON.stringify(FIN)); } catch (e) {} }
@@ -4886,10 +4927,14 @@ const finHousePlan_ = b => FIN_HOUSE_PLANS[b.plan] || FIN_HOUSE_PLANS.custom;
 const finHouseDown_ = b => { const p = finHousePlan_(b); return p.down != null ? b.price * p.down / 100 : b.down; };
 const finHousePmi_ = b => { const p = finHousePlan_(b); return p.pmi != null ? p.pmi : (b.pmi || 0); };
 const finKidCost_ = (k, f) => { const p = FIN_KID_PLANS[k.plan] || FIN_KID_PLANS.custom; return p[f] != null ? p[f] : (k[f] || 0); };
-function finRetireSpend_() {
+/* A replacement rate is a share of the pay you finish on, so the target has
+   to be handed the salary the run actually ended at. The no-argument form is
+   what the edit panel shows before a run exists. */
+function finRetireTarget_(finalSalary) {
   const p = FIN_RETIRE[FIN.retireProfile];
-  return p && p.pct != null ? FIN.gross * p.pct / 100 : FIN.retireSpend;
+  return p && p.pct != null ? (finalSalary || FIN.gross) * p.pct / 100 : FIN.retireSpend;
 }
+function finRetireSpend_() { return finRetireTarget_(FIN.gross); }
 
 // One simulated life. Net worth reads as one number, but inside it has to be
 // savings, investments, property and debt kept apart - otherwise a mortgage
@@ -4898,31 +4943,58 @@ function finPath_(collect) {
   const total = Math.max(0, FIN.netWorth);
   const sum = Math.max(1, FIN.pCash + FIN.pBrok + FIN.pRet);
   let cash = total * FIN.pCash / sum, brok = total * FIN.pBrok / sum, ret = total * FIN.pRet / sum;
+  /* What of the brokerage is basis rather than gain, so a withdrawal can be
+     taxed on the gain alone. Holdings you already have are counted as all
+     basis - the model has no way to know otherwise, and guessing a large
+     embedded gain would be the less honest error. */
+  let basis = brok;
   const assets = [], loans = [], leases = [], out = [];
   const years = FIN.runTo - FIN.age;
   let brokeAt = null;
-  const spendTarget = finRetireSpend_();
   let cadence = FIN.promoMin + Math.random() * Math.max(0, FIN.promoMax - FIN.promoMin);
   let salary = FIN.gross, sincePromo = 0;
   const lastPlanned = FIN.promos.length ? Math.max(...FIN.promos.map(p => Math.round(p.inYears || 0))) : -1;
+  // Take-home at today's pay, the baseline lifestyle creep is measured from.
+  const homePay = s => Math.max(0, (s - Math.min(s * FIN.k401 / 100, FIN_401K.elective))
+    * (1 - FIN.taxRate / 100) - finPayrollTax_(s));
+  const home0 = homePay(FIN.gross);
+  /* The retirement budget follows the pay you actually END on, not the pay
+     you start on. A replacement rate is a share of pre-retirement income by
+     definition, and reading it off today's salary made thirty years of
+     raises free: the money grew with every promotion, the spending never
+     did. Tracked as the plan runs, since the salary is path-dependent. */
+  let finalSalary = FIN.gross;
 
   for (let i = 0; i <= years; i++) {
     const age = FIN.age + i, year = FIN_YEAR0 + i;
+    /* Loan payments and balances are fixed in NOMINAL dollars, and this
+       whole model is in today's. A $2,400 mortgage payment is a real $2,400
+       in year one and a real $1,150 in year thirty - charging the full
+       amount for the entire term overstated the cost of every house. */
+    const defl = Math.pow(1 + FIN.inflation / 100, -i);
     // The OPENING balance for this age, recorded before anything happens.
     if (collect) out.push(Math.max(0, cash + brok + ret
-      + assets.reduce((n, a) => n + a.value, 0) - loans.reduce((n, L) => n + L.balance, 0)));
+      + assets.reduce((n, a) => n + a.value, 0)
+      - loans.reduce((n, L) => n + L.balance, 0) * defl));
 
     const earning = age < FIN.stopWork;
     const retired = age >= FIN.retireAge;
 
-    // Raising cash: savings, then investments, then the retirement account
-    // grossed up for the tax due on the way out.
+    // Raising cash: savings, then investments, then the retirement account.
+    // Both of the invested pots are grossed up for the tax due on the way
+    // out - the brokerage on its gain, the retirement account on the lot.
     const withdraw = amount => {
       let need = amount;
       const c = Math.min(Math.max(0, cash), need); cash -= c; need -= c;
       if (need <= 0) return;
-      const b = Math.min(Math.max(0, brok), need); brok -= b; need -= b;
-      if (need > 0) ret -= need / (1 - FIN.retireTax / 100);
+      if (brok > 0) {
+        const gain = Math.max(0, 1 - basis / brok);
+        const rate = gain * FIN.gainsTax / 100;
+        const gross = Math.min(brok, need / Math.max(0.01, 1 - rate));
+        basis = Math.max(0, basis - basis * (gross / brok));
+        brok -= gross; need -= gross * (1 - rate);
+      }
+      if (need > 0) ret -= need / Math.max(0.01, 1 - FIN.retireTax / 100);
     };
 
     FIN.buys.forEach(b => {
@@ -4958,8 +5030,8 @@ function finPath_(collect) {
         const interest = L.balance * L.r;
         const principal = Math.min(L.balance, L.pay - interest);
         L.balance -= principal; L.monthsLeft--;
-        loanCash += L.pay;
-        if (L.pmiMonthly > 0 && L.balance > L.pmiStopsAt) loanCash += L.pmiMonthly;
+        loanCash += L.pay * defl;
+        if (L.pmiMonthly > 0 && L.balance > L.pmiStopsAt) loanCash += L.pmiMonthly * defl;
       }
     });
     leases.forEach(L => { loanCash += L.monthly * 12; });
@@ -4990,7 +5062,7 @@ function finPath_(collect) {
     const dragged = Math.exp(Math.log(1 + Math.max(-0.99, FIN.realReturn / 100 - FIN.brokDrag / 100))
       - sd * sd / 2 + sd * Z);
     cash *= (1 + FIN.cashReal / 100);
-    brok *= dragged;
+    brok *= dragged;   // basis does not grow - that is what makes it a gain
     ret *= grow;
     assets.forEach(a => { a.value *= (1 + a.growth); });
 
@@ -5009,28 +5081,42 @@ function finPath_(collect) {
         // Nominal to real - a 3% raise against 2.5% inflation is worth 0.5%.
         salary *= (1 + nominal / 100) / (1 + FIN.inflation / 100);
       }
-      const k = salary * FIN.k401 / 100, match = salary * FIN.match / 100;
-      const takeHome = (salary - k) * (1 - FIN.taxRate / 100);
-      const spend = (retired ? spendTarget : FIN.monthly * 12) + rewards + loanCash + kidCash;
+      finalSalary = salary;
+      // Capped at what the IRS actually allows to go in.
+      const room = FIN_401K.elective + (age >= FIN_401K.catchUpAge ? FIN_401K.catchUp : 0);
+      const k = Math.min(salary * FIN.k401 / 100, room);
+      const match = Math.min(salary * FIN.match / 100, Math.max(0, FIN_401K.combined - k));
+      const takeHome = (salary - k) * (1 - FIN.taxRate / 100) - finPayrollTax_(salary);
+      /* Lifestyle creep. A budget frozen in real terms while real pay nearly
+         doubles means every raise is banked in full, forever - which is the
+         single biggest reason a projection like this runs away from what a
+         planner would tell you. Some share of a raise gets spent. */
+      const lifestyle = Math.max(0, takeHome - home0) * FIN.creep / 100;
+      const spend = (retired ? finRetireTarget_(finalSalary) : FIN.monthly * 12 + lifestyle)
+        + rewards + loanCash + kidCash;
       const free = takeHome - spend;
       ret += k + match;
-      if (free >= 0) { cash += free * FIN.toCash / 100; brok += free * (1 - FIN.toCash / 100); }
-      else withdraw(-free);
+      if (free >= 0) {
+        cash += free * FIN.toCash / 100;
+        const inv = free * (1 - FIN.toCash / 100);
+        brok += inv; basis += inv;
+      } else withdraw(-free);
     } else {
       const income = (FIN.ssAnnual > 0 && age >= FIN.ssAge) ? FIN.ssAnnual : 0;
-      const base = retired ? spendTarget : FIN.monthly * 12;
+      const base = retired ? finRetireTarget_(finalSalary)
+        : FIN.monthly * 12 + Math.max(0, homePay(finalSalary) - home0) * FIN.creep / 100;
       const need = base + rewards + loanCash + kidCash - income;
       if (need > 0) withdraw(need); else cash += -need;
     }
 
     const net = cash + brok + ret + assets.reduce((n, a) => n + a.value, 0)
-      - loans.reduce((n, L) => n + L.balance, 0);
+      - loans.reduce((n, L) => n + L.balance, 0) * defl;
     /* Broke is an absorbing state. Left alone the arithmetic runs to minus
        millions, which nobody can owe - you would have cut spending long
        before, and "how far past broke" was never information. */
     if (net <= 0) {
       if (brokeAt === null) brokeAt = age;
-      cash = 0; brok = 0; ret = 0;
+      cash = 0; brok = 0; ret = 0; basis = 0;
       assets.length = 0; loans.length = 0; leases.length = 0;
     }
   }
@@ -5106,6 +5192,44 @@ function finDrawCone_(res) {
              stroke="${colour}" stroke-width="1" stroke-dasharray="3 3" opacity="0.75"></line>`
       + chartAxisText_(x, y0 + 9, label, 'middle', 'chart-tick');
   };
+  /* Children are a SPAN, not a moment: daycare, then school, then four years
+     of college that cost more than the previous thirteen put together. A
+     dashed line at a birth year said nothing about where the money goes, so
+     each child gets a shaded run of dependent years with the college block
+     picked out darker - the dent in the median line then has a visible
+     cause instead of being a mystery flat spot. */
+  const span = (fromAge, toAge, fill, opacity, lift, label) => {
+    const a = finClamp_(fromAge - FIN.age, 0, b.length - 1);
+    const z = finClamp_(toAge - FIN.age, 0, b.length - 1);
+    if (z <= a) return '';
+    const xa = X(a), xz = X(z);
+    let text = '';
+    if (label) {
+      // Centred on the band, but pulled inside the plot when the band sits
+      // against an edge - a name half off the chart reads as a glitch.
+      const wide = label.length * 5.2;
+      const cx = finClamp_((xa + xz) / 2, x0 + wide / 2, x1 - wide / 2);
+      text = chartAxisText_(cx, y1 - 5 - lift, label, 'middle', 'chart-tick');
+    }
+    return `<rect x="${xa.toFixed(1)}" y="${y0}" width="${(xz - xa).toFixed(1)}"
+             height="${(y1 - y0).toFixed(1)}" fill="${fill}" opacity="${opacity}"></rect>` + text;
+  };
+  let bands = '';
+  let shown = 0;
+  FIN.kids.forEach(k => {
+    const born = FIN.age + (k.birthYear - FIN_YEAR0);
+    if (born + 22 < FIN.age || born > FIN.runTo) return;
+    const who = (k.label || 'Child').slice(0, 9);
+    bands += span(born, born + 18, 'var(--chart-2)', 0.10, 0, '');
+    /* Each child's label gets its own row. Two children born a few years
+       apart put their college blocks side by side, and a single shared
+       baseline printed one name straight through the other. */
+    bands += span(born + 18, born + 22, 'var(--chart-2)', 0.24, shown * 11, who);
+    shown++;
+  });
+  const kidKey = document.getElementById('finKidKey');
+  if (kidKey) kidKey.style.display = shown ? '' : 'none';
+
   let marks = '';
   FIN.buys.forEach(p => { marks += mark(FIN.age + (p.year - FIN_YEAR0), (p.label || '').slice(0, 8), 'var(--muted)'); });
   if (FIN.stopWork !== FIN.retireAge) marks += mark(FIN.stopWork, 'pay ends', 'var(--red)');
@@ -5124,17 +5248,38 @@ function finDrawCone_(res) {
              width="${band.toFixed(1)}" height="${H}"></rect>`;
   });
 
-  svg.innerHTML = out + marks
+  svg.innerHTML = out + bands + marks
     + `<polygon points="${upper} ${lower}" fill="var(--chart-1)" opacity="0.16"
         stroke="var(--chart-1)" stroke-opacity="0.35" stroke-width="1"></polygon>`
     + `<path d="${mid}" class="chart-line" stroke="var(--chart-1)"></path>`
     + ticks + hits;
 
   finLast_ = { b, X, Y, x0, x1 };
-  bindChartHits_(svg, b.map(d => ({
-    label: String(d.age),
-    detail: `Age ${d.age} — median ${finFull_(d.p50)} · range ${finFull_(d.p10)} to ${finFull_(d.p90)}`
-  })), 'finReadout');
+  bindChartHits_(svg, b.map(d => {
+    const kids = finKidsAt_(d.age);
+    return {
+      label: String(d.age),
+      detail: `Age ${d.age} — median ${finFull_(d.p50)} · range ${finFull_(d.p10)} to ${finFull_(d.p90)}`
+        + (kids.total > 0 ? ` · ${kids.what}, ${finFull_(kids.total)} this year` : '')
+    };
+  }), 'finReadout');
+}
+
+/* What the children cost in the year you are pointing at, and which stage
+   each is in. The same three brackets the simulation charges, read from the
+   same helper - so the chart cannot describe a cost the model did not make. */
+function finKidsAt_(myAge) {
+  const year = FIN_YEAR0 + (myAge - FIN.age);
+  let total = 0;
+  const parts = [];
+  FIN.kids.forEach(k => {
+    const a = year - k.birthYear;
+    if (a < 0 || a >= 22) return;
+    const stage = a < 5 ? 'care' : a < 18 ? 'school' : 'college';
+    total += finKidCost_(k, stage);
+    parts.push(`${k.label || 'Child'} ${a < 5 ? 'in daycare' : a < 18 ? 'at school' : 'at college'}`);
+  });
+  return { total, what: parts.join(', ') };
 }
 
 function finVerdict_(res) {
@@ -5304,12 +5449,17 @@ function finBuildEdit_() {
       ${finNum_('age', 'Your age')}
       ${finNum_('netWorth', 'Net worth', { pre: '$', step: 1000 })}
       ${finNum_('gross', 'Gross pay / year', { pre: '$', step: 1000 })}
-      ${finNum_('taxRate', 'Effective tax', { post: '%', step: 0.5 })}
+      ${finNum_('taxRate', 'Income tax', { post: '%', step: 0.5 })}
       ${finNum_('k401', 'To 401k', { post: '%', step: 0.5 })}
       ${finNum_('match', 'Employer match', { post: '%', step: 0.5 })}
       ${finNum_('monthly', 'Monthly spend', { pre: '$', step: 50 })}
+      ${finNum_('creep', 'Of each raise, spent', { post: '%', step: 5 })}
       ${finNum_('credit', 'Credit score', { step: 10, min: 300 })}
-    </div></div>
+    </div>
+    <div class="fin-derived">Income tax is federal and state only — payroll tax is added on top,
+      ${finFull_(finPayrollTax_(FIN.gross))} at this salary.
+      Take-home ${finFull_(Math.max(0, (FIN.gross - Math.min(FIN.gross * FIN.k401 / 100, FIN_401K.elective))
+        * (1 - FIN.taxRate / 100) - finPayrollTax_(FIN.gross)))} a year.</div></div>
 
     <div class="fin-group"><h4>Pay growth</h4><div class="fin-fields">
       ${finNum_('raiseNom', 'Annual raise', { post: '%', step: 0.25 })}
@@ -5334,6 +5484,7 @@ function finBuildEdit_() {
       ${finNum_('toCash', 'New savings kept as cash', { post: '%' })}
       ${finNum_('cashReal', 'Savings real return', { post: '%', step: 0.1 })}
       ${finNum_('brokDrag', 'Brokerage tax drag', { post: '%', step: 0.1 })}
+      ${finNum_('gainsTax', 'Capital gains', { post: '%', step: 1 })}
       ${finNum_('retireTax', 'Tax on withdrawals', { post: '%', step: 1 })}
     </div>
     <div class="fin-derived">${finFull_(FIN.netWorth * FIN.pCash / sum)} savings ·
@@ -5348,14 +5499,18 @@ function finBuildEdit_() {
       ${finNum_('ssAnnual', 'Social Security / yr', { pre: '$', step: 500 })}
       ${finNum_('ssAge', 'Starting at age')}
     </div>
-    <div class="fin-derived">${finFull_(finRetireSpend_())} a year${rp && rp.pct != null ? `, being ${rp.pct}% of today's pay` : ', set by hand'}</div></div>
+    <div class="fin-derived">${finFull_(finRetireTarget_(top.sal))} a year${rp && rp.pct != null
+      ? `, being ${rp.pct}% of the ${finFull_(top.sal)} you finish on — not of today's pay`
+      : ', set by hand'}</div></div>
 
     <div class="fin-group"><h4>Market</h4><div class="fin-fields">
       ${finSel_('marketProfile', 'Portfolio', FIN_MARKET)}
       ${finNum_('realReturn', 'Real return', { post: '%', step: 0.25 })}
       ${finNum_('vol', 'Volatility', { post: '%', step: 1 })}
     </div>
-    <div class="fin-derived">Volatility is what makes the band — set it to zero and the cone collapses to a single line.</div></div>
+    <div class="fin-derived">Real return is after inflation. The profiles are forward-looking
+      assumptions, roughly what the big shops publish — a point or two below the long historical
+      average, which is the single biggest lever on the number at the top.</div></div>
 
     <div class="fin-group"><h4>Every year</h4>
       <div class="fin-rows" id="finRewardRows"></div>
@@ -12700,7 +12855,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-starter-sections';
+const APP_BUILD_VERSION = '2026-08-26-fin-calibration';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
