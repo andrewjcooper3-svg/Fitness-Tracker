@@ -1154,6 +1154,22 @@
   .fin-hero.short { color: var(--red); }
   .fin-hero-sub { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 5px; }
 
+  /* One ratio against a limit: how far along the projection is towards the
+     pot retirement actually needs. A meter on the same track, not a chart -
+     there is one number here and a bar chart of one bar is not a chart. */
+  .fin-need-row { display: flex; align-items: baseline; gap: 9px; padding: 5px 0;
+    font-family: var(--font); font-size: 13px; color: var(--muted); }
+  .fin-need-row .n { margin-left: auto; font-size: 16px; font-weight: 700;
+    color: var(--text); font-variant-numeric: tabular-nums; }
+  .fin-need-row b { color: var(--text); font-weight: 700; }
+  .fin-need-meter { height: 10px; border-radius: 5px; background: var(--surface2);
+    overflow: hidden; margin: 4px 0 2px; }
+  .fin-need-meter i { display: block; height: 100%; border-radius: 5px;
+    background: var(--chart-1); transition: width 0.25s ease; }
+  .fin-need-meter i.short { background: var(--chart-warn); }
+  .fin-need-meter i.bad { background: var(--red); }
+  .fin-need-note { font-family: var(--font); font-size: 12.5px; color: var(--muted);
+    line-height: 1.5; margin-top: 10px; }
   .fin-mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; margin-bottom: 12px; }
   .fin-mix span { display: block; }
   .fin-mix-row { display: flex; align-items: center; gap: 9px; padding: 6px 0;
@@ -2731,6 +2747,19 @@
     <div class="fin-verdict" id="finVerdict"></div>
     <div class="fin-hero" id="finHero">—</div>
     <div class="fin-hero-sub" id="finHeroSub"></div>
+  </div>
+
+  <!-- What the projection has to clear. The hero above is what you are on
+       course for; this is the bar it has to get over, worked out from the
+       same engine rather than a rule of thumb. -->
+  <div class="stats-card" id="finNeedCard" style="display:none;">
+    <div class="stats-card-title">The minimum you need to retire</div>
+    <div class="fin-need-row"><span>Needed by <b id="finNeedAge">—</b></span>
+      <span class="n" id="finNeedValue">—</span></div>
+    <div class="fin-need-meter"><i id="finNeedFill"></i></div>
+    <div class="fin-need-row"><span>On course for</span>
+      <span class="n" id="finNeedHave">—</span></div>
+    <div class="fin-need-note" id="finNeedNote"></div>
   </div>
 
   <div class="stats-card">
@@ -5310,6 +5339,63 @@ function finSimulate_() {
   };
 }
 
+/* ---------- What you actually need at retirement ----------
+   Not a rule of thumb. The same engine that draws the cone is re-run over
+   just the drawdown years, starting from a candidate pot, and the pot is
+   bisected until the money lasts to the end of the plan in the share of runs
+   you are aiming for. Doing it that way is the point: a 4%-rule number would
+   quietly ignore the mortgage still running at 65, the child at college at
+   67, Social Security arriving at 67, and the tax paid on the way out of the
+   retirement account. This cannot ignore them, because it is the same code.
+
+   The timeline is SHIFTED rather than re-modelled: the run starts at your
+   retirement age, so every dated thing - a child's birth year, the year a
+   house was bought - moves back by the same number of years to keep it
+   landing where it really would. */
+const FIN_NEED_PATHS = 240;      // enough to place the threshold; this runs on every keystroke
+const FIN_NEED_TARGET = 0.90;    // "lasts to the end" in nine runs out of ten
+
+function finSurvivalFrom_(pot) {
+  let lived = 0;
+  for (let i = 0; i < FIN_NEED_PATHS; i++) {
+    FIN.netWorth = pot;
+    if (finPath_(false).brokeAt === null) lived++;
+  }
+  return lived / FIN_NEED_PATHS;
+}
+
+function finMinimumNeeded_(target) {
+  const save = FIN;
+  const shift = FIN.retireAge - FIN.age;
+  if (shift <= 0 || FIN.runTo <= FIN.retireAge) return null;
+  const scratch = JSON.parse(JSON.stringify(FIN));
+  scratch.age = save.retireAge;
+  scratch.stopWork = save.retireAge;        // no earning years in this run
+  scratch.gross = finFinalSalary_();        // the budget follows the pay you finish on
+  scratch.kids = save.kids.map(k => Object.assign({}, k, { birthYear: k.birthYear - shift }));
+  scratch.buys = save.buys.map(b => Object.assign({}, b, { year: b.year - shift }));
+
+  try {
+    FIN = scratch;
+    finReseed_();
+    // A pot that cannot survive on any budget - bail rather than bisect forever.
+    let hi = Math.max(100000, (finRetireTarget_(scratch.gross) || 50000) * 60);
+    if (finSurvivalFrom_(hi) < target) return null;
+    let lo = 0;
+    /* 16 halvings resolves the pot to about a thousandth of the search range,
+       far finer than the figure is displayed to - and far finer than the
+       sampling error of 240 paths, so more would be false precision. */
+    for (let i = 0; i < 16; i++) {
+      const midPot = (lo + hi) / 2;
+      finReseed_();                          // every candidate faces the same markets
+      if (finSurvivalFrom_(midPot) >= target) hi = midPot; else lo = midPot;
+    }
+    return hi;
+  } finally {
+    FIN = save;
+  }
+}
+
 /* ---------- Financial Future: drawing ---------- */
 let finLast_ = null;
 
@@ -5562,6 +5648,36 @@ function finKidsAt_(myAge) {
   return { total, what: parts.join(', ') };
 }
 
+function finNeed_(res) {
+  const card = document.getElementById('finNeedCard');
+  if (!card) return;
+  const need = finMinimumNeeded_(FIN_NEED_TARGET);
+  const at = res.band.find(d => d.age === FIN.retireAge);
+  if (!need || !at) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const have = at.p50;
+  const pct = finClamp_(have / need * 100, 0, 100);
+  document.getElementById('finNeedAge').textContent = FIN.retireAge;
+  document.getElementById('finNeedValue').textContent = finFull_(need);
+  document.getElementById('finNeedHave').textContent = finFull_(have);
+  const fill = document.getElementById('finNeedFill');
+  fill.style.width = pct.toFixed(1) + '%';
+  fill.className = have >= need ? '' : (have >= need * 0.75 ? 'short' : 'bad');
+
+  const budget = finRetireTarget_(finFinalSalary_());
+  const short = need - have;
+  const years = FIN.stopWork - FIN.age;
+  document.getElementById('finNeedNote').innerHTML =
+    `Enough to cover <b>${finFull_(budget)}</b> a year from ${FIN.retireAge} to ${FIN.runTo}`
+    + (FIN.ssAnnual > 0 ? `, on top of ${finFull_(FIN.ssAnnual)} of Social Security from ${FIN.ssAge}` : '')
+    + `, and still be there at the end in <b>${Math.round(FIN_NEED_TARGET * 100)}%</b> of runs.`
+    + (short > 0
+        ? ` You are <b>${finFull_(short)}</b> short — about <b>${finFull_(short / Math.max(1, years))}</b>
+            a year more saved between now and ${FIN.stopWork}, before any growth on it.`
+        : ` You are <b>${finFull_(-short)}</b> clear of it.`);
+}
+
 function finVerdict_(res) {
   const at = res.band.find(d => d.age === FIN.retireAge) || res.band[res.band.length - 1];
   const pct = Math.round(res.success * 100);
@@ -5645,6 +5761,7 @@ function renderFinancialTab() {
     const res = finSimulate_();
     finDrawCone_(res);
     finVerdict_(res);
+    finNeed_(res);
     finMix_();
     finTable_(res);
     const ro = document.getElementById('finReadout');
@@ -5700,26 +5817,32 @@ function finRowSel_(item, f, label, table) {
     </select></div>`;
 }
 
-function finBuildEdit_() {
-  const custom = FIN.retireProfile === 'custom';
+/* The pay you finish on, at the MIDDLE of the promotion cadence you set.
+   Every path in the simulation draws its own cadence, so there is no single
+   true answer - this is the representative one, and it is the same figure the
+   edit panel shows, so the retirement budget quoted there and the budget the
+   minimum is sized against can never disagree. */
+function finPayAt_(target) {
   const mid = FIN.promoMin + Math.max(0, FIN.promoMax - FIN.promoMin) / 2;
   const lastPlanned = FIN.promos.length ? Math.max(...FIN.promos.map(p => Math.round(p.inYears || 0))) : -1;
-  // Same two-stage rule the simulation uses, so the preview cannot disagree.
-  const payAt = target => {
-    let sal = FIN.gross, since = 0, cad = mid, n = 0;
-    for (let a = FIN.age + 1; a <= target; a++) {
-      const i = a - FIN.age;
-      let nom = FIN.raiseNom;
-      if (i <= lastPlanned) FIN.promos.forEach(pr => { if (Math.round(pr.inYears) === i) { nom += (+pr.pct || 0); n++; } });
-      else if (a <= FIN.promoUntil && cad > 0) {
-        since += 1;
-        if (since >= cad) { nom += FIN.promoNom; since -= cad; n++; cad *= (1 + FIN.promoStretch / 100); }
-      }
-      sal *= (1 + nom / 100) / (1 + FIN.inflation / 100);
+  let sal = FIN.gross, since = 0, cad = mid, n = 0;
+  for (let a = FIN.age + 1; a <= target; a++) {
+    const i = a - FIN.age;
+    let nom = FIN.raiseNom;
+    if (i <= lastPlanned) FIN.promos.forEach(pr => { if (Math.round(pr.inYears) === i) { nom += (+pr.pct || 0); n++; } });
+    else if (a <= FIN.promoUntil && cad > 0) {
+      since += 1;
+      if (since >= cad) { nom += FIN.promoNom; since -= cad; n++; cad *= (1 + FIN.promoStretch / 100); }
     }
-    return { sal, n };
-  };
-  const top = payAt(Math.min(FIN.promoUntil, FIN.stopWork));
+    sal *= (1 + nom / 100) / (1 + FIN.inflation / 100);
+  }
+  return { sal, n };
+}
+const finFinalSalary_ = () => finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork)).sal;
+
+function finBuildEdit_() {
+  const custom = FIN.retireProfile === 'custom';
+  const top = finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork));
   const gap = FIN.retireAge - FIN.stopWork;
   const sum = Math.max(1, FIN.pCash + FIN.pBrok + FIN.pRet);
   const rp = FIN_RETIRE[FIN.retireProfile];
@@ -13141,7 +13264,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-stable-projection';
+const APP_BUILD_VERSION = '2026-08-26-retirement-minimum';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
