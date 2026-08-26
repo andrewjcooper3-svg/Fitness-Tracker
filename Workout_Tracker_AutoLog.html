@@ -4837,6 +4837,12 @@ function showHistorySection(name) {
 const FIN_KEY = 'FINANCIAL_FUTURE_STATE';
 const FIN_PATHS = 2000;   // the phone runs this on every keystroke
 const FIN_YEAR0 = new Date().getFullYear();
+/* Every plan runs to 100. It used to be a field, and a field invites you to
+   pick the age you expect to die - which is the one assumption where being
+   wrong in the optimistic direction is unrecoverable. Outliving the plan is
+   the failure that has no fix at 85; funding a few years you do not need is
+   a rounding error by comparison. So it is not a choice any more. */
+const FIN_PLAN_TO = 100;
 
 const FIN_MARKET = {
   /* Real returns, after inflation, before fees.
@@ -4915,14 +4921,14 @@ const FIN_DEFAULTS = {
   retireProfile: 'standard', retireSpend: 60000,
   // Social Security at zero was not a neutral default, it was a wrong one:
   // a career at this pay claims somewhere around $3,000 a month at 67.
-  stopWork: 60, retireAge: 60, runTo: 95, ssAnnual: 36000, ssAge: 67,
+  stopWork: 60, retireAge: 60, runTo: FIN_PLAN_TO, ssAnnual: 36000, ssAge: 67,
   marketProfile: 'balanced', realReturn: 3.2, vol: 11,
   promos: [], rewards: [], kids: [], buys: []
 };
 let FIN = JSON.parse(JSON.stringify(FIN_DEFAULTS));
 // The three ages clamp against each other, so a half-typed number must never
 // be written over its neighbour. RAW holds what was actually typed.
-let FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
+let FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork };
 
 function finLoad_() {
   try {
@@ -4941,11 +4947,14 @@ function finLoad_() {
      still ran the figure it meant last year. A named profile is the
      authority; only Custom keeps what was typed. A profile that no longer
      exists becomes Custom rather than silently reverting to the default. */
+  // Saved plans, and plans arriving from another device, predate the fixed
+  // horizon. There is no way to set it any more, so there is nothing to keep.
+  FIN.runTo = FIN_PLAN_TO;
   const mk = FIN_MARKET[FIN.marketProfile];
   if (!mk) FIN.marketProfile = 'custom';
   else if (mk.ret != null) { FIN.realReturn = mk.ret; FIN.vol = mk.vol; }
   if (!FIN_RETIRE[FIN.retireProfile]) FIN.retireProfile = 'custom';
-  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
+  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork };
 }
 function finSave_() { try { localStorage.setItem(FIN_KEY, JSON.stringify(FIN)); } catch (e) {} }
 
@@ -5007,7 +5016,7 @@ function finAdopt_(remote) {
     if (Array.isArray(FIN_DEFAULTS[k])) { if (Array.isArray(remote[k])) FIN[k] = remote[k]; }
     else if (typeof remote[k] === typeof FIN_DEFAULTS[k]) FIN[k] = remote[k];
   });
-  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
+  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork };
   finSave_();
   return true;
 }
@@ -5747,10 +5756,10 @@ function renderFinancialTab() {
     finQueued_ = false;
     // Derived from RAW, never from the previous clamp, so a half-typed age
     // cannot permanently overwrite its neighbour.
-    FIN.retireAge = finClamp_(FIN_RAW.retireAge, FIN.age + 1, 100);
+    FIN.retireAge = finClamp_(FIN_RAW.retireAge, FIN.age + 1, FIN_PLAN_TO - 1);
     FIN.stopWork = finClamp_(FIN_RAW.stopWork, FIN.age + 1, FIN.retireAge);
-    FIN.runTo = finClamp_(FIN_RAW.runTo, FIN.retireAge + 1, 110);
-    ['retireAge', 'stopWork', 'runTo'].forEach(k => {
+    FIN.runTo = FIN_PLAN_TO;
+    ['retireAge', 'stopWork'].forEach(k => {
       const el = document.getElementById('fin_' + k);
       if (el && el !== document.activeElement && +el.value !== FIN[k]) el.value = FIN[k];
     });
@@ -5898,13 +5907,13 @@ function finBuildEdit_() {
       ${finSel_('retireProfile', 'Spending profile', FIN_RETIRE)}
       ${custom ? finNum_('retireSpend', 'Spending / year', { pre: '$', step: 1000 }) : ''}
       ${finNum_('retireAge', 'Retire at')}
-      ${finNum_('runTo', 'Plan through age')}
       ${finNum_('ssAnnual', 'Social Security / yr', { pre: '$', step: 500 })}
       ${finNum_('ssAge', 'Starting at age')}
     </div>
     <div class="fin-derived">${finFull_(finRetireTarget_(top.sal))} a year${rp && rp.pct != null
       ? `, being ${rp.pct}% of the ${finFull_(top.sal)} you finish on — not of today's pay`
-      : ', set by hand'}</div></div>
+      : ', set by hand'} · every plan runs to ${FIN_PLAN_TO}, so outliving it is not one of the
+      ways this can go wrong</div></div>
 
     <div class="fin-group"><h4>Market</h4><div class="fin-fields">
       ${finSel_('marketProfile', 'Portfolio', FIN_MARKET)}
@@ -6043,7 +6052,7 @@ function finAdd_(what) {
 function finReset_() {
   if (!confirm('Clear your figures and go back to the example numbers?')) return;
   FIN = JSON.parse(JSON.stringify(FIN_DEFAULTS));
-  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
+  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork };
   try { localStorage.removeItem(FIN_KEY); } catch (e) {}
   // A reset is an edit like any other: without a fresh stamp the next pull
   // would helpfully restore the plan you just cleared, from another device.
@@ -13264,7 +13273,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-retirement-minimum';
+const APP_BUILD_VERSION = '2026-08-26-plan-to-100';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

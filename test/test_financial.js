@@ -374,6 +374,72 @@ const FICA = s => Math.min(s, 184500) * 0.062 + s * 0.0145 + Math.max(0, s - 200
     await ctx.close();
   }
 
+  console.log('\n=== Every plan runs to 100 ===');
+  {
+    /* This used to be a field, which invited you to pick the age you expect
+       to die - the one assumption where guessing optimistically has no
+       recovery. It is fixed now, and a saved plan that predates the change
+       has to be pulled up to it rather than quietly kept short. */
+    const ctx = await browser.newContext({ viewport: { width: 430, height: 932 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => { console.log('  PAGEERROR', String(e).slice(0, 160)); fails++; });
+    await page.route('https://script.google.com/**', r =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' }));
+    await page.addInitScript(() => localStorage.setItem('FINANCIAL_FUTURE_STATE',
+      JSON.stringify({ age: 31, retireAge: 60, stopWork: 60, runTo: 80 })));
+    await page.goto(URL);
+    await page.waitForTimeout(900);
+    await open(page);
+
+    check('a plan saved with a shorter horizon is pulled up to 100',
+      await page.evaluate(() => FIN.runTo) === 100,
+      String(await page.evaluate(() => FIN.runTo)));
+    check('the header says so', /–\s*100/.test(
+      await page.evaluate(() => document.getElementById('finWindow').textContent)),
+      await page.evaluate(() => document.getElementById('finWindow').textContent));
+    check('the chart is plotted all the way there', await page.evaluate(() =>
+      finSimulate_().band[finSimulate_().band.length - 1].age) === 100);
+    check('and the table\'s last row is 100', await page.evaluate(() =>
+      [...document.querySelectorAll('#finTable tbody tr td:first-child')]
+        .pop().textContent.trim()) === '100');
+
+    await page.evaluate(() => openFinancialEdit());
+    await page.waitForTimeout(400);
+    check('there is no longer an age to choose', await page.evaluate(() =>
+      !document.getElementById('fin_runTo')));
+    check('the panel says where the plan ends instead', await page.evaluate(() =>
+      /runs to 100/.test(document.getElementById('finEditBody').textContent)));
+
+    /* Retirement has to stay inside the horizon. Typing 105 must land at 99,
+       not leave a plan that ends before it starts. */
+    await page.fill('#fin_retireAge', '105');
+    await page.waitForTimeout(700);
+    const ages = await page.evaluate(() => ({ r: FIN.retireAge, s: FIN.stopWork, t: FIN.runTo }));
+    check('retiring past the end of the plan is not possible',
+      ages.r < ages.t && ages.r === 99, JSON.stringify(ages));
+    check('and the last earning age follows it down', ages.s <= ages.r, JSON.stringify(ages));
+
+    /* The minimum has to be sized on the real horizon. Forty years of
+       drawdown needs more than twenty, and by roughly the right ratio. */
+    const needs = await page.evaluate(() => {
+      Object.assign(FIN, JSON.parse(JSON.stringify(FIN_DEFAULTS)), {
+        age: 50, gross: 0, monthly: 0, retireProfile: 'custom', retireSpend: 40000,
+        stopWork: 60, retireAge: 60, ssAnnual: 0, realReturn: 0, vol: 0,
+        promoMin: 1, promoMax: 1, retireTax: 0, kids: [], buys: [], rewards: []
+      });
+      const hundred = finMinimumNeeded_(FIN_NEED_TARGET);
+      FIN.runTo = 80;                       // what the old default would have asked for
+      const eighty = finMinimumNeeded_(FIN_NEED_TARGET);
+      return { hundred, eighty };
+    });
+    check('the minimum is sized on the full horizon',
+      Math.round(needs.hundred / 40000) === 41, `${needs.hundred} = ${(needs.hundred / 40000).toFixed(1)} years`);
+    check('which is twenty years more than the old default asked for',
+      Math.round((needs.hundred - needs.eighty) / 40000) === 20,
+      `${Math.round((needs.hundred - needs.eighty) / 40000)} years more`);
+    await ctx.close();
+  }
+
   console.log('\n=== What you type is kept ===');
   {
     const ctx = await browser.newContext({ viewport: { width: 430, height: 932 } });
