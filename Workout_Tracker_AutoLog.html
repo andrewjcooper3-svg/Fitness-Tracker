@@ -5040,11 +5040,39 @@ const finMoney_ = n => {
 const finFull_ = n => (n < 0 ? '-' : '') + '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
 const finRate_ = (table, score, i) => (table.find(t => score >= t[0]) || table[table.length - 1])[i];
 
+/* ---------- The dice are the same dice every time ----------
+   This ran on Math.random(), so every recompute drew 2000 fresh lives and
+   the answer moved even when nothing about the plan had. Typing the same
+   number twice gave two different projections, which meant you could reroll
+   until you liked what you saw. That is not a rounding wobble - it is the
+   headline number being unreproducible, and it makes every comparison
+   between two versions of a plan meaningless.
+
+   The seed is a CONSTANT, deliberately, rather than a hash of the inputs.
+   Same inputs give the same answer; and because every scenario replays the
+   identical sequence of draws, nudging one figure moves the cone smoothly
+   instead of reshuffling all 2000 lives and jumping. What you then see when
+   you change retirement age by a year is the effect of that year, not the
+   effect of new dice. (Statisticians call it common random numbers; the
+   point here is simply that the chart stops arguing with itself.) */
+const FIN_SEED = 0x9e3779b9;
+let finRandState_ = FIN_SEED;
+function finRand_() {
+  // mulberry32: small, fast, and good enough for a 2000-path cone.
+  finRandState_ |= 0; finRandState_ = (finRandState_ + 0x6d2b79f5) | 0;
+  let t = Math.imul(finRandState_ ^ (finRandState_ >>> 15), 1 | finRandState_);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
 let finSpare_ = null;
+// Called before every run. The spare has to be cleared too: a leftover half
+// of a Box-Muller pair would carry into the next run and shift it.
+function finReseed_() { finRandState_ = FIN_SEED; finSpare_ = null; }
+
 function finGauss_() {
   if (finSpare_ !== null) { const s = finSpare_; finSpare_ = null; return s; }
   let u = 0, v = 0, s = 0;
-  do { u = Math.random() * 2 - 1; v = Math.random() * 2 - 1; s = u * u + v * v; } while (s === 0 || s >= 1);
+  do { u = finRand_() * 2 - 1; v = finRand_() * 2 - 1; s = u * u + v * v; } while (s === 0 || s >= 1);
   const f = Math.sqrt(-2 * Math.log(s) / s);
   finSpare_ = v * f;
   return u * f;
@@ -5085,7 +5113,9 @@ function finPath_(collect) {
   const assets = [], loans = [], leases = [], out = [];
   const years = FIN.runTo - FIN.age;
   let brokeAt = null;
-  let cadence = FIN.promoMin + Math.random() * Math.max(0, FIN.promoMax - FIN.promoMin);
+  // From the seeded stream too - otherwise the promotion cadence alone
+  // would still make two identical plans disagree.
+  let cadence = FIN.promoMin + finRand_() * Math.max(0, FIN.promoMax - FIN.promoMin);
   let salary = FIN.gross, sincePromo = 0;
   const lastPlanned = FIN.promos.length ? Math.max(...FIN.promos.map(p => Math.round(p.inYears || 0))) : -1;
   // Take-home at today's pay, the baseline lifestyle creep is measured from.
@@ -5258,6 +5288,7 @@ function finPath_(collect) {
 }
 
 function finSimulate_() {
+  finReseed_();                 // same plan in, same 2000 lives out
   const years = FIN.runTo - FIN.age;
   const cols = Array.from({ length: years + 1 }, () => new Float64Array(FIN_PATHS));
   let survived = 0;
@@ -13110,7 +13141,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-commitment-shading';
+const APP_BUILD_VERSION = '2026-08-26-stable-projection';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
