@@ -2900,8 +2900,13 @@
         <div id="sdBuildDays"></div>
       </div>
       <div class="config-box">
-        <div class="config-title" style="margin-bottom:8px;">If something looks wrong</div>
+        <div class="config-toggle" onclick="toggleStarterSection('sdTroubleSec')">
+          <div class="config-title">If something looks wrong</div>
+          <div class="config-chevron" id="sdTroubleSecChevron">▸</div>
+        </div>
+        <div class="config-body" id="sdTroubleSecBody">
         <div id="sdTrouble"></div>
+        </div>
       </div>
       <button class="sd-btn secondary" style="width:100%;" onclick="promoteStarter()">It is doubling reliably - switch to maintenance</button>
     </div>
@@ -2927,20 +2932,30 @@
       </div>
 
       <div class="config-box">
-        <div class="config-title" style="margin-bottom:8px;">Where is it right now</div>
+        <div class="config-toggle" onclick="toggleStarterSection('sdWhere')">
+          <div class="config-title">Where is it right now</div>
+          <div class="config-chevron" id="sdWhereChevron">▸</div>
+        </div>
+        <div class="config-body" id="sdWhereBody">
         <div class="sd-seg" id="sdLocationSeg">
           <button data-loc="counter" onclick="setStarterLocation('counter')">Counter</button>
           <button data-loc="fridge" onclick="setStarterLocation('fridge')">Fridge</button>
         </div>
         <div class="ov-mini-empty" style="margin:8px 0 0;" id="sdLocationNote"></div>
+        </div>
       </div>
 
       <div class="config-box">
-        <div class="config-toggle" onclick="toggleKitchenCollapse_('sdFeedBody','sdFeedChevron')">
+        <div class="config-toggle" onclick="toggleStarterSection('sdFeed')">
           <div class="config-title">Log a feed</div>
           <div class="config-chevron" id="sdFeedChevron">▸</div>
         </div>
         <div class="config-body" id="sdFeedBody">
+          <!-- This block is MOVED, not copied, into the feed sheet when the
+               status card's button opens it, and moved back on close. One
+               set of ids means the form keeps every listener and default it
+               already had, and there is no second copy to drift. -->
+          <div id="sdFeedForm">
           <!-- Grams and ratio are independent and were conflated before:
                how much starter you KEEP sets the batch size, the RATIO
                sets the timing. Keeping 100g at 1:1:1 is a perfectly
@@ -2973,11 +2988,16 @@
           </div>
           <div class="ov-mini-empty" style="margin:8px 0 0;" id="sdFeedGrams"></div>
           <button class="sd-btn" style="width:100%; margin-top:10px;" onclick="logStarterFeed()">Log feed</button>
+          </div>
         </div>
       </div>
 
       <div class="config-box" id="sdRiseBox">
-        <div class="config-title" style="margin-bottom:8px;">Check on it</div>
+        <div class="config-toggle" onclick="toggleStarterSection('sdCheck')">
+          <div class="config-title">Check on it</div>
+          <div class="config-chevron" id="sdCheckChevron">▸</div>
+        </div>
+        <div class="config-body" id="sdCheckBody">
         <!-- Which feed this is about, said out loud. Without it you are
              annotating an invisible thing and have to trust that the app
              means the one you think it does. -->
@@ -3021,10 +3041,15 @@
         <button class="sd-btn" style="width:100%; margin-top:14px;" onclick="logStarterRise()">Save this check</button>
         <div id="sdCheckLearned"></div>
         <div id="sdRiseAdvice"></div>
+        </div>
       </div>
 
       <div class="config-box">
-        <div class="config-title" style="margin-bottom:4px;">Feeding before you go out</div>
+        <div class="config-toggle" onclick="toggleStarterSection('sdGap')">
+          <div class="config-title">Feeding before you go out</div>
+          <div class="config-chevron" id="sdGapChevron">▸</div>
+        </div>
+        <div class="config-body" id="sdGapBody">
         <div class="sd-field-row">
           <div class="sd-field">
             <div class="sd-field-label">Back in (hours)</div>
@@ -3032,10 +3057,15 @@
           </div>
         </div>
         <div id="sdGapAdvice"></div>
+        </div>
       </div>
 
       <div class="config-box">
-        <div class="config-title" style="margin-bottom:8px;">Plan a bake</div>
+        <div class="config-toggle" onclick="toggleStarterSection('sdPlan2')">
+          <div class="config-title">Plan a bake</div>
+          <div class="config-chevron" id="sdPlan2Chevron">▸</div>
+        </div>
+        <div class="config-body" id="sdPlan2Body">
         <div class="sd-field-row sd-row-wide">
           <div class="sd-field">
             <div class="sd-field-label">Mixing the dough at</div>
@@ -3044,15 +3074,21 @@
         </div>
         <button class="sd-btn secondary" style="width:100%; margin-top:8px;" onclick="planStarterBake()">Plan backwards from this</button>
         <div id="sdPlan"></div>
+        </div>
       </div>
 
       <div class="config-box">
-        <div class="config-title" style="margin-bottom:4px;">Feed history</div>
+        <div class="config-toggle" onclick="toggleStarterSection('sdHist')">
+          <div class="config-title">Feed history</div>
+          <div class="config-chevron" id="sdHistChevron">▸</div>
+        </div>
+        <div class="config-body" id="sdHistBody">
         <div id="sdFeedList"></div>
+        </div>
       </div>
 
       <div class="config-box">
-        <div class="config-toggle" onclick="toggleKitchenCollapse_('sdRefBody','sdRefChevron')">
+        <div class="config-toggle" onclick="toggleStarterSection('sdRef')">
           <div class="config-title">Quick reference</div>
           <div class="config-chevron" id="sdRefChevron">▸</div>
         </div>
@@ -3239,6 +3275,15 @@
     <div class="ov-page-title" style="margin-bottom:14px;">Your numbers</div>
     <div id="finEditBody"></div>
     <button class="event-modal-close" onclick="closeFinancialEdit(event)">Done</button>
+  </div>
+</div>
+
+<div class="event-modal-overlay" id="sdFeedOverlay" onclick="closeStarterFeedForm(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="ov-page-title" style="margin-bottom:12px;">Log a feed</div>
+    <div id="sdFeedModalHost"></div>
+    <button class="event-modal-close" onclick="closeStarterFeedForm(event)">Cancel</button>
   </div>
 </div>
 
@@ -8131,6 +8176,7 @@ function renderStarter() {
   if (stage === 'none') renderStarterSupplies_();
   if (stage === 'building') renderStarterBuild_(st);
   if (stage === 'active') renderStarterActive_(st);
+  applyStarterSections_();
   updateStarterNag_();
 }
 
@@ -8211,7 +8257,7 @@ function renderStarterStatus_(st) {
     <div class="sd-status-headline">${escapeHtml_(headline)}</div>
     <div class="sd-status-sub">${escapeHtml_(sub)}</div>
     <div class="sd-status-actions">
-      <button class="sd-btn" onclick="quickFeedStarter()">Fed it just now</button>
+      <button class="sd-btn" onclick="openStarterFeedForm()">Log a feed</button>
     </div>
   </div>`;
 }
@@ -8885,18 +8931,54 @@ function logStarterFeed() {
   document.getElementById('sdFeedTime').value = '';
   sdCheckDraft = null;
   document.getElementById('sdCheckTime').value = '';
+  // The form has to be back in the page before the re-render, or the
+  // repaint writes its defaults into fields sitting inside a closed sheet.
+  if (starterFeedSheetOpen_()) closeStarterFeedForm();
   renderStarter();
 }
 
-function quickFeedStarter() {
-  const st = loadStarter_();
-  st.feeds = st.feeds || [];
-  st.feeds.push({ id: genId_(), at: new Date().toISOString(), keepG: st.keepG || SD_DEFAULT_KEEP_G,
-                  ratio: st.ratio || '1:2:2', flour: st.flour || 'bread',
-                  tempF: st.tempF || SD_DEFAULT_TEMP_F, location: st.location || 'counter' });
-  sdCheckDraft = null;
-  saveStarter_(st);
-  renderStarter();
+/* The top button used to write a feed straight to the log using whatever
+   the last one used. Quick, but it guessed at the details and gave you no
+   chance to say otherwise - and now that the sections fold, the form it
+   should have shown you is usually rolled up somewhere below the fold.
+   So it lifts the real form into a sheet instead: same inputs, same ids,
+   same listeners, just borrowed for as long as the sheet is open. */
+function openStarterFeedForm() {
+  const form = document.getElementById('sdFeedForm');
+  const host = document.getElementById('sdFeedModalHost');
+  if (!form || !host) return;
+
+  // Time defaults to now every time the sheet opens - you are logging a
+  // feed you just did, and a stale value from an abandoned attempt is the
+  // one mistake here that silently corrupts the timing model.
+  const time = document.getElementById('sdFeedTime');
+  if (time) time.value = sdTimeValue_(new Date());
+  renderStarterFeedGrams_();
+
+  host.appendChild(form);
+  document.getElementById('sdFeedOverlay').classList.add('open');
+  const first = document.getElementById('sdFeedKeep');
+  if (first) setTimeout(() => first.focus({ preventScroll: true }), 60);
+}
+
+// Always puts the form back, even if the sheet is already shut, so a stray
+// call can never strand the fields inside a hidden overlay.
+function closeStarterFeedForm(e) {
+  // A tap on the backdrop closes; a tap that merely bubbled up from inside
+  // the sheet does not.
+  if (e && e.currentTarget && e.currentTarget.id === 'sdFeedOverlay'
+      && e.target !== e.currentTarget) return;
+  const form = document.getElementById('sdFeedForm');
+  const body = document.getElementById('sdFeedBody');
+  if (form && body && form.parentElement !== body) body.appendChild(form);
+  const ov = document.getElementById('sdFeedOverlay');
+  if (ov) ov.classList.remove('open');
+  updateViewportHeight('kitchen', true);
+}
+
+function starterFeedSheetOpen_() {
+  const ov = document.getElementById('sdFeedOverlay');
+  return !!ov && ov.classList.contains('open');
 }
 
 // Attaches to the most recent feed rather than creating a row of its own -
@@ -9119,6 +9201,52 @@ function formatExpirationDate_(dateStr) {
 // Find a Recipe) - collapsed by default so the actual list is the first
 // thing you see on each subtab, same pattern already used for the
 // Settings API-connection sections.
+/* The starter tab is long: a status card, a chart, then eight boxes. Only
+   two of them collapsed, so the rest of the page was always unrolled even
+   when you only wanted to log a feed. All of them fold now, and the open
+   set is remembered - a section you closed should stay closed tomorrow,
+   otherwise the tidying does not survive the next reload. */
+const SD_SECTIONS_KEY = 'STARTER_OPEN_SECTIONS';
+let sdOpenSections_ = null;
+
+function sdLoadSections_() {
+  if (sdOpenSections_) return sdOpenSections_;
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SD_SECTIONS_KEY) || 'null'); } catch (e) {}
+  // Nothing saved: open the two you reach for, leave the reference material
+  // folded. A first visit should not be a wall of headers either.
+  sdOpenSections_ = Array.isArray(saved) ? saved : ['sdWhere', 'sdCheck'];
+  return sdOpenSections_;
+}
+function sdSaveSections_() {
+  try { localStorage.setItem(SD_SECTIONS_KEY, JSON.stringify(sdOpenSections_ || [])); } catch (e) {}
+}
+
+function toggleStarterSection(key, force) {
+  const open = sdLoadSections_();
+  const at = open.indexOf(key);
+  const want = force === undefined ? at < 0 : !!force;
+  if (want && at < 0) open.push(key);
+  if (!want && at >= 0) open.splice(at, 1);
+  sdSaveSections_();
+  applyStarterSections_();
+  updateViewportHeight('kitchen', true);
+}
+
+// Applied from state rather than by flipping classes, so a re-render can
+// never leave a chevron pointing the wrong way.
+function applyStarterSections_() {
+  const open = sdLoadSections_();
+  document.querySelectorAll('#kitchenSectionStarter .config-body[id$="Body"]').forEach(body => {
+    const key = body.id.replace(/Body$/, '');
+    const chev = document.getElementById(key + 'Chevron');
+    if (!chev) return;                      // not one of ours
+    const on = open.includes(key);
+    body.classList.toggle('expanded', on);
+    chev.textContent = on ? '▾' : '▸';
+  });
+}
+
 function toggleKitchenCollapse_(bodyId, chevronId) {
   const body = document.getElementById(bodyId);
   const chevron = document.getElementById(chevronId);
@@ -12572,7 +12700,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-25-financial-tab';
+const APP_BUILD_VERSION = '2026-08-26-starter-sections';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
