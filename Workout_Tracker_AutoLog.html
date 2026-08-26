@@ -4899,6 +4899,10 @@ const FIN_HOUSE_PLANS = {
   custom: { label: 'Custom', down: null, pmi: null }
 };
 const FIN_CAR_MODES = { finance: 'Finance', cash: 'Pay cash', lease: 'Lease' };
+// Agent commission and closing costs on the way out, and the slice of the
+// gain the IRS does not take on a home you lived in.
+const FIN_SELL_COST = 6;
+const FIN_HOME_EXCLUSION = 250000;
 const FIN_KID_PLANS = {
   public:  { label: 'Daycare, public school, in-state college', care: 15000, school: 6000, college: 29910 },
   privcol: { label: 'Daycare, public school, private college',  care: 15000, school: 6000, college: 62570 },
@@ -5199,7 +5203,7 @@ function finPath_(collect) {
       if (need > 0) ret -= need / Math.max(0.01, 1 - FIN.retireTax / 100);
     };
 
-    FIN.buys.forEach(b => {
+    FIN.buys.forEach((b, bi) => {
       if (b.year !== year) return;
       if (b.kind === 'house') {
         const down = Math.min(b.price, Math.max(0, finHouseDown_(b)));
@@ -5207,8 +5211,11 @@ function finPath_(collect) {
         withdraw(down);                       // cash becomes an asset, not a hole
         // Tax, insurance and upkeep belong to the property, not the loan: a
         // house bought outright still costs ~1.9% of its value every year.
-        assets.push({ value: b.price, growth: (b.growth || 0) / 100, upkeep: 0.019 });
+        // Tagged with which purchase it came from, so a sale can find both
+        // the property and the mortgage that belongs to it.
+        assets.push({ owner: bi, value: b.price, growth: (b.growth || 0) / 100, upkeep: 0.019 });
         if (borrowed > 0) loans.push({
+          owner: bi,
           balance: borrowed, r: finHouseRate_(b) / 100 / 12,
           pay: finPayment_(borrowed, finHouseRate_(b), b.term), monthsLeft: b.term * 12,
           pmiMonthly: borrowed * (finHousePmi_(b) / 100) / 12, pmiStopsAt: b.price * 0.8 });
@@ -5222,6 +5229,30 @@ function finPath_(collect) {
           pay: finPayment_(borrowed, finCarRate_(b), b.term), monthsLeft: b.term * 12,
           pmiMonthly: 0, pmiStopsAt: 0 });
       }
+    });
+
+    /* Selling. Taken at the start of the year, so the year you sell is the
+       first year with no mortgage and no upkeep - a house half-owned for
+       twelve months is more precision than the rest of this model has.
+
+       What actually reaches you is the sale price less what is still owed,
+       less the costs of selling, less tax on the gain above the
+       primary-residence exclusion. Netting only the mortgage would have
+       handed you about 6% of a house that never existed. */
+    FIN.buys.forEach((b, bi) => {
+      if (b.kind !== 'house' || !b.sellYear || Math.round(b.sellYear) !== year) return;
+      const ai = assets.findIndex(a => a.owner === bi);
+      if (ai < 0) return;                     // not bought yet, or already sold
+      const value = assets[ai].value;
+      const li = loans.findIndex(L => L.owner === bi);
+      const owed = li >= 0 ? loans[li].balance * defl : 0;   // nominal debt, real money
+      const gain = Math.max(0, value - b.price);
+      const tax = Math.max(0, gain - FIN_HOME_EXCLUSION) * (FIN.gainsTax / 100);
+      const net = value - owed - value * (FIN_SELL_COST / 100) - tax;
+      assets.splice(ai, 1);
+      if (li >= 0) loans.splice(li, 1);
+      // Underwater is possible - you bring money to the closing table.
+      if (net >= 0) cash += net; else withdraw(-net);
     });
 
     // A year of loans, month by month, so principal and interest separate
@@ -5565,17 +5596,24 @@ function finLanes_() {
       // Bought outright: there is no payment term to draw, but the upkeep
       // never stops, so the lane runs on rather than ending at the purchase.
       if (plan.down === 100) {
-        if (!inRange(at, last)) return;
+        const until = bu.sellYear > 0
+          ? Math.min(last, FIN.age + (Math.round(bu.sellYear) - FIN_YEAR0)) : last;
+        if (!inRange(at, until)) return;
         lanes.push({ kind: 'house', label: bu.label || 'Property', segs: [
-          { from: at, to: last, fill, what: 'Owned outright · upkeep',
+          { from: at, to: until, fill,
+            what: bu.sellYear > 0 ? `Owned outright, sold at ${Math.round(until)}` : 'Owned outright · upkeep',
             yr: bu.price * 0.019 }] });
         return;
       }
-      const end = at + (bu.term || 30);
+      const sold = bu.sellYear > 0 ? FIN.age + (Math.round(bu.sellYear) - FIN_YEAR0) : null;
+      const end = Math.min(at + (bu.term || 30), sold == null ? Infinity : sold);
       if (!inRange(at, end)) return;
       const borrowed = Math.max(0, bu.price - finHouseDown_(bu));
       lanes.push({ kind: 'house', label: bu.label || 'Property', segs: [
-        { from: at, to: end, fill, what: `${bu.term}-year mortgage at ${finHouseRate_(bu).toFixed(2)}%`,
+        { from: at, to: end,
+          fill, what: sold != null && sold <= at + (bu.term || 30)
+            ? `Owned, then sold at ${Math.round(sold)}`
+            : `${bu.term}-year mortgage at ${finHouseRate_(bu).toFixed(2)}%`,
           yr: finPayment_(borrowed, finHouseRate_(bu), bu.term) * 12 + bu.price * 0.019 }] });
       return;
     }
@@ -5946,6 +5984,35 @@ function finBuildEdit_() {
 const FIN_LIST = k => k === 'promo' ? FIN.promos : k === 'reward' ? FIN.rewards
   : k === 'kid' ? FIN.kids : FIN.buys;
 
+/* What selling actually hands you, said in the row rather than left to be
+   discovered on the chart. The two deductions people forget are the cost of
+   selling and the tax above the exclusion, so both are named. */
+function finSellNote_(b) {
+  const held = Math.max(0, Math.round(b.sellYear) - b.year);
+  const value = b.price * Math.pow(1 + (b.growth || 0) / 100, held);
+  const gain = Math.max(0, value - b.price);
+  const tax = Math.max(0, gain - FIN_HOME_EXCLUSION) * (FIN.gainsTax / 100);
+  const owed = held >= (b.term || 30) || b.plan === 'cash' ? 0
+    : finRemaining_(Math.max(0, b.price - finHouseDown_(b)), finHouseRate_(b), b.term, held)
+      * Math.pow(1 + FIN.inflation / 100, -held);
+  const net = value - owed - value * (FIN_SELL_COST / 100) - tax;
+  return `Sold at ${FIN.age + (Math.round(b.sellYear) - FIN_YEAR0)} for about `
+    + `${finMoney_(value)} — ${finMoney_(net)} of it reaches you after `
+    + `${FIN_SELL_COST}% selling costs`
+    + (owed > 0 ? `, ${finMoney_(owed)} still owed` : '')
+    + (tax > 0 ? ` and ${finMoney_(tax)} of tax on the gain above ${finMoney_(FIN_HOME_EXCLUSION)}` : '')
+    + '. Nothing replaces the housing cost, so add a yearly cost for rent if you will not own after this.';
+}
+
+// What is left on a loan after n years of payments - the closed form, so the
+// note cannot disagree with the month-by-month the simulation runs.
+function finRemaining_(principal, annualRate, years, elapsed) {
+  const r = annualRate / 100 / 12, n = years * 12, k = Math.min(n, Math.max(0, elapsed * 12));
+  if (n <= 0) return 0;
+  if (r === 0) return principal * (1 - k / n);
+  return principal * (Math.pow(1 + r, n) - Math.pow(1 + r, k)) / (Math.pow(1 + r, n) - 1);
+}
+
 // One source per row note, so the markup and the live refresh cannot drift.
 const FIN_NOTE = {
   promo: pr => Math.round(pr.inYears || 0) < 1
@@ -5960,10 +6027,11 @@ const FIN_NOTE = {
       `${finMoney_(p.care)}/yr to 5 · ${finMoney_(p.school)}/yr to 18 · ${finMoney_(p.college)}/yr for four years`;
   },
   buy: b => b.kind === 'house'
-    ? (b.plan === 'cash'
+    ? ((b.plan === 'cash'
         ? `Bought outright — no mortgage, still ~${finMoney_(b.price * 0.019)}/yr in tax, insurance and upkeep`
         : `${finMoney_(finHouseDown_(b))} down at ${finHouseRate_(b).toFixed(2)}% — the rate a ${FIN.credit} score gets`
           + (finHousePmi_(b) > 0 ? ` · ${finHousePmi_(b)}% mortgage insurance until 20% equity` : ''))
+      + (b.sellYear > 0 ? ' · ' + finSellNote_(b) : ' · Sell in: leave blank to keep it'))
     : b.mode === 'lease' ? 'A lease buys no equity, and left in the model it renews forever'
     : b.mode === 'cash' ? 'Paid outright, then it depreciates — no interest, but the cash is gone'
     : `${finCarRate_(b).toFixed(2)}% APR — the ${b.used ? 'used' : 'new'}-car rate for a ${FIN.credit} score`
@@ -6011,7 +6079,8 @@ function finBuildRows_() {
             + finRowSel_(b, 'plan', 'Down payment', FIN_HOUSE_PLANS)
             + (b.plan === 'custom' ? finRowNum_(b, 'down', 'Down', { pre: '$', step: 1000 })
                 + finRowNum_(b, 'pmi', 'Mortgage ins.', { post: '%', step: 0.05 }) : '')
-            + finRowNum_(b, 'term', 'Years', { step: 1 }) + finRowNum_(b, 'growth', 'Growth / yr', { post: '%', step: 0.25 }),
+            + finRowNum_(b, 'term', 'Years', { step: 1 }) + finRowNum_(b, 'growth', 'Growth / yr', { post: '%', step: 0.25 })
+            + finRowNum_(b, 'sellYear', 'Sell in', { step: 1, min: 0 }),
             FIN_NOTE.buy(b))
         : finRowShell_('buy', i, b.mode === 'lease' ? 'Never stops' : 'Depreciates', b.label,
             finRowSel_(b, 'mode', 'How', FIN_CAR_MODES) + finRowNum_(b, 'year', 'Year', { step: 1 })
@@ -6043,7 +6112,7 @@ function finAdd_(what) {
   else if (what === 'reward') FIN.rewards.push({ label: 'Yearly cost', amount: 1000, from: FIN.age, to: FIN.retireAge });
   else if (what === 'kid') FIN.kids.push({ label: 'Child', birthYear: FIN_YEAR0 + 2, plan: 'public' });
   else if (what === 'house') FIN.buys.push({ kind: 'house', label: 'Property', year: FIN_YEAR0 + 5,
-    price: 400000, plan: 'c20', down: 80000, rate: null, term: 30, growth: 1, pmi: 0 });
+    price: 400000, plan: 'c20', down: 80000, rate: null, term: 30, growth: 1, pmi: 0, sellYear: 0 });
   else if (what === 'car') FIN.buys.push({ kind: 'car', label: 'Vehicle', mode: 'finance', year: FIN_YEAR0 + 3,
     price: 32000, down: 4000, rate: null, term: 5, lease: 550, used: 0 });
   finTouched_(); finBuildRows_(); renderFinancialTab();
@@ -13273,7 +13342,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-plan-to-100';
+const APP_BUILD_VERSION = '2026-08-26-sell-house';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
