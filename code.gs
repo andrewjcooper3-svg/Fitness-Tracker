@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-25-header-row-guard';
+const BACKEND_BUILD_VERSION = '2026-08-26-financial-sync';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -515,6 +515,35 @@ function saveWidgetSummary_(summary) {
 
 function loadWidgetSummary_() {
   const raw = PropertiesService.getScriptProperties().getProperty(WIDGET_SUMMARY_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+// ---------- Financial plan (its own property, its own endpoints) ----------
+//
+// The plan is a settings blob, not an append-only log like the starter, so
+// the resolution rule is different: LAST WRITE WINS, decided by the savedAt
+// the editing device stamped. Merging field by field would be worse rather
+// than better - half of one device's retirement assumptions spliced into
+// half of another's is a plan nobody chose, and the numbers only mean
+// anything as a set.
+const FINANCIAL_STATE_KEY = 'FINANCIAL_STATE';
+
+function saveFinancialState_(fin) {
+  if (!fin || typeof fin !== 'object') throw new Error('No financial plan supplied.');
+  /* The trap the starter fell into three times: a device that has not
+     received the plan yet pushing its blank one over the real one. An
+     unedited plan carries no savedAt, and is refused here rather than
+     quietly flattening someone's figures. */
+  if (!fin.savedAt) throw new Error('Refusing to store a plan that was never edited.');
+  const current = loadFinancialState_();
+  if (current && current.savedAt && String(current.savedAt) > String(fin.savedAt)) return current;
+  setPropertyChecked_(PropertiesService.getScriptProperties(), FINANCIAL_STATE_KEY, fin);
+  return fin;
+}
+
+function loadFinancialState_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(FINANCIAL_STATE_KEY);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (e) { return null; }
 }
@@ -1482,6 +1511,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadFinancialState') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', financial: loadFinancialState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadStarterState') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', starter: loadStarterState_() }))
@@ -1663,6 +1698,16 @@ function doPost(e) {
       saveStarterState_(data.starter);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success', starter: loadStarterState_() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Echoes back what is actually stored, so the client can tell an
+    // accepted write from one the timestamp rule declined - and show the
+    // difference rather than assuming success.
+    if (data.action === 'saveFinancialState') {
+      const stored = saveFinancialState_(data.financial);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success', financial: stored }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 

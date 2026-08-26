@@ -2700,6 +2700,11 @@
     </div>
   </div>
 
+  <!-- Whether this device has got the plan onto the backend, where the
+       others can reach it. Silent until there is something of yours to
+       sync; loud when a save did not land. -->
+  <div class="sd-sync-line" id="finSyncLine" onclick="syncFinancialToRemote()" title="Tap to sync now"></div>
+
   <div class="stats-card">
     <span class="fin-pill" id="finPill">—</span>
     <div class="fin-verdict" id="finVerdict"></div>
@@ -4859,6 +4864,10 @@ const FIN_DEFAULTS = {
   promoStretch: 25, promoUntil: 50,
   pCash: 15, pBrok: 25, pRet: 60, toCash: 20, cashReal: 0.5, brokDrag: 0.4,
   retireTax: 15, gainsTax: 15,
+  // Stamped only when YOU change something, so an untouched device can be
+  // told apart from one carrying a real plan. That distinction is the whole
+  // basis of the cross-device rule below.
+  savedAt: '',
   retireProfile: 'standard', retireSpend: 60000,
   // Social Security at zero was not a neutral default, it was a wrong one:
   // a career at this pay claims somewhere around $3,000 a month at 67.
@@ -4895,6 +4904,116 @@ function finLoad_() {
   FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
 }
 function finSave_() { try { localStorage.setItem(FIN_KEY, JSON.stringify(FIN)); } catch (e) {} }
+
+/* ---------- The plan follows you between devices ----------
+   Called only where YOU changed something - never from the render, which
+   also saves. Stamping on render would make a device that merely opened
+   the tab look like it was holding a freshly edited plan, and the whole
+   cross-device rule rests on being able to tell those two apart. */
+function finTouched_() {
+  FIN.savedAt = new Date().toISOString();
+  finSave_();
+  syncFinancialToRemote();
+}
+
+let finSyncState_ = { status: 'idle', at: null, message: '' };
+function setFinSyncState_(status, message) {
+  finSyncState_ = { status, at: new Date(), message: message || '' };
+  renderFinSyncLine_();
+}
+
+function renderFinSyncLine_() {
+  const el = document.getElementById('finSyncLine');
+  if (!el) return;
+  el.classList.remove('err');
+  const when = finSyncState_.at
+    ? finSyncState_.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : '';
+  switch (finSyncState_.status) {
+    case 'syncing': el.textContent = '↻ Syncing…'; break;
+    case 'ok': el.textContent = `✓ Saved to your other devices${when ? ' at ' + when : ''} · tap to sync now`; break;
+    case 'pulled': el.textContent = '✓ Loaded the newer plan from another device'; break;
+    case 'offline':
+    case 'error':
+      el.textContent = '⚠ ' + finSyncState_.message;
+      el.classList.add('err');
+      break;
+    default: el.textContent = FIN.savedAt ? 'Tap to sync now' : '';
+  }
+}
+
+async function fetchFinancialState_(url) {
+  const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=loadFinancialState');
+  const data = await res.json();
+  if (data.status !== 'success') return null;
+  // An older deployment does not know this action and answers with its
+  // generic payload; no `financial` key means "nothing stored", not "empty".
+  return data.financial || null;
+}
+
+// Whole-state, last-write-wins. The plan is a set of assumptions that only
+// mean anything together - splicing two devices' figures field by field
+// would produce a plan neither of them chose.
+function finAdopt_(remote) {
+  if (!remote || typeof remote !== 'object') return false;
+  const mine = FIN.savedAt || '';
+  if (!remote.savedAt || String(remote.savedAt) <= String(mine)) return false;
+  Object.keys(FIN_DEFAULTS).forEach(k => {
+    if (remote[k] === undefined) return;
+    if (Array.isArray(FIN_DEFAULTS[k])) { if (Array.isArray(remote[k])) FIN[k] = remote[k]; }
+    else if (typeof remote[k] === typeof FIN_DEFAULTS[k]) FIN[k] = remote[k];
+  });
+  FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
+  finSave_();
+  return true;
+}
+
+let finSyncTimer_ = null;
+function syncFinancialToRemote() {
+  clearTimeout(finSyncTimer_);
+  finSyncTimer_ = setTimeout(async () => {
+    const url = getDeploymentUrl();
+    if (!url) return setFinSyncState_('error', 'No backend URL configured — set it in Settings.');
+    if (!navigator.onLine) return setFinSyncState_('offline', 'Offline — saved on this device, will sync later.');
+    if (!FIN.savedAt) return;                 // nothing of yours to push yet
+
+    setFinSyncState_('syncing');
+    try {
+      // Read before write: the other device may have edited more recently,
+      // and a blind push would throw that away.
+      const remote = await fetchFinancialState_(url);
+      if (finAdopt_(remote)) {
+        finBuildEdit_(); renderFinancialTab();
+        return setFinSyncState_('pulled');
+      }
+      const res = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'saveFinancialState', financial: FIN })
+      });
+      const data = await res.json();
+      if (data.status === 'success' && data.financial) return setFinSyncState_('ok');
+      // The write was refused or the deployment predates this endpoint.
+      setFinSyncState_('error', data.message
+        ? String(data.message)
+        : 'Saved on this device only — redeploy code.gs to sync the plan.');
+    } catch (e) {
+      setFinSyncState_('error', 'Could not reach the backend — saved on this device.');
+    }
+  }, 600);
+}
+
+// On load: take the other device's plan if it is newer than this one's.
+async function pullFinancialFromRemote() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const remote = await fetchFinancialState_(url);
+    if (finAdopt_(remote)) {
+      setFinSyncState_('pulled');
+      finBuildEdit_(); renderFinancialTab();
+    } else renderFinSyncLine_();
+  } catch (e) { /* local plan stands; the next edit will try again */ }
+}
 
 const finClamp_ = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const finMoney_ = n => {
@@ -5634,7 +5753,7 @@ function finAdd_(what) {
     price: 400000, plan: 'c20', down: 80000, rate: null, term: 30, growth: 1, pmi: 0 });
   else if (what === 'car') FIN.buys.push({ kind: 'car', label: 'Vehicle', mode: 'finance', year: FIN_YEAR0 + 3,
     price: 32000, down: 4000, rate: null, term: 5, lease: 550, used: 0 });
-  finBuildRows_(); renderFinancialTab();
+  finTouched_(); finBuildRows_(); renderFinancialTab();
 }
 
 function finReset_() {
@@ -5642,6 +5761,9 @@ function finReset_() {
   FIN = JSON.parse(JSON.stringify(FIN_DEFAULTS));
   FIN_RAW = { retireAge: FIN.retireAge, stopWork: FIN.stopWork, runTo: FIN.runTo };
   try { localStorage.removeItem(FIN_KEY); } catch (e) {}
+  // A reset is an edit like any other: without a fresh stamp the next pull
+  // would helpfully restore the plan you just cleared, from another device.
+  finTouched_();
   finBuildEdit_(); renderFinancialTab();
 }
 
@@ -5653,7 +5775,7 @@ document.addEventListener('input', e => {
     const item = FIN_LIST(row.dataset.finKind)[+row.dataset.i];
     if (!item) return;
     item[e.target.dataset.f] = e.target.type === 'number' ? (parseFloat(e.target.value) || 0) : e.target.value;
-    renderFinancialTab(); finRefreshNotes_();
+    finTouched_(); renderFinancialTab(); finRefreshNotes_();
     return;
   }
   const key = e.target.dataset.fin;
@@ -5669,7 +5791,7 @@ document.addEventListener('input', e => {
   FIN[key] = v;
   if (key === 'realReturn' || key === 'vol') FIN.marketProfile = 'custom';
   if (key === 'retireSpend') FIN.retireProfile = 'custom';
-  renderFinancialTab(); finRefreshNotes_();
+  finTouched_(); renderFinancialTab(); finRefreshNotes_();
 });
 
 document.addEventListener('change', e => {
@@ -5681,7 +5803,7 @@ document.addEventListener('change', e => {
     if (!item) return;
     const raw = e.target.value;
     item[e.target.dataset.f] = /^-?\d+(\.\d+)?$/.test(raw) ? parseFloat(raw) : raw;
-    finBuildRows_(); renderFinancialTab();
+    finTouched_(); finBuildRows_(); renderFinancialTab();
     return;
   }
   const key = e.target.dataset.fin;
@@ -5691,7 +5813,7 @@ document.addEventListener('change', e => {
     const m = FIN_MARKET[FIN.marketProfile];
     if (m && m.ret != null) { FIN.realReturn = m.ret; FIN.vol = m.vol; }
   }
-  finBuildEdit_(); renderFinancialTab();
+  finTouched_(); finBuildEdit_(); renderFinancialTab();
 });
 
 document.addEventListener('click', e => {
@@ -5699,7 +5821,7 @@ document.addEventListener('click', e => {
   if (!del) return;
   const row = del.closest('.fin-row');
   FIN_LIST(row.dataset.finKind).splice(+row.dataset.i, 1);
-  finBuildRows_(); renderFinancialTab();
+  finTouched_(); finBuildRows_(); renderFinancialTab();
 });
 
 // The clamp write-back skips a focused box so it never fights your typing,
@@ -12493,7 +12615,10 @@ function renderActiveViewContent(view) {
   if (view === 'stats') { renderStatsTab(); renderHistoryTab(); loadWorkoutHistory(); loadRemoteWeightLog(); }
   if (view === 'kitchen') { renderKitchenTab(); loadRemoteKitchenState(); loadRemoteStarterState(); loadRemoteRecipes().then(applyPendingRecipeSeeds_); }
   if (view === 'bodyhealth') { renderBodyHealthTab(); loadRemoteBodyHealthLog(); }
-  if (view === 'financial') renderFinancialTab();
+  // Draw from what this device holds first, then reconcile - the tab is
+  // usable instantly and corrects itself a moment later if another device
+  // has been editing, rather than sitting blank on a network round trip.
+  if (view === 'financial') { renderFinancialTab(); pullFinancialFromRemote(); }
 }
 
 // All 4 views live side-by-side in a flex track (CSS `order` maps them to
@@ -12855,7 +12980,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-fin-calibration';
+const APP_BUILD_VERSION = '2026-08-26-fin-sync';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -16340,7 +16465,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-25-header-row-guard';
+const EXPECTED_BACKEND_VERSION = '2026-08-26-financial-sync';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
