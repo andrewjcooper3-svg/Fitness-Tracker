@@ -4915,7 +4915,7 @@ const FIN_DEFAULTS = {
   age: 31, netWorth: 48000, gross: 95000, taxRate: 16, k401: 8, match: 4,
   // A second earner, off until you give them a salary. Their income stops on
   // its own age, because two people rarely finish on the same day.
-  spouseGross: 0, spouse401k: 6, spouseMatch: 3, spouseStop: 60,
+  spouseGross: 0, spouse401k: 6, spouseMatch: 3, spouseStart: 31, spouseStop: 60,
   monthly: 3200, credit: 750, creep: 50,
   inflation: 2.5, raiseNom: 3, promoNom: 8, promoMin: 1, promoMax: 1.5,
   promoStretch: 25, promoUntil: 50,
@@ -5170,14 +5170,15 @@ function finPath_(collect) {
      unused contribution room subsidise the other's. */
   const homePay = (s, kPct) => Math.max(0, (s - Math.min(s * kPct / 100, FIN_401K.elective))
     * (1 - FIN.taxRate / 100) - finPayrollTax_(s));
-  const home0 = homePay(FIN.gross, FIN.k401) + homePay(FIN.spouseGross, FIN.spouse401k);
+  const home0 = homePay(FIN.gross, FIN.k401)
+    + (finSpouseStart_() <= FIN.age ? homePay(FIN.spouseGross, FIN.spouse401k) : 0);
   /* The retirement budget follows the pay you actually END on, not the pay
      you start on. A replacement rate is a share of pre-retirement income by
      definition, and reading it off today's salary made thirty years of
      raises free: the money grew with every promotion, the spending never
      did. Tracked as the plan runs, since the salary is path-dependent. */
   let finalSalary = FIN.gross + FIN.spouseGross;
-  let spouseSalary = FIN.spouseGross;
+  let spouseSalary = FIN.spouseGross, spouseYears = 0;
 
   for (let i = 0; i <= years; i++) {
     const age = FIN.age + i, year = FIN_YEAR0 + i;
@@ -5313,9 +5314,15 @@ function finPath_(collect) {
        yours but no promotions: a second career modelled in that much detail
        would be a second set of assumptions to get wrong. */
     let spouseHome = 0, spouseK = 0;
-    const spouseEarning = FIN.spouseGross > 0 && age < FIN.spouseStop;
+    const spouseEarning = FIN.spouseGross > 0
+      && age >= finSpouseStart_() && age < FIN.spouseStop;
     if (spouseEarning) {
-      if (i > 0) spouseSalary *= (1 + FIN.raiseNom / 100) / (1 + FIN.inflation / 100);
+      /* Their raises run from THEIR first year, not from today. The salary
+         you typed is in today's money whenever they start, so a career
+         beginning in five years starts at that figure rather than at five
+         years of raises on top of it. */
+      if (spouseYears > 0) spouseSalary *= (1 + FIN.raiseNom / 100) / (1 + FIN.inflation / 100);
+      spouseYears++;
       const sRoom = FIN_401K.elective + (age >= FIN_401K.catchUpAge ? FIN_401K.catchUp : 0);
       const sk = Math.min(spouseSalary * FIN.spouse401k / 100, sRoom);
       const sMatch = Math.min(spouseSalary * FIN.spouseMatch / 100,
@@ -5921,10 +5928,14 @@ function finPayAt_(target) {
    end of theirs. The replacement rate is a share of what the HOUSEHOLD was
    living on, so leaving a second income out would size retirement for one
    person and then spend for two. */
+// A start age already behind you simply means they are earning now.
+const finSpouseStart_ = () => Math.max(FIN.spouseStart || 0, FIN.age);
+const finSpouseYears_ = () => Math.max(0, FIN.spouseStop - finSpouseStart_());
+
 const finFinalSalary_ = () => finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork)).sal
-  + (FIN.spouseGross > 0
+  + (FIN.spouseGross > 0 && finSpouseYears_() > 0
       ? FIN.spouseGross * Math.pow((1 + FIN.raiseNom / 100) / (1 + FIN.inflation / 100),
-          Math.max(0, FIN.spouseStop - FIN.age))
+          Math.max(0, finSpouseYears_() - 1))
       : 0);
 
 /* One source per group summary, refreshed in place on every keystroke.
@@ -5937,12 +5948,17 @@ const FIN_DERIVED = {
   you: () => `Income tax is federal and state only — payroll tax is added on top, `
     + `${finFull_(finPayrollTax_(FIN.gross))} at this salary. `
     + `Your take-home ${finFull_(homeOf(FIN.gross, FIN.k401))} a year.`,
-  spouse: () => FIN.spouseGross > 0
-    ? `${finFull_(homeOf(FIN.spouseGross, FIN.spouse401k))} take-home a year on top of yours, `
-      + `ending when you are ${FIN.spouseStop} · their pay follows the same annual raise, `
-      + `without the promotions · payroll tax and the 401k limit are counted per person, not `
-      + `per household`
-    : 'Leave at zero if it is just you.',
+  spouse: () => {
+    if (!(FIN.spouseGross > 0)) return 'Leave at zero if it is just you.';
+    const from = finSpouseStart_(), yrs = finSpouseYears_();
+    if (yrs <= 0) return `Starts at ${from} and stops at ${FIN.spouseStop}, so it never runs — `
+      + `check those two ages.`;
+    return `${finFull_(homeOf(FIN.spouseGross, FIN.spouse401k))} take-home a year on top of `
+      + `yours, ${from <= FIN.age ? 'from now' : `from when you are ${from}`} until `
+      + `${FIN.spouseStop} — ${yrs} year${yrs === 1 ? '' : 's'} of it · their raises run from `
+      + `their first year, so the figure you typed is what they start on · payroll tax and the `
+      + `401k limit are counted per person, not per household`;
+  },
   growth: () => {
     const top = finPayAt_(Math.min(FIN.promoUntil, FIN.stopWork));
     const gap = FIN.retireAge - FIN.stopWork;
@@ -6004,7 +6020,8 @@ function finBuildEdit_() {
       ${finNum_('spouseGross', 'Their pay / year', { pre: '$', step: 1000 })}
       ${finNum_('spouse401k', 'To 401k', { post: '%', step: 0.5 })}
       ${finNum_('spouseMatch', 'Employer match', { post: '%', step: 0.5 })}
-      ${finNum_('spouseStop', 'Their income stops at your', { step: 1 })}
+      ${finNum_('spouseStart', 'Starts at your', { step: 1 })}
+      ${finNum_('spouseStop', 'Stops at your', { step: 1 })}
     </div>
     <div class="fin-derived" data-fin-derived="spouse"></div></div>
 
@@ -13432,7 +13449,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-second-income';
+const APP_BUILD_VERSION = '2026-08-26-spouse-start-date';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,

@@ -33,7 +33,7 @@ const ZERO = {
   pCash: 100, pBrok: 0, pRet: 0, toCash: 100, cashReal: 0, brokDrag: 0, retireTax: 0, gainsTax: 0,
   creep: 0, retireProfile: 'custom', retireSpend: 0, stopWork: 40, retireAge: 40, runTo: 50,
   ssAnnual: 0, ssAge: 67, marketProfile: 'custom', realReturn: 0, vol: 0, savedAt: '',
-  spouseGross: 0, spouse401k: 0, spouseMatch: 0, spouseStop: 40,
+  spouseGross: 0, spouse401k: 0, spouseMatch: 0, spouseStart: 30, spouseStop: 40,
   promos: [], rewards: [], kids: [], buys: []
 };
 
@@ -133,6 +133,38 @@ const ZERO = {
     needs.pair > needs.alone * 1.4,
     `${money(needs.alone)} vs ${money(needs.pair)}`);
 
+  console.log('\n=== Their income has a start age too ===');
+  /* Symmetric with the stop age, and for the same reason: a spouse who
+     joins the workforce in five years is not the same as one who has been
+     earning all along, and only the stop age could say when they finish -
+     nothing said when they began. */
+  const later = await at(40, { gross: 100000, spouseGross: 60000, spouseStart: 35 });
+  const now = await at(40, { gross: 100000, spouseGross: 60000, spouseStart: 30 });
+  check('starting five years later banks five fewer years',
+    near(now - later, 5 * (60000 - FICA(60000)), 1),
+    `${money(now - later)} vs ${money(5 * (60000 - FICA(60000)))}`);
+
+  check('a start age already behind you just means "now"',
+    (await at(40, { gross: 100000, spouseGross: 60000, spouseStart: 20 })) === now);
+
+  check('a start after the stop age means it never runs',
+    (await at(50, { gross: 100000, spouseGross: 60000, spouseStart: 45, spouseStop: 40,
+                    runTo: 60 })) === (await at(50, { gross: 100000 })));
+
+  console.log('\n=== Raises run from THEIR first year, not from today ===');
+  /* Someone joining in five years starts at the salary you typed - that
+     figure is today's money whenever their career actually begins - and
+     gets no raise in their own first year, exactly like you don't in
+     yours. Five years of nothing from you, then their five years at a 10%
+     nominal raise against no inflation: real growth of 10% a year, first
+     year flat. */
+  let byHand = 0, sal = 60000;
+  for (let y = 0; y < 5; y++) { byHand += sal - FICA(sal); if (y < 4) sal *= 1.10; }
+  const grown = await at(45, { gross: 0, spouseGross: 60000, raiseNom: 10, inflation: 0,
+    spouseStart: 35, spouseStop: 40, stopWork: 40, retireAge: 40, runTo: 45 });
+  check('their five years of raises match hand arithmetic',
+    near(grown, byHand, 2), `${money(grown)} vs ${money(byHand)}`);
+
   console.log('\n=== On the panel ===');
   await page.evaluate(() => {
     Object.assign(FIN, JSON.parse(JSON.stringify(FIN_DEFAULTS)));
@@ -185,7 +217,7 @@ const ZERO = {
     raise.text.slice(0, 70));
 
   const stop = await stale('spouseStop', 55, 'spouse');
-  check('and their end age follows the field', /you are 55/.test(stop.text),
+  check('and their end age follows the field', /until 55/.test(stop.text),
     stop.text.slice(0, 70));
 
   await ctx.close();
