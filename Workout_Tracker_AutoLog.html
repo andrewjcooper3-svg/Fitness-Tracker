@@ -6623,18 +6623,51 @@ function muscleSplit_(name) {
    looks exactly like a penalty when the reason (0.6 of a leg press is
    quads, the rest is glutes and hamstrings) is nowhere on screen. Carrying
    the unweighted count lets the breakdown show its own arithmetic. */
-/* A "set" is not the same unit for a walk as it is for a squat. Logging a
-   10-minute walk is one row - one "done" - same as one rep of Leg Press,
-   so two weekly walks and a leg day of forty-odd sets put cardio at 2
-   against everything else's 40, which is not a true picture of the work.
-   Cardio & other is the one bucket where every entry in this app is logged
-   as a duration (minutes), never a rep count, so its sets are counted in
-   10-minute units instead: a 10-minute walk is still 1, a 20-minute one is
-   2, a 5-minute one is 0.5. Nothing outside that bucket changes - a strength
-   set stays worth exactly one set, which is the comparison that actually
-   holds. */
+/* A "set" is not the same unit for a walk as it is for a squat, and a
+   walk is not the same unit as a run either. Logging a 10-minute walk is
+   one row - one "done" - same as one rep of Leg Press, so two weekly
+   walks and a leg day of forty-odd sets put cardio at 2 against
+   everything else's 40. Counting minutes alone fixed the first problem
+   and created a smaller version of the same one: ten easy minutes and
+   ten hard minutes both landed on the same number, which overstates the
+   easy ones and understates the hard ones.
+
+   So the rate per 10 minutes follows effort, roughly by MET (Compendium
+   of Physical Activities, rounded for a chart rather than a lab): a walk
+   at ~3.5 METs is lighter than a jog or a bike ride at ~7, which is
+   lighter again than running at ~10. Anchored so "moderate, sustained
+   cardio" - jogging, cycling, rowing - lands on 1 unit per 10 minutes,
+   the same reference point the flat version used for everything.
+
+   The real limit: this reads the EXERCISE NAME, which is all a history
+   row carries. "10.5 incline, 2.5 speed" typed into the notes is a hard
+   incline session, but it is still logged as "Walk" and rated as one -
+   the same name a flat, easy stroll would use. Getting that right needs
+   incline/pace as real fields, not a smarter regex. */
+const HX_CARDIO_RATE = [
+  // Most specific first, same discipline as MUSCLE_PATTERNS - "stair
+  // master" has to be claimed before a bare "run" pattern could misfire,
+  // and "jog" before "run" since a jog is not run-paced effort.
+  [/\b(row(ing)? (erg|machine)|erg)\b/i, 1.0],
+  [/stair ?master/i, 1.3],
+  [/treadmill|elliptical/i, 0.7],
+  [/\bjog\b/i, 1.0],
+  [/\brun\b/i, 1.4],
+  [/walk/i, 0.5],
+  [/\bbike\b|cycling/i, 1.0],
+  [/conditioning/i, 1.1],
+  [/yoga/i, 0.4],
+  [/stretch|mobility/i, 0.3],
+  [/sauna/i, 0.2]
+];
+function hxCardioRate_(name) {
+  for (const [re, rate] of HX_CARDIO_RATE) if (re.test(name)) return rate;
+  return 1.0;   // matched the bucket some other way (the bare word "cardio",
+                // or a name none of these patterns anticipated) - moderate
+                // rather than guessing light or hard.
+}
 function hxCardioUnits_(r) {
-  return r.totalReps > 0 ? r.totalReps / 10 : r.done;
+  return r.totalReps > 0 ? (r.totalReps / 10) * hxCardioRate_(r.exercise) : r.done;
 }
 
 function muscleBreakdown_(rows, weighted) {
@@ -13495,7 +13528,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-27-cardio-minutes';
+const APP_BUILD_VERSION = '2026-08-27-cardio-effort';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
