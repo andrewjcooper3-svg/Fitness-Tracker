@@ -327,6 +327,62 @@ function getWaterEntriesForDate_(date) {
   return entries;
 }
 
+const ROUTINES_SHEET_NAME = 'Routines Log';
+const ROUTINES_HEADERS = ['Date', 'Habit Id', 'Done', 'Logged At'];
+
+/**
+ * Habit check-offs work like the water log, not the weight log: every tap
+ * of a checkbox is its own appended row rather than an upsert, so two
+ * devices toggling the same habit around the same time can never race on
+ * a read-modify-write. Unlike water (where the day's rows are SUMMED),
+ * a checkbox is on/off - getRoutinesLedgerFromSheets_ below folds down to
+ * only the latest row per (date, habit), by Logged At, so an on/off/on
+ * flip settles on whatever actually happened last.
+ */
+function getOrCreateRoutinesSheet_() {
+  const ss = getOrCreateSpreadsheet_();
+  let sheet = ss.getSheetByName(ROUTINES_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(ROUTINES_SHEET_NAME);
+  sheet.appendRow(ROUTINES_HEADERS);
+  const headerRange = sheet.getRange(1, 1, 1, ROUTINES_HEADERS.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#1a1d24');
+  headerRange.setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function logRoutineEntry_(date, habitId, done) {
+  const sheet = getOrCreateRoutinesSheet_();
+  sheet.appendRow([date, habitId, !!done, new Date()]);
+}
+
+function getRoutinesLedgerFromSheets_() {
+  const sheet = getOrCreateRoutinesSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  const ledger = {};
+  if (lastRow < 2) return ledger;
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, ROUTINES_HEADERS.length).getValues();
+  rows.forEach(function (row) {
+    const key = cellDateKey_(row[0], timeZone);
+    const habitId = String(row[1]);
+    const loggedAt = row[3] instanceof Date ? row[3].toISOString() : String(row[3]);
+    if (!ledger[key]) ledger[key] = {};
+    const existing = ledger[key][habitId];
+    // Rows come back in sheet order (oldest first), so a later row only
+    // wins the fold when its own timestamp is actually later - defends
+    // against a sheet that was ever hand-edited out of chronological order.
+    if (!existing || loggedAt >= existing.loggedAt) {
+      ledger[key][habitId] = { done: !!row[2], loggedAt: loggedAt };
+    }
+  });
+  return ledger;
+}
+
 const BODY_HEALTH_SHEET_NAME = 'Body Health Log';
 const BODY_HEALTH_HEADERS = ['Date', 'Sleep Hours', 'HRV (ms)', 'Resting HR (bpm)', 'Workout Minutes', 'Avg Workout HR', 'Source', 'Logged At'];
 
@@ -544,6 +600,30 @@ function saveFinancialState_(fin) {
 
 function loadFinancialState_() {
   const raw = PropertiesService.getScriptProperties().getProperty(FINANCIAL_STATE_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+// ---------- Routines (habit/task list - its own property; the daily
+// check-off log itself lives in the Routines Log sheet above) ----------
+const ROUTINES_HABITS_STATE_KEY = 'ROUTINES_HABITS_STATE';
+
+// Whole-list, last-write-wins - same trade-off as the financial plan. The
+// habit list is edited rarely (add/edit/delete/restore), so splicing two
+// devices' lists together risks resurrecting a habit one of them deleted;
+// a plain savedAt guard is the same choice already made for Financial/
+// Kitchen state, applied here for consistency.
+function saveRoutinesHabitsState_(habits) {
+  if (!habits || typeof habits !== 'object') throw new Error('No habit list supplied.');
+  if (!habits.savedAt) throw new Error('Refusing to store habits that were never edited.');
+  const current = loadRoutinesHabitsState_();
+  if (current && current.savedAt && String(current.savedAt) > String(habits.savedAt)) return current;
+  setPropertyChecked_(PropertiesService.getScriptProperties(), ROUTINES_HABITS_STATE_KEY, habits);
+  return habits;
+}
+
+function loadRoutinesHabitsState_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(ROUTINES_HABITS_STATE_KEY);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (e) { return null; }
 }
@@ -1593,6 +1673,18 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadRoutinesHabits') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', habits: loadRoutinesHabitsState_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'loadRoutinesLedger') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', ledger: getRoutinesLedgerFromSheets_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadWaterEntries') {
     const date = e.parameter.date || Utilities.formatDate(new Date(), getOrCreateSpreadsheet_().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
     return ContentService
@@ -1665,6 +1757,23 @@ function doPost(e) {
       deleteLastWaterEntry_();
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'logRoutine') {
+      if (!data.date || !data.habitId) {
+        throw new Error('logRoutine requires a date and a habitId');
+      }
+      logRoutineEntry_(data.date, data.habitId, data.done);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveRoutinesHabits') {
+      const stored = saveRoutinesHabitsState_(data.habits);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success', habits: stored }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 

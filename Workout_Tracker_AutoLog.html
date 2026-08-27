@@ -315,6 +315,7 @@
      Overview, so the tab highlights while the carousel shows the wrong
      content. The order here has to match this view's index in viewOrder. */
   #view-financial { order: 6; }
+  #view-routines { order: 7; }
   /* Hidden for now - see the app-tab comment above. Still in the DOM
      with the rest of its markup/logic untouched, just taken out of the
      swipe flow entirely (order no longer matters while it's display:none). */
@@ -1938,6 +1939,139 @@
 
     #view-tracker { grid-template-columns: 1fr 340px; column-gap: 24px; }
   }
+
+  /* ---------- Routines tab (habits/tasks) - everything here is prefixed
+     rt- to stay clear of the rest of the app's class names. ---------- */
+  .rt-nav-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .rt-nav-btn { width: 30px; height: 30px; border-radius: 9px; border: none; background: var(--surface2);
+    color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+  .rt-nav-btn:disabled { opacity: 0.35; cursor: default; }
+  .rt-nav-label { flex: 1; text-align: center; font-size: 14.5px; font-weight: 700; }
+  .rt-nav-today-btn { background: none; border: none; color: var(--accent); font-family: var(--font); font-size: 12.5px;
+    font-weight: 700; cursor: pointer; padding: 4px 2px; flex-shrink: 0; }
+
+  .rt-today-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .rt-today-headline-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .rt-today-headline { font-size: 20px; font-weight: 800; letter-spacing: -0.2px; }
+  .rt-mini-day-block { position: relative; width: 28px; height: 28px; border-radius: 8px; background: var(--surface2); flex-shrink: 0; }
+
+  .rt-item-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .rt-item-row:last-child { border-bottom: none; }
+  .rt-check { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--border); background: none;
+    flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent; }
+  .rt-check svg { width: 15px; height: 15px; }
+  .rt-check.done { background: var(--green); border-color: var(--green); color: #fff; }
+  .rt-check:disabled { cursor: default; opacity: 1; }
+  .rt-item-body { flex: 1; min-width: 0; }
+  .rt-item-name { font-size: 14.5px; font-weight: 600; }
+  .rt-item-name.done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
+  .rt-item-meta { font-size: 12px; color: var(--muted); margin-top: 1px; display: flex; gap: 6px; align-items: center; }
+  .rt-streak-chip { font-size: 11px; font-weight: 700; color: var(--amber); flex-shrink: 0; white-space: nowrap; }
+  .rt-item-group-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.3px; padding: 12px 0 4px; border-top: 1px solid var(--border); margin-top: 4px; }
+  .rt-link-chip { font-size: 10.5px; font-weight: 700; color: var(--accent); flex-shrink: 0; white-space: nowrap; }
+  .rt-empty { font-size: 13px; color: var(--muted); padding: 6px 0; }
+
+  .rt-week-row { padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .rt-week-row:last-child { border-bottom: none; }
+  .rt-week-row-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .rt-week-row-name { font-size: 14px; font-weight: 600; }
+  .rt-week-row-count { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .rt-week-track { height: 8px; border-radius: 4px; background: var(--surface2); display: flex; gap: 2px; }
+  .rt-week-track span { display: block; flex: 1; border-radius: 3px; background: var(--surface2); position: relative; }
+  .rt-week-track span.on { background: var(--accent); }
+  .rt-week-track span.today-mark::after {
+    content: ''; position: absolute; inset: -3px; border: 1.5px solid var(--text); border-radius: 5px; opacity: 0.55;
+  }
+
+  .rt-seg { display: flex; background: var(--surface2); border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 12px; }
+  .rt-seg button { flex: 1; background: none; border: none; padding: 8px 4px; border-radius: 8px; font-family: var(--font);
+    font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; }
+  .rt-seg button.active { background: var(--surface); color: var(--text); }
+
+  .rt-month-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
+  .rt-month-dow span { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); }
+  .rt-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .rt-month-cell { position: relative; aspect-ratio: 1; border-radius: 9px; background: var(--surface2); cursor: pointer; }
+  .rt-month-cell.pad { background: transparent; cursor: default; }
+  .rt-month-cell.future { cursor: default; }
+  .rt-month-cell.selected { outline: 2px solid var(--text); outline-offset: 1px; }
+  .rt-day-sections { position: absolute; inset: 3px; border-radius: 6px; overflow: hidden; display: grid;
+    grid-auto-flow: column; grid-template-rows: 1fr; gap: 1px; }
+  .rt-day-sections.tiny { inset: 0; border-radius: 2px; gap: 0.5px; }
+  .rt-sec-done { background: var(--green); }
+  .rt-sec-pending { background: var(--amber); }
+  .rt-sec-miss { background: var(--red); }
+  .rt-month-daynum { position: absolute; top: 3px; right: 3px; font-size: 10px; font-weight: 700; color: var(--text);
+    background: var(--surface); border-radius: 4px; padding: 0 3px; line-height: 1.5; }
+  .rt-month-cell.pad .rt-month-daynum { display: none; }
+
+  .rt-year-flow { display: flex; flex-wrap: wrap; gap: 3px; }
+  .rt-year-sq { position: relative; width: 16px; height: 16px; border-radius: 4px; background: var(--surface2); flex-shrink: 0; }
+
+  .rt-legend { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+  .rt-legend .rt-month-cell { cursor: default; width: 12px; height: 12px; aspect-ratio: unset; border-radius: 3px; }
+  .rt-heat-detail { font-size: 13px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); min-height: 40px; }
+  .rt-heat-detail-date { font-weight: 700; margin-bottom: 6px; }
+  .rt-heat-detail-item { display: flex; gap: 7px; align-items: center; font-size: 12.5px; color: var(--muted); padding: 2px 0; }
+  .rt-heat-detail-item.on { color: var(--text); }
+  .rt-heat-detail-item.pending { color: var(--amber); }
+  .rt-heat-detail-item.miss { color: var(--red); }
+  .rt-heat-detail-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .rt-heat-detail-dot.on { background: var(--green); }
+  .rt-heat-detail-dot.pending { background: var(--amber); }
+  .rt-heat-detail-dot.miss { background: var(--red); }
+
+  .rt-habit-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .rt-habit-row:last-child { border-bottom: none; }
+  .rt-habit-row-top { display: flex; align-items: center; gap: 8px; }
+  .rt-habit-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .rt-habit-name { font-size: 14.5px; font-weight: 700; flex: 1; min-width: 0; }
+  .rt-habit-cadence { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .rt-habit-stats { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .rt-habit-stats b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .rt-habit-strip { display: flex; gap: 2px; margin-top: 9px; }
+  .rt-habit-strip span { flex: 1; height: 16px; border-radius: 3px; background: var(--surface2); }
+  .rt-habit-strip span.on { background: var(--accent); }
+  .rt-habit-strip span.miss { background: var(--red); opacity: 0.35; }
+  .rt-habit-strip span.future { background: transparent; }
+  .rt-habit-edit, .rt-habit-del { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
+  .rt-habit-edit { font-size: 14px; }
+  .rt-habit-del { font-size: 18px; }
+  .rt-habit-edit:hover { color: var(--accent); }
+  .rt-habit-del:hover { color: var(--red); }
+
+  .rt-deleted-toggle { width: 100%; background: none; border: none; color: var(--muted); font-family: var(--font);
+    font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 10px 2px 2px; text-align: left; }
+  .rt-deleted-toggle:hover { color: var(--text); }
+  .rt-deleted-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .rt-deleted-row:last-child { border-bottom: none; }
+  .rt-deleted-row-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--muted);
+    text-decoration: line-through; text-decoration-color: var(--border); }
+  .rt-deleted-row-meta { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .rt-restore-btn { background: var(--surface2); border: none; color: var(--accent); font-family: var(--font);
+    font-size: 11.5px; font-weight: 700; padding: 5px 10px; border-radius: 8px; cursor: pointer; flex-shrink: 0; }
+  .rt-restore-btn:hover { background: var(--border); }
+
+  /* Add/edit-habit sheet - reuses .event-modal-overlay/-sheet/-handle and
+     .config-input/.config-save; only the bits with no existing analog
+     (cadence segment, day picker, week stepper, link picker) are new. */
+  .rt-field { margin-bottom: 12px; }
+  .rt-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.3px; margin-bottom: 6px; }
+  .rt-day-pick { display: flex; gap: 5px; margin-top: 8px; }
+  .rt-day-pick button { flex: 1; aspect-ratio: 1; border-radius: 8px; border: none; background: var(--surface2);
+    color: var(--muted); font-family: var(--font); font-size: 11.5px; font-weight: 700; cursor: pointer; }
+  .rt-day-pick button.on { background: var(--accent); color: #fff; }
+  .rt-count-row { display: flex; align-items: center; gap: 10px; }
+  .rt-count-row button { width: 34px; height: 34px; border-radius: 9px; border: none; background: var(--surface2);
+    color: var(--text); font-size: 16px; font-weight: 700; cursor: pointer; }
+  .rt-count-row .n { font-size: 16px; font-weight: 800; min-width: 20px; text-align: center; }
+  .rt-link-select { width: 100%; box-sizing: border-box; font-family: var(--font); font-size: 13px; color: var(--text);
+    background: var(--surface2); border: none; border-radius: 10px; padding: 10px 12px; }
+  .rt-link-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  .rt-sheet-cancel { width: 100%; background: var(--surface2); border: none; color: var(--text); font-family: var(--font);
+    font-size: 14.5px; font-weight: 600; padding: 12px; border-radius: 14px; cursor: pointer; margin-top: 8px; }
 </style>
 <script>
   // Applies a saved manual Light/Dark override (if any) before body
@@ -2784,6 +2918,82 @@
 
 </div>
 
+<div id="view-routines" class="app-view">
+
+  <div class="sd-sync-line" id="rtSyncLine" onclick="syncRoutinesHabitsToRemote()" title="Tap to sync now"></div>
+
+  <div class="stats-card">
+    <div class="rt-nav-row">
+      <button class="rt-nav-btn" onclick="rtDayPrev()" aria-label="Previous day">‹</button>
+      <div class="rt-nav-label" id="rtTodayNavLabel"></div>
+      <button class="rt-nav-btn" id="rtDayNextBtn" onclick="rtDayNext()" aria-label="Next day">›</button>
+      <button class="rt-nav-today-btn" id="rtDayTodayBtn" onclick="rtDayJumpToday()">Today</button>
+    </div>
+    <div class="rt-today-head">
+      <svg width="52" height="52" viewBox="0 0 52 52" id="rtTodayRing"></svg>
+      <div style="flex:1; min-width:0;">
+        <div class="rt-today-headline-row">
+          <div class="rt-today-headline" id="rtTodayHeadline">—</div>
+          <div class="rt-mini-day-block" id="rtTodayMiniBlock"></div>
+        </div>
+      </div>
+    </div>
+    <div id="rtTodayList"></div>
+  </div>
+
+  <div class="stats-card" id="rtWeekCard">
+    <div class="stats-card-title">This week</div>
+    <div id="rtWeekList"></div>
+  </div>
+
+  <div class="config-box">
+    <div class="config-toggle" onclick="toggleKitchenCollapse_('rtHistoryBody','rtHistoryChevron')">
+      <div class="config-title">History</div>
+      <div class="config-chevron" id="rtHistoryChevron">▸</div>
+    </div>
+    <div class="config-body" id="rtHistoryBody">
+      <div class="rt-seg" id="rtHistSeg">
+        <button data-m="month" class="active" onclick="rtSetHistoryMode('month')">Month</button>
+        <button data-m="year" onclick="rtSetHistoryMode('year')">Year</button>
+      </div>
+      <div class="rt-nav-row">
+        <button class="rt-nav-btn" onclick="rtHistPrev()" aria-label="Previous">‹</button>
+        <div class="rt-nav-label" id="rtHistLabel"></div>
+        <button class="rt-nav-btn" id="rtHistNextBtn" onclick="rtHistNext()" aria-label="Next">›</button>
+        <button class="rt-nav-today-btn" id="rtHistTodayBtn" onclick="rtJumpToday()">Today</button>
+      </div>
+
+      <div id="rtMonthView">
+        <div class="rt-month-dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+        <div class="rt-month-grid" id="rtMonthGrid"></div>
+      </div>
+      <div id="rtYearView" style="display:none;">
+        <div class="rt-year-flow" id="rtYearGrid"></div>
+      </div>
+
+      <div class="rt-legend">
+        <span class="rt-month-cell" style="background:var(--green);"></span><span>Completed</span>
+        <span class="rt-month-cell" style="background:var(--amber); margin-left:10px;"></span><span>Pending</span>
+        <span class="rt-month-cell" style="background:var(--red); margin-left:10px;"></span><span>Missed</span>
+      </div>
+      <div class="rt-heat-detail" id="rtHeatDetail"></div>
+    </div>
+  </div>
+
+  <div class="config-box">
+    <div class="config-toggle" onclick="toggleKitchenCollapse_('rtHabitsBody','rtHabitsChevron')">
+      <div class="config-title">Habits &amp; tasks</div>
+      <div class="config-chevron" id="rtHabitsChevron">▸</div>
+    </div>
+    <div class="config-body" id="rtHabitsBody">
+      <div id="rtHabitList"></div>
+      <div style="height:10px;"></div>
+      <button class="add-exercise-btn" onclick="rtOpenHabitSheet()">+ Add a habit or task</button>
+    </div>
+  </div>
+
+</div>
+
 <div id="view-kitchen" class="app-view">
 
   <div class="kitchen-subtabs">
@@ -3160,6 +3370,43 @@
      (as .app-views-track has, for the swipe carousel) makes that ancestor
      the containing block for position:fixed descendants, so this modal
      has to live outside it to actually behave as fixed-to-viewport. -->
+<div class="event-modal-overlay" id="rtSheetOverlay" onclick="rtCloseSheetIfBackdrop(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="event-modal-title" id="rtSheetTitle">New habit</div>
+
+    <div class="rt-field">
+      <label for="rtHName">Name</label>
+      <input type="text" id="rtHName" class="config-input" style="width:100%; box-sizing:border-box;" placeholder="e.g. Read 20 minutes">
+    </div>
+
+    <div class="rt-field">
+      <label>How often</label>
+      <div class="rt-seg" id="rtCadenceSeg" style="margin-bottom:0;">
+        <button data-c="daily" class="active" onclick="rtSetCadence('daily')">Every day</button>
+        <button data-c="days" onclick="rtSetCadence('days')">Specific days</button>
+        <button data-c="week" onclick="rtSetCadence('week')">X / week</button>
+      </div>
+      <div class="rt-day-pick" id="rtDayPick" style="display:none;"></div>
+      <div class="rt-count-row" id="rtWeekCount" style="display:none; margin-top:8px;">
+        <button onclick="rtBumpWeekTarget(-1)">−</button>
+        <div class="n" id="rtWeekTargetN">3</div>
+        <button onclick="rtBumpWeekTarget(1)">+</button>
+        <span style="font-size:12.5px;color:var(--muted);">times this week</span>
+      </div>
+    </div>
+
+    <div class="rt-field">
+      <label for="rtHLink">Link to (optional)</label>
+      <select id="rtHLink" class="rt-link-select" onchange="rtOnLinkChange()"></select>
+      <div class="rt-link-note" id="rtLinkNote"></div>
+    </div>
+
+    <button class="ov-open-btn" style="width:100%;" onclick="rtSaveHabit()" id="rtSheetSaveBtn">Add habit</button>
+    <button class="rt-sheet-cancel" onclick="rtCloseSheet()">Cancel</button>
+  </div>
+</div>
+
 <div class="event-modal-overlay" id="eventModalOverlay" onclick="closeEventModal(event)">
   <div class="event-modal-sheet" onclick="event.stopPropagation()">
     <div class="event-modal-handle"></div>
@@ -3660,6 +3907,9 @@
   <div class="app-tab" data-view="financial" onclick="showAppView('financial')">
     <div class="app-tab-label">Future</div>
   </div>
+  <div class="app-tab" data-view="routines" onclick="showAppView('routines')">
+    <div class="app-tab-label">Routines</div>
+  </div>
 
   <!-- Landscape-tier only (hidden everywhere else): the active view's
        title sits at the bar's left edge and its meta/date at the right,
@@ -3712,6 +3962,10 @@
   <div class="app-sidebar-item" data-view="financial" onclick="showAppView('financial')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 6-8"></path><path d="M15 6h4v4"></path></svg>
     <div class="app-sidebar-item-label">Future</div>
+  </div>
+  <div class="app-sidebar-item" data-view="routines" onclick="showAppView('routines')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M8 12l2.5 2.5L16 9"></path></svg>
+    <div class="app-sidebar-item-label">Routines</div>
   </div>
 </div>
 
@@ -6326,6 +6580,695 @@ document.addEventListener('focusout', e => {
   const k = e.target.id.slice(4);
   if (k in FIN_RAW && +e.target.value !== FIN[k]) { e.target.value = FIN[k]; FIN_RAW[k] = FIN[k]; }
 });
+
+/* ---------- Routines tab (habits/tasks) ----------
+   Every identifier here is prefixed rt/RT so it can't collide with the
+   rest of this file. Habits (the small, rarely-edited list) sync as one
+   whole-list, last-write-wins blob - same trade-off already made for the
+   Financial plan. Check-offs (frequent, tiny, need real merging) sync the
+   way Water does: every tap appends its own row on the backend, and the
+   ledger read folds down to the latest row per (date, habit) - see
+   rtMergeRemoteLedger_ below and getRoutinesLedgerFromSheets_ in code.gs. */
+const STORAGE_ROUTINES_HABITS_KEY = 'WORKOUT_ROUTINES_HABITS';
+const STORAGE_ROUTINES_LOG_KEY = 'WORKOUT_ROUTINES_LOG';
+const ROUTINES_DAY_MS = 86400000;
+const RT_DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const rtToday = new Date(); rtToday.setHours(0, 0, 0, 0);
+
+// What a habit can link to instead of being checked off by hand - each
+// source answers "how much of this actually happened on date X," read
+// straight from that feature's own existing ledger. A linked habit is
+// considered done for a day once its value clears the habit's threshold.
+const ROUTINES_LINK_SOURCES = {
+  water: {
+    label: 'Water intake', unit: 'oz',
+    defaultThreshold: () => (typeof WATER_DAILY_GOAL === 'number' && WATER_DAILY_GOAL) || 100,
+    valueOn: dateStr => {
+      try {
+        const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
+        return Number(ledger[dateStr]) || 0;
+      } catch (e) { return 0; }
+    }
+  },
+  pushups: {
+    label: 'Pushups', unit: ' reps',
+    defaultThreshold: () => 100,
+    valueOn: dateStr => {
+      try {
+        const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+        return Number(ledger[dateStr]) || 0;
+      } catch (e) { return 0; }
+    }
+  }
+};
+
+function rtLoadHabitsLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_ROUTINES_HABITS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && Array.isArray(parsed.list)) return parsed;
+  } catch (e) {}
+  return { list: [], savedAt: null };
+}
+function rtLoadLogLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_ROUTINES_LOG_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+function rtSaveHabitsLocal() {
+  try { localStorage.setItem(STORAGE_ROUTINES_HABITS_KEY, JSON.stringify(RT_HABITS)); } catch (e) {}
+}
+function rtSaveLogLocal() {
+  try { localStorage.setItem(STORAGE_ROUTINES_LOG_KEY, JSON.stringify(RT_LOG)); } catch (e) {}
+}
+// Call after any real local edit (add/edit/delete/restore) - stamps a new
+// savedAt so this device's copy wins the next sync comparison, then kicks
+// off a push. Adopting a REMOTE copy must never call this, or it would
+// immediately re-stamp and re-push what was just pulled.
+function rtHabitsChanged() {
+  RT_HABITS.savedAt = new Date().toISOString();
+  rtSaveHabitsLocal();
+  syncRoutinesHabitsToRemote();
+}
+
+let RT_HABITS = rtLoadHabitsLocal();
+let RT_LOG = rtLoadLogLocal();
+
+function rtIsDoneOn(h, dateStr) {
+  if (h.link && ROUTINES_LINK_SOURCES[h.link.source]) {
+    return ROUTINES_LINK_SOURCES[h.link.source].valueOn(dateStr) >= (h.link.threshold || 0);
+  }
+  return !!(RT_LOG[dateStr] && RT_LOG[dateStr][h.id] && RT_LOG[dateStr][h.id].done);
+}
+
+/* ---- Cadence logic (ported from the Routines mockup) ---- */
+function rtIsDue(h, date) {
+  // Before the habit existed, it was never due.
+  if (h.created && date < new Date(h.created + 'T00:00:00')) return false;
+  // Deleting keeps the habit's history but stops it from being due from
+  // the deletion forward; restoring reopens it from today, and the gap
+  // in between (pausedRanges) stays a gap rather than a run of misses.
+  if (h.deleted && h.deletedAt && date >= new Date(h.deletedAt + 'T00:00:00')) return false;
+  if (h.pausedRanges) {
+    for (const r of h.pausedRanges) {
+      if (date >= new Date(r.from + 'T00:00:00') && date < new Date(r.to + 'T00:00:00')) return false;
+    }
+  }
+  const dow = date.getDay();
+  if (h.cadence === 'daily') return true;
+  if (h.cadence === 'days') return (h.days || []).includes(dow);
+  if (h.cadence === 'week') return true; // any day counts toward the weekly target
+  return false;
+}
+function rtCadenceLabel(h) {
+  if (h.cadence === 'daily') return 'Every day';
+  if (h.cadence === 'days') return (h.days || []).map(d => RT_DOW[d]).join(', ');
+  if (h.cadence === 'week') return h.weekTarget + '×/week';
+  return '';
+}
+function rtWeekStart(d) { const x = new Date(d); x.setDate(x.getDate() - x.getDay()); return x; }
+function rtWeekCountSoFar(h, refDate) {
+  const start = rtWeekStart(refDate);
+  let n = 0;
+  for (let i = 0; i <= (refDate - start) / ROUTINES_DAY_MS; i++) {
+    if (rtIsDoneOn(h, dateKey(new Date(start.getTime() + i * ROUTINES_DAY_MS)))) n++;
+  }
+  return n;
+}
+function rtCurrentStreak(h) {
+  let n = 0, d = new Date(rtToday);
+  const createdDate = h.created ? new Date(h.created + 'T00:00:00') : null;
+  while (true) {
+    if (h.cadence === 'week') {
+      const ws = rtWeekStart(d);
+      if (ws > rtToday) { d = new Date(ws.getTime() - ROUTINES_DAY_MS); continue; }
+      if (createdDate && ws < createdDate) break; // no weeks existed before the habit did
+      const c = rtWeekCountSoFar(h, ws.getTime() + 6 * ROUTINES_DAY_MS > rtToday.getTime() ? rtToday : new Date(ws.getTime() + 6 * ROUTINES_DAY_MS));
+      if (ws.getTime() === rtWeekStart(rtToday).getTime()) { d = new Date(ws.getTime() - ROUTINES_DAY_MS); continue; }
+      if (c >= h.weekTarget) { n++; d = new Date(ws.getTime() - ROUTINES_DAY_MS); } else break;
+      continue;
+    }
+    // Walking past the habit's own creation date would otherwise never hit
+    // a due day again, scanning backward forever - stop right there instead.
+    if (createdDate && d < createdDate) break;
+    if (!rtIsDue(h, d)) { d = new Date(d.getTime() - ROUTINES_DAY_MS); continue; }
+    const k = dateKey(d);
+    if (rtIsDoneOn(h, k)) { n++; d = new Date(d.getTime() - ROUTINES_DAY_MS); }
+    else if (k === dateKey(rtToday)) { d = new Date(d.getTime() - ROUTINES_DAY_MS); } // today not logged yet doesn't break it
+    else break;
+  }
+  return n;
+}
+function rtBestStreak(h) {
+  let best = 0, cur = 0;
+  for (let i = 119; i >= 0; i--) {
+    const d = new Date(rtToday.getTime() - i * ROUTINES_DAY_MS);
+    if (h.cadence === 'week') continue;
+    if (!rtIsDue(h, d)) continue;
+    if (rtIsDoneOn(h, dateKey(d))) { cur++; best = Math.max(best, cur); } else cur = 0;
+  }
+  return best;
+}
+function rtCompletionPct(h) {
+  let due = 0, done = 0;
+  for (let i = 89; i >= 0; i--) {
+    const d = new Date(rtToday.getTime() - i * ROUTINES_DAY_MS);
+    if (h.cadence === 'week') continue;
+    if (!rtIsDue(h, d)) continue;
+    due++;
+    if (rtIsDoneOn(h, dateKey(d))) done++;
+  }
+  return due ? Math.round(done / due * 100) : null;
+}
+
+/* ---- Checking things off ---- */
+function rtToggle(habitId, dateObj) {
+  const h = RT_HABITS.list.find(x => x.id === habitId);
+  if (h && h.link) return; // linked habits follow their source automatically
+  const k = dateKey(dateObj);
+  RT_LOG[k] = RT_LOG[k] || {};
+  const nextDone = !(RT_LOG[k][habitId] && RT_LOG[k][habitId].done);
+  RT_LOG[k][habitId] = { done: nextDone, loggedAt: new Date().toISOString() };
+  rtSaveLogLocal();
+  rtRenderAll();
+  rtLogToggleRemote_(k, habitId, nextDone);
+}
+function rtLogToggleRemote_(dateStr, habitId, done) {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return; // best-effort; the next pull reconciles if this drops
+  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'logRoutine', date: dateStr, habitId, done }) })
+    .catch(() => {});
+}
+
+function rtRenderRing(pct) {
+  const svg = document.getElementById('rtTodayRing');
+  if (!svg) return;
+  const r = 21, c = 2 * Math.PI * r;
+  const off = c * (1 - pct);
+  svg.innerHTML = `
+    <circle cx="26" cy="26" r="${r}" fill="none" stroke="var(--surface2)" stroke-width="5"></circle>
+    <circle cx="26" cy="26" r="${r}" fill="none" stroke="var(--accent)" stroke-width="5"
+      stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"
+      transform="rotate(-90 26 26)"></circle>
+    <text x="26" y="30" text-anchor="middle" font-size="13" font-weight="800" fill="var(--text)"
+      font-family="var(--font)">${Math.round(pct * 100)}%</text>`;
+}
+
+let rtViewDay = new Date(rtToday);
+function rtDayPrev() { rtViewDay = new Date(rtViewDay.getTime() - ROUTINES_DAY_MS); rtRenderToday(); }
+function rtDayNext() { if (dateKey(rtViewDay) === dateKey(rtToday)) return; rtViewDay = new Date(rtViewDay.getTime() + ROUTINES_DAY_MS); rtRenderToday(); }
+function rtDayJumpToday() { rtViewDay = new Date(rtToday); rtRenderToday(); }
+
+function rtItemRowHtml(h, k, metaText, showStreak) {
+  const done = rtIsDoneOn(h, k);
+  const streak = showStreak ? rtCurrentStreak(h) : 0;
+  const linked = !!h.link;
+  const checkAttrs = linked ? 'disabled' : `onclick="rtToggle('${h.id}', rtViewDay)"`;
+  return `<div class="rt-item-row">
+    <button class="rt-check ${done ? 'done' : ''}" ${checkAttrs} aria-label="${done ? 'Marked done' : 'Not done'}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+    </button>
+    <div class="rt-item-body">
+      <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
+      <div class="rt-item-meta">${metaText}${linked ? ' <span class="rt-link-chip">🔗 linked</span>' : ''}</div>
+    </div>
+    ${showStreak && streak > 1 ? `<div class="rt-streak-chip">${streak} day streak</div>` : ''}
+  </div>`;
+}
+
+function rtRenderToday() {
+  const isToday = dateKey(rtViewDay) === dateKey(rtToday);
+  const dueToday = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, rtViewDay));
+  const weeklyToday = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, rtViewDay));
+  const k = dateKey(rtViewDay);
+  const doneToday = dueToday.filter(h => rtIsDoneOn(h, k));
+  rtRenderRing(dueToday.length ? doneToday.length / dueToday.length : 0);
+
+  const headlineEl = document.getElementById('rtTodayHeadline');
+  if (headlineEl) headlineEl.textContent = dueToday.length ? `${doneToday.length} of ${dueToday.length} done` : 'Nothing due';
+  const navLabelEl = document.getElementById('rtTodayNavLabel');
+  if (navLabelEl) navLabelEl.textContent = isToday ? 'Today'
+    : rtViewDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const nextBtn = document.getElementById('rtDayNextBtn');
+  if (nextBtn) nextBtn.disabled = isToday;
+  const todayBtn = document.getElementById('rtDayTodayBtn');
+  if (todayBtn) todayBtn.style.display = isToday ? 'none' : '';
+  const miniEl = document.getElementById('rtTodayMiniBlock');
+  if (miniEl) miniEl.innerHTML = rtDaySections(k, rtViewDay);
+
+  const list = document.getElementById('rtTodayList');
+  if (!list) return;
+  if (!dueToday.length && !weeklyToday.length) {
+    list.innerHTML = '<div class="rt-empty">Every day and specific-day items land here.</div>';
+    return;
+  }
+  let html = dueToday.map(h => {
+    let meta = rtCadenceLabel(h);
+    if (h.link && ROUTINES_LINK_SOURCES[h.link.source]) {
+      const src = ROUTINES_LINK_SOURCES[h.link.source];
+      meta = `${src.valueOn(k)}/${h.link.threshold}${src.unit}`;
+    }
+    return rtItemRowHtml(h, k, meta, isToday);
+  }).join('');
+  // X-times-a-week items aren't "due" on any one day, so they get their
+  // own checkable group instead of counting toward the fixed ring/total.
+  if (weeklyToday.length) {
+    html += '<div class="rt-item-group-label">This week, any day</div>';
+    html += weeklyToday.map(h => rtItemRowHtml(h, k, `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`, false)).join('');
+  }
+  list.innerHTML = html;
+}
+
+function rtRenderWeek() {
+  const weekly = RT_HABITS.list.filter(h => h.cadence === 'week' && !h.deleted);
+  const card = document.getElementById('rtWeekCard');
+  if (!card) return;
+  if (!weekly.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const ws = rtWeekStart(rtToday);
+  document.getElementById('rtWeekList').innerHTML = weekly.map(h => {
+    const done = rtWeekCountSoFar(h, rtToday);
+    const cells = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(ws.getTime() + i * ROUTINES_DAY_MS);
+      const on = rtIsDoneOn(h, dateKey(d));
+      return `<span class="${on ? 'on' : ''} ${dateKey(d) === dateKey(rtToday) ? 'today-mark' : ''}" title="${RT_DOW[i]}"></span>`;
+    }).join('');
+    return `<div class="rt-week-row">
+      <div class="rt-week-row-top">
+        <div class="rt-week-row-name">${escapeText_(h.name)}</div>
+        <div class="rt-week-row-count">${done} / ${h.weekTarget}${done >= h.weekTarget ? ' ✓' : ''}</div>
+      </div>
+      <div class="rt-week-track">${cells}</div>
+    </div>`;
+  }).join('');
+}
+
+// One vertical section per due habit, filling left to right in a fixed
+// order (done, then today's still-open, then a real miss) so the color
+// story reads as one glance across the cell.
+function rtDaySections(k, d, tiny) {
+  const due = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
+  if (!due.length) return '';
+  const isToday = dateKey(d) === dateKey(rtToday);
+  const order = { 'rt-sec-done': 0, 'rt-sec-pending': 1, 'rt-sec-miss': 2 };
+  const items = due.map(h => {
+    const cls = rtIsDoneOn(h, k) ? 'rt-sec-done' : (isToday ? 'rt-sec-pending' : 'rt-sec-miss');
+    return { cls, name: h.name };
+  }).sort((a, b) => order[a.cls] - order[b.cls]);
+  const cells = items.map(it => `<span class="${it.cls}" title="${escapeAttr_(it.name)}"></span>`).join('');
+  return `<div class="rt-day-sections${tiny ? ' tiny' : ''}" style="grid-template-columns:repeat(${due.length},1fr);">${cells}</div>`;
+}
+
+let rtSelectedDay = null;
+let rtHistoryMode = 'month';
+let rtViewMonth = new Date(rtToday.getFullYear(), rtToday.getMonth(), 1);
+let rtViewYear = rtToday.getFullYear();
+
+function rtSetHistoryMode(m) {
+  rtHistoryMode = m;
+  document.querySelectorAll('#rtHistSeg button').forEach(b => b.classList.toggle('active', b.dataset.m === m));
+  document.getElementById('rtMonthView').style.display = m === 'month' ? '' : 'none';
+  document.getElementById('rtYearView').style.display = m === 'year' ? '' : 'none';
+  rtRenderHistory();
+}
+function rtIsCurrentPeriod() {
+  return rtHistoryMode === 'month'
+    ? rtViewMonth.getFullYear() === rtToday.getFullYear() && rtViewMonth.getMonth() === rtToday.getMonth()
+    : rtViewYear === rtToday.getFullYear();
+}
+function rtHistPrev() {
+  if (rtHistoryMode === 'month') rtViewMonth = new Date(rtViewMonth.getFullYear(), rtViewMonth.getMonth() - 1, 1);
+  else rtViewYear -= 1;
+  rtRenderHistory();
+}
+function rtHistNext() {
+  if (rtIsCurrentPeriod()) return; // never page into the future
+  if (rtHistoryMode === 'month') rtViewMonth = new Date(rtViewMonth.getFullYear(), rtViewMonth.getMonth() + 1, 1);
+  else rtViewYear += 1;
+  rtRenderHistory();
+}
+function rtJumpToday() {
+  rtViewMonth = new Date(rtToday.getFullYear(), rtToday.getMonth(), 1);
+  rtViewYear = rtToday.getFullYear();
+  rtSelectedDay = dateKey(rtToday);
+  rtRenderHistory();
+}
+function rtSelectDay(k) {
+  rtSelectedDay = k;
+  document.querySelectorAll('.rt-month-cell[data-date]').forEach(c => c.classList.toggle('selected', c.dataset.date === k));
+  rtRenderHeatDetail();
+}
+function rtRenderHistory() {
+  document.getElementById('rtHistLabel').textContent = rtHistoryMode === 'month'
+    ? rtViewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : String(rtViewYear);
+  document.getElementById('rtHistNextBtn').disabled = rtIsCurrentPeriod();
+  document.getElementById('rtHistTodayBtn').style.display = rtIsCurrentPeriod() ? 'none' : '';
+  if (rtHistoryMode === 'month') rtRenderMonthGrid(); else rtRenderYearGrid();
+  rtRenderHeatDetail();
+}
+function rtRenderMonthGrid() {
+  const y = rtViewMonth.getFullYear(), m = rtViewMonth.getMonth();
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+  let html = '';
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - firstDow + 1;
+    if (dayNum < 1 || dayNum > daysInMonth) { html += `<div class="rt-month-cell pad"></div>`; continue; }
+    const d = new Date(y, m, dayNum);
+    const k = dateKey(d);
+    const future = d > rtToday;
+    const sel = k === rtSelectedDay ? ' selected' : '';
+    if (future) {
+      html += `<div class="rt-month-cell future"><span class="rt-month-daynum">${dayNum}</span></div>`;
+    } else {
+      html += `<div class="rt-month-cell${sel}" data-date="${k}" tabindex="0" onclick="rtSelectDay('${k}')"
+        title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">
+        ${rtDaySections(k, d)}<span class="rt-month-daynum">${dayNum}</span></div>`;
+    }
+  }
+  document.getElementById('rtMonthGrid').innerHTML = html;
+}
+// Purely a glance-at-the-shape-of-the-year overview - no headers, no day
+// numbers, nothing to click. Small squares that just wrap by width, in
+// plain chronological order, so the whole year packs into a compact block.
+function rtRenderYearGrid() {
+  const jan1 = new Date(rtViewYear, 0, 1), dec31 = new Date(rtViewYear, 11, 31);
+  const totalDays = Math.round((dec31 - jan1) / ROUTINES_DAY_MS) + 1;
+  let html = '';
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(jan1.getTime() + i * ROUTINES_DAY_MS);
+    if (d > rtToday) { html += `<div class="rt-year-sq"></div>`; continue; }
+    const k = dateKey(d);
+    html += `<div class="rt-year-sq" data-date="${k}">${rtDaySections(k, d, true)}</div>`;
+  }
+  document.getElementById('rtYearGrid').innerHTML = html;
+}
+function rtRenderHeatDetail() {
+  const box = document.getElementById('rtHeatDetail');
+  if (!rtSelectedDay) { box.innerHTML = '<div class="rt-empty">Tap a day to see what was due and what got done.</div>'; return; }
+  const d = new Date(rtSelectedDay + 'T00:00:00');
+  const due = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
+  const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  if (!due.length) { box.innerHTML = `<div class="rt-heat-detail-date">${label}</div><div class="rt-empty">Nothing scheduled.</div>`; return; }
+  const isToday = rtSelectedDay === dateKey(rtToday);
+  box.innerHTML = `<div class="rt-heat-detail-date">${label}</div>` + due.map(h => {
+    const on = rtIsDoneOn(h, rtSelectedDay);
+    const cls = on ? 'on' : (isToday ? 'pending' : 'miss');
+    return `<div class="rt-heat-detail-item ${cls}"><span class="rt-heat-detail-dot ${cls}"></span>${escapeText_(h.name)}</div>`;
+  }).join('');
+}
+
+let rtDeletedMenuOpen = false;
+function rtToggleDeletedMenu() { rtDeletedMenuOpen = !rtDeletedMenuOpen; rtRenderHabits(); }
+
+function rtRenderHabits() {
+  const active = RT_HABITS.list.filter(h => !h.deleted);
+  const deleted = RT_HABITS.list.filter(h => h.deleted);
+  const rows = active.map(h => {
+    const strip = Array.from({ length: 28 }, (_, i) => {
+      const d = new Date(rtToday.getTime() - (27 - i) * ROUTINES_DAY_MS);
+      if (h.cadence === 'week') {
+        const on = rtIsDoneOn(h, dateKey(d));
+        return `<span class="${on ? 'on' : ''}" title="${dateKey(d)}"></span>`;
+      }
+      if (!rtIsDue(h, d)) return `<span class="future" title="not scheduled"></span>`;
+      const on = rtIsDoneOn(h, dateKey(d));
+      return `<span class="${on ? 'on' : 'miss'}" title="${dateKey(d)}"></span>`;
+    }).join('');
+    const pct = rtCompletionPct(h);
+    return `<div class="rt-habit-row">
+      <div class="rt-habit-row-top">
+        <span class="rt-habit-dot" style="background:${h.color}"></span>
+        <div class="rt-habit-name">${escapeText_(h.name)}</div>
+        <div class="rt-habit-cadence">${rtCadenceLabel(h)}</div>
+        <button class="rt-habit-edit" onclick="rtEditHabit('${h.id}')" aria-label="Edit">✎</button>
+        <button class="rt-habit-del" onclick="rtDeleteHabit('${h.id}')" aria-label="Delete">&times;</button>
+      </div>
+      <div class="rt-habit-stats">
+        <span>Streak <b>${rtCurrentStreak(h)}</b></span>
+        ${h.cadence !== 'week' ? `<span>Best <b>${rtBestStreak(h)}</b></span>` : ''}
+        ${pct !== null ? `<span>Last 90d <b>${pct}%</b></span>` : ''}
+        ${h.link && ROUTINES_LINK_SOURCES[h.link.source] ? `<span>🔗 ${escapeText_(ROUTINES_LINK_SOURCES[h.link.source].label)}</span>` : ''}
+      </div>
+      <div class="rt-habit-strip">${strip}</div>
+    </div>`;
+  }).join('') || '<div class="rt-empty">No habits yet - add one below.</div>';
+
+  let deletedHtml = '';
+  if (deleted.length) {
+    deletedHtml = `<button class="rt-deleted-toggle" onclick="rtToggleDeletedMenu()">${rtDeletedMenuOpen ? '▴' : '▾'} Deleted (${deleted.length})</button>`;
+    if (rtDeletedMenuOpen) {
+      deletedHtml += '<div class="rt-deleted-list">' + deleted.map(h => `
+        <div class="rt-deleted-row">
+          <div class="rt-deleted-row-name">${escapeText_(h.name)}</div>
+          <div class="rt-deleted-row-meta">Deleted ${new Date(h.deletedAt + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+          <button class="rt-restore-btn" onclick="rtRestoreHabit('${h.id}')">Restore</button>
+        </div>`).join('') + '</div>';
+    }
+  }
+  document.getElementById('rtHabitList').innerHTML = rows + deletedHtml;
+}
+
+// Deleting keeps the habit and its logged history around (just hidden
+// from the active list and no longer due) - the gap while it was gone is
+// not something restoring can undo, only rtIsDue() skips it going forward.
+function rtDeleteHabit(id) {
+  const h = RT_HABITS.list.find(x => x.id === id);
+  if (!h) return;
+  h.deleted = true;
+  h.deletedAt = dateKey(rtToday);
+  rtHabitsChanged();
+  rtRenderAll();
+}
+function rtRestoreHabit(id) {
+  const h = RT_HABITS.list.find(x => x.id === id);
+  if (!h) return;
+  if (!h.pausedRanges) h.pausedRanges = [];
+  if (h.deletedAt) h.pausedRanges.push({ from: h.deletedAt, to: dateKey(rtToday) });
+  h.deleted = false;
+  delete h.deletedAt;
+  rtHabitsChanged();
+  rtRenderAll();
+}
+
+function rtRenderAll() {
+  rtRenderToday();
+  rtRenderWeek();
+  rtRenderHistory();
+  rtRenderHabits();
+}
+
+/* ---- Add/edit-habit sheet ---- */
+let rtDraftCadence = 'daily', rtDraftDays = [], rtDraftWeekTarget = 3, rtDraftLink = null, rtEditingId = null;
+const ROUTINES_PALETTE = ['var(--accent)', 'var(--teal)', 'var(--purple)', 'var(--amber)', 'var(--green)', 'var(--red)'];
+
+function rtLinkSourceOptionsHtml() {
+  let html = '<option value="">None</option>';
+  Object.keys(ROUTINES_LINK_SOURCES).forEach(key => {
+    html += `<option value="${key}">${escapeAttr_(ROUTINES_LINK_SOURCES[key].label)}</option>`;
+  });
+  return html;
+}
+function rtOnLinkChange() {
+  const source = document.getElementById('rtHLink').value;
+  const note = document.getElementById('rtLinkNote');
+  if (!source || !ROUTINES_LINK_SOURCES[source]) {
+    rtDraftLink = null;
+    note.textContent = '';
+    return;
+  }
+  const src = ROUTINES_LINK_SOURCES[source];
+  const threshold = (rtDraftLink && rtDraftLink.source === source && rtDraftLink.threshold) || src.defaultThreshold();
+  rtDraftLink = { source, threshold };
+  note.textContent = `Marked done automatically once that day's ${src.label.toLowerCase()} reaches ${threshold}${src.unit}. Overrides checking it off by hand.`;
+}
+function rtOpenHabitSheet() {
+  rtEditingId = null;
+  rtDraftCadence = 'daily'; rtDraftDays = []; rtDraftWeekTarget = 3; rtDraftLink = null;
+  document.getElementById('rtHName').value = '';
+  document.getElementById('rtSheetTitle').textContent = 'New habit';
+  document.getElementById('rtSheetSaveBtn').textContent = 'Add habit';
+  document.getElementById('rtHLink').innerHTML = rtLinkSourceOptionsHtml();
+  document.getElementById('rtHLink').value = '';
+  document.getElementById('rtLinkNote').textContent = '';
+  rtSetCadence('daily');
+  document.getElementById('rtSheetOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('rtHName').focus(), 60);
+}
+function rtEditHabit(id) {
+  const h = RT_HABITS.list.find(x => x.id === id);
+  if (!h) return;
+  rtEditingId = id;
+  rtDraftCadence = h.cadence;
+  rtDraftDays = h.cadence === 'days' ? (h.days || []).slice() : [];
+  rtDraftWeekTarget = h.cadence === 'week' ? h.weekTarget : 3;
+  rtDraftLink = h.link ? Object.assign({}, h.link) : null;
+  document.getElementById('rtHName').value = h.name;
+  document.getElementById('rtSheetTitle').textContent = 'Edit habit';
+  document.getElementById('rtSheetSaveBtn').textContent = 'Save changes';
+  document.getElementById('rtHLink').innerHTML = rtLinkSourceOptionsHtml();
+  document.getElementById('rtHLink').value = h.link ? h.link.source : '';
+  rtOnLinkChange();
+  rtSetCadence(rtDraftCadence);
+  document.querySelectorAll('#rtDayPick button').forEach(b => b.classList.toggle('on', rtDraftDays.includes(+b.dataset.d)));
+  document.getElementById('rtWeekTargetN').textContent = rtDraftWeekTarget;
+  document.getElementById('rtSheetOverlay').classList.add('open');
+}
+function rtCloseSheet() { document.getElementById('rtSheetOverlay').classList.remove('open'); }
+function rtCloseSheetIfBackdrop(e) { if (e.target.id === 'rtSheetOverlay') rtCloseSheet(); }
+function rtSetCadence(c) {
+  rtDraftCadence = c;
+  document.querySelectorAll('#rtCadenceSeg button').forEach(b => b.classList.toggle('active', b.dataset.c === c));
+  document.getElementById('rtDayPick').style.display = c === 'days' ? 'flex' : 'none';
+  document.getElementById('rtWeekCount').style.display = c === 'week' ? 'flex' : 'none';
+  if (c === 'days' && !document.getElementById('rtDayPick').children.length) {
+    document.getElementById('rtDayPick').innerHTML = RT_DOW.map((d, i) =>
+      `<button data-d="${i}" onclick="rtToggleDay(${i})">${d[0]}</button>`).join('');
+  }
+}
+function rtToggleDay(i) {
+  const idx = rtDraftDays.indexOf(i);
+  if (idx >= 0) rtDraftDays.splice(idx, 1); else rtDraftDays.push(i);
+  document.querySelectorAll('#rtDayPick button').forEach(b => b.classList.toggle('on', rtDraftDays.includes(+b.dataset.d)));
+}
+function rtBumpWeekTarget(delta) {
+  rtDraftWeekTarget = Math.max(1, Math.min(7, rtDraftWeekTarget + delta));
+  document.getElementById('rtWeekTargetN').textContent = rtDraftWeekTarget;
+}
+function rtSaveHabit() {
+  const name = document.getElementById('rtHName').value.trim();
+  if (!name) { document.getElementById('rtHName').focus(); return; }
+  if (rtEditingId) {
+    const h = RT_HABITS.list.find(x => x.id === rtEditingId);
+    if (h) {
+      h.name = name;
+      h.cadence = rtDraftCadence;
+      delete h.days; delete h.weekTarget;
+      if (rtDraftCadence === 'days') h.days = rtDraftDays.length ? rtDraftDays.slice() : [1, 3, 5];
+      if (rtDraftCadence === 'week') h.weekTarget = rtDraftWeekTarget;
+      if (rtDraftLink) h.link = rtDraftLink; else delete h.link;
+    }
+  } else {
+    const h = { id: 'h' + Date.now(), name, color: ROUTINES_PALETTE[RT_HABITS.list.length % ROUTINES_PALETTE.length],
+      cadence: rtDraftCadence, created: dateKey(rtToday) };
+    if (rtDraftCadence === 'days') h.days = rtDraftDays.length ? rtDraftDays.slice() : [1, 3, 5];
+    if (rtDraftCadence === 'week') h.weekTarget = rtDraftWeekTarget;
+    if (rtDraftLink) h.link = rtDraftLink;
+    RT_HABITS.list.push(h);
+  }
+  rtHabitsChanged();
+  rtCloseSheet();
+  rtRenderAll();
+}
+
+/* ---------- The habit list follows you between devices ---------- */
+let rtSyncState_ = { status: 'idle', at: null, message: '' };
+function rtSetSyncState_(status, message) {
+  rtSyncState_ = { status, at: new Date(), message: message || '' };
+  rtRenderSyncLine_();
+}
+function rtRenderSyncLine_() {
+  const el = document.getElementById('rtSyncLine');
+  if (!el) return;
+  el.classList.remove('err');
+  const when = rtSyncState_.at ? rtSyncState_.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+  switch (rtSyncState_.status) {
+    case 'syncing': el.textContent = '↻ Syncing…'; break;
+    case 'ok': el.textContent = `✓ Saved to your other devices${when ? ' at ' + when : ''} · tap to sync now`; break;
+    case 'pulled': el.textContent = '✓ Loaded the latest from another device'; break;
+    case 'offline':
+    case 'error':
+      el.textContent = '⚠ ' + rtSyncState_.message;
+      el.classList.add('err');
+      break;
+    default: el.textContent = RT_HABITS.savedAt ? 'Tap to sync now' : '';
+  }
+}
+async function rtFetchHabitsState_(url) {
+  const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=loadRoutinesHabits');
+  const data = await res.json();
+  if (data.status !== 'success') return null;
+  return data.habits || null;
+}
+async function rtFetchLedger_(url) {
+  const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=loadRoutinesLedger');
+  const data = await res.json();
+  if (data.status !== 'success') return null;
+  return data.ledger || null;
+}
+// Whole-list, last-write-wins - splicing two devices' habit lists together
+// field by field risks resurrecting a habit one of them deleted.
+function rtAdoptRemoteHabits_(remote) {
+  if (!remote || typeof remote !== 'object' || !Array.isArray(remote.list)) return false;
+  const mine = RT_HABITS.savedAt || '';
+  if (!remote.savedAt || String(remote.savedAt) <= String(mine)) return false;
+  RT_HABITS = { list: remote.list, savedAt: remote.savedAt };
+  rtSaveHabitsLocal();
+  return true;
+}
+// Per-(date, habit) last-write-wins - a checkbox tap on one device must
+// never lose to an unrelated tap for a different day or habit elsewhere.
+function rtMergeRemoteLedger_(remoteLedger) {
+  if (!remoteLedger || typeof remoteLedger !== 'object') return false;
+  let changed = false;
+  Object.keys(remoteLedger).forEach(dateStr => {
+    const remoteDay = remoteLedger[dateStr];
+    Object.keys(remoteDay).forEach(habitId => {
+      const remoteCell = remoteDay[habitId];
+      RT_LOG[dateStr] = RT_LOG[dateStr] || {};
+      const localCell = RT_LOG[dateStr][habitId];
+      if (!localCell || String(remoteCell.loggedAt) > String(localCell.loggedAt)) {
+        RT_LOG[dateStr][habitId] = { done: !!remoteCell.done, loggedAt: remoteCell.loggedAt };
+        changed = true;
+      }
+    });
+  });
+  if (changed) rtSaveLogLocal();
+  return changed;
+}
+let rtSyncTimer_ = null;
+function syncRoutinesHabitsToRemote() {
+  clearTimeout(rtSyncTimer_);
+  rtSyncTimer_ = setTimeout(async () => {
+    const url = getDeploymentUrl();
+    if (!url) return rtSetSyncState_('error', 'No backend URL configured — set it in Settings.');
+    if (!navigator.onLine) return rtSetSyncState_('offline', 'Offline — saved on this device, will sync later.');
+    if (!RT_HABITS.savedAt) return; // nothing of yours to push yet
+
+    rtSetSyncState_('syncing');
+    try {
+      // Read before write: another device may have edited more recently,
+      // and a blind push would throw that away.
+      const remote = await rtFetchHabitsState_(url);
+      if (rtAdoptRemoteHabits_(remote)) { rtRenderAll(); return rtSetSyncState_('pulled'); }
+      const res = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'saveRoutinesHabits', habits: RT_HABITS })
+      });
+      const data = await res.json();
+      if (data.status === 'success' && data.habits) return rtSetSyncState_('ok');
+      rtSetSyncState_('error', data.message
+        ? String(data.message)
+        : 'The backend refused the save — it may predate this feature.');
+    } catch (e) {
+      rtSetSyncState_('error', 'Could not reach the backend.');
+    }
+  }, 900);
+}
+async function pullRoutinesFromRemote() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const [habitsRemote, ledgerRemote] = await Promise.all([rtFetchHabitsState_(url), rtFetchLedger_(url)]);
+    const habitsChanged = rtAdoptRemoteHabits_(habitsRemote);
+    const logChanged = rtMergeRemoteLedger_(ledgerRemote);
+    if (habitsChanged || logChanged) rtRenderAll();
+    if (habitsChanged) rtSetSyncState_('pulled'); else rtRenderSyncLine_();
+  } catch (e) { /* local state stands; the next open retries */ }
+}
 
 /* ---------- Arranging the Overview cards ----------
    Order and visibility live here, not in the markup, so the markup stays
@@ -13152,7 +14095,7 @@ function dismissArchiveNotice_() {
 // tab - it opens as a modal from the Weight Trend card on Stats instead
 // (see openWeightDetailModal), so Stats' own render call already covers
 // keeping its mini chart fresh.
-const viewOrder = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial'];
+const viewOrder = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -13167,6 +14110,7 @@ function renderActiveViewContent(view) {
   // usable instantly and corrects itself a moment later if another device
   // has been editing, rather than sitting blank on a network round trip.
   if (view === 'financial') { renderFinancialTab(); pullFinancialFromRemote(); }
+  if (view === 'routines') { rtRenderAll(); pullRoutinesFromRemote(); }
 }
 
 // All 4 views live side-by-side in a flex track (CSS `order` maps them to
@@ -18051,7 +18995,8 @@ const TOP_BAR_VIEW_INFO = {
   music:    { title: 'Music',    meta: '' },
   calendar: { title: 'Upcoming', meta: '' },
   stats:    { title: 'Stats',    meta: 'Trends' },
-  financial:{ title: 'Future',   meta: '' }
+  financial:{ title: 'Future',   meta: '' },
+  routines: { title: 'Routines', meta: '' }
 };
 
 // Headers that own buttons hand them to the bar while their view is
