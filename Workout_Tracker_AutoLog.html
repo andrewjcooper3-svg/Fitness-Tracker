@@ -6623,17 +6623,37 @@ function muscleSplit_(name) {
    looks exactly like a penalty when the reason (0.6 of a leg press is
    quads, the rest is glutes and hamstrings) is nowhere on screen. Carrying
    the unweighted count lets the breakdown show its own arithmetic. */
+/* A "set" is not the same unit for a walk as it is for a squat. Logging a
+   10-minute walk is one row - one "done" - same as one rep of Leg Press,
+   so two weekly walks and a leg day of forty-odd sets put cardio at 2
+   against everything else's 40, which is not a true picture of the work.
+   Cardio & other is the one bucket where every entry in this app is logged
+   as a duration (minutes), never a rep count, so its sets are counted in
+   10-minute units instead: a 10-minute walk is still 1, a 20-minute one is
+   2, a 5-minute one is 0.5. Nothing outside that bucket changes - a strength
+   set stays worth exactly one set, which is the comparison that actually
+   holds. */
+function hxCardioUnits_(r) {
+  return r.totalReps > 0 ? r.totalReps / 10 : r.done;
+}
+
 function muscleBreakdown_(rows, weighted) {
   const out = {};
   rows.forEach(r => {
     if (!r.done) return;
+    const isCardio = muscleFor_(r.exercise) === 'Cardio & other';
+    const unit = isCardio ? hxCardioUnits_(r) : r.done;
     const split = weighted ? muscleSplit_(r.exercise) : { [muscleFor_(r.exercise)]: 1 };
     Object.keys(split).forEach(g => {
-      const share = r.done * split[g];
+      const share = unit * split[g];
       if (!(share > 0)) return;
       const e = out[g] = out[g] || { sets: 0, ex: {}, raw: {} };
       e.sets += share;
       e.ex[r.exercise] = (e.ex[r.exercise] || 0) + share;
+      // Raw stays the literal count logged, never duration-scaled - it is
+      // what lets the card show its own arithmetic ("2 walks -> 3.5 units"
+      // for a couple of long ones, same as "3 sets -> 1.8 quads" for a
+      // squat that splits its credit across muscle groups instead of time).
       e.raw[r.exercise] = (e.raw[r.exercise] || 0) + r.done;
     });
   });
@@ -13475,7 +13495,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-26-spouse-promotions';
+const APP_BUILD_VERSION = '2026-08-27-cardio-minutes';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
