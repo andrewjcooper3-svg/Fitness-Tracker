@@ -3438,6 +3438,13 @@
         <button data-pref="dark" onclick="setThemePref('dark')">Dark</button>
       </div>
     </div>
+    <div class="config-box">
+      <div class="config-title" style="margin-bottom:10px;">Tab Order</div>
+      <div id="tabOrderList"></div>
+      <div class="hx-layout-actions">
+        <button class="hx-layout-reset" onclick="resetTabOrder()">Reset to default</button>
+      </div>
+    </div>
     <div class="config-box" style="margin-bottom:0;">
       <div class="config-title" style="margin-bottom:10px;">Pushup Goals</div>
       <div class="settings-field">
@@ -4897,6 +4904,7 @@ applyThemePref(loadThemePref());
 function openSettingsModal() {
   renderSettingsTab();
   renderThemePicker_();
+  renderTabOrderSettings_();
   document.getElementById('settingsModalOverlay').classList.add('open');
   loadRemoteSettingsState();
 }
@@ -14095,7 +14103,9 @@ function dismissArchiveNotice_() {
 // tab - it opens as a modal from the Weight Trend card on Stats instead
 // (see openWeightDetailModal), so Stats' own render call already covers
 // keeping its mini chart fresh.
-const viewOrder = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
+// Reassigned by applyTabOrder_() once a saved custom order is resolved -
+// the array literal here is only the default/reset target.
+let viewOrder = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
@@ -14170,6 +14180,94 @@ function goToView(view, animate) {
 
 function showAppView(view) {
   goToView(view, true);
+}
+
+/* ---------- Reordering the tabs themselves (Settings) ----------
+   Same up/down-list shape as Arrange Overview, applied to the tab bar
+   instead of a card flow: a saved order is reconciled against the tabs
+   that actually exist right now, so a stale id (a tab that got removed)
+   is dropped and a tab the saved order has never heard of (like Routines,
+   added after someone already customized their order) is appended at the
+   end rather than silently missing from their bar. */
+const STORAGE_TAB_ORDER_KEY = 'WORKOUT_TAB_ORDER';
+const TAB_ORDER_DEFAULT_ = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
+const TAB_LABELS_ = {
+  overview: 'Overview', tracker: 'Trainer', kitchen: 'Kitchen', music: 'Music',
+  calendar: 'Calendar', stats: 'History', financial: 'Future', routines: 'Routines'
+};
+
+function loadTabOrderRaw_() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_TAB_ORDER_KEY) || 'null');
+    return Array.isArray(raw) ? raw.filter(v => typeof v === 'string') : null;
+  } catch (e) { return null; }
+}
+function saveTabOrder_(order) {
+  try { localStorage.setItem(STORAGE_TAB_ORDER_KEY, JSON.stringify(order)); } catch (e) {}
+}
+function tabOrderResolved_() {
+  const saved = (loadTabOrderRaw_() || []).filter(v => TAB_ORDER_DEFAULT_.includes(v));
+  const missing = TAB_ORDER_DEFAULT_.filter(v => !saved.includes(v));
+  return saved.concat(missing);
+}
+
+// The view content divs stay put in the DOM (order:N maps them onto
+// viewOrder's positions, same trick already used for #view-financial
+// etc.) but the nav buttons themselves are light enough to just move.
+function applyTabOrder_() {
+  const order = tabOrderResolved_();
+  const activeView = viewOrder[currentViewIndex];
+  viewOrder = order;
+  order.forEach((view, i) => {
+    const el = document.getElementById('view-' + view);
+    if (el) el.style.order = String(i);
+  });
+  const tabsBar = document.getElementById('appTabs');
+  if (tabsBar) {
+    order.forEach(view => {
+      const tab = tabsBar.querySelector(`.app-tab[data-view="${view}"]`);
+      if (tab) tabsBar.appendChild(tab);
+    });
+    // The hidden Health tab isn't reorderable (it's not in TAB_ORDER_DEFAULT_)
+    // and never gets touched above - pin it at the end so it doesn't drift
+    // to the front of the DOM after repeated reorders. Display:none either
+    // way, so this is housekeeping, not a visible change.
+    const hiddenTab = tabsBar.querySelector('.app-tab[data-view="bodyhealth"]');
+    if (hiddenTab) tabsBar.appendChild(hiddenTab);
+  }
+  const sidebar = document.getElementById('appSidebar');
+  if (sidebar) order.forEach(view => {
+    const item = sidebar.querySelector(`.app-sidebar-item[data-view="${view}"]`);
+    if (item) sidebar.appendChild(item);
+  });
+  currentViewIndex = Math.max(0, order.indexOf(activeView));
+  goToView(order[currentViewIndex], false);
+}
+
+function renderTabOrderSettings_() {
+  const list = document.getElementById('tabOrderList');
+  if (!list) return;
+  const order = tabOrderResolved_();
+  list.innerHTML = order.map((view, i) => `<div class="hx-layout-row">
+      <div class="hx-layout-name" style="cursor:default;"><span>${escapeText_(TAB_LABELS_[view] || view)}</span></div>
+      <button class="hx-layout-move" onclick="moveTabOrder('${view}', -1)" aria-label="Move up"${i === 0 ? ' disabled' : ''}>↑</button>
+      <button class="hx-layout-move" onclick="moveTabOrder('${view}', 1)" aria-label="Move down"${i === order.length - 1 ? ' disabled' : ''}>↓</button>
+    </div>`).join('');
+}
+function moveTabOrder(view, dir) {
+  const order = tabOrderResolved_();
+  const i = order.indexOf(view);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return;
+  order.splice(j, 0, order.splice(i, 1)[0]);
+  saveTabOrder_(order);
+  applyTabOrder_();
+  renderTabOrderSettings_();
+}
+function resetTabOrder() {
+  try { localStorage.removeItem(STORAGE_TAB_ORDER_KEY); } catch (e) {}
+  applyTabOrder_();
+  renderTabOrderSettings_();
 }
 
 // Keeps the viewport's height in sync with whichever view is active any
@@ -19153,6 +19251,7 @@ initHistoryRange_();
 initMuscleWindow_();
 initMuscleMode_();
 loadHistoryLayout_();
+applyTabOrder_();
 finLoad_();
 initInbody_();
 initTabBarViewportPin();
