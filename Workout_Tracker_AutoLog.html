@@ -453,6 +453,7 @@
      glance-tile treatment below - a quieter, lower-eyestrain read. */
   .ov-hero-pushup { border-color: #e0916f; }
   .ov-hero-water { border-color: #6fa8c4; cursor: default; }
+  .ov-hero-routines { border-color: #33c2c2; cursor: default; }
   .ov-hero-card-label { font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
   .ov-hero-card-number { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.6px; line-height: 1; }
   .ov-hero-card-sub { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 2px; }
@@ -1957,21 +1958,27 @@
   .rt-today-headline { font-size: 20px; font-weight: 800; letter-spacing: -0.2px; }
   .rt-mini-day-block { position: relative; width: 28px; height: 28px; border-radius: 8px; background: var(--surface2); flex-shrink: 0; }
 
-  .rt-item-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .rt-item-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border);
+    break-inside: avoid; }
   .rt-item-row:last-child { border-bottom: none; }
-  .rt-check { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--border); background: none;
+  .rt-check { width: 21px; height: 21px; border-radius: 6px; border: 2px solid var(--border); background: none;
     flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent; }
-  .rt-check svg { width: 15px; height: 15px; }
+  .rt-check svg { width: 12px; height: 12px; }
   .rt-check.done { background: var(--green); border-color: var(--green); color: #fff; }
   .rt-check:disabled { cursor: default; opacity: 1; }
   /* One row: checkbox, name (truncates rather than wrapping), cadence
      pinned to the right edge - a compact list reads faster than a
      two-line stack when there can be several habits in view at once. */
-  .rt-item-name { font-size: 14.5px; font-weight: 600; flex: 1; min-width: 0;
+  .rt-item-name { font-size: 13.5px; font-weight: 600; flex: 1; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rt-item-name.done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
-  .rt-item-meta { font-size: 12px; color: var(--muted); flex-shrink: 0; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
-  .rt-streak-chip { font-size: 11px; font-weight: 700; color: var(--amber); flex-shrink: 0; white-space: nowrap; }
+  .rt-item-meta { font-size: 11px; color: var(--muted); flex-shrink: 0; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .rt-streak-chip { font-size: 10.5px; font-weight: 700; color: var(--amber); flex-shrink: 0; white-space: nowrap; }
+  /* Once there are enough habits to make the list keep growing, split
+     it into two columns instead - height stays roughly constant rather
+     than the card just getting taller and taller as habits pile up. */
+  .rt-item-list-2col { columns: 2; column-gap: 16px; }
+  .rt-item-list-2col .rt-item-group-label { column-span: all; }
   .rt-item-group-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
     letter-spacing: 0.3px; padding: 12px 0 4px; border-top: 1px solid var(--border); margin-top: 4px; }
   .rt-link-chip { font-size: 10.5px; font-weight: 700; color: var(--accent); flex-shrink: 0; white-space: nowrap; }
@@ -6621,6 +6628,10 @@ document.addEventListener('focusout', e => {
 const STORAGE_ROUTINES_HABITS_KEY = 'WORKOUT_ROUTINES_HABITS';
 const STORAGE_ROUTINES_LOG_KEY = 'WORKOUT_ROUTINES_LOG';
 const ROUTINES_DAY_MS = 86400000;
+// Past this many rows, the list switches to two columns (see
+// .rt-item-list-2col) so the card's height stays roughly constant
+// instead of growing without bound as more habits get added.
+const ROUTINES_2COL_THRESHOLD = 6;
 const RT_DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const rtToday = new Date(); rtToday.setHours(0, 0, 0, 0);
 
@@ -6847,6 +6858,7 @@ function rtRenderToday() {
   const list = document.getElementById('rtTodayList');
   if (!list) return;
   if (!dueToday.length && !weeklyToday.length) {
+    list.classList.remove('rt-item-list-2col');
     list.innerHTML = '<div class="rt-empty">Every day and specific-day items land here.</div>';
     return;
   }
@@ -6864,6 +6876,7 @@ function rtRenderToday() {
     html += '<div class="rt-item-group-label">This week, any day</div>';
     html += weeklyToday.map(h => rtItemRowHtml(h, k, `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`, false)).join('');
   }
+  list.classList.toggle('rt-item-list-2col', dueToday.length + weeklyToday.length > ROUTINES_2COL_THRESHOLD);
   list.innerHTML = html;
 }
 
@@ -6895,16 +6908,22 @@ function rtRenderWeek() {
 // order (done, then today's still-open, then a real miss) so the color
 // story reads as one glance across the cell.
 function rtDaySections(k, d, tiny) {
-  const due = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
-  if (!due.length) return '';
   const isToday = dateKey(d) === dateKey(rtToday);
+  const due = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
+  // A weekly-target habit isn't "due" on any particular day, so it never
+  // adds a pending/missed section - but the day it actually got checked
+  // off is real progress, so THAT day earns a green section same as any
+  // other completed habit.
+  const weeklyDone = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtIsDoneOn(h, k));
+  const all = due.concat(weeklyDone);
+  if (!all.length) return '';
   const order = { 'rt-sec-done': 0, 'rt-sec-pending': 1, 'rt-sec-miss': 2 };
-  const items = due.map(h => {
-    const cls = rtIsDoneOn(h, k) ? 'rt-sec-done' : (isToday ? 'rt-sec-pending' : 'rt-sec-miss');
+  const items = all.map(h => {
+    const cls = h.cadence === 'week' ? 'rt-sec-done' : (rtIsDoneOn(h, k) ? 'rt-sec-done' : (isToday ? 'rt-sec-pending' : 'rt-sec-miss'));
     return { cls, name: h.name };
   }).sort((a, b) => order[a.cls] - order[b.cls]);
   const cells = items.map(it => `<span class="${it.cls}" title="${escapeAttr_(it.name)}"></span>`).join('');
-  return `<div class="rt-day-sections${tiny ? ' tiny' : ''}" style="grid-template-columns:repeat(${due.length},1fr);">${cells}</div>`;
+  return `<div class="rt-day-sections${tiny ? ' tiny' : ''}" style="grid-template-columns:repeat(${all.length},1fr);">${cells}</div>`;
 }
 
 let rtSelectedDay = null;
@@ -6997,7 +7016,9 @@ function rtRenderHeatDetail() {
   const box = document.getElementById('rtHeatDetail');
   if (!rtSelectedDay) { box.innerHTML = '<div class="rt-empty">Tap a day to see what was due and what got done.</div>'; return; }
   const d = new Date(rtSelectedDay + 'T00:00:00');
-  const due = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
+  const fixedDue = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
+  const weeklyDone = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtIsDoneOn(h, rtSelectedDay));
+  const due = fixedDue.concat(weeklyDone);
   const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   if (!due.length) { box.innerHTML = `<div class="rt-heat-detail-date">${label}</div><div class="rt-empty">Nothing scheduled.</div>`; return; }
   const isToday = rtSelectedDay === dateKey(rtToday);
@@ -14696,6 +14717,7 @@ function renderOverviewRoutinesWidget_() {
   if (!list || typeof RT_HABITS === 'undefined') return;
   const active = RT_HABITS.list.filter(h => !h.deleted);
   const k = dateKey(rtToday);
+  list.classList.remove('rt-item-list-2col');
   if (!active.length) {
     list.innerHTML = '<div class="ov-mini-empty">No habits yet - add one from the Routines tab</div>';
   } else {
@@ -14706,6 +14728,7 @@ function renderOverviewRoutinesWidget_() {
     } else {
       let html = due.map(h => ovRoutinesItemRowHtml_(h, k)).join('');
       if (weekly.length) html += weekly.map(h => ovRoutinesItemRowHtml_(h, k, true)).join('');
+      list.classList.toggle('rt-item-list-2col', due.length + weekly.length > ROUTINES_2COL_THRESHOLD);
       list.innerHTML = html;
     }
   }
