@@ -2004,6 +2004,10 @@
   .rt-month-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
   .rt-month-dow span { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); }
   .rt-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  /* Overview's Month view: same weekday-aligned 7-column layout, but at
+     about half the size instead of stretching to the card's full width. */
+  .rt-month-grid.compact { grid-template-columns: repeat(7, 22px); width: max-content; }
+  .rt-month-grid.compact .rt-month-cell { cursor: default; }
   .rt-month-cell { position: relative; aspect-ratio: 1; border-radius: 9px; background: var(--surface2); cursor: pointer; }
   .rt-month-cell.pad { background: transparent; cursor: default; }
   .rt-month-cell.future { cursor: default; }
@@ -14735,10 +14739,9 @@ function renderOvRoutinesCalendar_() {
       <div class="rt-month-grid">${cells}</div>`;
     return;
   }
-  // Month stays plain (no header, no day numbers) but uses the SAME
-  // 7-column, 1fr-per-cell grid as Week - so its squares scale up to fill
-  // the same width Week's cells do, rather than sitting at a small fixed
-  // size with unused space down the row.
+  // Month stays plain (no header, no day numbers) and keeps the same
+  // weekday-aligned 7-column layout as Week, just at about half the
+  // size (.compact) instead of stretching to the card's full width.
   const y = rtToday.getFullYear(), m = rtToday.getMonth();
   const firstDow = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
@@ -14748,7 +14751,7 @@ function renderOvRoutinesCalendar_() {
     const dayNum = i - firstDow + 1;
     cells += (dayNum < 1 || dayNum > daysInMonth) ? '<div class="rt-month-cell pad"></div>' : ovRoutinesPlainCellHtml_(new Date(y, m, dayNum));
   }
-  grid.innerHTML = `<div class="rt-month-grid">${cells}</div>`;
+  grid.innerHTML = `<div class="rt-month-grid compact">${cells}</div>`;
 }
 
 function ovRoutinesItemRowHtml_(h, k, weekly) {

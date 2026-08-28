@@ -1,15 +1,16 @@
 /* The Overview Routines card's Month view stays plain (no day-of-week
-   header, no day-number chips) but uses the SAME 7-column, 1fr-per-cell
-   grid Week uses (.rt-month-grid/.rt-month-cell) - so its squares scale
-   up to fill the row exactly the way Week's cells do, instead of sitting
-   at a small fixed size with unused space down the row (the earlier,
-   smaller-square design this replaces).
+   header, no day-number chips) and keeps the same weekday-aligned
+   7-column layout Week uses (.rt-month-grid/.rt-month-cell), but at
+   about half Week's cell size (.rt-month-grid.compact fixes the column
+   width instead of stretching to 1fr) rather than filling the card's
+   full width - an earlier version matched Week's width exactly and
+   came out too large.
 
    What is checked here:
      - Week mode still has the dow header and day numbers (unchanged),
      - Month mode has neither,
-     - Month and Week cells are the exact same pixel width - the whole
-       point of this design,
+     - Month cells are meaningfully smaller than Week's (~half), not
+       stretched to the same width,
      - Month renders a full padded month grid (first-of-month aligned to
        its real weekday, trailing pad cells filling the last row), with
        one cell per day plus padding, and future days render blank. */
@@ -70,9 +71,9 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('Month mode has no day-number chips', monthInfo.daynums === 0, JSON.stringify(monthInfo));
   check('Month mode renders a full padded month grid (aligned to real weekdays)',
     monthInfo.totalCells === monthInfo.expectedTotal && monthInfo.padCells === monthInfo.expectedPad, JSON.stringify(monthInfo));
-  check('Month cells are the exact same width as Week cells - the point of this change',
-    Math.abs(monthInfo.cellWidth - weekInfo.cellWidth) < 1, `month ${monthInfo.cellWidth} vs week ${weekInfo.cellWidth}`);
-  check('cells are meaningfully bigger than the old fixed 16px squares', monthInfo.cellWidth > 30, String(monthInfo.cellWidth));
+  check('Month cells are roughly half Week\'s cell width (about 22px, not stretched to full width)',
+    monthInfo.cellWidth > 15 && monthInfo.cellWidth < 30 && monthInfo.cellWidth < weekInfo.cellWidth * 0.7,
+    `month ${monthInfo.cellWidth} vs week ${weekInfo.cellWidth}`);
 
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 
