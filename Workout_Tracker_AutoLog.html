@@ -6641,7 +6641,7 @@ const rtToday = new Date(); rtToday.setHours(0, 0, 0, 0);
 // considered done for a day once its value clears the habit's threshold.
 const ROUTINES_LINK_SOURCES = {
   water: {
-    label: 'Water intake', unit: 'oz',
+    kind: 'threshold', label: 'Water intake', unit: 'oz',
     defaultThreshold: () => (typeof WATER_DAILY_GOAL === 'number' && WATER_DAILY_GOAL) || 100,
     valueOn: dateStr => {
       try {
@@ -6651,13 +6651,23 @@ const ROUTINES_LINK_SOURCES = {
     }
   },
   pushups: {
-    label: 'Pushups', unit: ' reps',
+    kind: 'threshold', label: 'Pushups', unit: ' reps',
     defaultThreshold: () => 100,
     valueOn: dateStr => {
       try {
         const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
         return Number(ledger[dateStr]) || 0;
       } catch (e) { return 0; }
+    }
+  },
+  // Not a threshold to clear - just "did a weigh-in land on the Weight
+  // Log for this day." The Shortcut that logs it tends to run late at
+  // night, so this stays unchecked most of the day until it actually
+  // fires - that's real, not a bug.
+  weight: {
+    kind: 'logged', label: 'Weigh-in logged',
+    doneOn: dateStr => {
+      try { return loadWeightLog().some(e => e.date === dateStr); } catch (e) { return false; }
     }
   }
 };
@@ -6697,9 +6707,18 @@ let RT_LOG = rtLoadLogLocal();
 
 function rtIsDoneOn(h, dateStr) {
   if (h.link && ROUTINES_LINK_SOURCES[h.link.source]) {
-    return ROUTINES_LINK_SOURCES[h.link.source].valueOn(dateStr) >= (h.link.threshold || 0);
+    const src = ROUTINES_LINK_SOURCES[h.link.source];
+    return src.kind === 'logged' ? !!src.doneOn(dateStr) : src.valueOn(dateStr) >= (h.link.threshold || 0);
   }
   return !!(RT_LOG[dateStr] && RT_LOG[dateStr][h.id] && RT_LOG[dateStr][h.id].done);
+}
+// Meta text for a linked habit's row - "logged" sources are yes/no, so
+// they show a plain status instead of a value/threshold fraction.
+function rtLinkMetaText_(h, k) {
+  const src = ROUTINES_LINK_SOURCES[h.link.source];
+  if (!src) return '';
+  if (src.kind === 'logged') return rtIsDoneOn(h, k) ? 'Logged today' : 'Not logged yet';
+  return `${src.valueOn(k)}/${h.link.threshold}${src.unit}`;
 }
 
 /* ---- Cadence logic (ported from the Routines mockup) ---- */
@@ -6863,11 +6882,7 @@ function rtRenderToday() {
     return;
   }
   let html = dueToday.map(h => {
-    let meta = rtCadenceLabel(h);
-    if (h.link && ROUTINES_LINK_SOURCES[h.link.source]) {
-      const src = ROUTINES_LINK_SOURCES[h.link.source];
-      meta = `${src.valueOn(k)}/${h.link.threshold}${src.unit}`;
-    }
+    const meta = h.link ? rtLinkMetaText_(h, k) : rtCadenceLabel(h);
     return rtItemRowHtml(h, k, meta, isToday);
   }).join('');
   // X-times-a-week items aren't "due" on any one day, so they get their
@@ -7134,6 +7149,11 @@ function rtOnLinkChange() {
     return;
   }
   const src = ROUTINES_LINK_SOURCES[source];
+  if (src.kind === 'logged') {
+    rtDraftLink = { source };
+    note.textContent = `Marked done automatically once a weigh-in is logged that day. Overrides checking it off by hand.`;
+    return;
+  }
   const threshold = (rtDraftLink && rtDraftLink.source === source && rtDraftLink.threshold) || src.defaultThreshold();
   rtDraftLink = { source, threshold };
   note.textContent = `Marked done automatically once that day's ${src.label.toLowerCase()} reaches ${threshold}${src.unit}. Overrides checking it off by hand.`;
@@ -14699,7 +14719,7 @@ function renderOvRoutinesCalendar_() {
 function ovRoutinesItemRowHtml_(h, k, weekly) {
   const done = rtIsDoneOn(h, k);
   const linked = !!h.link;
-  const meta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : rtCadenceLabel(h);
+  const meta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : (linked ? rtLinkMetaText_(h, k) : rtCadenceLabel(h));
   const checkAttrs = linked ? 'disabled' : `onclick="event.stopPropagation(); ovToggleRoutine_('${h.id}')"`;
   return `<div class="rt-item-row">
     <button class="rt-check ${done ? 'done' : ''}" ${checkAttrs} aria-label="${done ? 'Marked done' : 'Not done'}">
