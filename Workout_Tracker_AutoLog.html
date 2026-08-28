@@ -2047,7 +2047,10 @@
   .rt-habit-strip span.on { background: var(--accent); }
   .rt-habit-strip span.miss { background: var(--red); opacity: 0.35; }
   .rt-habit-strip span.future { background: transparent; }
-  .rt-habit-edit, .rt-habit-del { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
+  .rt-habit-move, .rt-habit-edit, .rt-habit-del { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
+  .rt-habit-move { font-size: 13px; }
+  .rt-habit-move:disabled { opacity: 0.25; cursor: default; }
+  .rt-habit-move:hover:not(:disabled) { color: var(--accent); }
   .rt-habit-edit { font-size: 14px; }
   .rt-habit-del { font-size: 18px; }
   .rt-habit-edit:hover { color: var(--accent); }
@@ -7050,7 +7053,7 @@ function rtToggleDeletedMenu() { rtDeletedMenuOpen = !rtDeletedMenuOpen; rtRende
 function rtRenderHabits() {
   const active = RT_HABITS.list.filter(h => !h.deleted);
   const deleted = RT_HABITS.list.filter(h => h.deleted);
-  const rows = active.map(h => {
+  const rows = active.map((h, i) => {
     const strip = Array.from({ length: 28 }, (_, i) => {
       const d = new Date(rtToday.getTime() - (27 - i) * ROUTINES_DAY_MS);
       if (h.cadence === 'week') {
@@ -7067,6 +7070,8 @@ function rtRenderHabits() {
         <span class="rt-habit-dot" style="background:${h.color}"></span>
         <div class="rt-habit-name">${escapeText_(h.name)}</div>
         <div class="rt-habit-cadence">${rtCadenceLabel(h)}</div>
+        <button class="rt-habit-move" onclick="rtMoveHabit('${h.id}', -1)" aria-label="Move up"${i === 0 ? ' disabled' : ''}>↑</button>
+        <button class="rt-habit-move" onclick="rtMoveHabit('${h.id}', 1)" aria-label="Move down"${i === active.length - 1 ? ' disabled' : ''}>↓</button>
         <button class="rt-habit-edit" onclick="rtEditHabit('${h.id}')" aria-label="Edit">✎</button>
         <button class="rt-habit-del" onclick="rtDeleteHabit('${h.id}')" aria-label="Delete">&times;</button>
       </div>
@@ -7113,6 +7118,22 @@ function rtRestoreHabit(id) {
   if (h.deletedAt) h.pausedRanges.push({ from: h.deletedAt, to: dateKey(rtToday) });
   h.deleted = false;
   delete h.deletedAt;
+  rtHabitsChanged();
+  rtRenderAll();
+}
+
+// Swaps with the nearest ACTIVE neighbor in that direction, skipping past
+// any deleted habits sitting between them in the underlying array - a
+// deleted habit keeps whatever position it happened to be at rather than
+// being swappable, since it's not part of the visible ordering at all.
+function rtMoveHabit(id, dir) {
+  const list = RT_HABITS.list;
+  const i = list.findIndex(h => h.id === id);
+  if (i < 0) return;
+  let j = i + dir;
+  while (j >= 0 && j < list.length && list[j].deleted) j += dir;
+  if (j < 0 || j >= list.length) return;
+  const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
   rtHabitsChanged();
   rtRenderAll();
 }
