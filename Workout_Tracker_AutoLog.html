@@ -541,6 +541,7 @@
   .ov-glance-tile[data-widget="kitchen"] { border-color: #d9b36e; }
   .ov-glance-tile[data-widget="shopping"] { border-color: #86bf95; }
   .ov-glance-tile[data-widget="upcoming"] { border-color: #d992b0; }
+  .ov-glance-tile[data-widget="routines"] { border-color: #33c2c2; }
   .ov-glance-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; margin-bottom: 6px; flex-shrink: 0; }
   .ov-glance-icon svg { display: block; }
   .ov-glance-tile[data-widget="weight"] .ov-glance-icon { background: rgba(162,145,201,0.16); color: #a291c9; }
@@ -548,6 +549,9 @@
   .ov-glance-tile[data-widget="kitchen"] .ov-glance-icon { background: rgba(217,179,110,0.16); color: #d9b36e; }
   .ov-glance-tile[data-widget="shopping"] .ov-glance-icon { background: rgba(134,191,149,0.16); color: #86bf95; }
   .ov-glance-tile[data-widget="upcoming"] .ov-glance-icon { background: rgba(217,146,176,0.16); color: #d992b0; }
+  .ov-glance-tile[data-widget="routines"] .ov-glance-icon { background: rgba(51,194,194,0.16); color: #33c2c2; }
+  .ov-mini-routines-value { font-family: var(--font); font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }
+  .ov-mini-routines-sub { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; }
   .ov-glance-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px; }
   .ov-glance-tile:not(.ov-glance-tile-wide) .ov-glance-label { margin-bottom: 0; }
   .ov-glance-tile .sp-np-artist, .ov-glance-tile .sp-playlists { display: none; }
@@ -2302,6 +2306,14 @@
         <div class="ov-glance-label">Shopping</div>
       </div>
       <div class="ov-glance-right" id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
+    </div>
+
+    <div class="ov-glance-tile ov-widget" data-widget="routines" data-block="routines" data-size="small" onclick="handleWidgetTap(event, 'routines')">
+      <div class="ov-glance-left">
+        <div class="ov-glance-icon c-routines"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M8 12l2.5 2.5L16 9"></path></svg></div>
+        <div class="ov-glance-label">Routines</div>
+      </div>
+      <div class="ov-glance-right" id="ovRoutinesPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
     <div class="ov-glance-tile ov-glance-tile-wide ov-widget" data-widget="upcoming" data-block="upcoming" data-size="small" onclick="handleWidgetTap(event, 'calendar')">
@@ -14592,7 +14604,32 @@ function renderOverview() {
   renderOverviewWaterWidget();
   renderOverviewKitchenPreview();
   renderOverviewShoppingPreview();
+  renderOverviewRoutinesPreview();
   ensureCalendarLoaded();
+}
+
+// A quick glance at today's habits without leaving Overview - same
+// bold-number-plus-muted-line shape as the Weight tile. Only fixed-
+// schedule items count toward the fraction shown here, same as the
+// Routines tab's own ring: an X-times-a-week habit isn't "due" on any
+// one day, so it would only ever muddy what "3 of 5" means.
+function renderOverviewRoutinesPreview() {
+  const el = document.getElementById('ovRoutinesPreview');
+  if (!el || typeof RT_HABITS === 'undefined') return;
+  const active = RT_HABITS.list.filter(h => !h.deleted);
+  if (!active.length) {
+    el.innerHTML = '<div class="ov-mini-empty">Tap to set up habits</div>';
+    return;
+  }
+  const due = active.filter(h => h.cadence !== 'week' && rtIsDue(h, rtToday));
+  if (!due.length) {
+    el.innerHTML = '<div class="ov-mini-empty">Nothing due today</div>';
+    return;
+  }
+  const k = dateKey(rtToday);
+  const done = due.filter(h => rtIsDoneOn(h, k)).length;
+  el.innerHTML = `<div class="ov-mini-routines-value">${done}/${due.length}</div>
+    <div class="ov-mini-routines-sub">done today</div>`;
 }
 
 // Water widget - same ring-plus-goal shape as the Pushups hero, but its
