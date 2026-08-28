@@ -2004,10 +2004,6 @@
   .rt-month-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px; }
   .rt-month-dow span { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); }
   .rt-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  /* Overview's Month view: same weekday-aligned 7-column layout, but at
-     about half the size instead of stretching to the card's full width. */
-  .rt-month-grid.compact { grid-template-columns: repeat(7, 22px); width: max-content; }
-  .rt-month-grid.compact .rt-month-cell { cursor: default; }
   .rt-month-cell { position: relative; aspect-ratio: 1; border-radius: 9px; background: var(--surface2); cursor: pointer; }
   .rt-month-cell.pad { background: transparent; cursor: default; }
   .rt-month-cell.future { cursor: default; }
@@ -2024,6 +2020,13 @@
 
   .rt-year-flow { display: flex; flex-wrap: wrap; gap: 3px; }
   .rt-year-sq { position: relative; width: 16px; height: 16px; border-radius: 4px; background: var(--surface2); flex-shrink: 0; }
+
+  /* Overview's Month view: small squares (~20px, half Week's cell size)
+     that still fill the card's full width - auto-fill sizes however many
+     columns fit at that minimum width and stretches them evenly, so it
+     doesn't need a hardcoded column count. */
+  .ov-month-flow { display: grid; grid-template-columns: repeat(auto-fill, minmax(20px, 1fr)); gap: 3px; }
+  .ov-month-sq { position: relative; aspect-ratio: 1; border-radius: 5px; background: var(--surface2); }
 
   .rt-legend { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
   .rt-legend .rt-month-cell { cursor: default; width: 12px; height: 12px; aspect-ratio: unset; border-radius: 3px; }
@@ -14720,14 +14723,6 @@ function ovRoutinesDayCellHtml_(d) {
   if (d > rtToday) return `<div class="rt-month-cell future"><span class="rt-month-daynum">${d.getDate()}</span></div>`;
   return `<div class="rt-month-cell" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d)}<span class="rt-month-daynum">${d.getDate()}</span></div>`;
 }
-// Same cell markup, minus the day-number chip - used for Month mode below,
-// which stays plain (no numbers) but otherwise fills the row exactly like
-// Week's cells do.
-function ovRoutinesPlainCellHtml_(d) {
-  if (d > rtToday) return `<div class="rt-month-cell future"></div>`;
-  const k = dateKey(d);
-  return `<div class="rt-month-cell" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d)}</div>`;
-}
 function renderOvRoutinesCalendar_() {
   const grid = document.getElementById('ovRoutinesCalGrid');
   if (!grid || typeof RT_HABITS === 'undefined') return;
@@ -14739,19 +14734,22 @@ function renderOvRoutinesCalendar_() {
       <div class="rt-month-grid">${cells}</div>`;
     return;
   }
-  // Month stays plain (no header, no day numbers) and keeps the same
-  // weekday-aligned 7-column layout as Week, just at about half the
-  // size (.compact) instead of stretching to the card's full width.
+  // Month stays plain (no header, no day numbers) and uses small squares
+  // (about half Week's cell size) - grid-template-columns: auto-fill sizes
+  // however many columns fit the card's actual width at that minimum size
+  // and stretches them evenly, so the grid fills the full width without
+  // hardcoding a column count (and without Week's weekday alignment, which
+  // doesn't fit at this size anyway).
   const y = rtToday.getFullYear(), m = rtToday.getMonth();
-  const firstDow = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
   let cells = '';
-  for (let i = 0; i < totalCells; i++) {
-    const dayNum = i - firstDow + 1;
-    cells += (dayNum < 1 || dayNum > daysInMonth) ? '<div class="rt-month-cell pad"></div>' : ovRoutinesPlainCellHtml_(new Date(y, m, dayNum));
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(y, m, day);
+    if (d > rtToday) { cells += '<div class="ov-month-sq"></div>'; continue; }
+    const k = dateKey(d);
+    cells += `<div class="ov-month-sq" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d, true)}</div>`;
   }
-  grid.innerHTML = `<div class="rt-month-grid compact">${cells}</div>`;
+  grid.innerHTML = `<div class="ov-month-flow">${cells}</div>`;
 }
 
 function ovRoutinesItemRowHtml_(h, k, weekly) {

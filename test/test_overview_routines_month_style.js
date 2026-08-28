@@ -1,19 +1,23 @@
 /* The Overview Routines card's Month view stays plain (no day-of-week
-   header, no day-number chips) and keeps the same weekday-aligned
-   7-column layout Week uses (.rt-month-grid/.rt-month-cell), but at
-   about half Week's cell size (.rt-month-grid.compact fixes the column
-   width instead of stretching to 1fr) rather than filling the card's
-   full width - an earlier version matched Week's width exactly and
-   came out too large.
+   header, no day-number chips) and drops Week's weekday-aligned 7-column
+   layout entirely: it's a flat flow of small squares, one per day of the
+   month (.ov-month-flow/.ov-month-sq), sized with CSS grid-template-columns:
+   repeat(auto-fill, minmax(20px, 1fr)) so however many ~20px columns fit
+   the card's actual width are stretched evenly to fill it - small like the
+   Routines tab's Year view, but full-width like Week, without hardcoding a
+   column count. Two earlier versions were tried and rejected: matching
+   Week's cell width exactly came out "too big", and a fixed 7-column
+   22px-wide layout came out small but didn't fill the block's width.
 
    What is checked here:
      - Week mode still has the dow header and day numbers (unchanged),
      - Month mode has neither,
-     - Month cells are meaningfully smaller than Week's (~half), not
-       stretched to the same width,
-     - Month renders a full padded month grid (first-of-month aligned to
-       its real weekday, trailing pad cells filling the last row), with
-       one cell per day plus padding, and future days render blank. */
+     - Month renders exactly one cell per day of the month (no padding
+       cells for weekday alignment, unlike Week's grid),
+     - Month cells are small (~20px, meaningfully smaller than Week's),
+     - the month grid's rendered width matches the card's content width
+       (unlike the old fixed-width version, which left empty space),
+     - future days render blank. */
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
@@ -55,25 +59,40 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
 
   const monthInfo = await page.evaluate(() => {
     const y = rtToday.getFullYear(), m = rtToday.getMonth();
-    const firstDow = new Date(y, m, 1).getDay();
     const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const grid = document.getElementById('ovRoutinesCalGrid');
+    const flow = grid.querySelector('.ov-month-flow');
+    const sqs = [...grid.querySelectorAll('.ov-month-sq')];
+    const cardWidth = document.querySelector('.ov-hero-routines').getBoundingClientRect().width;
     return {
-      hasDow: !!document.querySelector('#ovRoutinesCalGrid .rt-month-dow'),
-      daynums: document.querySelectorAll('#ovRoutinesCalGrid .rt-month-daynum').length,
-      totalCells: document.querySelectorAll('#ovRoutinesCalGrid .rt-month-cell').length,
-      padCells: document.querySelectorAll('#ovRoutinesCalGrid .rt-month-cell.pad').length,
-      expectedTotal: Math.ceil((firstDow + daysInMonth) / 7) * 7,
-      expectedPad: Math.ceil((firstDow + daysInMonth) / 7) * 7 - daysInMonth,
-      cellWidth: document.querySelector('#ovRoutinesCalGrid .rt-month-cell:not(.pad)').getBoundingClientRect().width
+      hasDow: !!grid.querySelector('.rt-month-dow'),
+      daynums: grid.querySelectorAll('.rt-month-daynum').length,
+      totalCells: sqs.length,
+      daysInMonth,
+      cellWidth: sqs[0].getBoundingClientRect().width,
+      flowWidth: flow.getBoundingClientRect().width,
+      cardWidth
     };
   });
   check('Month mode has no dow header', !monthInfo.hasDow, JSON.stringify(monthInfo));
   check('Month mode has no day-number chips', monthInfo.daynums === 0, JSON.stringify(monthInfo));
-  check('Month mode renders a full padded month grid (aligned to real weekdays)',
-    monthInfo.totalCells === monthInfo.expectedTotal && monthInfo.padCells === monthInfo.expectedPad, JSON.stringify(monthInfo));
-  check('Month cells are roughly half Week\'s cell width (about 22px, not stretched to full width)',
-    monthInfo.cellWidth > 15 && monthInfo.cellWidth < 30 && monthInfo.cellWidth < weekInfo.cellWidth * 0.7,
+  check('Month mode renders exactly one cell per day of the month (no padding cells)',
+    monthInfo.totalCells === monthInfo.daysInMonth, JSON.stringify(monthInfo));
+  check('Month cells are small (~20px, meaningfully smaller than Week\'s)',
+    monthInfo.cellWidth > 10 && monthInfo.cellWidth < 30 && monthInfo.cellWidth < weekInfo.cellWidth * 0.7,
     `month ${monthInfo.cellWidth} vs week ${weekInfo.cellWidth}`);
+  check('the grid fills the card\'s width rather than leaving empty space',
+    monthInfo.flowWidth > monthInfo.cardWidth * 0.85, JSON.stringify(monthInfo));
+
+  const futureBlank = await page.evaluate(() => {
+    const y = rtToday.getFullYear(), m = rtToday.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    if (rtToday.getDate() >= daysInMonth) return true;
+    const sqs = [...document.querySelectorAll('#ovRoutinesCalGrid .ov-month-sq')];
+    const lastSq = sqs[sqs.length - 1];
+    return lastSq.textContent.trim() === '' && !lastSq.hasAttribute('title');
+  });
+  check('future days render blank', futureBlank);
 
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 

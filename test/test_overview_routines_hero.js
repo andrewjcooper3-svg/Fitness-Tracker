@@ -79,10 +79,10 @@ async function run(viewport, label) {
 
     await page.evaluate(() => setOvRoutinesCalMode('month'));
     await page.waitForTimeout(150);
-    // Month mode uses the same 7-col .rt-month-grid as Week (full-width
-    // cells, no header/day numbers) - see test_overview_routines_month_style.js
-    // for the detailed checks.
-    const monthCells = await page.evaluate(() => document.querySelectorAll('#ovRoutinesCalGrid .rt-month-cell').length);
+    // Month mode uses a flat flow of small squares (.ov-month-flow/.ov-month-sq),
+    // one per day of the month (no padding cells, no header/day numbers) - see
+    // test_overview_routines_month_style.js for the detailed checks.
+    const monthCells = await page.evaluate(() => document.querySelectorAll('#ovRoutinesCalGrid .ov-month-sq').length);
     check('month view shows a full month grid (>28 cells)', monthCells > 28, String(monthCells));
 
     await page.reload();
