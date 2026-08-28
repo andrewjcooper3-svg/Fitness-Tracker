@@ -196,22 +196,49 @@ function cellDateKey_(rawValue, timeZone) {
   return rawValue instanceof Date ? Utilities.formatDate(rawValue, timeZone, 'yyyy-MM-dd') : String(rawValue);
 }
 
+/**
+ * A Shortcut that reads "most recent weight sample" from Health resends
+ * that same cached number on a day you never actually stepped on the
+ * scale - it has no way to tell "still true" apart from "no new data
+ * today." A genuine coincidence of two consecutive days landing on the
+ * exact same weight is rare enough, and this failure mode common enough,
+ * that an exact match against the most recent PRIOR entry is treated as
+ * that stale echo rather than a real measurement: it is not written (and
+ * is removed if an earlier call already wrote it for this same date).
+ * Deliberately compares against the closest earlier entry on record, not
+ * strictly yesterday's calendar date, so a gap in logging doesn't defeat
+ * the check the day logging resumes.
+ */
 function logWeightEntry_(date, weight, bodyFat, source) {
   const sheet = getOrCreateWeightSheet_();
   const timeZone = sheet.getParent().getSpreadsheetTimeZone();
   const lastRow = sheet.getLastRow();
   const now = new Date();
 
+  let todayRowIndex = -1;
+  let priorDate = null, priorWeight = null;
   if (lastRow > 1) {
-    const dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (let i = 0; i < dates.length; i++) {
-      if (cellDateKey_(dates[i][0], timeZone) === date) {
-        const rowIndex = i + 2;
-        sheet.getRange(rowIndex, 1, 1, WEIGHT_HEADERS.length)
-          .setValues([[date, weight, bodyFat != null ? bodyFat : '', source || '', now]]);
-        return;
+    const rows = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      const rowDate = cellDateKey_(rows[i][0], timeZone);
+      if (rowDate === date) {
+        todayRowIndex = i + 2;
+      } else if (rowDate < date && (priorDate === null || rowDate > priorDate)) {
+        priorDate = rowDate;
+        priorWeight = rows[i][1];
       }
     }
+  }
+
+  if (priorWeight !== null && Number(priorWeight) === Number(weight)) {
+    if (todayRowIndex !== -1) sheet.deleteRow(todayRowIndex);
+    return;
+  }
+
+  if (todayRowIndex !== -1) {
+    sheet.getRange(todayRowIndex, 1, 1, WEIGHT_HEADERS.length)
+      .setValues([[date, weight, bodyFat != null ? bodyFat : '', source || '', now]]);
+    return;
   }
 
   sheet.appendRow([date, weight, bodyFat != null ? bodyFat : '', source || '', now]);
