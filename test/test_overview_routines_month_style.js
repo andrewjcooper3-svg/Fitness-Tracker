@@ -1,17 +1,18 @@
-/* The Overview Routines card's Month view is styled to match the
-   Routines tab's own Year view exactly - small squares (.rt-year-sq)
-   in a free-flowing .rt-year-flow container, no day-of-week header, no
-   day-number chips. Week view is untouched (still the larger, labeled
-   .rt-month-cell grid), so this is deliberately an asymmetric choice
-   between the two calendar modes, not a general style change.
+/* The Overview Routines card's Month view stays plain (no day-of-week
+   header, no day-number chips) but uses the SAME 7-column, 1fr-per-cell
+   grid Week uses (.rt-month-grid/.rt-month-cell) - so its squares scale
+   up to fill the row exactly the way Week's cells do, instead of sitting
+   at a small fixed size with unused space down the row (the earlier,
+   smaller-square design this replaces).
 
    What is checked here:
      - Week mode still has the dow header and day numbers (unchanged),
      - Month mode has neither,
-     - Month mode uses .rt-year-flow/.rt-year-sq, one square per day in
-       the month (future days render as blank squares),
-     - the squares are the same literal pixel size as the ones in the
-       Routines tab's own Year view (same CSS class, exact parity). */
+     - Month and Week cells are the exact same pixel width - the whole
+       point of this design,
+     - Month renders a full padded month grid (first-of-month aligned to
+       its real weekday, trailing pad cells filling the last row), with
+       one cell per day plus padding, and future days render blank. */
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
@@ -41,43 +42,37 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   });
   await page.waitForTimeout(200);
 
-  // Week mode should be unchanged (still the larger day-numbered cells).
   const weekInfo = await page.evaluate(() => ({
     hasDow: !!document.querySelector('#ovRoutinesCalGrid .rt-month-dow'),
     daynums: document.querySelectorAll('#ovRoutinesCalGrid .rt-month-daynum').length,
-    cellClass: document.querySelector('#ovRoutinesCalGrid .rt-month-cell') ? 'rt-month-cell' : null
+    cellWidth: document.querySelector('#ovRoutinesCalGrid .rt-month-cell').getBoundingClientRect().width
   }));
   check('Week mode still shows the dow header and day numbers (unchanged)', weekInfo.hasDow && weekInfo.daynums === 7, JSON.stringify(weekInfo));
 
   await page.evaluate(() => setOvRoutinesCalMode('month'));
   await page.waitForTimeout(200);
 
-  const monthInfo = await page.evaluate(() => ({
-    hasDow: !!document.querySelector('#ovRoutinesCalGrid .rt-month-dow'),
-    daynums: document.querySelectorAll('#ovRoutinesCalGrid .rt-month-daynum').length,
-    yearSqCount: document.querySelectorAll('#ovRoutinesCalGrid .rt-year-sq').length,
-    hasYearFlow: !!document.querySelector('#ovRoutinesCalGrid .rt-year-flow'),
-    sqWidth: (() => {
-      const sq = document.querySelector('#ovRoutinesCalGrid .rt-year-sq');
-      return sq ? sq.getBoundingClientRect().width : null;
-    })()
-  }));
-  check('Month mode has no dow header (matches Year tab style)', !monthInfo.hasDow, JSON.stringify(monthInfo));
-  check('Month mode has no day-number chips (matches Year tab style)', monthInfo.daynums === 0, JSON.stringify(monthInfo));
-  check('Month mode uses the same small-square flow container as the Year tab', monthInfo.hasYearFlow, JSON.stringify(monthInfo));
-  const expectedDayCount = await page.evaluate(() => new Date(rtToday.getFullYear(), rtToday.getMonth() + 1, 0).getDate());
-  check('Month mode renders one square per day in the current month (future ones blank)', monthInfo.yearSqCount === expectedDayCount, JSON.stringify(monthInfo) + ' expected ' + expectedDayCount);
-  check('squares are small (~16px, matching the Year tab), not the larger month cells', monthInfo.sqWidth < 20, JSON.stringify(monthInfo));
-
-  // Compare pixel size directly against the Routines tab's own Year view squares.
-  const routinesYearSqWidth = await page.evaluate(() => {
-    showAppView('routines');
-    toggleKitchenCollapse_('rtHistoryBody', 'rtHistoryChevron');
-    rtSetHistoryMode('year');
-    const sq = document.querySelector('#rtYearGrid .rt-year-sq');
-    return sq ? sq.getBoundingClientRect().width : null;
+  const monthInfo = await page.evaluate(() => {
+    const y = rtToday.getFullYear(), m = rtToday.getMonth();
+    const firstDow = new Date(y, m, 1).getDay();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    return {
+      hasDow: !!document.querySelector('#ovRoutinesCalGrid .rt-month-dow'),
+      daynums: document.querySelectorAll('#ovRoutinesCalGrid .rt-month-daynum').length,
+      totalCells: document.querySelectorAll('#ovRoutinesCalGrid .rt-month-cell').length,
+      padCells: document.querySelectorAll('#ovRoutinesCalGrid .rt-month-cell.pad').length,
+      expectedTotal: Math.ceil((firstDow + daysInMonth) / 7) * 7,
+      expectedPad: Math.ceil((firstDow + daysInMonth) / 7) * 7 - daysInMonth,
+      cellWidth: document.querySelector('#ovRoutinesCalGrid .rt-month-cell:not(.pad)').getBoundingClientRect().width
+    };
   });
-  check('matches the exact same square size as the Routines tab Year view', Math.abs(monthInfo.sqWidth - routinesYearSqWidth) < 1, `${monthInfo.sqWidth} vs ${routinesYearSqWidth}`);
+  check('Month mode has no dow header', !monthInfo.hasDow, JSON.stringify(monthInfo));
+  check('Month mode has no day-number chips', monthInfo.daynums === 0, JSON.stringify(monthInfo));
+  check('Month mode renders a full padded month grid (aligned to real weekdays)',
+    monthInfo.totalCells === monthInfo.expectedTotal && monthInfo.padCells === monthInfo.expectedPad, JSON.stringify(monthInfo));
+  check('Month cells are the exact same width as Week cells - the point of this change',
+    Math.abs(monthInfo.cellWidth - weekInfo.cellWidth) < 1, `month ${monthInfo.cellWidth} vs week ${weekInfo.cellWidth}`);
+  check('cells are meaningfully bigger than the old fixed 16px squares', monthInfo.cellWidth > 30, String(monthInfo.cellWidth));
 
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 

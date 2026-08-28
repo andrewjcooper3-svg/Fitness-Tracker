@@ -14716,6 +14716,14 @@ function ovRoutinesDayCellHtml_(d) {
   if (d > rtToday) return `<div class="rt-month-cell future"><span class="rt-month-daynum">${d.getDate()}</span></div>`;
   return `<div class="rt-month-cell" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d)}<span class="rt-month-daynum">${d.getDate()}</span></div>`;
 }
+// Same cell markup, minus the day-number chip - used for Month mode below,
+// which stays plain (no numbers) but otherwise fills the row exactly like
+// Week's cells do.
+function ovRoutinesPlainCellHtml_(d) {
+  if (d > rtToday) return `<div class="rt-month-cell future"></div>`;
+  const k = dateKey(d);
+  return `<div class="rt-month-cell" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d)}</div>`;
+}
 function renderOvRoutinesCalendar_() {
   const grid = document.getElementById('ovRoutinesCalGrid');
   if (!grid || typeof RT_HABITS === 'undefined') return;
@@ -14727,19 +14735,20 @@ function renderOvRoutinesCalendar_() {
       <div class="rt-month-grid">${cells}</div>`;
     return;
   }
-  // Month, styled the same minimal way the Routines tab's own Year view is -
-  // small squares that just wrap by width, no headers, no day numbers,
-  // purely a glance at the shape of the month.
+  // Month stays plain (no header, no day numbers) but uses the SAME
+  // 7-column, 1fr-per-cell grid as Week - so its squares scale up to fill
+  // the same width Week's cells do, rather than sitting at a small fixed
+  // size with unused space down the row.
   const y = rtToday.getFullYear(), m = rtToday.getMonth();
+  const firstDow = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
   let cells = '';
-  for (let day = 1; day <= daysInMonth; day++) {
-    const d = new Date(y, m, day);
-    if (d > rtToday) { cells += '<div class="rt-year-sq"></div>'; continue; }
-    const k = dateKey(d);
-    cells += `<div class="rt-year-sq" data-date="${k}">${rtDaySections(k, d, true)}</div>`;
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - firstDow + 1;
+    cells += (dayNum < 1 || dayNum > daysInMonth) ? '<div class="rt-month-cell pad"></div>' : ovRoutinesPlainCellHtml_(new Date(y, m, dayNum));
   }
-  grid.innerHTML = `<div class="rt-year-flow">${cells}</div>`;
+  grid.innerHTML = `<div class="rt-month-grid">${cells}</div>`;
 }
 
 function ovRoutinesItemRowHtml_(h, k, weekly) {
