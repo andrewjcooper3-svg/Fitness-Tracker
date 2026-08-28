@@ -14719,22 +14719,27 @@ function ovRoutinesDayCellHtml_(d) {
 function renderOvRoutinesCalendar_() {
   const grid = document.getElementById('ovRoutinesCalGrid');
   if (!grid || typeof RT_HABITS === 'undefined') return;
-  let cells = '';
   if (ovRoutinesCalMode_ === 'week') {
     const ws = rtWeekStart(rtToday);
+    let cells = '';
     for (let i = 0; i < 7; i++) cells += ovRoutinesDayCellHtml_(new Date(ws.getTime() + i * ROUTINES_DAY_MS));
-  } else {
-    const y = rtToday.getFullYear(), m = rtToday.getMonth();
-    const firstDow = new Date(y, m, 1).getDay();
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
-    for (let i = 0; i < totalCells; i++) {
-      const dayNum = i - firstDow + 1;
-      cells += (dayNum < 1 || dayNum > daysInMonth) ? '<div class="rt-month-cell pad"></div>' : ovRoutinesDayCellHtml_(new Date(y, m, dayNum));
-    }
+    grid.innerHTML = `<div class="rt-month-dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+      <div class="rt-month-grid">${cells}</div>`;
+    return;
   }
-  grid.innerHTML = `<div class="rt-month-dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
-    <div class="rt-month-grid">${cells}</div>`;
+  // Month, styled the same minimal way the Routines tab's own Year view is -
+  // small squares that just wrap by width, no headers, no day numbers,
+  // purely a glance at the shape of the month.
+  const y = rtToday.getFullYear(), m = rtToday.getMonth();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  let cells = '';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(y, m, day);
+    if (d > rtToday) { cells += '<div class="rt-year-sq"></div>'; continue; }
+    const k = dateKey(d);
+    cells += `<div class="rt-year-sq" data-date="${k}">${rtDaySections(k, d, true)}</div>`;
+  }
+  grid.innerHTML = `<div class="rt-year-flow">${cells}</div>`;
 }
 
 function ovRoutinesItemRowHtml_(h, k, weekly) {
