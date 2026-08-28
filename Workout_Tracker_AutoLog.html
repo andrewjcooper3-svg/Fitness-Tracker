@@ -469,6 +469,8 @@
   .ov-hero-chevron { opacity: 0.65; font-weight: 400; }
   .ov-pu-chart-wrap { display: none; margin-top: 8px; }
   .ov-pu-chart-wrap.expanded { display: block; }
+  .ov-routines-cal-wrap { display: none; margin-top: 10px; }
+  .ov-routines-cal-wrap.expanded { display: block; }
   .ov-pu-chart { width: 100%; height: 46px; display: block; overflow: visible; }
   .ov-pu-chart-labels { display: flex; font-family: var(--font); font-size: 9.5px; color: var(--muted); margin-top: 2px; }
   .ov-pu-chart-labels span { flex: 1; text-align: center; }
@@ -541,7 +543,6 @@
   .ov-glance-tile[data-widget="kitchen"] { border-color: #d9b36e; }
   .ov-glance-tile[data-widget="shopping"] { border-color: #86bf95; }
   .ov-glance-tile[data-widget="upcoming"] { border-color: #d992b0; }
-  .ov-glance-tile[data-widget="routines"] { border-color: #33c2c2; }
   .ov-glance-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; margin-bottom: 6px; flex-shrink: 0; }
   .ov-glance-icon svg { display: block; }
   .ov-glance-tile[data-widget="weight"] .ov-glance-icon { background: rgba(162,145,201,0.16); color: #a291c9; }
@@ -549,9 +550,6 @@
   .ov-glance-tile[data-widget="kitchen"] .ov-glance-icon { background: rgba(217,179,110,0.16); color: #d9b36e; }
   .ov-glance-tile[data-widget="shopping"] .ov-glance-icon { background: rgba(134,191,149,0.16); color: #86bf95; }
   .ov-glance-tile[data-widget="upcoming"] .ov-glance-icon { background: rgba(217,146,176,0.16); color: #d992b0; }
-  .ov-glance-tile[data-widget="routines"] .ov-glance-icon { background: rgba(51,194,194,0.16); color: #33c2c2; }
-  .ov-mini-routines-value { font-family: var(--font); font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }
-  .ov-mini-routines-sub { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; }
   .ov-glance-label { font-family: var(--font); font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px; }
   .ov-glance-tile:not(.ov-glance-tile-wide) .ov-glance-label { margin-bottom: 0; }
   .ov-glance-tile .sp-np-artist, .ov-glance-tile .sp-playlists { display: none; }
@@ -1694,7 +1692,7 @@
   @media (min-width: 768px) {
     .ov-blocks > .ov-hero-card { display: flex; align-items: stretch; column-gap: 16px; }
     .ov-hero-main { flex: 0 0 calc(50% - 22px); }
-    .wt-chart-wrap, .ov-pu-chart-wrap {
+    .wt-chart-wrap, .ov-pu-chart-wrap, .ov-routines-cal-wrap {
       display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; margin-top: 0;
     }
     .wt-chart, .ov-pu-chart { flex: 1 1 auto; height: auto; min-height: 54px; }
@@ -2263,6 +2261,22 @@
     </div>
   </div>
 
+  <div class="ov-hero-card ov-hero-routines" data-block="routines">
+    <div class="ov-hero-main">
+      <div class="ov-hero-head" onclick="toggleOvRoutinesCal_(event)">
+        <div class="ov-hero-card-label" style="margin-bottom:0;">✅ Routines <span class="ov-hero-chevron" id="ovRoutinesChevron">▸</span></div>
+      </div>
+      <div id="ovRoutinesList" style="margin-top:8px;"></div>
+    </div>
+    <div class="ov-routines-cal-wrap" id="ovRoutinesCalWrap" onclick="event.stopPropagation()">
+      <div class="rt-seg" id="ovRoutinesCalSeg" style="margin-bottom:8px;">
+        <button data-m="week" class="active" onclick="setOvRoutinesCalMode('week')">Week</button>
+        <button data-m="month" onclick="setOvRoutinesCalMode('month')">Month</button>
+      </div>
+      <div id="ovRoutinesCalGrid"></div>
+    </div>
+  </div>
+
   <!-- Matching set of simple line icons (same stroke width/size) instead
        of raw platform emoji - emoji glyphs vary wildly in visual style/
        weight/optical size from each other (some flat, some filled,
@@ -2306,14 +2320,6 @@
         <div class="ov-glance-label">Shopping</div>
       </div>
       <div class="ov-glance-right" id="ovShoppingPreview"><div class="ov-mini-empty">Loading…</div></div>
-    </div>
-
-    <div class="ov-glance-tile ov-widget" data-widget="routines" data-block="routines" data-size="small" onclick="handleWidgetTap(event, 'routines')">
-      <div class="ov-glance-left">
-        <div class="ov-glance-icon c-routines"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="M8 12l2.5 2.5L16 9"></path></svg></div>
-        <div class="ov-glance-label">Routines</div>
-      </div>
-      <div class="ov-glance-right" id="ovRoutinesPreview"><div class="ov-mini-empty">Loading…</div></div>
     </div>
 
     <div class="ov-glance-tile ov-glance-tile-wide ov-widget" data-widget="upcoming" data-block="upcoming" data-size="small" onclick="handleWidgetTap(event, 'calendar')">
@@ -7079,6 +7085,11 @@ function rtRenderAll() {
   rtRenderWeek();
   rtRenderHistory();
   rtRenderHabits();
+  // Keep the Overview hero card in sync too, regardless of which surface
+  // (this tab, Overview's own checkboxes, or a remote sync merge) caused
+  // the change - defined further down the file, but hoisted like any
+  // other function declaration.
+  if (typeof renderOverviewRoutinesWidget_ === 'function') renderOverviewRoutinesWidget_();
 }
 
 /* ---- Add/edit-habit sheet ---- */
@@ -14604,32 +14615,114 @@ function renderOverview() {
   renderOverviewWaterWidget();
   renderOverviewKitchenPreview();
   renderOverviewShoppingPreview();
-  renderOverviewRoutinesPreview();
+  renderOverviewRoutinesWidget_();
   ensureCalendarLoaded();
 }
 
-// A quick glance at today's habits without leaving Overview - same
-// bold-number-plus-muted-line shape as the Weight tile. Only fixed-
-// schedule items count toward the fraction shown here, same as the
-// Routines tab's own ring: an X-times-a-week habit isn't "due" on any
-// one day, so it would only ever muddy what "3 of 5" means.
-function renderOverviewRoutinesPreview() {
-  const el = document.getElementById('ovRoutinesPreview');
-  if (!el || typeof RT_HABITS === 'undefined') return;
+/* ---------- Routines hero card (Overview) ----------
+   Same shape as the Pushups/Water cards: a checkable list in the main
+   column, a week/month calendar that's a drop-down on phones and the
+   permanent right column at >=768px (see the .ov-routines-cal-wrap rule
+   in the shared hero breakpoint). Reuses the Routines tab's own render
+   primitives (rtIsDue, rtIsDoneOn, rtDaySections, ...) directly rather
+   than recomputing any of this - the two surfaces would drift apart if
+   completion logic existed in two places. */
+const STORAGE_OV_ROUTINES_CAL_OPEN = 'WORKOUT_OV_ROUTINES_CAL_OPEN';
+let ovRoutinesCalMode_ = 'week';
+
+function toggleOvRoutinesCal_(event) {
+  if (heroChartsPinned_()) return; // pinned open at >=768px - nothing to toggle
+  if (event) event.stopPropagation();
+  const wrap = document.getElementById('ovRoutinesCalWrap');
+  const chevron = document.getElementById('ovRoutinesChevron');
+  if (!wrap) return;
+  const expanded = wrap.classList.toggle('expanded');
+  if (chevron) chevron.textContent = expanded ? '▾' : '▸';
+  try { localStorage.setItem(STORAGE_OV_ROUTINES_CAL_OPEN, expanded ? '1' : '0'); } catch (e) {}
+  if (expanded) renderOvRoutinesCalendar_();
+  updateViewportHeight('overview', true);
+}
+function setOvRoutinesCalMode(mode) {
+  ovRoutinesCalMode_ = mode;
+  document.querySelectorAll('#ovRoutinesCalSeg button').forEach(b => b.classList.toggle('active', b.dataset.m === mode));
+  renderOvRoutinesCalendar_();
+  updateViewportHeight('overview', true);
+}
+function ovRoutinesDayCellHtml_(d) {
+  const k = dateKey(d);
+  if (d > rtToday) return `<div class="rt-month-cell future"><span class="rt-month-daynum">${d.getDate()}</span></div>`;
+  return `<div class="rt-month-cell" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d)}<span class="rt-month-daynum">${d.getDate()}</span></div>`;
+}
+function renderOvRoutinesCalendar_() {
+  const grid = document.getElementById('ovRoutinesCalGrid');
+  if (!grid || typeof RT_HABITS === 'undefined') return;
+  let cells = '';
+  if (ovRoutinesCalMode_ === 'week') {
+    const ws = rtWeekStart(rtToday);
+    for (let i = 0; i < 7; i++) cells += ovRoutinesDayCellHtml_(new Date(ws.getTime() + i * ROUTINES_DAY_MS));
+  } else {
+    const y = rtToday.getFullYear(), m = rtToday.getMonth();
+    const firstDow = new Date(y, m, 1).getDay();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+    for (let i = 0; i < totalCells; i++) {
+      const dayNum = i - firstDow + 1;
+      cells += (dayNum < 1 || dayNum > daysInMonth) ? '<div class="rt-month-cell pad"></div>' : ovRoutinesDayCellHtml_(new Date(y, m, dayNum));
+    }
+  }
+  grid.innerHTML = `<div class="rt-month-dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+    <div class="rt-month-grid">${cells}</div>`;
+}
+
+function ovRoutinesItemRowHtml_(h, k, weekly) {
+  const done = rtIsDoneOn(h, k);
+  const linked = !!h.link;
+  const meta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : rtCadenceLabel(h);
+  const checkAttrs = linked ? 'disabled' : `onclick="event.stopPropagation(); ovToggleRoutine_('${h.id}')"`;
+  return `<div class="rt-item-row">
+    <button class="rt-check ${done ? 'done' : ''}" ${checkAttrs} aria-label="${done ? 'Marked done' : 'Not done'}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+    </button>
+    <div class="rt-item-body">
+      <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
+      <div class="rt-item-meta">${meta}${linked ? ' <span class="rt-link-chip">🔗</span>' : ''}</div>
+    </div>
+  </div>`;
+}
+function ovToggleRoutine_(id) {
+  rtToggle(id, rtToday); // rtToggle already calls rtRenderAll(), which re-enters here too
+}
+function renderOverviewRoutinesWidget_() {
+  const list = document.getElementById('ovRoutinesList');
+  if (!list || typeof RT_HABITS === 'undefined') return;
   const active = RT_HABITS.list.filter(h => !h.deleted);
-  if (!active.length) {
-    el.innerHTML = '<div class="ov-mini-empty">Tap to set up habits</div>';
-    return;
-  }
-  const due = active.filter(h => h.cadence !== 'week' && rtIsDue(h, rtToday));
-  if (!due.length) {
-    el.innerHTML = '<div class="ov-mini-empty">Nothing due today</div>';
-    return;
-  }
   const k = dateKey(rtToday);
-  const done = due.filter(h => rtIsDoneOn(h, k)).length;
-  el.innerHTML = `<div class="ov-mini-routines-value">${done}/${due.length}</div>
-    <div class="ov-mini-routines-sub">done today</div>`;
+  if (!active.length) {
+    list.innerHTML = '<div class="ov-mini-empty">No habits yet - add one from the Routines tab</div>';
+  } else {
+    const due = active.filter(h => h.cadence !== 'week' && rtIsDue(h, rtToday));
+    const weekly = active.filter(h => h.cadence === 'week' && rtIsDue(h, rtToday));
+    if (!due.length && !weekly.length) {
+      list.innerHTML = '<div class="ov-mini-empty">Nothing due today</div>';
+    } else {
+      let html = due.map(h => ovRoutinesItemRowHtml_(h, k)).join('');
+      if (weekly.length) html += weekly.map(h => ovRoutinesItemRowHtml_(h, k, true)).join('');
+      list.innerHTML = html;
+    }
+  }
+
+  // Restore the open/closed state chosen last time, same one-shot guard
+  // as the Pushups chart - renderOverview() runs on every view switch.
+  const wrap = document.getElementById('ovRoutinesCalWrap');
+  const chevron = document.getElementById('ovRoutinesChevron');
+  if (wrap && !wrap.dataset.restored) {
+    wrap.dataset.restored = '1';
+    let open = false;
+    try { open = localStorage.getItem(STORAGE_OV_ROUTINES_CAL_OPEN) === '1'; } catch (e) {}
+    wrap.classList.toggle('expanded', open);
+    if (chevron) chevron.textContent = open ? '▾' : '▸';
+  }
+  if ((wrap && wrap.classList.contains('expanded')) || heroChartsPinned_()) renderOvRoutinesCalendar_();
 }
 
 // Water widget - same ring-plus-goal shape as the Pushups hero, but its
