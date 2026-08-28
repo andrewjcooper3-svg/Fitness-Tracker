@@ -1699,6 +1699,20 @@
     .wt-chart, .ov-pu-chart { flex: 1 1 auto; height: auto; min-height: 54px; }
     .ov-hero-chevron { display: none; }
     .ov-hero-head, .ov-hero-water .ov-widget-head { cursor: default; }
+
+    /* Month view's calendar box is stretched by align-items:stretch to
+       match the habit list's height, but its grid used to just sit at its
+       small natural content size inside that box, leaving blank space
+       below it. Growing the grid down through the flex chain (wrap ->
+       #ovRoutinesCalGrid -> .ov-month-flow) gives it a real height to fill;
+       ovFillMonthFlow_ then picks column/row track counts (see its own
+       comment) so the squares divide that box exactly, in both directions,
+       staying as close to square as the box allows. Week keeps its
+       original small fixed-aspect cells - it's always a single row of 7,
+       so there's no "filling more height" problem for it to solve. */
+    #ovRoutinesCalGrid { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 90px; }
+    #ovRoutinesCalGrid .ov-month-flow { flex: 1 1 auto; min-height: 0; }
+    #ovRoutinesCalGrid .ov-month-sq { aspect-ratio: auto; }
   }
 
   /* Wide landscape phone / tablet only (768-1099px, NOT desktop):
@@ -14750,7 +14764,44 @@ function renderOvRoutinesCalendar_() {
     cells += `<div class="ov-month-sq" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d, true)}</div>`;
   }
   grid.innerHTML = `<div class="ov-month-flow">${cells}</div>`;
+  if (heroChartsPinned_()) ovFillMonthFlow_(grid.querySelector('.ov-month-flow'), daysInMonth);
 }
+/* At >=768px the calendar box is stretched (by align-items:stretch) to
+   match the habit list's height, and the CSS chain (#ovRoutinesCalGrid ->
+   .ov-month-flow, both flex:1 1 auto) makes the grid actually occupy that
+   full box rather than sitting at its small natural size. Filling a WxH
+   box with N squares while keeping them close to square (rather than
+   thin/tall rectangles) isn't something grid-template-columns: auto-fill
+   can do on its own - auto-fill only reasons about width - so this picks
+   the column count that maximizes the resulting cell's smaller dimension,
+   then sets exact column/row track counts so the grid divides the box
+   exactly (fr tracks leave no leftover space in either direction). Runs
+   again on resize/orientation change since it's driven by measurements,
+   not fixed math - see the resize listener below. */
+function ovFillMonthFlow_(flowEl, count) {
+  if (!flowEl || !count) return;
+  const w = flowEl.clientWidth, h = flowEl.clientHeight;
+  if (!w || !h) return;
+  let bestCols = count, bestSize = -1;
+  for (let cols = 1; cols <= count; cols++) {
+    const rows = Math.ceil(count / cols);
+    const size = Math.min(w / cols, h / rows);
+    if (size > bestSize) { bestSize = size; bestCols = cols; }
+  }
+  const bestRows = Math.ceil(count / bestCols);
+  flowEl.style.gridTemplateColumns = `repeat(${bestCols}, 1fr)`;
+  flowEl.style.gridTemplateRows = `repeat(${bestRows}, 1fr)`;
+}
+let ovMonthFlowResizeTimer_ = null;
+window.addEventListener('resize', () => {
+  clearTimeout(ovMonthFlowResizeTimer_);
+  ovMonthFlowResizeTimer_ = setTimeout(() => {
+    const flow = document.querySelector('#ovRoutinesCalGrid .ov-month-flow');
+    if (!flow) return;
+    if (heroChartsPinned_()) ovFillMonthFlow_(flow, flow.children.length);
+    else { flow.style.gridTemplateColumns = ''; flow.style.gridTemplateRows = ''; }
+  }, 150);
+});
 
 function ovRoutinesItemRowHtml_(h, k, weekly) {
   const done = rtIsDoneOn(h, k);
