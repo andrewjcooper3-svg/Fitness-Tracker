@@ -1957,17 +1957,20 @@
   .rt-today-headline { font-size: 20px; font-weight: 800; letter-spacing: -0.2px; }
   .rt-mini-day-block { position: relative; width: 28px; height: 28px; border-radius: 8px; background: var(--surface2); flex-shrink: 0; }
 
-  .rt-item-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .rt-item-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .rt-item-row:last-child { border-bottom: none; }
   .rt-check { width: 26px; height: 26px; border-radius: 8px; border: 2px solid var(--border); background: none;
     flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent; }
   .rt-check svg { width: 15px; height: 15px; }
   .rt-check.done { background: var(--green); border-color: var(--green); color: #fff; }
   .rt-check:disabled { cursor: default; opacity: 1; }
-  .rt-item-body { flex: 1; min-width: 0; }
-  .rt-item-name { font-size: 14.5px; font-weight: 600; }
+  /* One row: checkbox, name (truncates rather than wrapping), cadence
+     pinned to the right edge - a compact list reads faster than a
+     two-line stack when there can be several habits in view at once. */
+  .rt-item-name { font-size: 14.5px; font-weight: 600; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rt-item-name.done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
-  .rt-item-meta { font-size: 12px; color: var(--muted); margin-top: 1px; display: flex; gap: 6px; align-items: center; }
+  .rt-item-meta { font-size: 12px; color: var(--muted); flex-shrink: 0; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
   .rt-streak-chip { font-size: 11px; font-weight: 700; color: var(--amber); flex-shrink: 0; white-space: nowrap; }
   .rt-item-group-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
     letter-spacing: 0.3px; padding: 12px 0 4px; border-top: 1px solid var(--border); margin-top: 4px; }
@@ -6815,10 +6818,8 @@ function rtItemRowHtml(h, k, metaText, showStreak) {
     <button class="rt-check ${done ? 'done' : ''}" ${checkAttrs} aria-label="${done ? 'Marked done' : 'Not done'}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
     </button>
-    <div class="rt-item-body">
-      <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
-      <div class="rt-item-meta">${metaText}${linked ? ' <span class="rt-link-chip">🔗 linked</span>' : ''}</div>
-    </div>
+    <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
+    <div class="rt-item-meta">${metaText}${linked ? ' <span class="rt-link-chip">🔗 linked</span>' : ''}</div>
     ${showStreak && streak > 1 ? `<div class="rt-streak-chip">${streak} day streak</div>` : ''}
   </div>`;
 }
@@ -14683,10 +14684,8 @@ function ovRoutinesItemRowHtml_(h, k, weekly) {
     <button class="rt-check ${done ? 'done' : ''}" ${checkAttrs} aria-label="${done ? 'Marked done' : 'Not done'}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
     </button>
-    <div class="rt-item-body">
-      <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
-      <div class="rt-item-meta">${meta}${linked ? ' <span class="rt-link-chip">🔗</span>' : ''}</div>
-    </div>
+    <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
+    <div class="rt-item-meta">${meta}${linked ? ' <span class="rt-link-chip">🔗</span>' : ''}</div>
   </div>`;
 }
 function ovToggleRoutine_(id) {
