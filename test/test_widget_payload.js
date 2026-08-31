@@ -58,7 +58,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('today and before are not', !s.pushups.days.slice(0, idx + 1).some(d => d.future));
 
   check('the next lift is reported', !!s.lift && !!s.lift.day, JSON.stringify(s.lift));
-  check('and it is a real lifting day', ['Monday', 'Wednesday'].includes(s.lift.day), s.lift.day);
+  check('and it is a real lifting day', ['Tuesday', 'Thursday'].includes(s.lift.day), s.lift.day);
 
   // Derived from the plan, so it must actually follow the plan.
   const derived = await page.evaluate(() => ({
@@ -66,7 +66,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     satPush: planPushupsForDay_('sat'), sunPush: planPushupsForDay_('sun')
   }));
   console.log('  lift days:', derived.lift.join(', '));
-  check('Mon and Wed are the lifting days', derived.lift.join(',') === 'mon,wed', derived.lift.join(','));
+  check('Tue and Thu are the lifting days', derived.lift.join(',') === 'tue,thu', derived.lift.join(','));
   check('a walk-and-sauna Saturday is not a lifting day', !derived.lift.includes('sat'));
 
   await ctx.close();
