@@ -4146,6 +4146,9 @@ const WATER_DRINK_TYPES = {
   chamomile: { label: 'Chamomile tea',    defaultOz: 8,  hydrationRatio: 1 },
   milk:      { label: 'Milk',             defaultOz: 8,  hydrationRatio: 1 },
   oj:        { label: 'Orange juice',     defaultOz: 8,  hydrationRatio: 1 },
+  // Thicker than juice (fruit solids, yogurt/ice bulk out the volume
+  // without hydrating as fully), so a bit under 1 rather than 1:1.
+  smoothie:  { label: 'Smoothie',         defaultOz: 16, hydrationRatio: 0.85 },
   soda:      { label: 'Soda (cola)',      defaultOz: 12, hydrationRatio: 0.92, caffeinePerOz: 2.83 },
   beer:      { label: 'Beer',             defaultOz: 12, hydrationRatio: 0.67, alcoholPerOz: 0.05 },
   wine:      { label: 'Wine',             defaultOz: 5,  hydrationRatio: 0.6,  alcoholPerOz: 0.12 },
@@ -4163,7 +4166,7 @@ const WATER_DRINK_TYPES = {
 // What the widget's drink dropdown offers, in order. Water has its own
 // dedicated button/steppers so it isn't here, and the legacy keys above
 // (tea, cocktail2) are display-only.
-const WATER_DRINK_PICKER = ['coffee', 'latte', 'espresso', 'earlgrey', 'greentea', 'chamomile', 'milk', 'oj', 'soda', 'beer', 'wine', 'cocktail', 'espmartini', 'carajillo', 'vodkared'];
+const WATER_DRINK_PICKER = ['coffee', 'latte', 'espresso', 'earlgrey', 'greentea', 'chamomile', 'milk', 'oj', 'smoothie', 'soda', 'beer', 'wine', 'cocktail', 'espmartini', 'carajillo', 'vodkared'];
 
 // Resolves a drink plus a chosen size/shots into the concrete amounts
 // an entry stores. Kept as the single place the rates turn into
