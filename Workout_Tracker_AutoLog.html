@@ -820,6 +820,7 @@
   .wp-block-workout { background: color-mix(in srgb, var(--amber) 22%, transparent); border-left: 3px solid var(--amber); color: var(--text); }
   .wp-block-pushups { background: color-mix(in srgb, var(--green) 20%, transparent); border-left: 3px solid var(--green); color: var(--text); }
   .wp-block-event { color: var(--text); }
+  .wp-block-habit { background: color-mix(in srgb, #9A5BA8 22%, transparent); border-left: 3px solid #9A5BA8; color: var(--text); }
   .wp-marker { position: absolute; left: 2px; right: 2px; border-top: 2px dotted var(--muted); font-family: var(--font); font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 2px; cursor: default; }
   .wp-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-family: var(--font); font-size: 11px; color: var(--muted); }
   .wp-legend-item { display: flex; align-items: center; gap: 5px; }
@@ -2440,6 +2441,12 @@
       <button class="wp-week-nav-btn" onclick="wpWeekPrev()" aria-label="Previous week">‹</button>
       <div class="wp-week-label" id="wpWeekLabel"></div>
       <button class="wp-week-nav-btn" onclick="wpWeekNext()" aria-label="Next week">›</button>
+    </div>
+    <div class="rt-seg" id="wpZoomSeg" style="margin-bottom:10px;">
+      <button data-zoom="full" class="active" onclick="wpSetZoom('full')">Full day</button>
+      <button data-zoom="morning" onclick="wpSetZoom('morning')">Morning</button>
+      <button data-zoom="afternoon" onclick="wpSetZoom('afternoon')">Afternoon</button>
+      <button data-zoom="evening" onclick="wpSetZoom('evening')">Evening</button>
     </div>
     <div class="wp-grid-wrap"><div class="wp-grid" id="wpGrid"></div></div>
     <div class="wp-legend" id="wpLegend"></div>
@@ -17047,18 +17054,31 @@ function wpEstMinutesForDay_(dayKey) {
   return Number(m[2] || m[1]);
 }
 
-const WEEKPLAN_START_HOUR_ = 6;   // grid top
-const WEEKPLAN_END_HOUR_ = 24;    // grid bottom (midnight)
-const WEEKPLAN_PX_PER_HOUR_ = 40;
+// Zoom means "see fewer hours, each one bigger," not a CSS scale - it's
+// what actually buys room for full labels on short blocks, since a
+// crowded 18-hour day at a fixed px/hour has no slack to give them.
+const WEEKPLAN_ZOOM_PRESETS_ = {
+  full:      { startHour: 6,  endHour: 24, pxPerHour: 40 },
+  morning:   { startHour: 5,  endHour: 13, pxPerHour: 65 },
+  afternoon: { startHour: 11, endHour: 19, pxPerHour: 65 },
+  evening:   { startHour: 16, endHour: 24, pxPerHour: 65 }
+};
+let wpZoom_ = 'full';
+function wpSetZoom(zoom) {
+  wpZoom_ = WEEKPLAN_ZOOM_PRESETS_[zoom] ? zoom : 'full';
+  document.querySelectorAll('#wpZoomSeg button').forEach(b => b.classList.toggle('active', b.dataset.zoom === wpZoom_));
+  renderWeekPlan_();
+}
 
 // Builds the generated (not-from-a-real-calendar) blocks for one day:
 // work + its flanking commute, a workout block on lift days sized from
-// the plan's own Est. time text, and a Pushups placeholder every day.
-// Weekends get no work/commute blocks - only Tue/Thu currently count as
-// lift days (isLiftDay_ reads the live plan, so this tracks a future
-// schedule change automatically) and neither falls on a weekend today,
-// but nothing here assumes that.
-function wpGeneratedBlocksForDay_(dayKey, dayIndex, cfg) {
+// the plan's own Est. time text, and a Pushups block on whichever
+// weekdays actually have pushup history (see wpPushupActiveDows_) rather
+// than assuming every day. Weekends get no work/commute blocks - only
+// Tue/Thu currently count as lift days (isLiftDay_ reads the live plan,
+// so this tracks a future schedule change automatically) and neither
+// falls on a weekend today, but nothing here assumes that.
+function wpGeneratedBlocksForDay_(dayKey, dayIndex, dateObj, cfg) {
   const blocks = [];
   const isWeekday = dayIndex >= 0 && dayIndex <= 4;
   const workStart = wpTimeToMin_(cfg.workStart);
@@ -17079,12 +17099,92 @@ function wpGeneratedBlocksForDay_(dayKey, dayIndex, cfg) {
     }
   }
 
-  const pushupStart = wpTimeToMin_(cfg.pushupTime);
-  if (pushupStart != null) {
-    blocks.push({ start: pushupStart, end: pushupStart + 15, type: 'pushups', label: 'Pushups' });
+  if (wpPushupActiveDows_().has(dateObj.getDay())) {
+    const pushupStart = wpTimeToMin_(cfg.pushupTime);
+    if (pushupStart != null) blocks.push({ start: pushupStart, end: pushupStart + 15, type: 'pushups', label: 'Pushups' });
   }
 
   return blocks;
+}
+
+// Empirically which weekdays actually get pushups done, from the pushup
+// ledger (already has plenty of real history) rather than assuming every
+// day - a device with no ledger history yet falls back to Mon-Sat,
+// matching the existing "Sunday off" daily-baseline assumption used
+// elsewhere in the app. The exact TIME still comes from Settings' fixed
+// pushupTime, and duration is still a flat placeholder - there's no
+// historical Checked At data to derive either from yet (that column was
+// only just added), so both stay fixed until a few weeks of real data
+// exist to average instead.
+function wpPushupActiveDows_() {
+  let ledger = {};
+  try { ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}'); } catch (e) {}
+  const freq = {};
+  let totalDays = 0;
+  Object.keys(ledger).forEach(dateStr => {
+    if (!(ledger[dateStr] > 0)) return;
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return;
+    freq[d.getDay()] = (freq[d.getDay()] || 0) + 1;
+    totalDays++;
+  });
+  if (!totalDays) return new Set([1, 2, 3, 4, 5, 6]);
+  return wpTopDaysOfWeek_(freq, 6);
+}
+
+// The N days of the week (0=Sun..6=Sat) with the highest count in a
+// {dow: count} frequency map, ties broken by day order.
+function wpTopDaysOfWeek_(freq, n) {
+  return new Set(Object.keys(freq).map(Number).sort((a, b) => (freq[b] - freq[a]) || (a - b)).slice(0, Math.max(n, 0)));
+}
+
+// When a (non-linked) habit typically gets done, and which weekdays it's
+// actually done on - both derived from RT_LOG's real loggedAt history
+// (already synced locally, no backend call needed), not assumed. Linked
+// habits (Water/Pushups/Weight) have no discrete check-off moment of
+// their own, so they're skipped - see rtCompletedTimeText_ for the same
+// distinction. Returns null with no history yet, which is the signal to
+// fall back to the plain due-list instead of guessing a time.
+function wpHabitTimeStats_(h) {
+  if (typeof RT_LOG === 'undefined') return null;
+  const entries = [];
+  Object.keys(RT_LOG).forEach(dateStr => {
+    const rec = RT_LOG[dateStr] && RT_LOG[dateStr][h.id];
+    if (!rec || !rec.done || !rec.loggedAt) return;
+    const t = new Date(rec.loggedAt);
+    if (isNaN(t.getTime())) return;
+    const dow = new Date(dateStr + 'T00:00:00').getDay();
+    entries.push({ minutes: t.getHours() * 60 + t.getMinutes(), dow });
+  });
+  if (!entries.length) return null;
+  const avgMinutes = Math.round(entries.reduce((s, e) => s + e.minutes, 0) / entries.length);
+  const dayFrequency = {};
+  entries.forEach(e => { dayFrequency[e.dow] = (dayFrequency[e.dow] || 0) + 1; });
+  return { avgMinutes, dayFrequency };
+}
+
+// Non-linked habits with enough history to place at a real time: a
+// daily/specific-day one every day it's due, a weekly-target one only on
+// whichever days it's most often actually done - not spread evenly
+// across "any day this week". With no history yet, a habit is simply
+// absent here and falls back to the plain chip under the grid instead
+// (see wpHabitsForDate_'s exclusion set).
+function wpHabitItemsForDate_(dateObj) {
+  if (typeof RT_HABITS === 'undefined' || !RT_HABITS.list) return [];
+  const dow = dateObj.getDay();
+  const items = [];
+  RT_HABITS.list.forEach(h => {
+    if (h.deleted || h.link) return;
+    const stats = wpHabitTimeStats_(h);
+    if (!stats) return;
+    if (h.cadence === 'week') {
+      if (!wpTopDaysOfWeek_(stats.dayFrequency, h.weekTarget || 1).has(dow)) return;
+    } else if (!rtIsDue(h, dateObj)) {
+      return;
+    }
+    items.push({ start: stats.avgMinutes, end: stats.avgMinutes + 15, label: h.name, habitId: h.id });
+  });
+  return items;
 }
 
 function wpEventsForDate_(dateObj) {
@@ -17093,32 +17193,93 @@ function wpEventsForDate_(dateObj) {
   return lastCalendarEvents.filter(ev => !ev.allDay && new Date(ev.start).toDateString() === dayStr);
 }
 
-// Returns null for a block that's entirely outside the visible hours.
-// Trims a hairline off the bottom of every block so two blocks that are
-// exactly back-to-back in time (a 10-minute commute ending right as work
-// starts) show a gap instead of visually fusing into one shape - without
-// it, a run of short blocks (5-10 min commutes) read as one overlapping
+// Every space-occupying item for one day - generated blocks, placed
+// habits, and blocking calendar events - laid out together so items that
+// share a moment split the width between them instead of stacking on top
+// of each other (see wpLayoutColumns_). Informational calendar events
+// are handled separately as full-width markers, since they never compete
+// for space in the first place.
+function wpTimedItemsForDay_(dayKey, dayIndex, dateObj, cfg) {
+  const items = [];
+  wpGeneratedBlocksForDay_(dayKey, dayIndex, dateObj, cfg).forEach(b =>
+    items.push({ start: b.start, end: b.end, cls: 'wp-block-' + b.type, label: b.label }));
+
+  wpHabitItemsForDate_(dateObj).forEach(it =>
+    items.push({ start: it.start, end: it.end, cls: 'wp-block-habit', label: it.label }));
+
+  wpEventsForDate_(dateObj).forEach(ev => {
+    if (isCalendarInformational_(ev.calendar)) return;
+    const startMin = wpMinutesSinceMidnight_(new Date(ev.start));
+    const endMin = ev.end ? wpMinutesSinceMidnight_(new Date(ev.end)) : startMin + 30;
+    const color = getEventColor(ev);
+    items.push({
+      start: startMin, end: endMin, cls: 'wp-block-event', label: ev.summary,
+      style: `background:${hexToRgba_(color, 0.22)}; border-left:3px solid ${color};`
+    });
+  });
+
+  return items;
+}
+
+// Classic day-view collision layout: items overlapping in time get
+// packed into side-by-side columns instead of stacking on top of each
+// other (the actual "things overlapping" bug this replaces - two fixed
+// 50/50 lanes drawn without regard for what else shared that lane's
+// moment). Clusters connected-overlapping items first so an item early
+// in the day sharing a moment with several others doesn't also narrow
+// something unrelated later on that never overlapped anything.
+function wpLayoutColumns_(items) {
+  const sorted = items.slice().sort((a, b) => a.start - b.start || a.end - b.end);
+  let clusterEnd = -Infinity, cluster = [], clusters = [];
+  sorted.forEach(item => {
+    if (cluster.length && item.start >= clusterEnd) { clusters.push(cluster); cluster = []; clusterEnd = -Infinity; }
+    cluster.push(item);
+    clusterEnd = Math.max(clusterEnd, item.end);
+  });
+  if (cluster.length) clusters.push(cluster);
+
+  clusters.forEach(clusterItems => {
+    const colEnds = [];
+    clusterItems.forEach(item => {
+      let placed = false;
+      for (let c = 0; c < colEnds.length; c++) {
+        if (colEnds[c] <= item.start) { item.col = c; colEnds[c] = item.end; placed = true; break; }
+      }
+      if (!placed) { item.col = colEnds.length; colEnds.push(item.end); }
+    });
+    clusterItems.forEach(item => { item.totalCols = colEnds.length; });
+  });
+  return sorted;
+}
+
+// Returns null for a block that's entirely outside the visible (zoomed)
+// hours. Trims a hairline off the bottom of every block so two blocks
+// that are exactly back-to-back in time (a 10-minute commute ending
+// right as work starts) show a gap instead of visually fusing into one
+// shape - without it, a run of short blocks reads as one overlapping
 // smear. The trim can never exceed the block's own real height, so a
 // short block is never forced to bleed into whatever comes right after
 // it - a floor here that's bigger than a 5-minute slot's true ~3px would
-// do exactly that (a real bug hit while building this: a "minimum
-// visible height" of 9px is taller than several real commute blocks,
-// so it pushed those into the very next block's territory). showLabel is
-// false for anything under ~20 real minutes: at that height there's no
-// room to lay out text without spilling into the next block, so those
-// render as a plain color sliver - the title attribute still carries the
-// full label for a tap/hover.
-function wpBlockStyle_(startMin, endMin, laneLeft, laneWidth) {
-  const clampedStart = Math.max(startMin, WEEKPLAN_START_HOUR_ * 60);
-  const clampedEnd = Math.min(endMin, WEEKPLAN_END_HOUR_ * 60);
+// do exactly that (a real bug hit while building this). showLabel needs
+// both enough height (~20 real minutes) AND at most 2 side-by-side
+// columns - past that there's no room to lay out text without it
+// spilling out, so those render as a plain color sliver and the title
+// attribute still carries the full label for a tap/hover (or zoom in:
+// narrowing the visible hours gives every column more width too).
+function wpBlockStyle_(startMin, endMin, zoom, col, totalCols) {
+  const rangeStart = zoom.startHour * 60, rangeEnd = zoom.endHour * 60;
+  const clampedStart = Math.max(startMin, rangeStart);
+  const clampedEnd = Math.min(endMin, rangeEnd);
   if (clampedEnd <= clampedStart) return null;
-  const top = (clampedStart - WEEKPLAN_START_HOUR_ * 60) / 60 * WEEKPLAN_PX_PER_HOUR_;
-  const rawHeight = (clampedEnd - clampedStart) / 60 * WEEKPLAN_PX_PER_HOUR_;
+  const top = (clampedStart - rangeStart) / 60 * zoom.pxPerHour;
+  const rawHeight = (clampedEnd - clampedStart) / 60 * zoom.pxPerHour;
   const gap = Math.min(1.5, rawHeight * 0.3);
   const height = Math.max(rawHeight - gap, 2);
+  const left = totalCols > 1 ? `calc(${col} * 100% / ${totalCols} + 2px)` : '2px';
+  const width = totalCols > 1 ? `calc(100% / ${totalCols} - 4px)` : 'calc(100% - 4px)';
   return {
-    style: `top:${top}px; height:${height}px; left:${laneLeft}; width:${laneWidth};`,
-    showLabel: rawHeight >= 20
+    style: `top:${top}px; height:${height}px; left:${left}; width:${width};`,
+    showLabel: rawHeight >= 20 && totalCols <= 2
   };
 }
 
@@ -17150,6 +17311,7 @@ function renderWeekPlan_() {
   }
 
   const cfg = loadWeekPlanConfig_();
+  const zoom = WEEKPLAN_ZOOM_PRESETS_[wpZoom_] || WEEKPLAN_ZOOM_PRESETS_.full;
   const monday = wpWeekStart_();
   const sunday = new Date(monday.getTime() + 6 * ROUTINES_DAY_MS);
   const labelEl = document.getElementById('wpWeekLabel');
@@ -17159,10 +17321,11 @@ function renderWeekPlan_() {
   }
 
   const todayStr = new Date().toDateString();
+  const colHeight = (zoom.endHour - zoom.startHour) * zoom.pxPerHour;
 
   let axisHtml = '';
-  for (let h = WEEKPLAN_START_HOUR_; h < WEEKPLAN_END_HOUR_; h++) {
-    axisHtml += `<div class="wp-axis-hour">${wpMinToTimeLabel_(h * 60)}</div>`;
+  for (let h = zoom.startHour; h < zoom.endHour; h++) {
+    axisHtml += `<div class="wp-axis-hour" style="height:${zoom.pxPerHour}px;">${wpMinToTimeLabel_(h * 60)}</div>`;
   }
 
   let daysHtml = '';
@@ -17172,42 +17335,41 @@ function renderWeekPlan_() {
     const dayLabel = dateObj.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
 
     let hourLines = '';
-    for (let h = WEEKPLAN_START_HOUR_ + 1; h < WEEKPLAN_END_HOUR_; h++) {
-      hourLines += `<div class="wp-hour-line" style="top:${(h - WEEKPLAN_START_HOUR_) * WEEKPLAN_PX_PER_HOUR_}px;"></div>`;
+    for (let h = zoom.startHour + 1; h < zoom.endHour; h++) {
+      hourLines += `<div class="wp-hour-line" style="top:${(h - zoom.startHour) * zoom.pxPerHour}px;"></div>`;
     }
 
+    const items = wpLayoutColumns_(wpTimedItemsForDay_(dayKey, i, dateObj, cfg));
     let blocksHtml = '';
-    wpGeneratedBlocksForDay_(dayKey, i, cfg).forEach(b => {
-      const pos = wpBlockStyle_(b.start, b.end, '2px', 'calc(50% - 3px)');
+    items.forEach(it => {
+      const pos = wpBlockStyle_(it.start, it.end, zoom, it.col, it.totalCols);
       if (!pos) return;
-      blocksHtml += `<div class="wp-block wp-block-${b.type}${pos.showLabel ? '' : ' compact'}" style="${pos.style}" title="${escapeAttr_(b.label)}">${pos.showLabel ? escapeText_(b.label) : ''}</div>`;
+      blocksHtml += `<div class="wp-block ${it.cls}${pos.showLabel ? '' : ' compact'}" style="${pos.style} ${it.style || ''}" title="${escapeAttr_(it.label)}">${pos.showLabel ? escapeText_(it.label) : ''}</div>`;
     });
 
-    const dayEvents = wpEventsForDate_(dateObj);
-    dayEvents.forEach(ev => {
+    // Informational calendar events: a thin full-width marker, never part
+    // of the column layout above since they're never a real conflict.
+    wpEventsForDate_(dateObj).forEach(ev => {
+      if (!isCalendarInformational_(ev.calendar)) return;
       const startMin = wpMinutesSinceMidnight_(new Date(ev.start));
-      const endMin = ev.end ? wpMinutesSinceMidnight_(new Date(ev.end)) : startMin + 30;
+      const rangeStart = zoom.startHour * 60, rangeEnd = zoom.endHour * 60;
+      const clampedStart = Math.max(startMin, rangeStart);
+      if (clampedStart >= rangeEnd) return;
+      const top = (clampedStart - rangeStart) / 60 * zoom.pxPerHour;
       const color = getEventColor(ev);
-      if (isCalendarInformational_(ev.calendar)) {
-        const clampedStart = Math.max(startMin, WEEKPLAN_START_HOUR_ * 60);
-        if (clampedStart >= WEEKPLAN_END_HOUR_ * 60) return;
-        const top = (clampedStart - WEEKPLAN_START_HOUR_ * 60) / 60 * WEEKPLAN_PX_PER_HOUR_;
-        blocksHtml += `<div class="wp-marker" style="top:${top}px; border-color:${color};" title="${escapeAttr_(ev.summary)}">${escapeText_(ev.summary)}</div>`;
-      } else {
-        const pos = wpBlockStyle_(startMin, endMin, 'calc(50% + 1px)', 'calc(50% - 3px)');
-        if (!pos) return;
-        const bg = hexToRgba_(color, 0.22);
-        blocksHtml += `<div class="wp-block wp-block-event${pos.showLabel ? '' : ' compact'}" style="${pos.style} background:${bg}; border-left:3px solid ${color};" title="${escapeAttr_(ev.summary)}">${pos.showLabel ? escapeText_(ev.summary) : ''}</div>`;
-      }
+      blocksHtml += `<div class="wp-marker" style="top:${top}px; border-color:${color};" title="${escapeAttr_(ev.summary)}">${escapeText_(ev.summary)}</div>`;
     });
 
-    const habitsHtml = wpHabitsForDate_(dateObj).map(h =>
+    // Habits already placed on the grid (wpHabitItemsForDate_, above)
+    // don't also need a plain chip repeating them below it.
+    const placedHabitIds = new Set(wpHabitItemsForDate_(dateObj).map(it => it.habitId));
+    const habitsHtml = wpHabitsForDate_(dateObj, placedHabitIds).map(h =>
       `<div class="wp-habit-chip${h.done ? ' done' : ''}" title="${escapeAttr_(h.name)}"><span class="wp-habit-dot"></span>${escapeText_(h.name)}</div>`
     ).join('');
 
     daysHtml += `<div class="wp-day-col-wrap">
       <div class="wp-day-head${isToday ? ' today' : ''}">${escapeText_(dayLabel)}</div>
-      <div class="wp-day-col">${hourLines}${blocksHtml}</div>
+      <div class="wp-day-col" style="height:${colHeight}px;">${hourLines}${blocksHtml}</div>
       <div class="wp-day-habits">${habitsHtml}</div>
     </div>`;
   });
@@ -17219,11 +17381,12 @@ function renderWeekPlan_() {
     legendEl.innerHTML = [
       ['var(--amber)', 'Workout (generated)'],
       ['var(--green)', 'Pushups (generated)'],
+      ['#9A5BA8', 'Habit/task (learned time)'],
       ['var(--muted)', 'Work / commute (generated)'],
       ['var(--accent)', 'Real calendar event']
     ].map(([color, label]) => `<div class="wp-legend-item"><span class="wp-legend-swatch" style="background:${color};"></span>${escapeText_(label)}</div>`).join('')
       + '<div class="wp-legend-item">┄ informational calendar (reminder only)</div>'
-      + '<div class="wp-legend-item">● below the grid: habits/tasks due that day</div>';
+      + '<div class="wp-legend-item">● below the grid: habits/tasks with no learned time yet</div>';
   }
 
   const weeklyEl = document.getElementById('wpWeeklyRow');
@@ -17237,15 +17400,17 @@ function renderWeekPlan_() {
   }
 }
 
-// Fixed-cadence habits/tasks due on this specific date - weekly-target
-// ones aren't tied to any one day, so they get their own row below the
-// grid instead (see wpWeeklyHabits_), same split the Routines tab itself
-// uses between "Today" and "This week, any day".
-function wpHabitsForDate_(dateObj) {
+// Fixed-cadence habits/tasks due on this specific date with no learned
+// time yet (excludeIds - see wpHabitItemsForDate_, which places anything
+// with enough history directly on the grid instead). Weekly-target ones
+// aren't tied to any one day in the first place, so they get their own
+// row below the grid regardless (see wpWeeklyHabits_), same split the
+// Routines tab itself uses between "Today" and "This week, any day".
+function wpHabitsForDate_(dateObj, excludeIds) {
   if (typeof RT_HABITS === 'undefined' || !RT_HABITS.list) return [];
   const k = dateKey(dateObj);
   return RT_HABITS.list
-    .filter(h => !h.deleted && h.cadence !== 'week' && rtIsDue(h, dateObj))
+    .filter(h => !h.deleted && h.cadence !== 'week' && rtIsDue(h, dateObj) && !(excludeIds && excludeIds.has(h.id)))
     .map(h => ({ name: h.name, done: rtIsDoneOn(h, k) }));
 }
 function wpWeeklyHabits_() {

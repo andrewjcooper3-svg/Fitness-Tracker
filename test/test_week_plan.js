@@ -21,7 +21,17 @@
        building this, where a "minimum visible height" taller than a
        short block's own real time slot forced it into the next one,
      - due habits/tasks show under each day, and a weekly-target one
-       shows once in its own row rather than duplicated onto every day. */
+       shows once in its own row rather than duplicated onto every day,
+     - two items sharing the same time split into side-by-side columns
+       instead of stacking on top of each other,
+     - zooming to a narrower hour range shows fewer hours, and the axis
+       labels stay aligned with the grid lines at every zoom level (a
+       real bug hit while building this: the axis's own row height was
+       hardcoded to the "full day" zoom's px/hour, so it silently drifted
+       out of sync with the grid at any other zoom level),
+     - a habit with no completion history yet falls back to a plain
+       due-chip; once it has enough history, it places itself on the
+       grid at its own learned average time instead. */
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
@@ -87,7 +97,13 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('7 day columns rendered', cols.length === 7, String(cols.length));
   check('Monday (light day) has work but no workout block', cols[0].work && !cols[0].workout, JSON.stringify(cols[0]));
   check('Tuesday (gym day) has both a work block and a workout block', cols[1].work && cols[1].workout, JSON.stringify(cols[1]));
-  check('every day has a Pushups block', cols.every(c => c.pushups));
+  // Pushups now places on the 6 weekdays with the most pushup-ledger
+  // history (wpPushupActiveDows_) rather than blindly every day - this
+  // app's boot sequence unconditionally seeds some real historical ledger
+  // dates, so exactly which day comes up short depends on that data, not
+  // a fixed assumption; just check the count comes out to 6 of 7.
+  const pushupDayCount = cols.filter(c => c.pushups).length;
+  check('exactly 6 of 7 days have a Pushups block (the 6 most active weekdays)', pushupDayCount === 6, JSON.stringify(cols.map(c => c.pushups)));
   check('the real "Dentist" event shows as a blocking block by default', cols[1].event && !cols[1].marker, JSON.stringify(cols[1]));
 
   console.log('\n=== Marking the Work calendar informational flips it to a marker, live ===');
@@ -150,6 +166,92 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   const label2 = await page.evaluate(() => document.getElementById('wpWeekLabel').textContent);
   check('next-week navigation changes the displayed week', label1 !== label2, `${label1} -> ${label2}`);
   await page.evaluate(() => wpWeekPrev());
+  await page.waitForTimeout(150);
+
+  console.log('\n=== Same-time items lay out side by side, not stacked ===');
+  const columnLayout = await page.evaluate(() => {
+    const overlapping = wpLayoutColumns_([
+      { start: 600, end: 660, cls: 'a', label: 'A' },
+      { start: 600, end: 660, cls: 'b', label: 'B' }
+    ]).map(it => ({ col: it.col, totalCols: it.totalCols }));
+    const separate = wpLayoutColumns_([
+      { start: 600, end: 660, cls: 'a', label: 'A' },
+      { start: 700, end: 760, cls: 'b', label: 'B' }
+    ]).map(it => it.totalCols);
+    return { overlapping, separate };
+  });
+  check('two fully-overlapping items get 2 columns in different slots',
+    columnLayout.overlapping.length === 2 && columnLayout.overlapping[0].totalCols === 2 &&
+    columnLayout.overlapping[1].totalCols === 2 && columnLayout.overlapping[0].col !== columnLayout.overlapping[1].col,
+    JSON.stringify(columnLayout.overlapping));
+  check('two items that never overlap each stay full-width (1 column)',
+    columnLayout.separate.every(c => c === 1), JSON.stringify(columnLayout.separate));
+
+  console.log('\n=== Zoom keeps the axis aligned with the grid at every level ===');
+  await page.evaluate(() => wpSetZoom('evening'));
+  await page.waitForTimeout(200);
+  const alignment = await page.evaluate(() => {
+    const grid = document.getElementById('wpGrid');
+    const gridTop = grid.getBoundingClientRect().top;
+    // .wp-axis-hour carries a deliberate -6px nudge (CSS) so the printed
+    // number sits up next to the line it labels rather than centered in
+    // its own row - a constant per label, so it's undone here rather than
+    // treated as slop. What actually matters is that this offset STAYS
+    // constant across labels: if the axis's own row height doesn't match
+    // the zoom's px/hour, the gap between axis and grid grows with every
+    // row instead of holding steady.
+    const axisHours = [...document.querySelectorAll('#wpGrid .wp-axis-hour')];
+    const hourLines = [...document.querySelector('#wpGrid .wp-day-col').querySelectorAll('.wp-hour-line')];
+    // hourLines start one hour later than axisHours (there's no line at
+    // the very top edge, just the first label) - hourLines[i] lines up
+    // with axisHours[i + 1].
+    const nudge = 6;
+    const diffAt = i => Math.abs((axisHours[i + 1].getBoundingClientRect().top - gridTop + nudge) - (hourLines[i].getBoundingClientRect().top - gridTop));
+    return { early: diffAt(0), late: diffAt(hourLines.length - 1) };
+  });
+  check('the axis stays aligned with the day columns\' hour lines near the top', alignment.early < 2, JSON.stringify(alignment));
+  check('...and stays aligned deep into the column too (no cumulative drift from a zoom-mismatched row height)', alignment.late < 2, JSON.stringify(alignment));
+  await page.evaluate(() => wpSetZoom('full'));
+  await page.waitForTimeout(150);
+
+  console.log('\n=== A habit with enough history places itself on the grid ===');
+  await page.evaluate(() => {
+    showAppView('routines');
+    rtOpenHabitSheet();
+    document.getElementById('rtHName').value = 'Make Bed';
+    rtSetCadence('daily');
+    rtSaveHabit();
+    showAppView('calendar');
+  });
+  await page.waitForTimeout(300);
+  const noHistory = await page.evaluate(() => {
+    const mon = [...document.querySelectorAll('#wpGrid .wp-day-col-wrap')][0];
+    return { hasBlock: !!mon.querySelector('.wp-block-habit'), chipText: mon.querySelector('.wp-day-habits').textContent };
+  });
+  check('with no completion history yet, it falls back to a plain due-chip',
+    !noHistory.hasBlock && /Make Bed/.test(noHistory.chipText), JSON.stringify(noHistory));
+
+  await page.evaluate(() => {
+    const h = RT_HABITS.list.find(x => x.name === 'Make Bed');
+    const monday = getWeekMondayFor(new Date());
+    for (let i = 1; i <= 5; i++) {
+      const d = new Date(monday.getTime() - i * ROUTINES_DAY_MS);
+      const loggedAt = new Date(d); loggedAt.setHours(7, 15, 0, 0);
+      RT_LOG[dateKey(d)] = RT_LOG[dateKey(d)] || {};
+      RT_LOG[dateKey(d)][h.id] = { done: true, loggedAt: loggedAt.toISOString() };
+    }
+    rtSaveLogLocal();
+    renderWeekPlan_();
+  });
+  await page.waitForTimeout(300);
+  const withHistory = await page.evaluate(() => {
+    const mon = [...document.querySelectorAll('#wpGrid .wp-day-col-wrap')][0];
+    return { hasBlock: !!mon.querySelector('.wp-block-habit'), chipText: mon.querySelector('.wp-day-habits').textContent };
+  });
+  check('with 5 days of ~7:15am history, it now places on the grid at that learned time',
+    withHistory.hasBlock, JSON.stringify(withHistory));
+  check('and it no longer duplicates onto the plain chip list',
+    !/Make Bed/.test(withHistory.chipText), JSON.stringify(withHistory));
 
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 
