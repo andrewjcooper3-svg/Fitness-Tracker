@@ -2045,6 +2045,13 @@
   .rt-check svg { width: 12px; height: 12px; }
   .rt-check.done { background: var(--green); border-color: var(--green); color: #fff; }
   .rt-check:disabled { cursor: default; opacity: 1; }
+  /* A threshold-linked habit (Water, Pushups) isn't checked off by hand -
+     it flips to done on its own once the day's logged value clears the
+     threshold. Until then, this fills the box like a pie slice as that
+     value grows, purely as a glance-able "how close am I" cue - it never
+     changes when rtIsDoneOn actually flips (no partial credit for a
+     habit that's 90% of the way there). */
+  .rt-check.rt-link-progress { background: conic-gradient(var(--accent) calc(var(--fill, 0) * 1turn), var(--surface2) 0); transition: background 0.4s ease; }
   /* One row: checkbox, name (truncates rather than wrapping), cadence
      pinned to the right edge - a compact list reads faster than a
      two-line stack when there can be several habits in view at once. */
@@ -6881,6 +6888,19 @@ function rtLinkMetaText_(h, k) {
   if (src.kind === 'logged') return rtIsDoneOn(h, k) ? 'Logged today' : 'Not logged yet';
   return `${src.valueOn(k)}/${h.link.threshold}${src.unit}`;
 }
+// 0-1 fraction of a threshold-linked habit's daily value logged so far -
+// purely for the checkbox's pie-fill visual (see .rt-link-progress). Not
+// used for the actual done/not-done call, which stays the hard >=
+// threshold check in rtIsDoneOn - this can read 0.9 while the habit is
+// still, correctly, not done.
+function rtLinkProgressRatio_(h, k) {
+  if (!h.link) return null;
+  const src = ROUTINES_LINK_SOURCES[h.link.source];
+  if (!src || src.kind !== 'threshold') return null;
+  const threshold = h.link.threshold || src.defaultThreshold();
+  if (!threshold) return null;
+  return Math.max(0, Math.min(1, src.valueOn(k) / threshold));
+}
 
 /* ---- Cadence logic (ported from the Routines mockup) ---- */
 function rtIsDue(h, date) {
@@ -7005,8 +7025,10 @@ function rtItemRowHtml(h, k, metaText, showStreak) {
   const streak = showStreak ? rtCurrentStreak(h) : 0;
   const linked = !!h.link;
   const checkAttrs = linked ? 'disabled' : `onclick="rtToggle('${h.id}', rtViewDay)"`;
+  const progress = done ? null : rtLinkProgressRatio_(h, k);
+  const progressStyle = progress != null ? ` style="--fill:${progress.toFixed(3)}"` : '';
   return `<div class="rt-item-row">
-    <button class="rt-check ${done ? 'done' : ''}" ${checkAttrs} aria-label="${done ? 'Marked done' : 'Not done'}">
+    <button class="rt-check ${done ? 'done' : ''}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${done ? 'Marked done' : 'Not done'}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
     </button>
     <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
@@ -15014,8 +15036,10 @@ function ovRoutinesItemRowHtml_(h, k, weekly) {
   const fallbackMeta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : (linked ? rtLinkMetaText_(h, k) : rtCadenceLabel(h));
   const meta = doneTime || fallbackMeta;
   const checkAttrs = linked ? 'disabled' : `onclick="event.stopPropagation(); ovToggleRoutine_('${h.id}')"`;
+  const progress = done ? null : rtLinkProgressRatio_(h, k);
+  const progressStyle = progress != null ? ` style="--fill:${progress.toFixed(3)}"` : '';
   return `<div class="rt-item-row">
-    <button class="rt-check ${done ? 'done' : ''}" ${checkAttrs} aria-label="${done ? 'Marked done' : 'Not done'}">
+    <button class="rt-check ${done ? 'done' : ''}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${done ? 'Marked done' : 'Not done'}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
     </button>
     <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
