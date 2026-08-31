@@ -13660,6 +13660,7 @@ async function fetchAndApplyRemoteDraft() {
 
     if (needsDayTemplateMigration20260727) stripStaleDayTemplateExercises_(data.draft.days);
     if (needsDayTemplateMigration20260824) stripStaleWednesday20260824_(data.draft.days);
+    if (needsDayTemplateMigration20260831) stripStaleGymScheduleMove20260831_(data.draft.days);
 
     isRestoringState = true;
     dayKeys.forEach(day => restoreDay(day, data.draft.days[day]));
@@ -13740,6 +13741,34 @@ function migrateStaleDayTemplates20260824() {
   }
 }
 
+/* Same problem a third time for the Aug 31 gym-schedule move (Mon/Wed's
+   full gym content swapped onto Tue/Thu, Mon/Wed dropping to a single
+   Pushups card). If this device already saved default state for the
+   current week under the OLD schedule - e.g. it was opened once right at
+   the week rollover, before this move shipped - Tuesday's saved single
+   "Pushups" card (ex0) would make Thursday's... no, Tuesday's new "Leg
+   Press" (also ex0, purely by position) survive while the other 11 new
+   exercises get pruned as "not in savedIds", and the reverse would
+   recreate Monday's/Wednesday's old 12/13-card gym sessions as bogus
+   "custom" cards on what is now a 1-card Pushups day. ALL FOUR days
+   changed shape this time (unlike the Aug 24 case), so all four get
+   their stale exercises array cleared. */
+const DAY_TEMPLATE_MIGRATION_20260831_KEY = 'WORKOUT_DAY_TEMPLATE_MIGRATED_20260831';
+let needsDayTemplateMigration20260831 = false;
+function stripStaleGymScheduleMove20260831_(days) {
+  ['mon', 'tue', 'wed', 'thu'].forEach(day => { if (days && days[day]) delete days[day].exercises; });
+}
+function migrateStaleDayTemplates20260831() {
+  if (localStorage.getItem(DAY_TEMPLATE_MIGRATION_20260831_KEY)) return;
+  needsDayTemplateMigration20260831 = true;
+  localStorage.setItem(DAY_TEMPLATE_MIGRATION_20260831_KEY, '1');
+  const state = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null');
+  if (state && state.days) {
+    stripStaleGymScheduleMove20260831_(state.days);
+    localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
+  }
+}
+
 // Unlike WORKOUT_TRACKER_STATE (which resets every new week), this ledger
 // accumulates indefinitely - it's the only thing that lets the Pushups tab
 // show week/month/year/deficit totals that span past week resets.
@@ -13803,6 +13832,7 @@ async function loadRemotePushupLedger() {
     });
     localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(local));
     applyManualPushupLedgerCorrection20260817_();
+    applyManualPushupLedgerCorrection20260831_();
     if (viewOrder[currentViewIndex] === 'tracker') renderPushupsTab();
     if (viewOrder[currentViewIndex] === 'overview') renderOverview();
   } catch (e) {
@@ -13875,6 +13905,31 @@ function applyManualPushupLedgerCorrection20260817_() {
     // Week of Aug 10 - Aug 16
     '2026-08-10': 0, '2026-08-11': 190, '2026-08-12': 180, '2026-08-13': 155,
     '2026-08-14': 0, '2026-08-15': 80, '2026-08-16': 385
+  };
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  Object.keys(corrected).forEach(key => { ledger[key] = corrected[key]; });
+  localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(ledger));
+}
+
+// Same class of correction, requested again for the week of Aug 24 - Aug
+// 30: the Stats chart's most recent bar was reading around 1500 reps
+// against a real total near 1200. That week span coincided with the
+// Aug 31 gym-schedule move (Mon/Wed -> Tue/Thu), which - before that move
+// shipped with its own migration - could leave duplicate/misattributed
+// "Pushups" cards sitting in a day's DOM (stale sets restored against the
+// wrong template position). computeWeekStats() sums every card named
+// "Pushups" on a day with no de-dup, so any such duplicate would double
+// (or more) that day's local total, which then wins forever under the
+// max-merge in loadRemotePushupLedger() since max never comes back down.
+// Hand-derived from the actual per-set PDF export for this week -
+// counting only sets marked Completed=Yes - and force-overwritten (not
+// max-merged) for the same reason as the 20260817 correction: the lower,
+// corrected number needs to be able to replace an inflated cached one.
+function applyManualPushupLedgerCorrection20260831_() {
+  const corrected = {
+    // Week of Aug 24 - Aug 30
+    '2026-08-24': 220, '2026-08-25': 220, '2026-08-26': 190, '2026-08-27': 220,
+    '2026-08-28': 220, '2026-08-29': 0, '2026-08-30': 105
   };
   const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
   Object.keys(corrected).forEach(key => { ledger[key] = corrected[key]; });
@@ -19451,6 +19506,7 @@ seedYearCarryForward();
 forceYearCarryResetJul27();
 migrateStaleDayTemplates20260727();
 migrateStaleDayTemplates20260824();
+migrateStaleDayTemplates20260831();
 restoreState();
 weekLabelAtLoad_ = getWeekLabel();
 document.addEventListener('visibilitychange', () => {
