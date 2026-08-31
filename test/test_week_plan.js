@@ -15,7 +15,13 @@
        a lift day gets both, and every day gets a Pushups block,
      - a real calendar event renders as a blocking block by default,
      - marking that event's calendar "informational" in Settings turns
-       it into a thin marker instead, live, without a reload. */
+       it into a thin marker instead, live, without a reload,
+     - short back-to-back blocks (a 5-10 min commute) never visually
+       overlap the block right after them - a real bug hit while
+       building this, where a "minimum visible height" taller than a
+       short block's own real time slot forced it into the next one,
+     - due habits/tasks show under each day, and a weekly-target one
+       shows once in its own row rather than duplicated onto every day. */
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
@@ -100,6 +106,42 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     return { event: !!tueCol.querySelector('.wp-block-event'), marker: !!tueCol.querySelector('.wp-marker') };
   });
   check('after marking it informational, the event is a marker instead of a blocking block', afterToggle.marker && !afterToggle.event, JSON.stringify(afterToggle));
+
+  console.log('\n=== Short back-to-back blocks (commutes) never overlap ===');
+  const tueBlocks = await page.evaluate(() => {
+    const col = [...document.querySelectorAll('#wpGrid .wp-day-col')][1];
+    return [...col.querySelectorAll('.wp-block')].map(b => {
+      const r = b.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom };
+    }).sort((a, b) => a.top - b.top);
+  });
+  let overlap = false;
+  for (let i = 1; i < tueBlocks.length; i++) {
+    if (tueBlocks[i].top < tueBlocks[i - 1].bottom - 0.5) overlap = true;
+  }
+  check('no two stacked blocks on Tuesday visually overlap', !overlap, JSON.stringify(tueBlocks));
+
+  console.log('\n=== Habits/tasks are listed ===');
+  await page.evaluate(() => {
+    showAppView('routines');
+    rtOpenHabitSheet();
+    document.getElementById('rtHName').value = 'Read';
+    rtSetCadence('daily');
+    rtSaveHabit();
+    rtOpenHabitSheet();
+    document.getElementById('rtHName').value = 'Guitar';
+    rtSetCadence('week');
+    rtSaveHabit();
+    showAppView('calendar');
+  });
+  await page.waitForTimeout(300);
+  const habitsInfo = await page.evaluate(() => ({
+    mondayText: [...document.querySelectorAll('#wpGrid .wp-day-col-wrap')][0].querySelector('.wp-day-habits').textContent,
+    weeklyRowText: document.getElementById('wpWeeklyRow').textContent
+  }));
+  check('the daily habit "Read" shows under Monday', /Read/.test(habitsInfo.mondayText), habitsInfo.mondayText);
+  check('the weekly habit "Guitar" is NOT duplicated onto Monday', !/Guitar/.test(habitsInfo.mondayText), habitsInfo.mondayText);
+  check('"Guitar" shows once in the weekly-target row with a fraction', /Guitar/.test(habitsInfo.weeklyRowText) && /\d\/\d/.test(habitsInfo.weeklyRowText), habitsInfo.weeklyRowText);
 
   console.log('\n=== Week navigation ===');
   const label1 = await page.evaluate(() => document.getElementById('wpWeekLabel').textContent);

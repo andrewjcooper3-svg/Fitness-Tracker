@@ -806,6 +806,15 @@
   .wp-day-col-wrap:last-child .wp-day-col { border-right: 1px solid var(--border); }
   .wp-hour-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border); opacity: 0.5; }
   .wp-block { position: absolute; left: 2px; right: 2px; border-radius: 6px; padding: 2px 5px; font-family: var(--font); font-size: 10px; font-weight: 600; overflow: hidden; box-sizing: border-box; line-height: 1.25; cursor: default; }
+  /* An unlabeled (too-short-for-text) block: padding/border are the only
+     things holding a box open once its text is gone, and at these
+     durations (a 5-10 min commute) their combined minimum size is bigger
+     than the block's real time slot, which forced every short block to
+     bleed into whatever comes right after it regardless of its computed
+     height - the actual bug behind "things overlapping". Stripping
+     padding and thinning the border here lets the box actually shrink to
+     the height JS gives it. */
+  .wp-block.compact { padding: 0 4px; }
   .wp-block-work { background: var(--surface2); color: var(--muted); border: 1px dashed var(--border); }
   .wp-block-commute { background: var(--surface2); color: var(--muted); border: 1px dashed var(--border); font-style: italic; opacity: 0.85; }
   .wp-block-workout { background: color-mix(in srgb, var(--amber) 22%, transparent); border-left: 3px solid var(--amber); color: var(--text); }
@@ -823,6 +832,14 @@
   .wp-cal-toggle-btn.informational { color: var(--muted); }
   .wp-commute-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .wp-commute-grid label { display: flex; flex-direction: column; gap: 4px; font-family: var(--font); font-size: 11px; color: var(--muted); }
+  .wp-day-habits { padding: 6px 3px; border-left: 1px solid var(--border); min-height: 10px; }
+  .wp-day-col-wrap:last-child .wp-day-habits { border-right: 1px solid var(--border); }
+  .wp-habit-chip { display: flex; align-items: center; gap: 4px; font-family: var(--font); font-size: 9.5px; color: var(--muted); padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
+  .wp-habit-chip.done { color: var(--text); }
+  .wp-habit-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); flex-shrink: 0; }
+  .wp-habit-chip.done .wp-habit-dot { background: var(--green); border-color: var(--green); }
+  .wp-weekly-row { margin-top: 12px; font-family: var(--font); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 16px; }
+  .wp-weekly-row .wp-weekly-item b { color: var(--text); }
 
   .sp-card { background: var(--surface); border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid var(--border); }
   .sp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; }
@@ -2426,6 +2443,7 @@
     </div>
     <div class="wp-grid-wrap"><div class="wp-grid" id="wpGrid"></div></div>
     <div class="wp-legend" id="wpLegend"></div>
+    <div class="wp-weekly-row" id="wpWeeklyRow"></div>
     <div class="wp-note">Generated from your calendar, work hours, and commute times in Settings, plus this week's workout plan - the workout/pushups blocks and any calendar-informed placement are estimates, not a live calendar, and nothing here is written back to Apple Calendar.</div>
   </div>
 </div>
@@ -17075,13 +17093,33 @@ function wpEventsForDate_(dateObj) {
   return lastCalendarEvents.filter(ev => !ev.allDay && new Date(ev.start).toDateString() === dayStr);
 }
 
+// Returns null for a block that's entirely outside the visible hours.
+// Trims a hairline off the bottom of every block so two blocks that are
+// exactly back-to-back in time (a 10-minute commute ending right as work
+// starts) show a gap instead of visually fusing into one shape - without
+// it, a run of short blocks (5-10 min commutes) read as one overlapping
+// smear. The trim can never exceed the block's own real height, so a
+// short block is never forced to bleed into whatever comes right after
+// it - a floor here that's bigger than a 5-minute slot's true ~3px would
+// do exactly that (a real bug hit while building this: a "minimum
+// visible height" of 9px is taller than several real commute blocks,
+// so it pushed those into the very next block's territory). showLabel is
+// false for anything under ~20 real minutes: at that height there's no
+// room to lay out text without spilling into the next block, so those
+// render as a plain color sliver - the title attribute still carries the
+// full label for a tap/hover.
 function wpBlockStyle_(startMin, endMin, laneLeft, laneWidth) {
   const clampedStart = Math.max(startMin, WEEKPLAN_START_HOUR_ * 60);
   const clampedEnd = Math.min(endMin, WEEKPLAN_END_HOUR_ * 60);
   if (clampedEnd <= clampedStart) return null;
   const top = (clampedStart - WEEKPLAN_START_HOUR_ * 60) / 60 * WEEKPLAN_PX_PER_HOUR_;
-  const height = (clampedEnd - clampedStart) / 60 * WEEKPLAN_PX_PER_HOUR_;
-  return `top:${top}px; height:${Math.max(height, 14)}px; left:${laneLeft}; width:${laneWidth};`;
+  const rawHeight = (clampedEnd - clampedStart) / 60 * WEEKPLAN_PX_PER_HOUR_;
+  const gap = Math.min(1.5, rawHeight * 0.3);
+  const height = Math.max(rawHeight - gap, 2);
+  return {
+    style: `top:${top}px; height:${height}px; left:${laneLeft}; width:${laneWidth};`,
+    showLabel: rawHeight >= 20
+  };
 }
 
 let wpCurrentWeekStart_ = null;
@@ -17140,9 +17178,9 @@ function renderWeekPlan_() {
 
     let blocksHtml = '';
     wpGeneratedBlocksForDay_(dayKey, i, cfg).forEach(b => {
-      const style = wpBlockStyle_(b.start, b.end, '2px', 'calc(50% - 3px)');
-      if (!style) return;
-      blocksHtml += `<div class="wp-block wp-block-${b.type}" style="${style}" title="${escapeAttr_(b.label)}">${escapeText_(b.label)}</div>`;
+      const pos = wpBlockStyle_(b.start, b.end, '2px', 'calc(50% - 3px)');
+      if (!pos) return;
+      blocksHtml += `<div class="wp-block wp-block-${b.type}${pos.showLabel ? '' : ' compact'}" style="${pos.style}" title="${escapeAttr_(b.label)}">${pos.showLabel ? escapeText_(b.label) : ''}</div>`;
     });
 
     const dayEvents = wpEventsForDate_(dateObj);
@@ -17156,16 +17194,21 @@ function renderWeekPlan_() {
         const top = (clampedStart - WEEKPLAN_START_HOUR_ * 60) / 60 * WEEKPLAN_PX_PER_HOUR_;
         blocksHtml += `<div class="wp-marker" style="top:${top}px; border-color:${color};" title="${escapeAttr_(ev.summary)}">${escapeText_(ev.summary)}</div>`;
       } else {
-        const style = wpBlockStyle_(startMin, endMin, 'calc(50% + 1px)', 'calc(50% - 3px)');
-        if (!style) return;
+        const pos = wpBlockStyle_(startMin, endMin, 'calc(50% + 1px)', 'calc(50% - 3px)');
+        if (!pos) return;
         const bg = hexToRgba_(color, 0.22);
-        blocksHtml += `<div class="wp-block wp-block-event" style="${style} background:${bg}; border-left:3px solid ${color};" title="${escapeAttr_(ev.summary)}">${escapeText_(ev.summary)}</div>`;
+        blocksHtml += `<div class="wp-block wp-block-event${pos.showLabel ? '' : ' compact'}" style="${pos.style} background:${bg}; border-left:3px solid ${color};" title="${escapeAttr_(ev.summary)}">${pos.showLabel ? escapeText_(ev.summary) : ''}</div>`;
       }
     });
+
+    const habitsHtml = wpHabitsForDate_(dateObj).map(h =>
+      `<div class="wp-habit-chip${h.done ? ' done' : ''}" title="${escapeAttr_(h.name)}"><span class="wp-habit-dot"></span>${escapeText_(h.name)}</div>`
+    ).join('');
 
     daysHtml += `<div class="wp-day-col-wrap">
       <div class="wp-day-head${isToday ? ' today' : ''}">${escapeText_(dayLabel)}</div>
       <div class="wp-day-col">${hourLines}${blocksHtml}</div>
+      <div class="wp-day-habits">${habitsHtml}</div>
     </div>`;
   });
 
@@ -17179,8 +17222,47 @@ function renderWeekPlan_() {
       ['var(--muted)', 'Work / commute (generated)'],
       ['var(--accent)', 'Real calendar event']
     ].map(([color, label]) => `<div class="wp-legend-item"><span class="wp-legend-swatch" style="background:${color};"></span>${escapeText_(label)}</div>`).join('')
-      + '<div class="wp-legend-item">┄ informational calendar (reminder only)</div>';
+      + '<div class="wp-legend-item">┄ informational calendar (reminder only)</div>'
+      + '<div class="wp-legend-item">● below the grid: habits/tasks due that day</div>';
   }
+
+  const weeklyEl = document.getElementById('wpWeeklyRow');
+  if (weeklyEl) {
+    const weekly = wpWeeklyHabits_();
+    weeklyEl.innerHTML = weekly.length
+      ? '<span><b>This week, any day:</b></span>' + weekly.map(h =>
+          `<span class="wp-weekly-item">${escapeText_(h.name)} <b>${wpWeeklyCountForRange_(h, monday)}/${h.weekTarget}</b></span>`
+        ).join('')
+      : '';
+  }
+}
+
+// Fixed-cadence habits/tasks due on this specific date - weekly-target
+// ones aren't tied to any one day, so they get their own row below the
+// grid instead (see wpWeeklyHabits_), same split the Routines tab itself
+// uses between "Today" and "This week, any day".
+function wpHabitsForDate_(dateObj) {
+  if (typeof RT_HABITS === 'undefined' || !RT_HABITS.list) return [];
+  const k = dateKey(dateObj);
+  return RT_HABITS.list
+    .filter(h => !h.deleted && h.cadence !== 'week' && rtIsDue(h, dateObj))
+    .map(h => ({ name: h.name, done: rtIsDoneOn(h, k) }));
+}
+function wpWeeklyHabits_() {
+  if (typeof RT_HABITS === 'undefined' || !RT_HABITS.list) return [];
+  return RT_HABITS.list.filter(h => !h.deleted && h.cadence === 'week');
+}
+// rtWeekCountSoFar's week runs Sunday-Saturday and only counts up through
+// its reference date (it's built for "how far into the CURRENT week am I
+// right now"), neither of which fits a Monday-based week that can be
+// navigated to the future or a fully-finished past week - counts across
+// the exact displayed Monday-Sunday range instead.
+function wpWeeklyCountForRange_(h, monday) {
+  let n = 0;
+  for (let i = 0; i < 7; i++) {
+    if (rtIsDoneOn(h, dateKey(new Date(monday.getTime() + i * ROUTINES_DAY_MS)))) n++;
+  }
+  return n;
 }
 
 function wpMinutesSinceMidnight_(d) { return d.getHours() * 60 + d.getMinutes(); }
