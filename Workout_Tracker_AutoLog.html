@@ -2042,7 +2042,7 @@
   .rt-item-row:last-child { border-bottom: none; }
   .rt-check { width: 21px; height: 21px; border-radius: 6px; border: 2px solid var(--border); background: none;
     flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: transparent;
-    position: relative; }
+    position: relative; appearance: none; -webkit-appearance: none; }
   .rt-check svg { width: 12px; height: 12px; position: relative; }
   .rt-check.done { background: var(--green); border-color: var(--green); color: #fff; }
   .rt-check:disabled { cursor: default; opacity: 1; }
@@ -2054,9 +2054,15 @@
      actually flips (no partial credit for a habit that's 90% of the way
      there). The empty portion is transparent, not a tinted fill, so a
      habit with nothing logged yet still reads as a plain empty checkbox
-     rather than looking pre-filled. */
+     rather than looking pre-filled. background-clip: padding-box keeps
+     the gradient inside the border instead of painting underneath it -
+     without it, the box's translucent border blends with the gradient's
+     hard edge at the rounded corners and leaves a visible ghost/halo
+     outline around the whole checkbox (a real rendering artifact, not
+     just a screenshot fluke - confirmed isolated from the rest of the
+     page's CSS). */
   .rt-check.rt-link-progress { background: conic-gradient(var(--accent) calc(var(--fill, 0) * 1turn), transparent 0deg);
-    transition: background 0.4s ease; }
+    background-clip: padding-box; transition: background 0.4s ease; }
   /* One row: checkbox, name (truncates rather than wrapping), cadence
      pinned to the right edge - a compact list reads faster than a
      two-line stack when there can be several habits in view at once. */
