@@ -788,6 +788,42 @@
   .cal-event-cal { font-family: var(--font); font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
   .cal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
+  /* Week Plan sub-tab: a generated week-at-a-glance built from real
+     calendar events, fixed work/commute rules, and the workout plan -
+     not a live calendar of its own, so it never writes anything back. */
+  .wp-week-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .wp-week-nav-btn { background: var(--surface2); border: none; color: var(--text); width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+  .wp-week-label { font-family: var(--font); font-weight: 700; font-size: 14px; }
+  .wp-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+  .wp-grid { display: flex; min-width: 560px; }
+  .wp-axis { flex-shrink: 0; width: 42px; padding-top: 30px; }
+  .wp-axis-hour { height: 40px; font-family: var(--font); font-size: 10px; color: var(--muted); text-align: right; padding-right: 6px; box-sizing: border-box; position: relative; top: -6px; }
+  .wp-days { display: flex; flex: 1; min-width: 0; }
+  .wp-day-col-wrap { flex: 1; min-width: 74px; }
+  .wp-day-head { font-family: var(--font); font-size: 11px; font-weight: 700; text-align: center; color: var(--muted); border-bottom: 1px solid var(--border); height: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+  .wp-day-head.today { color: var(--accent); }
+  .wp-day-col { position: relative; height: 720px; border-left: 1px solid var(--border); }
+  .wp-day-col-wrap:last-child .wp-day-col { border-right: 1px solid var(--border); }
+  .wp-hour-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border); opacity: 0.5; }
+  .wp-block { position: absolute; left: 2px; right: 2px; border-radius: 6px; padding: 2px 5px; font-family: var(--font); font-size: 10px; font-weight: 600; overflow: hidden; box-sizing: border-box; line-height: 1.25; cursor: default; }
+  .wp-block-work { background: var(--surface2); color: var(--muted); border: 1px dashed var(--border); }
+  .wp-block-commute { background: var(--surface2); color: var(--muted); border: 1px dashed var(--border); font-style: italic; opacity: 0.85; }
+  .wp-block-workout { background: color-mix(in srgb, var(--amber) 22%, transparent); border-left: 3px solid var(--amber); color: var(--text); }
+  .wp-block-pushups { background: color-mix(in srgb, var(--green) 20%, transparent); border-left: 3px solid var(--green); color: var(--text); }
+  .wp-block-event { color: var(--text); }
+  .wp-marker { position: absolute; left: 2px; right: 2px; border-top: 2px dotted var(--muted); font-family: var(--font); font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 2px; cursor: default; }
+  .wp-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-family: var(--font); font-size: 11px; color: var(--muted); }
+  .wp-legend-item { display: flex; align-items: center; gap: 5px; }
+  .wp-legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .wp-note { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .wp-cal-list { display: flex; flex-direction: column; gap: 6px; }
+  .wp-cal-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: var(--surface2); border-radius: 10px; font-family: var(--font); font-size: 13px; }
+  .wp-cal-row-name { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wp-cal-toggle-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--font); font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 8px; cursor: pointer; flex-shrink: 0; }
+  .wp-cal-toggle-btn.informational { color: var(--muted); }
+  .wp-commute-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .wp-commute-grid label { display: flex; flex-direction: column; gap: 4px; font-family: var(--font); font-size: 11px; color: var(--muted); }
+
   .sp-card { background: var(--surface); border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid var(--border); }
   .sp-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; }
   .sp-title { font-family: var(--font); font-size: 14px; font-weight: 600; display: flex; align-items: center; }
@@ -1792,7 +1828,7 @@
        a control - Settings is only reachable via Overview's gear. */
     #view-tracker > .header,
     #view-overview > .ov-page-head,
-    #view-calendar > .cal-header { display: none; }
+    #view-calendar .cal-header { display: none; }
 
     .app-bar-title {
       display: block;
@@ -2368,12 +2404,30 @@
 </div>
 
 <div id="view-calendar" class="app-view">
-  <div class="cal-header">
-    <div class="cal-title">Upcoming</div>
-    <button class="cal-refresh-btn" onclick="loadCalendarEvents()" title="Refresh">↻</button>
+  <div class="rt-seg" id="calSubSeg" style="margin-bottom:12px;">
+    <button data-sub="upcoming" class="active" onclick="setCalSubTab('upcoming')">Upcoming</button>
+    <button data-sub="weekplan" onclick="setCalSubTab('weekplan')">Week Plan</button>
   </div>
-  <div id="calStatus" class="cal-status"></div>
-  <div id="calEventList"></div>
+
+  <div id="calSubUpcoming">
+    <div class="cal-header">
+      <div class="cal-title">Upcoming</div>
+      <button class="cal-refresh-btn" onclick="loadCalendarEvents()" title="Refresh">↻</button>
+    </div>
+    <div id="calStatus" class="cal-status"></div>
+    <div id="calEventList"></div>
+  </div>
+
+  <div id="calSubWeekPlan" style="display:none;">
+    <div class="wp-week-header">
+      <button class="wp-week-nav-btn" onclick="wpWeekPrev()" aria-label="Previous week">‹</button>
+      <div class="wp-week-label" id="wpWeekLabel"></div>
+      <button class="wp-week-nav-btn" onclick="wpWeekNext()" aria-label="Next week">›</button>
+    </div>
+    <div class="wp-grid-wrap"><div class="wp-grid" id="wpGrid"></div></div>
+    <div class="wp-legend" id="wpLegend"></div>
+    <div class="wp-note">Generated from your calendar, work hours, and commute times in Settings, plus this week's workout plan - the workout/pushups blocks and any calendar-informed placement are estimates, not a live calendar, and nothing here is written back to Apple Calendar.</div>
+  </div>
 </div>
 
 <div id="view-music" class="app-view">
@@ -3563,6 +3617,38 @@
           <button class="config-save" onclick="saveCalendarWorkerUrl()">Save</button>
         </div>
         <div class="config-status" id="calendarConfigStatus">Not connected — paste your Worker URL above.</div>
+      </div>
+
+      <div class="config-toggle" onclick="toggleWeekPlanConfig()" style="margin-top:14px;">
+        <div class="config-title">⚙ Week Plan</div>
+        <div class="config-chevron" id="weekPlanConfigChevron">▸</div>
+      </div>
+      <div class="config-body" id="weekPlanConfigBody">
+        <div class="settings-field">
+          <div class="sp-config-label" style="margin:0 0 6px;">Work hours</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="time" id="wpWorkStart" class="config-input">
+            <span style="color:var(--muted);">to</span>
+            <input type="time" id="wpWorkEnd" class="config-input">
+          </div>
+        </div>
+        <div class="settings-field">
+          <div class="sp-config-label" style="margin:0 0 6px;">Commute (minutes)</div>
+          <div class="wp-commute-grid">
+            <label>Home → Work<input type="number" id="wpCommuteHW" class="config-input" min="0" step="1"></label>
+            <label>Work → Home<input type="number" id="wpCommuteWH" class="config-input" min="0" step="1"></label>
+            <label>Work → Gym<input type="number" id="wpCommuteWG" class="config-input" min="0" step="1"></label>
+            <label>Gym → Home<input type="number" id="wpCommuteGH" class="config-input" min="0" step="1"></label>
+          </div>
+        </div>
+        <div class="settings-field">
+          <div class="sp-config-label" style="margin:0 0 6px;">Usual pushups time (until there's enough logged history to learn it)</div>
+          <input type="time" id="wpPushupTime" class="config-input">
+        </div>
+        <button class="ov-open-btn" onclick="saveWeekPlanSettings()" style="margin-top:12px;">Save</button>
+        <div class="config-status" id="weekPlanSettingsStatus"></div>
+        <div class="sp-config-label" style="margin:16px 0 6px;">Calendars (which ones block the plan vs. are just a reminder)</div>
+        <div id="wpCalendarList" class="wp-cal-list"></div>
       </div>
 
       <div class="config-toggle" onclick="toggleSpotifyConfig()" style="margin-top:14px;">
@@ -4962,6 +5048,7 @@ function openSettingsModal() {
   renderSettingsTab();
   renderThemePicker_();
   renderTabOrderSettings_();
+  loadWeekPlanSettingsIntoUI_();
   document.getElementById('settingsModalOverlay').classList.add('open');
   loadRemoteSettingsState();
 }
@@ -16722,6 +16809,7 @@ function ensureCalendarLoaded() {
     loadCalendarEvents();
   } else if (lastCalendarEvents) {
     renderOverviewCalendarPreview();
+    renderWeekPlanIfActive_();
   }
 }
 
@@ -16735,6 +16823,7 @@ async function loadCalendarEvents() {
     statusEl.textContent = '⚠ No Calendar Worker URL configured — set it in Settings (gear icon, Overview tab).';
     statusEl.className = 'cal-status error';
     renderOverviewCalendarPreview();
+    renderWeekPlanIfActive_();
     return;
   }
 
@@ -16760,6 +16849,7 @@ async function loadCalendarEvents() {
       return evDay >= todayStart;
     });
     renderOverviewCalendarPreview();
+    renderWeekPlanIfActive_();
 
     if (lastCalendarEvents.length === 0) {
       statusEl.textContent = 'No upcoming events in the next 30 days.';
@@ -16774,6 +16864,7 @@ async function loadCalendarEvents() {
     statusEl.className = 'cal-status error';
     lastCalendarEvents = null;
     renderOverviewCalendarPreview();
+    renderWeekPlanIfActive_();
   }
 }
 
@@ -16864,6 +16955,301 @@ function openEventModal(ev) {
 function closeEventModal(event) {
   if (event) event.stopPropagation();
   document.getElementById('eventModalOverlay').classList.remove('open');
+}
+
+/* ---------- Week Plan (Calendar sub-tab) ----------
+   A generated week-at-a-glance, not a live calendar of its own: work
+   hours + commute times (Settings) lay down fixed blocks, the workout
+   plan's own "Est. time" text sizes a block on lift days, Pushups gets a
+   placeholder block until there's enough Checked At history to place it
+   for real, and the real calendar (already fetched for the Upcoming tab,
+   reused here rather than a second network round-trip) is drawn
+   alongside rather than merged in - a calendar marked "blocking" in
+   Settings is a real commitment so it gets its own lane next to the
+   generated guess, and one marked "informational" (an F1 watch-time
+   calendar, say) is never a hard conflict, so it's just a thin marker
+   across the day rather than a block that competes for space. Never
+   writes anything back to Apple Calendar - see calendar-worker.js,
+   which is read-only by design. */
+const STORAGE_WEEKPLAN_CONFIG_KEY = 'WORKOUT_WEEKPLAN_CONFIG';
+const WEEKPLAN_CONFIG_DEFAULT_ = {
+  workStart: '08:00', workEnd: '17:00',
+  commuteHomeToWork: 10, commuteWorkToHome: 10, commuteWorkToGym: 5, commuteGymToHome: 10,
+  pushupTime: '21:00'
+};
+function loadWeekPlanConfig_() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_WEEKPLAN_CONFIG_KEY) || 'null');
+    return Object.assign({}, WEEKPLAN_CONFIG_DEFAULT_, saved || {});
+  } catch (e) { return Object.assign({}, WEEKPLAN_CONFIG_DEFAULT_); }
+}
+
+// Informational calendars are the exception list - anything not named
+// here is treated as blocking by default, since assuming a calendar is a
+// hard commitment is the safer failure mode than silently scheduling over
+// something real.
+const STORAGE_CAL_INFORMATIONAL_KEY = 'WORKOUT_CAL_INFORMATIONAL_CALENDARS';
+function loadInformationalCalendars_() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_CAL_INFORMATIONAL_KEY) || '[]'); } catch (e) { return []; }
+}
+function isCalendarInformational_(name) {
+  return loadInformationalCalendars_().includes(name || '');
+}
+function toggleCalendarInformational_(name) {
+  const list = loadInformationalCalendars_();
+  const idx = list.indexOf(name);
+  if (idx === -1) list.push(name); else list.splice(idx, 1);
+  localStorage.setItem(STORAGE_CAL_INFORMATIONAL_KEY, JSON.stringify(list));
+  renderWeekPlanCalendarSettings_();
+  renderWeekPlanIfActive_();
+}
+
+function wpTimeToMin_(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || '');
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+function wpMinToTimeLabel_(min) {
+  const d = new Date(2000, 0, 1, 0, Math.round(min));
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+// The day panel's own header alert already says e.g. "Est. time: 40-50
+// min" - reusing that text (rather than a second, separate duration
+// setting) means the block automatically tracks a future plan edit
+// instead of drifting from it. Takes the upper end of the range as the
+// more realistic estimate; falls back to a plain default for a lift day
+// whose header text doesn't match (a custom exercise list, say).
+function wpEstMinutesForDay_(dayKey) {
+  const panel = document.getElementById('day-' + dayKey);
+  const alertSpan = panel && panel.querySelector('.day-header .alert span');
+  const text = alertSpan ? alertSpan.textContent : '';
+  const m = /Est\.\s*time:\s*(\d+)(?:-(\d+))?\s*min/i.exec(text);
+  if (!m) return 45;
+  return Number(m[2] || m[1]);
+}
+
+const WEEKPLAN_START_HOUR_ = 6;   // grid top
+const WEEKPLAN_END_HOUR_ = 24;    // grid bottom (midnight)
+const WEEKPLAN_PX_PER_HOUR_ = 40;
+
+// Builds the generated (not-from-a-real-calendar) blocks for one day:
+// work + its flanking commute, a workout block on lift days sized from
+// the plan's own Est. time text, and a Pushups placeholder every day.
+// Weekends get no work/commute blocks - only Tue/Thu currently count as
+// lift days (isLiftDay_ reads the live plan, so this tracks a future
+// schedule change automatically) and neither falls on a weekend today,
+// but nothing here assumes that.
+function wpGeneratedBlocksForDay_(dayKey, dayIndex, cfg) {
+  const blocks = [];
+  const isWeekday = dayIndex >= 0 && dayIndex <= 4;
+  const workStart = wpTimeToMin_(cfg.workStart);
+  const workEnd = wpTimeToMin_(cfg.workEnd);
+
+  if (isWeekday && workStart != null && workEnd != null) {
+    blocks.push({ start: workStart, end: workEnd, type: 'work', label: 'Work' });
+    blocks.push({ start: workStart - cfg.commuteHomeToWork, end: workStart, type: 'commute', label: 'Commute' });
+
+    if (typeof isLiftDay_ === 'function' && isLiftDay_(dayKey)) {
+      const gymStart = workEnd + cfg.commuteWorkToGym;
+      const gymEnd = gymStart + wpEstMinutesForDay_(dayKey);
+      blocks.push({ start: workEnd, end: gymStart, type: 'commute', label: 'To gym' });
+      blocks.push({ start: gymStart, end: gymEnd, type: 'workout', label: `Workout (~${gymEnd - gymStart}m)` });
+      blocks.push({ start: gymEnd, end: gymEnd + cfg.commuteGymToHome, type: 'commute', label: 'To home' });
+    } else {
+      blocks.push({ start: workEnd, end: workEnd + cfg.commuteWorkToHome, type: 'commute', label: 'Commute' });
+    }
+  }
+
+  const pushupStart = wpTimeToMin_(cfg.pushupTime);
+  if (pushupStart != null) {
+    blocks.push({ start: pushupStart, end: pushupStart + 15, type: 'pushups', label: 'Pushups' });
+  }
+
+  return blocks;
+}
+
+function wpEventsForDate_(dateObj) {
+  if (!Array.isArray(lastCalendarEvents)) return [];
+  const dayStr = dateObj.toDateString();
+  return lastCalendarEvents.filter(ev => !ev.allDay && new Date(ev.start).toDateString() === dayStr);
+}
+
+function wpBlockStyle_(startMin, endMin, laneLeft, laneWidth) {
+  const clampedStart = Math.max(startMin, WEEKPLAN_START_HOUR_ * 60);
+  const clampedEnd = Math.min(endMin, WEEKPLAN_END_HOUR_ * 60);
+  if (clampedEnd <= clampedStart) return null;
+  const top = (clampedStart - WEEKPLAN_START_HOUR_ * 60) / 60 * WEEKPLAN_PX_PER_HOUR_;
+  const height = (clampedEnd - clampedStart) / 60 * WEEKPLAN_PX_PER_HOUR_;
+  return `top:${top}px; height:${Math.max(height, 14)}px; left:${laneLeft}; width:${laneWidth};`;
+}
+
+let wpCurrentWeekStart_ = null;
+function wpWeekStart_() {
+  if (!wpCurrentWeekStart_) wpCurrentWeekStart_ = getWeekMondayFor(new Date());
+  return wpCurrentWeekStart_;
+}
+function wpWeekPrev() { wpCurrentWeekStart_ = new Date(wpWeekStart_().getTime() - 7 * ROUTINES_DAY_MS); renderWeekPlan_(); }
+function wpWeekNext() { wpCurrentWeekStart_ = new Date(wpWeekStart_().getTime() + 7 * ROUTINES_DAY_MS); renderWeekPlan_(); }
+
+function renderWeekPlanIfActive_() {
+  if (calActiveSubTab_ === 'weekplan') renderWeekPlan_();
+}
+
+function renderWeekPlan_() {
+  const grid = document.getElementById('wpGrid');
+  if (!grid) return;
+  // Same fetch-once gate as ensureCalendarLoaded(), but without its
+  // "already loaded -> re-render the Overview preview" branch, which
+  // (now that that render also re-enters here - see renderWeekPlanIfActive_
+  // below) would recurse into this function forever. loadCalendarEvents()
+  // itself calls renderWeekPlanIfActive_() when the fetch resolves, so the
+  // grid still fills in once the data actually arrives.
+  if (!calendarLoadedOnce) {
+    calendarLoadedOnce = true;
+    loadCalendarEvents();
+    return;
+  }
+
+  const cfg = loadWeekPlanConfig_();
+  const monday = wpWeekStart_();
+  const sunday = new Date(monday.getTime() + 6 * ROUTINES_DAY_MS);
+  const labelEl = document.getElementById('wpWeekLabel');
+  if (labelEl) {
+    const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    labelEl.textContent = `${fmt(monday)} – ${fmt(sunday)}`;
+  }
+
+  const todayStr = new Date().toDateString();
+
+  let axisHtml = '';
+  for (let h = WEEKPLAN_START_HOUR_; h < WEEKPLAN_END_HOUR_; h++) {
+    axisHtml += `<div class="wp-axis-hour">${wpMinToTimeLabel_(h * 60)}</div>`;
+  }
+
+  let daysHtml = '';
+  dayKeys.forEach((dayKey, i) => {
+    const dateObj = new Date(monday.getTime() + i * ROUTINES_DAY_MS);
+    const isToday = dateObj.toDateString() === todayStr;
+    const dayLabel = dateObj.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+
+    let hourLines = '';
+    for (let h = WEEKPLAN_START_HOUR_ + 1; h < WEEKPLAN_END_HOUR_; h++) {
+      hourLines += `<div class="wp-hour-line" style="top:${(h - WEEKPLAN_START_HOUR_) * WEEKPLAN_PX_PER_HOUR_}px;"></div>`;
+    }
+
+    let blocksHtml = '';
+    wpGeneratedBlocksForDay_(dayKey, i, cfg).forEach(b => {
+      const style = wpBlockStyle_(b.start, b.end, '2px', 'calc(50% - 3px)');
+      if (!style) return;
+      blocksHtml += `<div class="wp-block wp-block-${b.type}" style="${style}" title="${escapeAttr_(b.label)}">${escapeText_(b.label)}</div>`;
+    });
+
+    const dayEvents = wpEventsForDate_(dateObj);
+    dayEvents.forEach(ev => {
+      const startMin = wpMinutesSinceMidnight_(new Date(ev.start));
+      const endMin = ev.end ? wpMinutesSinceMidnight_(new Date(ev.end)) : startMin + 30;
+      const color = getEventColor(ev);
+      if (isCalendarInformational_(ev.calendar)) {
+        const clampedStart = Math.max(startMin, WEEKPLAN_START_HOUR_ * 60);
+        if (clampedStart >= WEEKPLAN_END_HOUR_ * 60) return;
+        const top = (clampedStart - WEEKPLAN_START_HOUR_ * 60) / 60 * WEEKPLAN_PX_PER_HOUR_;
+        blocksHtml += `<div class="wp-marker" style="top:${top}px; border-color:${color};" title="${escapeAttr_(ev.summary)}">${escapeText_(ev.summary)}</div>`;
+      } else {
+        const style = wpBlockStyle_(startMin, endMin, 'calc(50% + 1px)', 'calc(50% - 3px)');
+        if (!style) return;
+        const bg = hexToRgba_(color, 0.22);
+        blocksHtml += `<div class="wp-block wp-block-event" style="${style} background:${bg}; border-left:3px solid ${color};" title="${escapeAttr_(ev.summary)}">${escapeText_(ev.summary)}</div>`;
+      }
+    });
+
+    daysHtml += `<div class="wp-day-col-wrap">
+      <div class="wp-day-head${isToday ? ' today' : ''}">${escapeText_(dayLabel)}</div>
+      <div class="wp-day-col">${hourLines}${blocksHtml}</div>
+    </div>`;
+  });
+
+  grid.innerHTML = `<div class="wp-axis">${axisHtml}</div><div class="wp-days">${daysHtml}</div>`;
+
+  const legendEl = document.getElementById('wpLegend');
+  if (legendEl) {
+    legendEl.innerHTML = [
+      ['var(--amber)', 'Workout (generated)'],
+      ['var(--green)', 'Pushups (generated)'],
+      ['var(--muted)', 'Work / commute (generated)'],
+      ['var(--accent)', 'Real calendar event']
+    ].map(([color, label]) => `<div class="wp-legend-item"><span class="wp-legend-swatch" style="background:${color};"></span>${escapeText_(label)}</div>`).join('')
+      + '<div class="wp-legend-item">┄ informational calendar (reminder only)</div>';
+  }
+}
+
+function wpMinutesSinceMidnight_(d) { return d.getHours() * 60 + d.getMinutes(); }
+
+function setCalSubTab(tab) {
+  calActiveSubTab_ = tab;
+  document.querySelectorAll('#calSubSeg button').forEach(b => b.classList.toggle('active', b.dataset.sub === tab));
+  document.getElementById('calSubUpcoming').style.display = tab === 'upcoming' ? '' : 'none';
+  document.getElementById('calSubWeekPlan').style.display = tab === 'weekplan' ? '' : 'none';
+  if (tab === 'upcoming') ensureCalendarLoaded();
+  else renderWeekPlan_();
+}
+let calActiveSubTab_ = 'upcoming';
+
+// Every distinct calendar name seen in the last fetch, so Settings can
+// offer a toggle for it - a calendar with zero events in the last 30 days
+// (an inactive subscription) simply won't appear here until it has one.
+function renderWeekPlanCalendarSettings_() {
+  const listEl = document.getElementById('wpCalendarList');
+  if (!listEl) return;
+  const names = Array.from(new Set((lastCalendarEvents || []).map(ev => ev.calendar).filter(Boolean))).sort();
+  if (!names.length) {
+    listEl.innerHTML = '<div class="wp-note" style="margin-top:0;">Open the Calendar tab first so your calendars show up here.</div>';
+    return;
+  }
+  listEl.innerHTML = names.map(name => {
+    const informational = isCalendarInformational_(name);
+    const color = getCalendarColor(name);
+    return `<div class="wp-cal-row">
+      <div class="wp-cal-row-name"><span class="cal-dot" style="background:${color};"></span>${escapeText_(name)}</div>
+      <button class="wp-cal-toggle-btn${informational ? ' informational' : ''}" onclick="toggleCalendarInformational_('${escapeHtml_(escapeJsAttr_(name))}')">${informational ? 'Informational' : 'Blocking'}</button>
+    </div>`;
+  }).join('');
+}
+
+function loadWeekPlanSettingsIntoUI_() {
+  const cfg = loadWeekPlanConfig_();
+  document.getElementById('wpWorkStart').value = cfg.workStart;
+  document.getElementById('wpWorkEnd').value = cfg.workEnd;
+  document.getElementById('wpCommuteHW').value = cfg.commuteHomeToWork;
+  document.getElementById('wpCommuteWH').value = cfg.commuteWorkToHome;
+  document.getElementById('wpCommuteWG').value = cfg.commuteWorkToGym;
+  document.getElementById('wpCommuteGH').value = cfg.commuteGymToHome;
+  document.getElementById('wpPushupTime').value = cfg.pushupTime;
+  renderWeekPlanCalendarSettings_();
+}
+
+function saveWeekPlanSettings() {
+  const cfg = {
+    workStart: document.getElementById('wpWorkStart').value || WEEKPLAN_CONFIG_DEFAULT_.workStart,
+    workEnd: document.getElementById('wpWorkEnd').value || WEEKPLAN_CONFIG_DEFAULT_.workEnd,
+    commuteHomeToWork: Number(document.getElementById('wpCommuteHW').value) || 0,
+    commuteWorkToHome: Number(document.getElementById('wpCommuteWH').value) || 0,
+    commuteWorkToGym: Number(document.getElementById('wpCommuteWG').value) || 0,
+    commuteGymToHome: Number(document.getElementById('wpCommuteGH').value) || 0,
+    pushupTime: document.getElementById('wpPushupTime').value || WEEKPLAN_CONFIG_DEFAULT_.pushupTime
+  };
+  localStorage.setItem(STORAGE_WEEKPLAN_CONFIG_KEY, JSON.stringify(cfg));
+  const statusEl = document.getElementById('weekPlanSettingsStatus');
+  if (statusEl) { statusEl.textContent = '✓ Saved'; statusEl.className = 'config-status'; }
+  renderWeekPlanIfActive_();
+}
+
+function toggleWeekPlanConfig() {
+  const body = document.getElementById('weekPlanConfigBody');
+  const chevron = document.getElementById('weekPlanConfigChevron');
+  body.classList.toggle('expanded');
+  chevron.textContent = body.classList.contains('expanded') ? '▾' : '▸';
+  if (body.classList.contains('expanded')) loadWeekPlanSettingsIntoUI_();
 }
 
 /* ---------- Spotify (currently playing + pinned playlists + workout shuffle) ---------- */
@@ -19462,7 +19848,7 @@ const TOP_BAR_VIEW_INFO = {
 // them back) have to be captured up front.
 const TOP_BAR_ACTION_SELECTORS = {
   overview: '#view-overview > .ov-page-head > .ov-page-head-actions',
-  calendar: '#view-calendar > .cal-header > .cal-refresh-btn'
+  calendar: '#view-calendar .cal-header > .cal-refresh-btn'
 };
 const topBarActionHomes_ = new Map();
 const topBarMediaQuery_ = window.matchMedia('(min-width: 768px) and (max-width: 1099.98px)');
