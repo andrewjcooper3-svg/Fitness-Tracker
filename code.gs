@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-26-financial-sync';
+const BACKEND_BUILD_VERSION = '2026-08-31-checked-at';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -41,8 +41,14 @@ const BACKEND_BUILD_VERSION = '2026-08-26-financial-sync';
 // trailing addition means new rows appended to those old tabs still
 // land Notes in its original column; migrateWeekSheetHeader_ below
 // upgrades an old tab's header row in place the next time it's touched.
-const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Set', 'Target Weight', 'Actual Weight', 'Target Reps', 'Actual Reps', 'Completed', 'Notes', 'Quality'];
-const COLUMN_WIDTHS = [140, 90, 190, 50, 100, 100, 90, 90, 90, 240, 90];
+//
+// Checked At is the moment that specific set's checkbox actually got
+// tapped, not the moment "Generate Session Summary" ran (Timestamp,
+// column 1 - shared by every row in the session). Background bookkeeping
+// only; nothing in the app's UI surfaces it. Same trailing-append pattern
+// as Quality, for the same reason.
+const HEADERS = ['Timestamp', 'Day', 'Exercise', 'Set', 'Target Weight', 'Actual Weight', 'Target Reps', 'Actual Reps', 'Completed', 'Notes', 'Quality', 'Checked At'];
+const COLUMN_WIDTHS = [140, 90, 190, 50, 100, 100, 90, 90, 90, 240, 90, 140];
 
 // One pastel per day of week so blocks of rows are easy to tell apart at a glance.
 const DAY_COLORS = {
@@ -116,25 +122,31 @@ function formatNewSheet_(sheet) {
   sheet.getRange(1, 11, sheet.getMaxRows(), 1).setHorizontalAlignment('center');
 }
 
-// A week-sheet tab created before the Quality column existed only has
-// the old 10-column header row. Since Quality was appended at the END
-// of HEADERS (not inserted before Notes - see the comment on HEADERS
-// above), an old tab just needs that one header cell added on to reach
-// 11 columns; every existing data row's Notes stays exactly where it
-// already was, and simply has no Quality value (correctly - that data
-// genuinely predates the feature) until a set on that tab gets a
-// quality tag going forward.
+// A week-sheet tab created before a later column existed (Quality, then
+// Checked At) only has the shorter header row from whenever it was made.
+// Since each addition was appended at the END of HEADERS rather than
+// inserted before Notes (see the comment on HEADERS above), an old tab
+// just needs whichever trailing header cells it's missing added on -
+// every existing data row's earlier columns stay exactly where they
+// already were, and simply have no value in a column that postdates them,
+// until a row on that tab gets a value for it going forward. Generic over
+// however many trailing columns are missing (one so far when this covered
+// Quality alone; now up to two), rather than one hardcoded name per
+// addition, so the next trailing column doesn't need its own near-copy of
+// this function.
 function migrateWeekSheetHeader_(sheet) {
-  const existingHeaders = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
-  if (existingHeaders[HEADERS.length - 1] === HEADERS[HEADERS.length - 1]) return;
-
-  const headerCell = sheet.getRange(1, HEADERS.length);
-  headerCell.setValue('Quality');
-  headerCell.setFontWeight('bold');
-  headerCell.setBackground('#1a1d24');
-  headerCell.setFontColor('#ffffff');
-  sheet.setColumnWidth(HEADERS.length, COLUMN_WIDTHS[HEADERS.length - 1]);
-  sheet.getRange(1, HEADERS.length, sheet.getMaxRows(), 1).setHorizontalAlignment('center');
+  const width = Math.min(sheet.getLastColumn(), HEADERS.length);
+  const existingHeaders = width > 0 ? sheet.getRange(1, 1, 1, width).getValues()[0] : [];
+  for (let i = 0; i < HEADERS.length; i++) {
+    if (existingHeaders[i] === HEADERS[i]) continue;
+    const headerCell = sheet.getRange(1, i + 1);
+    headerCell.setValue(HEADERS[i]);
+    headerCell.setFontWeight('bold');
+    headerCell.setBackground('#1a1d24');
+    headerCell.setFontColor('#ffffff');
+    sheet.setColumnWidth(i + 1, COLUMN_WIDTHS[i]);
+    sheet.getRange(1, i + 1, sheet.getMaxRows(), 1).setHorizontalAlignment(i === 10 ? 'center' : 'left');
+  }
 }
 
 function getOrCreateWeekSheet_(weekLabel) {
@@ -1291,19 +1303,20 @@ function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
             s.actualReps != null ? s.actualReps : '',
             s.completed ? 'Yes' : 'No',
             s.notes || '',
-            formatQuality_(s.quality)
+            formatQuality_(s.quality),
+            s.checkedAt || ''
           ]);
           rowsAdded++;
         });
       } else {
         // An exercise with no set data - log a bare placeholder row for it.
-        appendRow([timestamp, day, ex.name || '', '', '', '', '', '', '', '', '']);
+        appendRow([timestamp, day, ex.name || '', '', '', '', '', '', '', '', '', '']);
         rowsAdded++;
       }
     });
   } else {
     // No exercises for the day (e.g. a rest/cardio-only day) - log a single placeholder row.
-    appendRow([timestamp, day, '', '', '', '', '', '', '', notes || '', '']);
+    appendRow([timestamp, day, '', '', '', '', '', '', '', notes || '', '', '']);
     rowsAdded = 1;
   }
 

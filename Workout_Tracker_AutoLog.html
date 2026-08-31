@@ -2054,6 +2054,8 @@
   .rt-heat-detail-dot.on { background: var(--green); }
   .rt-heat-detail-dot.pending { background: var(--amber); }
   .rt-heat-detail-dot.miss { background: var(--red); }
+  .rt-heat-detail-name { flex: 1; min-width: 0; }
+  .rt-heat-detail-time { color: var(--muted); font-size: 11px; flex-shrink: 0; }
 
   .rt-habit-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
   .rt-habit-row:last-child { border-bottom: none; }
@@ -6739,6 +6741,20 @@ function rtIsDoneOn(h, dateStr) {
   }
   return !!(RT_LOG[dateStr] && RT_LOG[dateStr][h.id] && RT_LOG[dateStr][h.id].done);
 }
+// When a (non-linked) habit was actually checked off, not just whether it
+// was - rtToggle already stamps this on every check-off (RT_LOG's
+// loggedAt), synced to the Routines Log sheet the same way. Linked habits
+// (Water/Pushups/Weight) have no single check-off moment of their own -
+// their "done" state is read live off another log - so this returns
+// nothing for them rather than a misleading time.
+function rtCompletedTimeText_(h, k) {
+  if (h.link) return '';
+  const entry = RT_LOG[k] && RT_LOG[k][h.id];
+  if (!entry || !entry.done || !entry.loggedAt) return '';
+  const t = new Date(entry.loggedAt);
+  if (isNaN(t.getTime())) return '';
+  return t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
 // Meta text for a linked habit's row - "logged" sources are yes/no, so
 // they show a plain status instead of a value/threshold fraction.
 function rtLinkMetaText_(h, k) {
@@ -6909,14 +6925,20 @@ function rtRenderToday() {
     return;
   }
   let html = dueToday.map(h => {
-    const meta = h.link ? rtLinkMetaText_(h, k) : rtCadenceLabel(h);
+    // Once it's done, the time it got checked off is more useful than the
+    // cadence label that was only ever there to say when it's due.
+    const doneTime = rtCompletedTimeText_(h, k);
+    const meta = h.link ? rtLinkMetaText_(h, k) : (doneTime || rtCadenceLabel(h));
     return rtItemRowHtml(h, k, meta, isToday);
   }).join('');
   // X-times-a-week items aren't "due" on any one day, so they get their
   // own checkable group instead of counting toward the fixed ring/total.
   if (weeklyToday.length) {
     html += '<div class="rt-item-group-label">This week, any day</div>';
-    html += weeklyToday.map(h => rtItemRowHtml(h, k, `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`, false)).join('');
+    html += weeklyToday.map(h => {
+      const doneTime = rtCompletedTimeText_(h, k);
+      return rtItemRowHtml(h, k, doneTime || `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`, false);
+    }).join('');
   }
   list.classList.toggle('rt-item-list-2col', dueToday.length + weeklyToday.length > ROUTINES_2COL_THRESHOLD);
   list.innerHTML = html;
@@ -7067,7 +7089,10 @@ function rtRenderHeatDetail() {
   box.innerHTML = `<div class="rt-heat-detail-date">${label}</div>` + due.map(h => {
     const on = rtIsDoneOn(h, rtSelectedDay);
     const cls = on ? 'on' : (isToday ? 'pending' : 'miss');
-    return `<div class="rt-heat-detail-item ${cls}"><span class="rt-heat-detail-dot ${cls}"></span>${escapeText_(h.name)}</div>`;
+    const doneTime = on ? rtCompletedTimeText_(h, rtSelectedDay) : '';
+    return `<div class="rt-heat-detail-item ${cls}"><span class="rt-heat-detail-dot ${cls}"></span>` +
+      `<span class="rt-heat-detail-name">${escapeText_(h.name)}</span>` +
+      (doneTime ? `<span class="rt-heat-detail-time">${doneTime}</span>` : '') + `</div>`;
   }).join('');
 }
 
@@ -13559,6 +13584,7 @@ function serializeDay(day) {
         reps: inputs[1] ? inputs[1].value : '',
         notes: inputs[2] ? inputs[2].value : '',
         checked: row.querySelector('.set-checkbox').classList.contains('checked'),
+        checkedAt: row.querySelector('.set-checkbox').dataset.checkedAt || '',
         quality: activeQuality ? activeQuality.dataset.quality : '',
         // The targets live in the inputs' placeholders, which come from the
         // week's plan - and the plan is replaced the moment a new week
@@ -14066,6 +14092,7 @@ function restoreDay(day, savedDay) {
         if (inputs[1]) inputs[1].value = savedSet.reps || '';
         if (inputs[2]) inputs[2].value = savedSet.notes || '';
         if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
+        if (savedSet.checkedAt) row.querySelector('.set-checkbox').dataset.checkedAt = savedSet.checkedAt;
         if (savedSet.quality) {
           const qualityBox = row.querySelector('.quality-box[data-quality="' + savedSet.quality + '"]');
           if (qualityBox) qualityBox.classList.add('active');
@@ -14100,6 +14127,7 @@ function restoreDay(day, savedDay) {
         if (inputs[1]) inputs[1].value = savedSet.reps || '';
         if (inputs[2]) inputs[2].value = savedSet.notes || '';
         if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
+        if (savedSet.checkedAt) row.querySelector('.set-checkbox').dataset.checkedAt = savedSet.checkedAt;
         if (savedSet.quality) {
           const qualityBox = row.querySelector('.quality-box[data-quality="' + savedSet.quality + '"]');
           if (qualityBox) qualityBox.classList.add('active');
@@ -14864,7 +14892,9 @@ window.addEventListener('resize', () => {
 function ovRoutinesItemRowHtml_(h, k, weekly) {
   const done = rtIsDoneOn(h, k);
   const linked = !!h.link;
-  const meta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : (linked ? rtLinkMetaText_(h, k) : rtCadenceLabel(h));
+  const doneTime = done ? rtCompletedTimeText_(h, k) : '';
+  const fallbackMeta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : (linked ? rtLinkMetaText_(h, k) : rtCadenceLabel(h));
+  const meta = doneTime || fallbackMeta;
   const checkAttrs = linked ? 'disabled' : `onclick="event.stopPropagation(); ovToggleRoutine_('${h.id}')"`;
   return `<div class="rt-item-row">
     <button class="rt-check ${done ? 'done' : ''}" ${checkAttrs} aria-label="${done ? 'Marked done' : 'Not done'}">
@@ -18283,8 +18313,16 @@ function toggleExercise(header) {
   toggle.textContent = sets.classList.contains('expanded') ? '▾' : '▸';
 }
 
+// Background-only bookkeeping, not shown anywhere in the UI: stamping the
+// moment a set actually gets checked off (not the moment the whole session
+// gets submitted, which is all the "Timestamp" column on the Sheet
+// captures - every row in a session shares that one value). Cleared on
+// uncheck so a later re-check gets its own fresh time rather than keeping
+// a stale one.
 function toggleSetCheck(el) {
-  el.classList.toggle('checked');
+  const nowChecked = el.classList.toggle('checked');
+  if (nowChecked) el.dataset.checkedAt = new Date().toISOString();
+  else delete el.dataset.checkedAt;
   const card = el.closest('.exercise-card');
   if (card) updateExerciseTotal(card);
   saveState();
@@ -18598,6 +18636,8 @@ function parseExerciseCard(card) {
       actualWeight: asNumberOrString(actualOrTarget(inputs[0])),
       actualReps: actualOrTarget(inputs[1]),
       completed: row.querySelector('.set-checkbox').classList.contains('checked'),
+      // Background-only - see toggleSetCheck. Not shown anywhere in the UI.
+      checkedAt: row.querySelector('.set-checkbox').dataset.checkedAt || '',
       quality: activeQuality ? activeQuality.dataset.quality : '',
       notes: inputs[2] ? inputs[2].value.trim() : ''
     };
