@@ -24,14 +24,15 @@
        shows once in its own row rather than duplicated onto every day,
      - two items sharing the same time split into side-by-side columns
        instead of stacking on top of each other,
-     - zooming to a narrower hour range shows fewer hours, and the axis
-       labels stay aligned with the grid lines at every zoom level (a
-       real bug hit while building this: the axis's own row height was
-       hardcoded to the "full day" zoom's px/hour, so it silently drifted
-       out of sync with the grid at any other zoom level),
+     - the grid is one continuous scrollable column (not a set of zoom
+       presets to switch between), the axis stays aligned with the grid's
+       hour lines, and today's column carries a live "now" line,
      - a habit with no completion history yet falls back to a plain
        due-chip; once it has enough history, it places itself on the
-       grid at its own learned average time instead. */
+       grid at its own learned average time instead,
+     - sourdough starter feeds show on the grid: a real logged feed on the
+       day it happened, and a projected next feed (dashed) derived from
+       the starter's own learned interval. */
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
@@ -187,9 +188,17 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('two items that never overlap each stay full-width (1 column)',
     columnLayout.separate.every(c => c === 1), JSON.stringify(columnLayout.separate));
 
-  console.log('\n=== Zoom keeps the axis aligned with the grid at every level ===');
-  await page.evaluate(() => wpSetZoom('evening'));
-  await page.waitForTimeout(200);
+  console.log('\n=== One continuous scrollable column, not zoom presets ===');
+  const scrollShape = await page.evaluate(() => {
+    const wrap = document.getElementById('wpGridWrap');
+    const grid = document.getElementById('wpGrid');
+    const axisHours = document.querySelectorAll('#wpGrid .wp-axis-hour').length;
+    return { scrollable: wrap.scrollHeight > wrap.clientHeight, axisHours, scrollTop: wrap.scrollTop };
+  });
+  check('the grid-wrap actually overflows (a real scroll area, not a fixed page)', scrollShape.scrollable, JSON.stringify(scrollShape));
+  check('all 24 hours are in the DOM at once (one continuous column)', scrollShape.axisHours === 24, String(scrollShape.axisHours));
+  check('opening the tab auto-scrolled away from midnight', scrollShape.scrollTop > 0, String(scrollShape.scrollTop));
+
   const alignment = await page.evaluate(() => {
     const grid = document.getElementById('wpGrid');
     const gridTop = grid.getBoundingClientRect().top;
@@ -198,7 +207,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     // its own row - a constant per label, so it's undone here rather than
     // treated as slop. What actually matters is that this offset STAYS
     // constant across labels: if the axis's own row height doesn't match
-    // the zoom's px/hour, the gap between axis and grid grows with every
+    // the grid's px/hour, the gap between axis and grid grows with every
     // row instead of holding steady.
     const axisHours = [...document.querySelectorAll('#wpGrid .wp-axis-hour')];
     const hourLines = [...document.querySelector('#wpGrid .wp-day-col').querySelectorAll('.wp-hour-line')];
@@ -210,9 +219,22 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     return { early: diffAt(0), late: diffAt(hourLines.length - 1) };
   });
   check('the axis stays aligned with the day columns\' hour lines near the top', alignment.early < 2, JSON.stringify(alignment));
-  check('...and stays aligned deep into the column too (no cumulative drift from a zoom-mismatched row height)', alignment.late < 2, JSON.stringify(alignment));
-  await page.evaluate(() => wpSetZoom('full'));
+  check('...and stays aligned deep into the column too (no cumulative drift from a mismatched row height)', alignment.late < 2, JSON.stringify(alignment));
+
+  const nowLine = await page.evaluate(() => {
+    const cols = [...document.querySelectorAll('#wpGrid .wp-day-col-wrap')];
+    const todayIdx = cols.findIndex(c => c.querySelector('.wp-day-head.today'));
+    return { todayIdx, nowLines: cols.map(c => !!c.querySelector('.wp-now-line')) };
+  });
+  check('a "now" line is drawn only on today\'s column', nowLine.todayIdx >= 0 &&
+    nowLine.nowLines.filter(Boolean).length === 1 && nowLine.nowLines[nowLine.todayIdx],
+    JSON.stringify(nowLine));
+
+  await page.evaluate(() => { document.getElementById('wpGridWrap').scrollTop = 0; });
+  await page.evaluate(() => wpWeekToday());
   await page.waitForTimeout(150);
+  const rescrolled = await page.evaluate(() => document.getElementById('wpGridWrap').scrollTop);
+  check('the Today button re-scrolls back near "now"', rescrolled > 0, String(rescrolled));
 
   console.log('\n=== A habit with enough history places itself on the grid ===');
   await page.evaluate(() => {
@@ -252,6 +274,30 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     withHistory.hasBlock, JSON.stringify(withHistory));
   check('and it no longer duplicates onto the plain chip list',
     !/Make Bed/.test(withHistory.chipText), JSON.stringify(withHistory));
+
+  console.log('\n=== Sourdough starter feeds show on the grid ===');
+  await page.evaluate(() => {
+    const fedAt = new Date(); fedAt.setHours(8, 0, 0, 0);
+    const st = {
+      stage: 'active', name: 'Test', bornOn: null, build: {}, location: 'counter',
+      ratio: '1:1:1', flour: 'bread', keepG: 100, tempF: 70,
+      feeds: [{ id: 'f1', at: fedAt.toISOString(), keepG: 100, ratio: '1:1:1', flour: 'bread', tempF: 70, location: 'counter', checks: [] }]
+    };
+    localStorage.setItem('WORKOUT_KITCHEN_STARTER', JSON.stringify(st));
+    renderWeekPlan_();
+  });
+  await page.waitForTimeout(300);
+  const starterBlocks = await page.evaluate(() => {
+    const cols = [...document.querySelectorAll('#wpGrid .wp-day-col-wrap')];
+    return {
+      real: cols.map(c => !!c.querySelector('.wp-block-starter:not(.projected)')),
+      projected: cols.some(c => !!c.querySelector('.wp-block-starter.projected'))
+    };
+  });
+  check('a real logged feed shows a solid starter block on the day it happened',
+    starterBlocks.real.some(Boolean), JSON.stringify(starterBlocks.real));
+  check('a projected next feed shows somewhere in the week as a dashed block',
+    starterBlocks.projected, JSON.stringify(starterBlocks));
 
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 

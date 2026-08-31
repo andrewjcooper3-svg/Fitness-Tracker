@@ -790,22 +790,31 @@
 
   /* Week Plan sub-tab: a generated week-at-a-glance built from real
      calendar events, fixed work/commute rules, and the workout plan -
-     not a live calendar of its own, so it never writes anything back. */
-  .wp-week-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .wp-week-nav-btn { background: var(--surface2); border: none; color: var(--text); width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer; }
-  .wp-week-label { font-family: var(--font); font-weight: 700; font-size: 14px; }
-  .wp-grid-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
-  .wp-grid { display: flex; min-width: 560px; }
-  .wp-axis { flex-shrink: 0; width: 42px; padding-top: 30px; }
-  .wp-axis-hour { height: 40px; font-family: var(--font); font-size: 10px; color: var(--muted); text-align: right; padding-right: 6px; box-sizing: border-box; position: relative; top: -6px; }
+     not a live calendar of its own, so it never writes anything back.
+     Laid out like a normal calendar week view (Google/Apple Calendar):
+     one continuous scrollable hour column rather than switching between
+     fixed zoom presets, a day-header row pinned to the top of the scroll
+     area and a time gutter pinned to the left of it, and a live "now"
+     line - all standard conventions for this kind of view. */
+  .wp-week-header { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .wp-week-nav-btn { background: var(--surface2); border: none; color: var(--text); width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer; flex-shrink: 0; }
+  .wp-week-today-btn { width: auto; padding: 0 12px; font-size: 12px; font-weight: 700; }
+  .wp-week-label { font-family: var(--font); font-weight: 700; font-size: 14px; flex: 1; text-align: center; }
+  .wp-grid-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 14px; max-height: 68vh; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .wp-grid { display: flex; min-width: 600px; position: relative; }
+  .wp-axis { flex-shrink: 0; width: 44px; padding-top: 32px; position: sticky; left: 0; z-index: 3; background: var(--surface); }
+  .wp-axis-hour { height: 56px; font-family: var(--font); font-size: 10px; color: var(--muted); text-align: right; padding-right: 7px; box-sizing: border-box; position: relative; top: -6px; }
   .wp-days { display: flex; flex: 1; min-width: 0; }
-  .wp-day-col-wrap { flex: 1; min-width: 74px; }
-  .wp-day-head { font-family: var(--font); font-size: 11px; font-weight: 700; text-align: center; color: var(--muted); border-bottom: 1px solid var(--border); height: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+  .wp-day-col-wrap { flex: 1; min-width: 80px; }
+  .wp-day-head { font-family: var(--font); font-size: 11px; font-weight: 700; text-align: center; color: var(--muted); border-bottom: 1px solid var(--border); height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; position: sticky; top: 0; z-index: 2; background: var(--surface); }
   .wp-day-head.today { color: var(--accent); }
-  .wp-day-col { position: relative; height: 720px; border-left: 1px solid var(--border); }
+  .wp-day-head.today .wp-day-head-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-left: 4px; }
+  .wp-day-col { position: relative; border-left: 1px solid var(--border); background: var(--bg); }
   .wp-day-col-wrap:last-child .wp-day-col { border-right: 1px solid var(--border); }
   .wp-hour-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border); opacity: 0.5; }
-  .wp-block { position: absolute; left: 2px; right: 2px; border-radius: 6px; padding: 2px 5px; font-family: var(--font); font-size: 10px; font-weight: 600; overflow: hidden; box-sizing: border-box; line-height: 1.25; cursor: default; }
+  .wp-now-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--red); z-index: 1; pointer-events: none; }
+  .wp-now-line::before { content: ''; position: absolute; left: -3px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
+  .wp-block { position: absolute; left: 2px; right: 2px; border-radius: 6px; padding: 3px 6px; font-family: var(--font); font-size: 10px; font-weight: 600; overflow: hidden; box-sizing: border-box; line-height: 1.3; cursor: default; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
   /* An unlabeled (too-short-for-text) block: padding/border are the only
      things holding a box open once its text is gone, and at these
      durations (a 5-10 min commute) their combined minimum size is bigger
@@ -814,18 +823,20 @@
      height - the actual bug behind "things overlapping". Stripping
      padding and thinning the border here lets the box actually shrink to
      the height JS gives it. */
-  .wp-block.compact { padding: 0 4px; }
+  .wp-block.compact { padding: 0 4px; box-shadow: none; }
   .wp-block-work { background: var(--surface2); color: var(--muted); border: 1px dashed var(--border); }
   .wp-block-commute { background: var(--surface2); color: var(--muted); border: 1px dashed var(--border); font-style: italic; opacity: 0.85; }
-  .wp-block-workout { background: color-mix(in srgb, var(--amber) 22%, transparent); border-left: 3px solid var(--amber); color: var(--text); }
-  .wp-block-pushups { background: color-mix(in srgb, var(--green) 20%, transparent); border-left: 3px solid var(--green); color: var(--text); }
+  .wp-block-workout { background: color-mix(in srgb, var(--amber) 24%, var(--surface)); border-left: 3px solid var(--amber); color: var(--text); }
+  .wp-block-pushups { background: color-mix(in srgb, var(--green) 22%, var(--surface)); border-left: 3px solid var(--green); color: var(--text); }
   .wp-block-event { color: var(--text); }
-  .wp-block-habit { background: color-mix(in srgb, #9A5BA8 22%, transparent); border-left: 3px solid #9A5BA8; color: var(--text); }
+  .wp-block-habit { background: color-mix(in srgb, #9A5BA8 24%, var(--surface)); border-left: 3px solid #9A5BA8; color: var(--text); }
+  .wp-block-starter { background: color-mix(in srgb, #D9A441 24%, var(--surface)); border-left: 3px solid #D9A441; color: var(--text); }
+  .wp-block-starter.projected { border-left-style: dashed; opacity: 0.85; }
   .wp-marker { position: absolute; left: 2px; right: 2px; border-top: 2px dotted var(--muted); font-family: var(--font); font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 2px; cursor: default; }
-  .wp-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-family: var(--font); font-size: 11px; color: var(--muted); }
+  .wp-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; font-family: var(--font); font-size: 11px; color: var(--muted); }
   .wp-legend-item { display: flex; align-items: center; gap: 5px; }
   .wp-legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-  .wp-note { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .wp-note { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
   .wp-cal-list { display: flex; flex-direction: column; gap: 6px; }
   .wp-cal-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: var(--surface2); border-radius: 10px; font-family: var(--font); font-size: 13px; }
   .wp-cal-row-name { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2440,15 +2451,10 @@
     <div class="wp-week-header">
       <button class="wp-week-nav-btn" onclick="wpWeekPrev()" aria-label="Previous week">‹</button>
       <div class="wp-week-label" id="wpWeekLabel"></div>
+      <button class="wp-week-nav-btn wp-week-today-btn" onclick="wpWeekToday()">Today</button>
       <button class="wp-week-nav-btn" onclick="wpWeekNext()" aria-label="Next week">›</button>
     </div>
-    <div class="rt-seg" id="wpZoomSeg" style="margin-bottom:10px;">
-      <button data-zoom="full" class="active" onclick="wpSetZoom('full')">Full day</button>
-      <button data-zoom="morning" onclick="wpSetZoom('morning')">Morning</button>
-      <button data-zoom="afternoon" onclick="wpSetZoom('afternoon')">Afternoon</button>
-      <button data-zoom="evening" onclick="wpSetZoom('evening')">Evening</button>
-    </div>
-    <div class="wp-grid-wrap"><div class="wp-grid" id="wpGrid"></div></div>
+    <div class="wp-grid-wrap" id="wpGridWrap"><div class="wp-grid" id="wpGrid"></div></div>
     <div class="wp-legend" id="wpLegend"></div>
     <div class="wp-weekly-row" id="wpWeeklyRow"></div>
     <div class="wp-note">Generated from your calendar, work hours, and commute times in Settings, plus this week's workout plan - the workout/pushups blocks and any calendar-informed placement are estimates, not a live calendar, and nothing here is written back to Apple Calendar.</div>
@@ -17054,21 +17060,14 @@ function wpEstMinutesForDay_(dayKey) {
   return Number(m[2] || m[1]);
 }
 
-// Zoom means "see fewer hours, each one bigger," not a CSS scale - it's
-// what actually buys room for full labels on short blocks, since a
-// crowded 18-hour day at a fixed px/hour has no slack to give them.
-const WEEKPLAN_ZOOM_PRESETS_ = {
-  full:      { startHour: 6,  endHour: 24, pxPerHour: 40 },
-  morning:   { startHour: 5,  endHour: 13, pxPerHour: 65 },
-  afternoon: { startHour: 11, endHour: 19, pxPerHour: 65 },
-  evening:   { startHour: 16, endHour: 24, pxPerHour: 65 }
-};
-let wpZoom_ = 'full';
-function wpSetZoom(zoom) {
-  wpZoom_ = WEEKPLAN_ZOOM_PRESETS_[zoom] ? zoom : 'full';
-  document.querySelectorAll('#wpZoomSeg button').forEach(b => b.classList.toggle('active', b.dataset.zoom === wpZoom_));
-  renderWeekPlan_();
-}
+// One continuous scrollable day, like Google/Apple Calendar's week view,
+// rather than a set of zoom presets to pick between - the grid-wrap itself
+// scrolls (see .wp-grid-wrap's max-height + overflow:auto), and rendering
+// auto-scrolls to something useful (see wpAutoScroll_) instead of the user
+// having to hunt for "now" in a full midnight-to-midnight column.
+const WEEKPLAN_START_HOUR_ = 0;
+const WEEKPLAN_END_HOUR_ = 24;
+const WEEKPLAN_PX_PER_HOUR_ = 56;
 
 // Builds the generated (not-from-a-real-calendar) blocks for one day:
 // work + its flanking commute, a workout block on lift days sized from
@@ -17193,6 +17192,52 @@ function wpEventsForDate_(dateObj) {
   return lastCalendarEvents.filter(ev => !ev.allDay && new Date(ev.start).toDateString() === dayStr);
 }
 
+// Real logged feeds land as solid blocks on the day they actually happened
+// (st.feeds already carries an exact timestamp, so no averaging needed).
+// Future feeds are projected forward from the last one using the starter's
+// own learned interval (the same number starterStatus_ uses for its "due"
+// badge), stopping at the edge of the requested day and skipping a
+// projection that would land within an hour of an already-logged feed -
+// that feed already covers the moment, and showing both would just be the
+// same feed twice. Fridge storage still projects fine here: intervalH is
+// simply SD_FRIDGE_DAYS*24 in that case, so it shows up as a rare weekly
+// block instead of a nightly one.
+function wpStarterItemsForDate_(dateObj) {
+  if (typeof loadStarter_ !== 'function' || typeof starterStatus_ !== 'function') return [];
+  const st = loadStarter_();
+  if (!st || !Array.isArray(st.feeds) || !st.feeds.length) return [];
+  const dayStr = dateObj.toDateString();
+  const items = [];
+  const realMinutes = [];
+
+  st.feeds.forEach(f => {
+    const at = new Date(f.at);
+    if (isNaN(at.getTime()) || at.toDateString() !== dayStr) return;
+    const startMin = wpMinutesSinceMidnight_(at);
+    items.push({ start: startMin, end: startMin + 15, label: 'Feed starter', projected: false });
+    realMinutes.push(startMin);
+  });
+
+  const status = starterStatus_(st, new Date());
+  if (status && status.fedAt && status.intervalH) {
+    const now = new Date();
+    const dayEnd = new Date(dateObj.getTime() + ROUTINES_DAY_MS);
+    let next = new Date(status.fedAt.getTime() + status.intervalH * 3600000);
+    let guard = 0;
+    while (next < dayEnd && guard++ < 60) {
+      if (next > now && next.toDateString() === dayStr) {
+        const startMin = wpMinutesSinceMidnight_(next);
+        if (!realMinutes.some(m => Math.abs(m - startMin) < 60)) {
+          items.push({ start: startMin, end: startMin + 15, label: 'Feed starter (est.)', projected: true });
+        }
+      }
+      next = new Date(next.getTime() + status.intervalH * 3600000);
+    }
+  }
+
+  return items;
+}
+
 // Every space-occupying item for one day - generated blocks, placed
 // habits, and blocking calendar events - laid out together so items that
 // share a moment split the width between them instead of stacking on top
@@ -17217,6 +17262,9 @@ function wpTimedItemsForDay_(dayKey, dayIndex, dateObj, cfg) {
       style: `background:${hexToRgba_(color, 0.22)}; border-left:3px solid ${color};`
     });
   });
+
+  wpStarterItemsForDate_(dateObj).forEach(it =>
+    items.push({ start: it.start, end: it.end, cls: 'wp-block-starter' + (it.projected ? ' projected' : ''), label: it.label }));
 
   return items;
 }
@@ -17266,13 +17314,13 @@ function wpLayoutColumns_(items) {
 // spilling out, so those render as a plain color sliver and the title
 // attribute still carries the full label for a tap/hover (or zoom in:
 // narrowing the visible hours gives every column more width too).
-function wpBlockStyle_(startMin, endMin, zoom, col, totalCols) {
-  const rangeStart = zoom.startHour * 60, rangeEnd = zoom.endHour * 60;
+function wpBlockStyle_(startMin, endMin, col, totalCols) {
+  const rangeStart = WEEKPLAN_START_HOUR_ * 60, rangeEnd = WEEKPLAN_END_HOUR_ * 60;
   const clampedStart = Math.max(startMin, rangeStart);
   const clampedEnd = Math.min(endMin, rangeEnd);
   if (clampedEnd <= clampedStart) return null;
-  const top = (clampedStart - rangeStart) / 60 * zoom.pxPerHour;
-  const rawHeight = (clampedEnd - clampedStart) / 60 * zoom.pxPerHour;
+  const top = (clampedStart - rangeStart) / 60 * WEEKPLAN_PX_PER_HOUR_;
+  const rawHeight = (clampedEnd - clampedStart) / 60 * WEEKPLAN_PX_PER_HOUR_;
   const gap = Math.min(1.5, rawHeight * 0.3);
   const height = Math.max(rawHeight - gap, 2);
   const left = totalCols > 1 ? `calc(${col} * 100% / ${totalCols} + 2px)` : '2px';
@@ -17288,14 +17336,27 @@ function wpWeekStart_() {
   if (!wpCurrentWeekStart_) wpCurrentWeekStart_ = getWeekMondayFor(new Date());
   return wpCurrentWeekStart_;
 }
-function wpWeekPrev() { wpCurrentWeekStart_ = new Date(wpWeekStart_().getTime() - 7 * ROUTINES_DAY_MS); renderWeekPlan_(); }
-function wpWeekNext() { wpCurrentWeekStart_ = new Date(wpWeekStart_().getTime() + 7 * ROUTINES_DAY_MS); renderWeekPlan_(); }
+function wpWeekPrev() { wpCurrentWeekStart_ = new Date(wpWeekStart_().getTime() - 7 * ROUTINES_DAY_MS); renderWeekPlan_({ scrollToNow: true }); }
+function wpWeekNext() { wpCurrentWeekStart_ = new Date(wpWeekStart_().getTime() + 7 * ROUTINES_DAY_MS); renderWeekPlan_({ scrollToNow: true }); }
+function wpWeekToday() { wpCurrentWeekStart_ = getWeekMondayFor(new Date()); renderWeekPlan_({ scrollToNow: true }); }
 
 function renderWeekPlanIfActive_() {
   if (calActiveSubTab_ === 'weekplan') renderWeekPlan_();
 }
 
-function renderWeekPlan_() {
+// Lands the scroll position somewhere useful instead of midnight: an hour
+// before "now" when today is actually in the displayed week (so the current
+// moment is visible near the top without being cut off), or a plain 7am
+// default for a week that's fully in the past or future.
+function wpAutoScroll_(monday, sunday, todayInWeek) {
+  const wrap = document.getElementById('wpGridWrap');
+  if (!wrap) return;
+  const targetHour = todayInWeek ? Math.max(0, new Date().getHours() - 1) : 7;
+  wrap.scrollTop = targetHour * WEEKPLAN_PX_PER_HOUR_;
+}
+
+function renderWeekPlan_(opts) {
+  opts = opts || {};
   const grid = document.getElementById('wpGrid');
   if (!grid) return;
   // Same fetch-once gate as ensureCalendarLoaded(), but without its
@@ -17311,7 +17372,6 @@ function renderWeekPlan_() {
   }
 
   const cfg = loadWeekPlanConfig_();
-  const zoom = WEEKPLAN_ZOOM_PRESETS_[wpZoom_] || WEEKPLAN_ZOOM_PRESETS_.full;
   const monday = wpWeekStart_();
   const sunday = new Date(monday.getTime() + 6 * ROUTINES_DAY_MS);
   const labelEl = document.getElementById('wpWeekLabel');
@@ -17320,12 +17380,15 @@ function renderWeekPlan_() {
     labelEl.textContent = `${fmt(monday)} – ${fmt(sunday)}`;
   }
 
-  const todayStr = new Date().toDateString();
-  const colHeight = (zoom.endHour - zoom.startHour) * zoom.pxPerHour;
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const nowMinutes = wpMinutesSinceMidnight_(now);
+  const todayInWeek = now >= monday && now < new Date(sunday.getTime() + ROUTINES_DAY_MS);
+  const colHeight = (WEEKPLAN_END_HOUR_ - WEEKPLAN_START_HOUR_) * WEEKPLAN_PX_PER_HOUR_;
 
   let axisHtml = '';
-  for (let h = zoom.startHour; h < zoom.endHour; h++) {
-    axisHtml += `<div class="wp-axis-hour" style="height:${zoom.pxPerHour}px;">${wpMinToTimeLabel_(h * 60)}</div>`;
+  for (let h = WEEKPLAN_START_HOUR_; h < WEEKPLAN_END_HOUR_; h++) {
+    axisHtml += `<div class="wp-axis-hour">${wpMinToTimeLabel_(h * 60)}</div>`;
   }
 
   let daysHtml = '';
@@ -17335,14 +17398,14 @@ function renderWeekPlan_() {
     const dayLabel = dateObj.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
 
     let hourLines = '';
-    for (let h = zoom.startHour + 1; h < zoom.endHour; h++) {
-      hourLines += `<div class="wp-hour-line" style="top:${(h - zoom.startHour) * zoom.pxPerHour}px;"></div>`;
+    for (let h = WEEKPLAN_START_HOUR_ + 1; h < WEEKPLAN_END_HOUR_; h++) {
+      hourLines += `<div class="wp-hour-line" style="top:${(h - WEEKPLAN_START_HOUR_) * WEEKPLAN_PX_PER_HOUR_}px;"></div>`;
     }
 
     const items = wpLayoutColumns_(wpTimedItemsForDay_(dayKey, i, dateObj, cfg));
     let blocksHtml = '';
     items.forEach(it => {
-      const pos = wpBlockStyle_(it.start, it.end, zoom, it.col, it.totalCols);
+      const pos = wpBlockStyle_(it.start, it.end, it.col, it.totalCols);
       if (!pos) return;
       blocksHtml += `<div class="wp-block ${it.cls}${pos.showLabel ? '' : ' compact'}" style="${pos.style} ${it.style || ''}" title="${escapeAttr_(it.label)}">${pos.showLabel ? escapeText_(it.label) : ''}</div>`;
     });
@@ -17352,13 +17415,19 @@ function renderWeekPlan_() {
     wpEventsForDate_(dateObj).forEach(ev => {
       if (!isCalendarInformational_(ev.calendar)) return;
       const startMin = wpMinutesSinceMidnight_(new Date(ev.start));
-      const rangeStart = zoom.startHour * 60, rangeEnd = zoom.endHour * 60;
+      const rangeStart = WEEKPLAN_START_HOUR_ * 60, rangeEnd = WEEKPLAN_END_HOUR_ * 60;
       const clampedStart = Math.max(startMin, rangeStart);
       if (clampedStart >= rangeEnd) return;
-      const top = (clampedStart - rangeStart) / 60 * zoom.pxPerHour;
+      const top = (clampedStart - rangeStart) / 60 * WEEKPLAN_PX_PER_HOUR_;
       const color = getEventColor(ev);
       blocksHtml += `<div class="wp-marker" style="top:${top}px; border-color:${color};" title="${escapeAttr_(ev.summary)}">${escapeText_(ev.summary)}</div>`;
     });
+
+    // A live current-time line, only on today's own column.
+    if (isToday) {
+      const nowTop = (nowMinutes - WEEKPLAN_START_HOUR_ * 60) / 60 * WEEKPLAN_PX_PER_HOUR_;
+      blocksHtml += `<div class="wp-now-line" style="top:${nowTop}px;"></div>`;
+    }
 
     // Habits already placed on the grid (wpHabitItemsForDate_, above)
     // don't also need a plain chip repeating them below it.
@@ -17368,13 +17437,14 @@ function renderWeekPlan_() {
     ).join('');
 
     daysHtml += `<div class="wp-day-col-wrap">
-      <div class="wp-day-head${isToday ? ' today' : ''}">${escapeText_(dayLabel)}</div>
+      <div class="wp-day-head${isToday ? ' today' : ''}">${escapeText_(dayLabel)}${isToday ? '<span class="wp-day-head-dot"></span>' : ''}</div>
       <div class="wp-day-col" style="height:${colHeight}px;">${hourLines}${blocksHtml}</div>
       <div class="wp-day-habits">${habitsHtml}</div>
     </div>`;
   });
 
   grid.innerHTML = `<div class="wp-axis">${axisHtml}</div><div class="wp-days">${daysHtml}</div>`;
+  if (opts.scrollToNow) wpAutoScroll_(monday, sunday, todayInWeek);
 
   const legendEl = document.getElementById('wpLegend');
   if (legendEl) {
@@ -17382,10 +17452,11 @@ function renderWeekPlan_() {
       ['var(--amber)', 'Workout (generated)'],
       ['var(--green)', 'Pushups (generated)'],
       ['#9A5BA8', 'Habit/task (learned time)'],
+      ['#D9A441', 'Starter feed'],
       ['var(--muted)', 'Work / commute (generated)'],
       ['var(--accent)', 'Real calendar event']
     ].map(([color, label]) => `<div class="wp-legend-item"><span class="wp-legend-swatch" style="background:${color};"></span>${escapeText_(label)}</div>`).join('')
-      + '<div class="wp-legend-item">┄ informational calendar (reminder only)</div>'
+      + '<div class="wp-legend-item">┄ informational calendar (reminder only) / estimated starter feed</div>'
       + '<div class="wp-legend-item">● below the grid: habits/tasks with no learned time yet</div>';
   }
 
@@ -17438,7 +17509,7 @@ function setCalSubTab(tab) {
   document.getElementById('calSubUpcoming').style.display = tab === 'upcoming' ? '' : 'none';
   document.getElementById('calSubWeekPlan').style.display = tab === 'weekplan' ? '' : 'none';
   if (tab === 'upcoming') ensureCalendarLoaded();
-  else renderWeekPlan_();
+  else renderWeekPlan_({ scrollToNow: true });
 }
 let calActiveSubTab_ = 'upcoming';
 
