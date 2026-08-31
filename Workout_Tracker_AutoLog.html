@@ -2048,15 +2048,14 @@
   .rt-check:disabled { cursor: default; opacity: 1; }
   /* A threshold-linked habit (Water, Pushups) isn't checked off by hand -
      it flips to done on its own once the day's logged value clears the
-     threshold. Until then, a small round dial inside the box fills in
-     like a pie as that value grows, purely as a glance-able "how close
-     am I" cue - it never changes when rtIsDoneOn actually flips (no
-     partial credit for a habit that's 90% of the way there). A circle
-     inset from the square box reads cleanly as a pie; a conic-gradient
-     filling the square itself just looks like a stray diagonal cut. */
-  .rt-check.rt-link-progress::after { content: ''; position: absolute; top: 50%; left: 50%;
-    width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%);
-    background: conic-gradient(var(--accent) calc(var(--fill, 0) * 1turn), var(--surface2) 0deg);
+     threshold. Until then, the box itself fills in like a pie (a wedge
+     sweeping clockwise from the top) as that value grows, purely as a
+     glance-able "how close am I" cue - it never changes when rtIsDoneOn
+     actually flips (no partial credit for a habit that's 90% of the way
+     there). The empty portion is transparent, not a tinted fill, so a
+     habit with nothing logged yet still reads as a plain empty checkbox
+     rather than looking pre-filled. */
+  .rt-check.rt-link-progress { background: conic-gradient(var(--accent) calc(var(--fill, 0) * 1turn), transparent 0deg);
     transition: background 0.4s ease; }
   /* One row: checkbox, name (truncates rather than wrapping), cadence
      pinned to the right edge - a compact list reads faster than a
