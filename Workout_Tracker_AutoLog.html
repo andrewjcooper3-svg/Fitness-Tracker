@@ -2322,6 +2322,12 @@
       <div class="ov-hero-card-label" style="margin-bottom:0;">💧 Water <span class="ov-hero-chevron" id="wtChartChevron">▸</span></div>
       <button class="wt-undo-btn" id="wtUndoBtn" onclick="undoLastWaterEntry(event)" style="display:none;">↩ Undo</button>
     </div>
+    <div class="rt-nav-row" style="margin-bottom:8px;" onclick="event.stopPropagation()">
+      <button class="rt-nav-btn" onclick="wtDayPrev()" aria-label="Previous day">‹</button>
+      <div class="rt-nav-label" id="wtDayNavLabel"></div>
+      <button class="rt-nav-btn" id="wtDayNextBtn" onclick="wtDayNext()" aria-label="Next day">›</button>
+      <button class="rt-nav-today-btn" id="wtDayTodayBtn" onclick="wtDayJumpToday()">Today</button>
+    </div>
     <div class="wt-body">
       <div class="wt-ring" id="wtRing">
         <div class="wt-ring-center">
@@ -15178,6 +15184,19 @@ function getTodayWaterEntries_() {
   return { date: todayKey, entries: getWaterEntryStore_().days[todayKey] || [] };
 }
 
+// Same shape as getTodayWaterEntries_/saveTodayWaterEntries_, but for
+// whatever day the widget is currently viewing (see wtViewDay) rather than
+// always today - what lets the "back a day" nav add/undo against a past
+// day's own entries instead of quietly writing them onto today.
+function getWaterEntriesForDay_(day) {
+  return { date: day, entries: getWaterEntryStore_().days[day] || [] };
+}
+function saveWaterEntriesForDay_(day, entries) {
+  const store = getWaterEntryStore_();
+  store.days[day] = entries;
+  saveWaterEntryStore_(store);
+}
+
 function saveTodayWaterEntries_(state) {
   const store = getWaterEntryStore_();
   store.days[state.date] = state.entries;
@@ -15337,6 +15356,35 @@ function markWaterDaySynced_(day) {
   const synced = getSyncedWaterDays_() || [];
   if (synced.indexOf(day) === -1) synced.push(day);
   localStorage.setItem(STORAGE_WATER_SYNCED_DAYS_KEY, JSON.stringify(synced.sort().slice(-60)));
+}
+function isWaterDaySynced_(day) { return (getSyncedWaterDays_() || []).indexOf(day) !== -1; }
+
+// A single entry posted straight to the Water Log sheet, bypassing the
+// draft mechanism entirely - for a backdated entry added to a day the
+// sheet already has a final total for (see logWaterIntake). There is no
+// "add one row to an already-closed day" concept in the draft/flush
+// pipeline (syncWaterDraft_ refuses to touch a day once it's synced, on
+// purpose - see its own comment), so this mirrors the exact per-entry
+// post flushCompletedWaterDays_ makes when a day first closes: one more
+// row, same shape, no re-flush of the rows already there.
+async function postSingleWaterEntryDirect_(day, entry) {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'logWater', date: day, type: entry.type,
+        rawOz: entry.rawOz, hydrationOz: entry.hydrationOz,
+        loggedAt: entry.loggedAt || '', endAt: entry.endAt || '',
+        caffeineMg: entry.caffeineMg || 0, alcoholOz: entry.alcoholOz || 0
+      })
+    });
+  } catch (e) {
+    // Offline/rejected - the local ledger and entry already reflect it;
+    // this is a rare manual backfill rather than the everyday tap-to-log
+    // path, so it isn't worth a retry queue of its own.
+  }
 }
 
 // On upgrade, every day up to and including today was already written
@@ -15685,25 +15733,29 @@ function resetDrinkTimeToNow_(event) {
   input.value = `${pad2_(now.getHours())}:${pad2_(now.getMinutes())}`;
 }
 
-// Turns an "HH:MM" box into a real Date on today's date, or null when
-// it's empty/unparseable.
+// Turns an "HH:MM" box into a real Date on the day the widget is
+// currently viewing (wtViewDay) rather than always today - the only
+// thing that makes backdating a drink to a previous day actually land
+// on that day instead of quietly landing on today with an odd time. or
+// null when the box is empty/unparseable.
 function readTimeInput_(id) {
   const input = document.getElementById(id);
   if (!input || !input.value) return null;
   const parts = input.value.split(':');
   const h = Number(parts[0]), m = Number(parts[1]);
   if (!isFinite(h) || !isFinite(m)) return null;
-  const when = new Date();
+  const when = new Date(wtViewDay);
   when.setHours(h, m, 0, 0);
   return when;
 }
 
-// Start falls back to now, so a log can never land on a bogus
-// timestamp. End is optional and only honoured when it's actually after
-// the start - an end at or before the start (including a mistyped one)
-// just means "logged at a single moment", the default behaviour.
+// Start falls back to right now on the viewed day (same day, current
+// time of day), so a log can never land on a bogus timestamp. End is
+// optional and only honoured when it's actually after the start - an
+// end at or before the start (including a mistyped one) just means
+// "logged at a single moment", the default behaviour.
 function readDrinkTimeRange_() {
-  const start = readTimeInput_('wtDrinkTime') || new Date();
+  const start = readTimeInput_('wtDrinkTime') || wtDefaultLogTime_();
   const end = readTimeInput_('wtDrinkTimeEnd');
   return { start: start, end: (end && end > start) ? end : null };
 }
@@ -15759,26 +15811,64 @@ function toggleWaterChart_() {
   updateViewportHeight('overview', true);
 }
 
+// The day the Water widget is currently showing - defaults to today, and
+// is the one thing every other function below reads instead of assuming
+// "right now": what turns the widget from a today-only logger into one
+// that can look back and backfill a day that got missed. Never goes past
+// today (see wtDayNext) - there's nothing to view or log ahead of now.
+let wtViewDay = new Date();
+function wtDayKey_() { return dateKey(wtViewDay); }
+function wtDayPrev() { wtViewDay = new Date(wtViewDay.getTime() - ROUTINES_DAY_MS); renderOverviewWaterWidget(); }
+function wtDayNext() {
+  if (wtDayKey_() === dateKey(new Date())) return;
+  wtViewDay = new Date(wtViewDay.getTime() + ROUTINES_DAY_MS);
+  renderOverviewWaterWidget();
+}
+function wtDayJumpToday() { wtViewDay = new Date(); renderOverviewWaterWidget(); }
+
+// "Right now" on whatever day is being viewed - the viewed day's date
+// with the real current time of day, so a backdated log defaults to a
+// plausible time instead of midnight when the time box is empty.
+function wtDefaultLogTime_() {
+  const now = new Date();
+  const d = new Date(wtViewDay);
+  d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+  return d;
+}
+
 function renderOverviewWaterWidget() {
   const ringEl = document.getElementById('wtRing');
   if (!ringEl) return;
-  const todayKey = dateKey(new Date());
+  const dayKey = wtDayKey_();
+  const isToday = dayKey === dateKey(new Date());
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
-  const todayOz = Math.max(0, ledger[todayKey] || 0);
-  const pct = WATER_DAILY_GOAL ? Math.min(100, Math.round(todayOz / WATER_DAILY_GOAL * 100)) : 0;
+  const dayOz = Math.max(0, ledger[dayKey] || 0);
+  const pct = WATER_DAILY_GOAL ? Math.min(100, Math.round(dayOz / WATER_DAILY_GOAL * 100)) : 0;
 
   ringEl.style.setProperty('--pct', pct);
   // Rounded for display only - custom sizes make net hydration
   // fractional (12oz beer at 0.67 = 8.04), and the ledger keeps the
   // exact value so a day's sum doesn't drift from repeated rounding.
-  document.getElementById('wtRingNum').textContent = Math.round(todayOz);
+  document.getElementById('wtRingNum').textContent = Math.round(dayOz);
   document.getElementById('wtRingTarget').textContent = 'of ' + WATER_DAILY_GOAL + ' oz';
+
+  const navLabelEl = document.getElementById('wtDayNavLabel');
+  if (navLabelEl) navLabelEl.textContent = isToday ? 'Today'
+    : wtViewDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const nextBtn = document.getElementById('wtDayNextBtn');
+  if (nextBtn) nextBtn.disabled = isToday;
+  const todayBtn = document.getElementById('wtDayTodayBtn');
+  if (todayBtn) todayBtn.style.display = isToday ? 'none' : '';
 
   renderWaterButtons();
 
-  const state = getTodayWaterEntries_();
+  const state = getWaterEntriesForDay_(dayKey);
   const undoBtn = document.getElementById('wtUndoBtn');
-  if (undoBtn) undoBtn.style.display = state.entries.length ? '' : 'none';
+  // Undo can only ever remove a LOCAL draft entry - once a day is synced
+  // to the Water Log sheet there's no endpoint to delete a single row, so
+  // offering Undo there would silently lie: the next ledger pull just
+  // max-merges the sheet's (still-higher) total straight back in anyway.
+  if (undoBtn) undoBtn.style.display = (state.entries.length && !isWaterDaySynced_(dayKey)) ? '' : 'none';
 
   renderWaterHourlyChart(state.entries);
   renderCaffeineLine_();
@@ -15790,6 +15880,11 @@ function renderOverviewWaterWidget() {
 function renderCaffeineLine_() {
   const el = document.getElementById('wtCaffeineOnBoard');
   if (!el) return;
+  // "On board right now" is inherently about the present moment, not a
+  // day you can navigate to - showing today's live decay curve under a
+  // backdated day would just be a wrong number wearing a right-looking
+  // label, so it goes quiet instead whenever the widget isn't on today.
+  if (wtDayKey_() !== dateKey(new Date())) { el.innerHTML = ''; syncWaterStatusRow_(); return; }
   const doses = getRecentDrinkDoses_();
   const mg = currentCaffeineMg_(new Date(), doses);
   const bac = bacAt_(new Date(), doses);
@@ -16188,11 +16283,12 @@ function logWaterIntake(event, type) {
     : (() => { const f = readDrinkAmountFields_(); return computeDrinkAmounts_(drinkType, f.oz, f.shots); })();
 
   const range = readDrinkTimeRange_();
+  const dayKey = wtDayKey_();
   const todayKey = dateKey(new Date());
   const loggedAt = range.start.toISOString();
 
   const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
-  ledger[todayKey] = (ledger[todayKey] || 0) + amounts.hydrationOz;
+  ledger[dayKey] = (ledger[dayKey] || 0) + amounts.hydrationOz;
   localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(ledger));
 
   const entry = {
@@ -16206,50 +16302,70 @@ function logWaterIntake(event, type) {
   };
   if (range.end) entry.endAt = range.end.toISOString();
 
-  const state = getTodayWaterEntries_();
+  const state = getWaterEntriesForDay_(dayKey);
   state.entries.push(entry);
-  saveTodayWaterEntries_(state);
+  saveWaterEntriesForDay_(dayKey, state.entries);
 
   resetDrinkTimeToNow_();
   renderOverviewWaterWidget();
-  // No sheet write here - the day is written as one batch once it's
-  // over (flushCompletedWaterDays_). This only shares the in-progress
-  // day with your other devices.
-  scheduleWaterDraftSync_();
-  // This path increments the ledger directly rather than going through
-  // recomputeWaterLedgerForDay_, so it needs its own nudge to the widget.
-  syncWidgetSummary();
+
+  if (dayKey === todayKey) {
+    // No sheet write here - today is written as one batch once it's
+    // over (flushCompletedWaterDays_). This only shares the in-progress
+    // day with your other devices.
+    scheduleWaterDraftSync_();
+    // This path increments the ledger directly rather than going through
+    // recomputeWaterLedgerForDay_, so it needs its own nudge to the widget.
+    syncWidgetSummary();
+  } else if (isWaterDaySynced_(dayKey)) {
+    // Backdating onto a day the Sheet already has a final total for -
+    // the draft path refuses this exact case on purpose (see
+    // syncWaterDraft_), so this one entry goes straight to the Sheet
+    // instead, the same way flushing a day posts each of its rows.
+    postSingleWaterEntryDirect_(dayKey, entry);
+  } else {
+    // A backdated entry on a day that hasn't been flushed yet - still
+    // just sitting in that day's draft, so sync that draft directly
+    // (scheduleWaterDraftSync_ always targets today, which isn't this).
+    syncWaterDraft_(dayKey);
+  }
 }
 
-// Undoes the most recent entry - locally that's unambiguous (today's own
-// entries list), and on the backend it's simply the Water Log sheet's
-// last row, since rows are appended in the order they were logged. Good
-// enough for the common case this is meant for (fix a mis-tap right
-// after it happens); it doesn't try to reconcile against a different
-// device tapping at the same moment.
+// Undoes the most recent entry on the day the widget is currently
+// viewing. For today that's unambiguous (today's own entries list) and
+// on the backend it's simply nothing yet, since today's rows haven't
+// been written to the Sheet at all (see the comment above). For a past
+// day the widget only offers this button once for entries that ALSO
+// haven't reached the Sheet yet - once a day is synced there's no
+// endpoint to delete one of its rows, so renderOverviewWaterWidget hides
+// Undo entirely rather than let it silently do nothing. Doesn't try to
+// reconcile against a different device tapping at the same moment.
 function undoLastWaterEntry(event) {
   event.stopPropagation();
-  const state = getTodayWaterEntries_();
+  const dayKey = wtDayKey_();
+  if (isWaterDaySynced_(dayKey)) return; // Nothing this can safely remove - see above.
+  const state = getWaterEntriesForDay_(dayKey);
   if (!state.entries.length) return;
   const removed = state.entries.pop();
-  saveTodayWaterEntries_(state);
+  saveWaterEntriesForDay_(dayKey, state.entries);
 
-  const todayKey = dateKey(new Date());
   // Tombstoned rather than just dropped: another device still holding
   // this entry would otherwise merge it straight back on the next sync.
   const store = getWaterEntryStore_();
   store.deleted = store.deleted || {};
-  store.deleted[todayKey] = (store.deleted[todayKey] || []).concat([drinkEntryId_(removed)]);
+  store.deleted[dayKey] = (store.deleted[dayKey] || []).concat([drinkEntryId_(removed)]);
   saveWaterEntryStore_(store);
 
-  recomputeWaterLedgerForDay_(todayKey, store.days[todayKey] || []);
+  recomputeWaterLedgerForDay_(dayKey, store.days[dayKey] || []);
 
   renderOverviewWaterWidget();
-  // No sheet write: today hasn't been sent yet, so the undo only has to
-  // reach your other devices. This also retires the old 'undoLastWater'
-  // round trip, which deleted whatever row happened to be last in the
+  // No sheet write: this day hasn't been sent yet (guarded above), so the
+  // undo only has to reach your other devices, via whichever draft path
+  // matches the day. This also retires the old 'undoLastWater' round
+  // trip, which deleted whatever row happened to be last in the
   // sheet - not necessarily the one just undone.
-  scheduleWaterDraftSync_();
+  if (dayKey === dateKey(new Date())) scheduleWaterDraftSync_();
+  else syncWaterDraft_(dayKey);
 }
 
 async function loadRemoteWaterLedger() {
