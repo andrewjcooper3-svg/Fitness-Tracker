@@ -2045,6 +2045,10 @@
     position: relative; appearance: none; -webkit-appearance: none; }
   .rt-check svg { width: 12px; height: 12px; position: relative; }
   .rt-check.done { background: var(--green); border-color: var(--green); color: #fff; }
+  /* Vacation: this day couldn't be done (traveling, no scale, whatever) -
+     a real third state, not a miss and not done, so it gets its own color
+     rather than borrowing red or green. See rtToggleExcused. */
+  .rt-check.excused { background: var(--blue); border-color: var(--blue); color: #fff; }
   .rt-check:disabled { cursor: default; opacity: 1; }
   /* A threshold-linked habit (Water, Pushups) isn't checked off by hand -
      it flips to done on its own once the day's logged value clears the
@@ -2071,6 +2075,14 @@
   .rt-item-name.done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
   .rt-item-meta { font-size: 11px; color: var(--muted); flex-shrink: 0; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
   .rt-streak-chip { font-size: 10.5px; font-weight: 700; color: var(--amber); flex-shrink: 0; white-space: nowrap; }
+  /* The vacation toggle - always visible rather than tucked behind a
+     long-press, since "I can't do this today" needs to be a one-tap
+     action to actually get used while traveling. */
+  .rt-vacation-btn { width: 21px; height: 21px; border-radius: 6px; border: none; background: var(--surface2);
+    color: var(--muted); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    padding: 0; appearance: none; -webkit-appearance: none; }
+  .rt-vacation-btn svg { width: 13px; height: 13px; }
+  .rt-vacation-btn.active { background: var(--blue); color: #fff; }
   /* Once there are enough habits to make the list keep growing, split
      it into two columns instead - height stays roughly constant rather
      than the card just getting taller and taller as habits pile up. */
@@ -2109,6 +2121,7 @@
     grid-auto-flow: column; grid-template-rows: 1fr; gap: 1px; }
   .rt-day-sections.tiny { inset: 0; border-radius: 2px; gap: 0.5px; }
   .rt-sec-done { background: var(--green); }
+  .rt-sec-excused { background: var(--blue); }
   .rt-sec-pending { background: var(--amber); }
   .rt-sec-miss { background: var(--red); }
   .rt-month-daynum { position: absolute; top: 3px; right: 3px; font-size: 10px; font-weight: 700; color: var(--text);
@@ -2131,10 +2144,12 @@
   .rt-heat-detail-date { font-weight: 700; margin-bottom: 6px; }
   .rt-heat-detail-item { display: flex; gap: 7px; align-items: center; font-size: 12.5px; color: var(--muted); padding: 2px 0; }
   .rt-heat-detail-item.on { color: var(--text); }
+  .rt-heat-detail-item.excused { color: var(--blue); }
   .rt-heat-detail-item.pending { color: var(--amber); }
   .rt-heat-detail-item.miss { color: var(--red); }
   .rt-heat-detail-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
   .rt-heat-detail-dot.on { background: var(--green); }
+  .rt-heat-detail-dot.excused { background: var(--blue); }
   .rt-heat-detail-dot.pending { background: var(--amber); }
   .rt-heat-detail-dot.miss { background: var(--red); }
   .rt-heat-detail-name { flex: 1; min-width: 0; }
@@ -2151,6 +2166,7 @@
   .rt-habit-strip { display: flex; gap: 2px; margin-top: 9px; }
   .rt-habit-strip span { flex: 1; height: 16px; border-radius: 3px; background: var(--surface2); }
   .rt-habit-strip span.on { background: var(--accent); }
+  .rt-habit-strip span.excused { background: var(--blue); opacity: 0.55; }
   .rt-habit-strip span.miss { background: var(--red); opacity: 0.35; }
   .rt-habit-strip span.future { background: transparent; }
   .rt-habit-move, .rt-habit-edit, .rt-habit-del { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
@@ -3136,6 +3152,7 @@
 
       <div class="rt-legend">
         <span class="rt-month-cell" style="background:var(--green);"></span><span>Completed</span>
+        <span class="rt-month-cell" style="background:var(--blue); margin-left:10px;"></span><span>Vacation</span>
         <span class="rt-month-cell" style="background:var(--amber); margin-left:10px;"></span><span>Pending</span>
         <span class="rt-month-cell" style="background:var(--red); margin-left:10px;"></span><span>Missed</span>
       </div>
@@ -6883,6 +6900,24 @@ function rtIsDoneOn(h, dateStr) {
   }
   return !!(RT_LOG[dateStr] && RT_LOG[dateStr][h.id] && RT_LOG[dateStr][h.id].done);
 }
+// Vacation: a day marked as "not possible to complete" (traveling with no
+// scale, no gym nearby, whatever) - a real third state alongside done/not
+// done, stored independently of h.link so it works even for a linked
+// habit like a Weight check-in that has no discrete check-off of its own
+// (see rtToggleExcused). Deliberately ignored once the habit turns out
+// to be done anyway (see every render site below, which checks
+// `excused && !done`) - an actual completion always wins over a leftover
+// vacation flag, rather than hiding it.
+function rtIsExcusedOn(h, dateStr) {
+  const rec = RT_LOG[dateStr] && RT_LOG[dateStr][h.id];
+  return !!(rec && rec.excused);
+}
+// "On vacation" outranks whatever meta text a row would otherwise show
+// (cadence label, done time, link status) - null when it doesn't apply,
+// so callers can just `||` it in front of their normal fallback.
+function rtExcusedMetaOverride_(h, k) {
+  return (rtIsExcusedOn(h, k) && !rtIsDoneOn(h, k)) ? 'On vacation' : null;
+}
 // When a (non-linked) habit was actually checked off, not just whether it
 // was - rtToggle already stamps this on every check-off (RT_LOG's
 // loggedAt), synced to the Routines Log sheet the same way. Linked habits
@@ -6971,6 +7006,10 @@ function rtCurrentStreak(h) {
     if (createdDate && d < createdDate) break;
     if (!rtIsDue(h, d)) { d = new Date(d.getTime() - ROUTINES_DAY_MS); continue; }
     const k = dateKey(d);
+    // A vacation day is neutral, not a miss - skip straight past it rather
+    // than either extending the streak (nothing was actually done) or
+    // breaking it (nothing should have been expected).
+    if (rtIsExcusedOn(h, k) && !rtIsDoneOn(h, k)) { d = new Date(d.getTime() - ROUTINES_DAY_MS); continue; }
     if (rtIsDoneOn(h, k)) { n++; d = new Date(d.getTime() - ROUTINES_DAY_MS); }
     else if (k === dateKey(rtToday)) { d = new Date(d.getTime() - ROUTINES_DAY_MS); } // today not logged yet doesn't break it
     else break;
@@ -6983,7 +7022,9 @@ function rtBestStreak(h) {
     const d = new Date(rtToday.getTime() - i * ROUTINES_DAY_MS);
     if (h.cadence === 'week') continue;
     if (!rtIsDue(h, d)) continue;
-    if (rtIsDoneOn(h, dateKey(d))) { cur++; best = Math.max(best, cur); } else cur = 0;
+    const k = dateKey(d);
+    if (rtIsExcusedOn(h, k) && !rtIsDoneOn(h, k)) continue; // vacation day: neutral, doesn't reset the run
+    if (rtIsDoneOn(h, k)) { cur++; best = Math.max(best, cur); } else cur = 0;
   }
   return best;
 }
@@ -6993,6 +7034,7 @@ function rtCompletionPct(h) {
     const d = new Date(rtToday.getTime() - i * ROUTINES_DAY_MS);
     if (h.cadence === 'week') continue;
     if (!rtIsDue(h, d)) continue;
+    if (rtIsExcusedOn(h, dateKey(d)) && !rtIsDoneOn(h, dateKey(d))) continue; // excluded entirely - neither due nor done
     due++;
     if (rtIsDoneOn(h, dateKey(d))) done++;
   }
@@ -7006,15 +7048,38 @@ function rtToggle(habitId, dateObj) {
   const k = dateKey(dateObj);
   RT_LOG[k] = RT_LOG[k] || {};
   const nextDone = !(RT_LOG[k][habitId] && RT_LOG[k][habitId].done);
-  RT_LOG[k][habitId] = { done: nextDone, loggedAt: new Date().toISOString() };
+  // Actually doing it clears any leftover vacation mark - the two are
+  // mutually exclusive (see rtToggleExcused, the other direction of this).
+  RT_LOG[k][habitId] = { done: nextDone, loggedAt: new Date().toISOString(), excused: false };
   rtSaveLogLocal();
   rtRenderAll();
-  rtLogToggleRemote_(k, habitId, nextDone);
+  rtLogToggleRemote_(k, habitId, nextDone, false);
 }
-function rtLogToggleRemote_(dateStr, habitId, done) {
+// Vacation toggle - marks a day as "not possible to complete" instead of
+// checking it off. Works for a linked habit too (that's the whole point:
+// a Weight check-in has no checkbox of its own to tap, but "couldn't weigh
+// in, I'm traveling" is still a real thing to record), since it's stored
+// independently of however the habit's own done state gets computed.
+function rtToggleExcused(habitId, dateObj) {
+  const h = RT_HABITS.list.find(x => x.id === habitId);
+  if (!h) return;
+  const k = dateKey(dateObj);
+  RT_LOG[k] = RT_LOG[k] || {};
+  const cur = RT_LOG[k][habitId] || {};
+  const nextExcused = !cur.excused;
+  // Marking vacation clears done - "couldn't do it" only makes sense once
+  // any existing completion for the day is cleared, same mutual exclusion
+  // rtToggle enforces the other way.
+  const nextDone = nextExcused ? false : !!cur.done;
+  RT_LOG[k][habitId] = { done: nextDone, loggedAt: new Date().toISOString(), excused: nextExcused };
+  rtSaveLogLocal();
+  rtRenderAll();
+  rtLogToggleRemote_(k, habitId, nextDone, nextExcused);
+}
+function rtLogToggleRemote_(dateStr, habitId, done, excused) {
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return; // best-effort; the next pull reconciles if this drops
-  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'logRoutine', date: dateStr, habitId, done }) })
+  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'logRoutine', date: dateStr, habitId, done, excused: !!excused }) })
     .catch(() => {});
 }
 
@@ -7037,20 +7102,33 @@ function rtDayPrev() { rtViewDay = new Date(rtViewDay.getTime() - ROUTINES_DAY_M
 function rtDayNext() { if (dateKey(rtViewDay) === dateKey(rtToday)) return; rtViewDay = new Date(rtViewDay.getTime() + ROUTINES_DAY_MS); rtRenderToday(); }
 function rtDayJumpToday() { rtViewDay = new Date(rtToday); rtRenderToday(); }
 
+// Shared between the checkbox (done state) and the vacation toggle button
+// (its own icon, and what an excused checkbox shows instead of a check).
+const RT_CHECK_ICON_SVG_ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>';
+const RT_VACATION_ICON_SVG_ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="2"></rect><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>';
+
 function rtItemRowHtml(h, k, metaText, showStreak) {
-  const done = rtIsDoneOn(h, k);
+  const rawDone = rtIsDoneOn(h, k);
+  // An actual completion always wins over a leftover vacation flag - see
+  // rtIsExcusedOn.
+  const excused = rtIsExcusedOn(h, k) && !rawDone;
+  const done = rawDone;
   const streak = showStreak ? rtCurrentStreak(h) : 0;
   const linked = !!h.link;
   const checkAttrs = linked ? 'disabled' : `onclick="rtToggle('${h.id}', rtViewDay)"`;
-  const progress = done ? null : rtLinkProgressRatio_(h, k);
+  const progress = (done || excused) ? null : rtLinkProgressRatio_(h, k);
   const progressStyle = progress != null ? ` style="--fill:${progress.toFixed(3)}"` : '';
+  const checkCls = excused ? 'excused' : (done ? 'done' : '');
+  const checkLabel = done ? 'Marked done' : (excused ? 'On vacation' : 'Not done');
   return `<div class="rt-item-row">
-    <button class="rt-check ${done ? 'done' : ''}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${done ? 'Marked done' : 'Not done'}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+    <button class="rt-check ${checkCls}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${checkLabel}">
+      ${excused ? RT_VACATION_ICON_SVG_ : RT_CHECK_ICON_SVG_}
     </button>
     <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
     <div class="rt-item-meta">${metaText}${linked ? ' <span class="rt-link-chip">🔗 linked</span>' : ''}</div>
     ${showStreak && streak > 1 ? `<div class="rt-streak-chip">${streak} day streak</div>` : ''}
+    <button class="rt-vacation-btn${excused ? ' active' : ''}" onclick="event.stopPropagation(); rtToggleExcused('${h.id}', rtViewDay)"
+      title="${excused ? 'Remove vacation mark' : 'Mark as vacation - not possible today'}" aria-label="${excused ? 'Remove vacation mark' : 'Mark as vacation'}">${RT_VACATION_ICON_SVG_}</button>
   </div>`;
 }
 
@@ -7059,11 +7137,16 @@ function rtRenderToday() {
   const dueToday = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, rtViewDay));
   const weeklyToday = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, rtViewDay));
   const k = dateKey(rtViewDay);
-  const doneToday = dueToday.filter(h => rtIsDoneOn(h, k));
-  rtRenderRing(dueToday.length ? doneToday.length / dueToday.length : 0);
+  // A habit on vacation today isn't scored either way - it doesn't count
+  // against the ring/headline (that's the whole point), but it also isn't
+  // "done", so it has to leave the denominator rather than just sit there
+  // dragging the percentage down.
+  const scoredToday = dueToday.filter(h => !(rtIsExcusedOn(h, k) && !rtIsDoneOn(h, k)));
+  const doneToday = scoredToday.filter(h => rtIsDoneOn(h, k));
+  rtRenderRing(scoredToday.length ? doneToday.length / scoredToday.length : 0);
 
   const headlineEl = document.getElementById('rtTodayHeadline');
-  if (headlineEl) headlineEl.textContent = dueToday.length ? `${doneToday.length} of ${dueToday.length} done` : 'Nothing due';
+  if (headlineEl) headlineEl.textContent = scoredToday.length ? `${doneToday.length} of ${scoredToday.length} done` : 'Nothing due';
   const navLabelEl = document.getElementById('rtTodayNavLabel');
   if (navLabelEl) navLabelEl.textContent = isToday ? 'Today'
     : rtViewDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -7085,7 +7168,7 @@ function rtRenderToday() {
     // Once it's done, the time it got checked off is more useful than the
     // cadence label that was only ever there to say when it's due.
     const doneTime = rtCompletedTimeText_(h, k);
-    const meta = h.link ? rtLinkMetaText_(h, k) : (doneTime || rtCadenceLabel(h));
+    const meta = rtExcusedMetaOverride_(h, k) || (h.link ? rtLinkMetaText_(h, k) : (doneTime || rtCadenceLabel(h)));
     return rtItemRowHtml(h, k, meta, isToday);
   }).join('');
   // X-times-a-week items aren't "due" on any one day, so they get their
@@ -7094,7 +7177,8 @@ function rtRenderToday() {
     html += '<div class="rt-item-group-label">This week, any day</div>';
     html += weeklyToday.map(h => {
       const doneTime = rtCompletedTimeText_(h, k);
-      return rtItemRowHtml(h, k, doneTime || `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`, false);
+      const meta = rtExcusedMetaOverride_(h, k) || doneTime || `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`;
+      return rtItemRowHtml(h, k, meta, false);
     }).join('');
   }
   list.classList.toggle('rt-item-list-2col', dueToday.length + weeklyToday.length > ROUTINES_2COL_THRESHOLD);
@@ -7138,9 +7222,12 @@ function rtDaySections(k, d, tiny) {
   const weeklyDone = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtIsDoneOn(h, k));
   const all = due.concat(weeklyDone);
   if (!all.length) return '';
-  const order = { 'rt-sec-done': 0, 'rt-sec-pending': 1, 'rt-sec-miss': 2 };
+  const order = { 'rt-sec-done': 0, 'rt-sec-excused': 1, 'rt-sec-pending': 2, 'rt-sec-miss': 3 };
   const items = all.map(h => {
-    const cls = h.cadence === 'week' ? 'rt-sec-done' : (rtIsDoneOn(h, k) ? 'rt-sec-done' : (isToday ? 'rt-sec-pending' : 'rt-sec-miss'));
+    const doneOn = rtIsDoneOn(h, k);
+    const excused = h.cadence !== 'week' && rtIsExcusedOn(h, k) && !doneOn;
+    const cls = excused ? 'rt-sec-excused'
+      : h.cadence === 'week' ? 'rt-sec-done' : (doneOn ? 'rt-sec-done' : (isToday ? 'rt-sec-pending' : 'rt-sec-miss'));
     return { cls, name: h.name };
   }).sort((a, b) => order[a.cls] - order[b.cls]);
   const cells = items.map(it => `<span class="${it.cls}" title="${escapeAttr_(it.name)}"></span>`).join('');
@@ -7245,8 +7332,9 @@ function rtRenderHeatDetail() {
   const isToday = rtSelectedDay === dateKey(rtToday);
   box.innerHTML = `<div class="rt-heat-detail-date">${label}</div>` + due.map(h => {
     const on = rtIsDoneOn(h, rtSelectedDay);
-    const cls = on ? 'on' : (isToday ? 'pending' : 'miss');
-    const doneTime = on ? rtCompletedTimeText_(h, rtSelectedDay) : '';
+    const excused = rtIsExcusedOn(h, rtSelectedDay) && !on;
+    const cls = excused ? 'excused' : (on ? 'on' : (isToday ? 'pending' : 'miss'));
+    const doneTime = on ? rtCompletedTimeText_(h, rtSelectedDay) : (excused ? 'On vacation' : '');
     return `<div class="rt-heat-detail-item ${cls}"><span class="rt-heat-detail-dot ${cls}"></span>` +
       `<span class="rt-heat-detail-name">${escapeText_(h.name)}</span>` +
       (doneTime ? `<span class="rt-heat-detail-time">${doneTime}</span>` : '') + `</div>`;
@@ -7267,8 +7355,10 @@ function rtRenderHabits() {
         return `<span class="${on ? 'on' : ''}" title="${dateKey(d)}"></span>`;
       }
       if (!rtIsDue(h, d)) return `<span class="future" title="not scheduled"></span>`;
-      const on = rtIsDoneOn(h, dateKey(d));
-      return `<span class="${on ? 'on' : 'miss'}" title="${dateKey(d)}"></span>`;
+      const dk = dateKey(d);
+      const on = rtIsDoneOn(h, dk);
+      const excused = rtIsExcusedOn(h, dk) && !on;
+      return `<span class="${excused ? 'excused' : (on ? 'on' : 'miss')}" title="${dk}${excused ? ' (vacation)' : ''}"></span>`;
     }).join('');
     const pct = rtCompletionPct(h);
     return `<div class="rt-habit-row">
@@ -7521,7 +7611,7 @@ function rtMergeRemoteLedger_(remoteLedger) {
       RT_LOG[dateStr] = RT_LOG[dateStr] || {};
       const localCell = RT_LOG[dateStr][habitId];
       if (!localCell || String(remoteCell.loggedAt) > String(localCell.loggedAt)) {
-        RT_LOG[dateStr][habitId] = { done: !!remoteCell.done, loggedAt: remoteCell.loggedAt };
+        RT_LOG[dateStr][habitId] = { done: !!remoteCell.done, loggedAt: remoteCell.loggedAt, excused: !!remoteCell.excused };
         changed = true;
       }
     });
@@ -15047,24 +15137,33 @@ window.addEventListener('resize', () => {
 });
 
 function ovRoutinesItemRowHtml_(h, k, weekly) {
-  const done = rtIsDoneOn(h, k);
+  const rawDone = rtIsDoneOn(h, k);
+  const excused = rtIsExcusedOn(h, k) && !rawDone;
+  const done = rawDone;
   const linked = !!h.link;
   const doneTime = done ? rtCompletedTimeText_(h, k) : '';
   const fallbackMeta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : (linked ? rtLinkMetaText_(h, k) : rtCadenceLabel(h));
-  const meta = doneTime || fallbackMeta;
+  const meta = excused ? 'On vacation' : (doneTime || fallbackMeta);
   const checkAttrs = linked ? 'disabled' : `onclick="event.stopPropagation(); ovToggleRoutine_('${h.id}')"`;
-  const progress = done ? null : rtLinkProgressRatio_(h, k);
+  const progress = (done || excused) ? null : rtLinkProgressRatio_(h, k);
   const progressStyle = progress != null ? ` style="--fill:${progress.toFixed(3)}"` : '';
+  const checkCls = excused ? 'excused' : (done ? 'done' : '');
+  const checkLabel = done ? 'Marked done' : (excused ? 'On vacation' : 'Not done');
   return `<div class="rt-item-row">
-    <button class="rt-check ${done ? 'done' : ''}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${done ? 'Marked done' : 'Not done'}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+    <button class="rt-check ${checkCls}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${checkLabel}">
+      ${excused ? RT_VACATION_ICON_SVG_ : RT_CHECK_ICON_SVG_}
     </button>
     <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
     <div class="rt-item-meta">${meta}${linked ? ' <span class="rt-link-chip">🔗</span>' : ''}</div>
+    <button class="rt-vacation-btn${excused ? ' active' : ''}" onclick="event.stopPropagation(); ovToggleExcusedRoutine_('${h.id}')"
+      title="${excused ? 'Remove vacation mark' : 'Mark as vacation - not possible today'}" aria-label="${excused ? 'Remove vacation mark' : 'Mark as vacation'}">${RT_VACATION_ICON_SVG_}</button>
   </div>`;
 }
 function ovToggleRoutine_(id) {
   rtToggle(id, rtToday); // rtToggle already calls rtRenderAll(), which re-enters here too
+}
+function ovToggleExcusedRoutine_(id) {
+  rtToggleExcused(id, rtToday); // rtToggleExcused already calls rtRenderAll(), which re-enters here too
 }
 function renderOverviewRoutinesWidget_() {
   const list = document.getElementById('ovRoutinesList');
@@ -19265,7 +19364,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-08-26-financial-sync';
+const EXPECTED_BACKEND_VERSION = '2026-09-01-routine-excused';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');

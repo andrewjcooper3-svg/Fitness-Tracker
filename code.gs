@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-08-31-checked-at';
+const BACKEND_BUILD_VERSION = '2026-09-01-routine-excused';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -367,7 +367,7 @@ function getWaterEntriesForDate_(date) {
 }
 
 const ROUTINES_SHEET_NAME = 'Routines Log';
-const ROUTINES_HEADERS = ['Date', 'Habit Id', 'Done', 'Logged At'];
+const ROUTINES_HEADERS = ['Date', 'Habit Id', 'Done', 'Logged At', 'Excused'];
 
 /**
  * Habit check-offs work like the water log, not the weight log: every tap
@@ -381,7 +381,10 @@ const ROUTINES_HEADERS = ['Date', 'Habit Id', 'Done', 'Logged At'];
 function getOrCreateRoutinesSheet_() {
   const ss = getOrCreateSpreadsheet_();
   let sheet = ss.getSheetByName(ROUTINES_SHEET_NAME);
-  if (sheet) return sheet;
+  if (sheet) {
+    migrateRoutinesSheetHeader_(sheet);
+    return sheet;
+  }
 
   sheet = ss.insertSheet(ROUTINES_SHEET_NAME);
   sheet.appendRow(ROUTINES_HEADERS);
@@ -393,9 +396,25 @@ function getOrCreateRoutinesSheet_() {
   return sheet;
 }
 
-function logRoutineEntry_(date, habitId, done) {
+// A sheet created before the Excused column existed only has 4 columns -
+// backfill any trailing header this build expects but the sheet doesn't
+// have yet, same widen-not-replace pattern the workout week sheets use.
+// Existing rows simply read back blank/false for it, which is exactly
+// "not excused" - no data migration needed, just the header label.
+function migrateRoutinesSheetHeader_(sheet) {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol >= ROUTINES_HEADERS.length) return;
+  const added = ROUTINES_HEADERS.slice(lastCol);
+  const range = sheet.getRange(1, lastCol + 1, 1, added.length);
+  range.setValues([added]);
+  range.setFontWeight('bold');
+  range.setBackground('#1a1d24');
+  range.setFontColor('#ffffff');
+}
+
+function logRoutineEntry_(date, habitId, done, excused) {
   const sheet = getOrCreateRoutinesSheet_();
-  sheet.appendRow([date, habitId, !!done, new Date()]);
+  sheet.appendRow([date, habitId, !!done, new Date(), !!excused]);
 }
 
 function getRoutinesLedgerFromSheets_() {
@@ -416,7 +435,7 @@ function getRoutinesLedgerFromSheets_() {
     // wins the fold when its own timestamp is actually later - defends
     // against a sheet that was ever hand-edited out of chronological order.
     if (!existing || loggedAt >= existing.loggedAt) {
-      ledger[key][habitId] = { done: !!row[2], loggedAt: loggedAt };
+      ledger[key][habitId] = { done: !!row[2], loggedAt: loggedAt, excused: !!row[4] };
     }
   });
   return ledger;
@@ -1804,7 +1823,7 @@ function doPost(e) {
       if (!data.date || !data.habitId) {
         throw new Error('logRoutine requires a date and a habitId');
       }
-      logRoutineEntry_(data.date, data.habitId, data.done);
+      logRoutineEntry_(data.date, data.habitId, data.done, data.excused);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
