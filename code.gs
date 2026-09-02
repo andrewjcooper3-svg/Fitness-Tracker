@@ -701,20 +701,27 @@ function mbRefreshNow_() {
   try { responses = UrlFetchApp.fetchAll(requests); } catch (e) { console.error('fetchAll: ' + e); }
   const [pointsRes, alertsRes, cbsRes, stooqRes, burgRes, tbayRes] = responses;
 
-  try { const w = mbParseWeather_(pointsRes, alertsRes, nwsOpts); if (w) brief.weather = w; } catch (e) { console.error('weather: ' + e); }
-  try { const c = mbGatherCalendar_(); if (c.length) brief.calendar = c; } catch (e) { console.error('calendar: ' + e); }
-  try { brief.inbox = mbGatherInbox_(); } catch (e) { console.error('inbox: ' + e); }
+  // Recorded per-section rather than just console.error'd - an empty
+  // section (e.g. "Inbox is quiet") and a SWALLOWED FAILURE look
+  // identical in the modal otherwise, and Andrew has no easy way to see
+  // Apps Script's Executions log from his phone. This surfaces the real
+  // reason right in the UI instead.
+  const errors = {};
+  try { const w = mbParseWeather_(pointsRes, alertsRes, nwsOpts); if (w) brief.weather = w; } catch (e) { errors.weather = String(e); }
+  try { const c = mbGatherCalendar_(); if (c.length) brief.calendar = c; } catch (e) { errors.calendar = String(e); }
+  try { brief.inbox = mbGatherInbox_(); } catch (e) { errors.inbox = String(e); }
   try {
     const h = mbParseHeadlines_(cbsRes, stooqRes);
     if (h.headlines.length) brief.headlines = h.headlines;
     if (h.marketsSummary) brief.markets = { summary: h.marketsSummary };
-  } catch (e) { console.error('headlines: ' + e); }
+  } catch (e) { errors.headlines = String(e); }
   try {
     const ev = [];
     if (burgRes) mbExtractEvents_(burgRes.getContentText()).forEach(e => ev.push(e));
     if (tbayRes) mbExtractEvents_(tbayRes.getContentText()).forEach(e => ev.push(e));
     if (ev.length) brief.events = ev.slice(0, 6);
-  } catch (e) { console.error('events: ' + e); }
+  } catch (e) { errors.events = String(e); }
+  if (Object.keys(errors).length) brief._errors = errors;
 
   const fitted = mbFitBudget_(brief);
   saveMorningBrief_(fitted);

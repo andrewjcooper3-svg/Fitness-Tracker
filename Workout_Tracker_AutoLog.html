@@ -5347,9 +5347,21 @@ function renderMorningBrief_(brief, offline) {
 
   const events = brief.events || [];
   if (events.length) {
-    html += `<div class="config-box" style="margin-bottom:0;">
+    html += `<div class="config-box">
       <div class="mb-section-title">Out This Week</div>
       ${events.map(ev => `<div class="mb-row"><div class="mb-row-label">${escapeHtml_(ev.name || '')}</div><div class="mb-row-value">${escapeHtml_(ev.date || '')}</div></div>`).join('')}
+    </div>`;
+  }
+
+  // A section that failed server-side (most often an authorization gap
+  // on Gmail/Calendar, or a source's markup changing) looks identical to
+  // one that's just genuinely empty otherwise - surface the real reason
+  // here instead of a silent "quiet inbox"/"nothing today".
+  const errs = brief._errors;
+  if (errs && Object.keys(errs).length) {
+    html += `<div class="config-box" style="margin-bottom:0;">
+      <div class="mb-section-title">Couldn't Load</div>
+      ${Object.keys(errs).map(k => `<div class="mb-row"><div class="mb-row-label">${escapeHtml_(k)}</div><div class="mb-row-value">${escapeHtml_(errs[k])}</div></div>`).join('')}
     </div>`;
   }
 

@@ -126,6 +126,23 @@ const SAMPLE_BRIEF = {
   const afterRefresh = await page.evaluate(() => document.getElementById('mbContent').innerHTML);
   check('renders the freshly-regenerated data, not the stale cached value', afterRefresh.includes('88') && !afterRefresh.includes('>91'), afterRefresh.match(/mb-weather-temp">[^<]*/)[0]);
 
+  console.log('\n=== A section that failed server-side shows its real error, not a silent empty state ===');
+  const BRIEF_WITH_ERRORS = {
+    updatedAt: '2026-09-03T14:00:00Z',
+    weather: SAMPLE_BRIEF.weather,
+    _errors: { calendar: 'Exception: You do not have permission to call CalendarApp.getAllCalendars', inbox: 'Exception: You do not have permission to call GmailApp.search' }
+  };
+  await page.unroute('https://script.google.com/**');
+  await page.route('https://script.google.com/**', route => {
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', brief: BRIEF_WITH_ERRORS }) });
+  });
+  await page.click('#mbRefreshBtn');
+  await page.waitForTimeout(300);
+  const withErrors = await page.evaluate(() => document.getElementById('mbContent').innerHTML);
+  check('surfaces the calendar failure reason', withErrors.includes('You do not have permission to call CalendarApp'));
+  check('surfaces the inbox failure reason', withErrors.includes('You do not have permission to call GmailApp'));
+  check('still renders the sections that DID succeed', withErrors.includes('St. Petersburg, FL'));
+
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 
   await browser.close();
