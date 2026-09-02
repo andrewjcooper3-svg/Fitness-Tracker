@@ -725,6 +725,8 @@ function mbRefreshNow_() {
     const h = mbParseHeadlines_(cbsRes, stooqRes);
     if (h.headlines.length) brief.headlines = h.headlines;
     if (h.marketsSummary) brief.markets = { summary: h.marketsSummary };
+    if (h.cbsError) errors.headlines = h.cbsError;
+    if (h.stooqError) errors.markets = h.stooqError;
   } catch (e) { errors.headlines = String(e); }
   try {
     const ev = [];
@@ -745,11 +747,22 @@ function mbRefreshNow_() {
 // batch above; only the forecast fetch (needs the points response's own
 // URL first) still happens here, sequentially.
 function mbParseWeather_(pointsRes, alertsRes, opts) {
-  if (!pointsRes) return null;
+  // Every failure path here throws instead of returning null - a silent
+  // null return looked identical to "nothing to show" and never made it
+  // into _errors the way a real calendar/inbox failure does, so weather
+  // could vanish from the brief with zero indication why.
+  if (!pointsRes) throw new Error('NWS points request never completed (the parallel fetchAll batch may have failed entirely)');
+  if (pointsRes.getResponseCode() !== 200) {
+    throw new Error('NWS points request failed (HTTP ' + pointsRes.getResponseCode() + '): ' + pointsRes.getContentText().slice(0, 200));
+  }
   const points = JSON.parse(pointsRes.getContentText());
   const forecastUrl = points.properties && points.properties.forecast;
-  if (!forecastUrl) return null;
-  const forecast = JSON.parse(UrlFetchApp.fetch(forecastUrl, opts).getContentText());
+  if (!forecastUrl) throw new Error('NWS points response had no forecast URL: ' + pointsRes.getContentText().slice(0, 200));
+  const forecastRes = UrlFetchApp.fetch(forecastUrl, opts);
+  if (forecastRes.getResponseCode() !== 200) {
+    throw new Error('NWS forecast request failed (HTTP ' + forecastRes.getResponseCode() + '): ' + forecastRes.getContentText().slice(0, 200));
+  }
+  const forecast = JSON.parse(forecastRes.getContentText());
   const periods = (forecast.properties && forecast.properties.periods) || [];
   const dayPeriod = periods.find(p => p.isDaytime) || periods[0];
   const nightPeriod = periods.find(p => !p.isDaytime) || periods[1];
@@ -871,37 +884,43 @@ function mbCategorizeMail_(from, subject) {
 // so they're far less likely to silently break than an HTML scrape. Takes
 // the already-fetched responses from the parallel batch in mbRefreshNow_.
 function mbParseHeadlines_(cbsRes, stooqRes) {
+  // Each source records its OWN error rather than just console.error'ing
+  // it - the same silent-swallow gap mbParseWeather_ had, where a real
+  // failure and a source that's just quiet today looked identical with
+  // nothing in _errors to tell them apart.
   const headlines = [];
+  let cbsError = null;
   try {
-    if (cbsRes) {
-      const doc = XmlService.parse(cbsRes.getContentText());
-      const items = doc.getRootElement().getChild('channel').getChildren('item');
-      items.slice(0, 5).forEach(item => {
-        const title = (item.getChildText('title') || '').trim();
-        let summary = (item.getChildText('description') || '').replace(/<[^>]+>/g, '').trim();
-        if (summary.length > 160) summary = summary.slice(0, 157) + '...';
-        if (title) headlines.push({ title: title, summary: summary });
-      });
-    }
-  } catch (e) { console.error('cbs rss: ' + e); }
+    if (!cbsRes) throw new Error('CBS RSS request never completed (the parallel fetchAll batch may have failed entirely)');
+    if (cbsRes.getResponseCode() !== 200) throw new Error('CBS RSS request failed (HTTP ' + cbsRes.getResponseCode() + ')');
+    const doc = XmlService.parse(cbsRes.getContentText());
+    const items = doc.getRootElement().getChild('channel').getChildren('item');
+    items.slice(0, 5).forEach(item => {
+      const title = (item.getChildText('title') || '').trim();
+      let summary = (item.getChildText('description') || '').replace(/<[^>]+>/g, '').trim();
+      if (summary.length > 160) summary = summary.slice(0, 157) + '...';
+      if (title) headlines.push({ title: title, summary: summary });
+    });
+  } catch (e) { cbsError = String(e); }
 
   let marketsSummary = null;
+  let stooqError = null;
   try {
-    if (stooqRes) {
-      const rows = Utilities.parseCsv(stooqRes.getContentText()).slice(1); // header row first
-      const labels = { '^DJI': 'Dow', '^SPX': 'S&P', '^NDQ': 'Nasdaq' };
-      const parts = rows.map(r => {
-        const symbol = (r[0] || '').toUpperCase();
-        const open = parseFloat(r[3]), close = parseFloat(r[6]);
-        if (!labels[symbol] || !open || !close) return null;
-        const pct = ((close - open) / open * 100).toFixed(1);
-        return labels[symbol] + ' ' + (pct >= 0 ? '+' : '') + pct + '%';
-      }).filter(Boolean);
-      if (parts.length) marketsSummary = parts.join(' · ');
-    }
-  } catch (e) { console.error('stooq: ' + e); }
+    if (!stooqRes) throw new Error('Stooq request never completed (the parallel fetchAll batch may have failed entirely)');
+    if (stooqRes.getResponseCode() !== 200) throw new Error('Stooq request failed (HTTP ' + stooqRes.getResponseCode() + ')');
+    const rows = Utilities.parseCsv(stooqRes.getContentText()).slice(1); // header row first
+    const labels = { '^DJI': 'Dow', '^SPX': 'S&P', '^NDQ': 'Nasdaq' };
+    const parts = rows.map(r => {
+      const symbol = (r[0] || '').toUpperCase();
+      const open = parseFloat(r[3]), close = parseFloat(r[6]);
+      if (!labels[symbol] || !open || !close) return null;
+      const pct = ((close - open) / open * 100).toFixed(1);
+      return labels[symbol] + ' ' + (pct >= 0 ? '+' : '') + pct + '%';
+    }).filter(Boolean);
+    if (parts.length) marketsSummary = parts.join(' · ');
+  } catch (e) { stooqError = String(e); }
 
-  return { headlines: headlines, marketsSummary: marketsSummary };
+  return { headlines: headlines, marketsSummary: marketsSummary, cbsError: cbsError, stooqError: stooqError };
 }
 
 // Best-effort HTML scrape of two local-events sites that don't publish a
