@@ -686,6 +686,16 @@ function refreshMorningBriefAuto_() {
 // the "points" response's URL first.
 function mbRefreshNow_() {
   const brief = { updatedAt: new Date().toISOString() };
+  // A quiet inbox/calendar with NO error is consistent with a genuinely
+  // empty day, but also with this whole script simply executing as a
+  // different Google account than the one being checked by eye - a web
+  // app runs as whoever OWNS the Apps Script project, and that account's
+  // Gmail/Calendar would come back truthfully empty with zero exceptions
+  // if it isn't the account actually being used day to day. Surfacing
+  // which account this actually ran as settles that immediately.
+  try { brief._runningAs = Session.getEffectiveUser().getEmail() || '(blank - no email visibility)'; }
+  catch (e) { brief._runningAs = 'could not determine: ' + e; }
+
   const lat = 27.7676, lon = -82.6403; // St. Petersburg, FL
   const nwsOpts = { headers: { 'User-Agent': 'FitnessTrackerApp (andrewjcooper3@gmail.com)' }, muteHttpExceptions: true };
 

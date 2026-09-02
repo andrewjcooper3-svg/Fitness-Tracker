@@ -5301,7 +5301,7 @@ function renderMorningBrief_(brief, offline) {
     return;
   }
 
-  updatedEl.textContent = mbFmtUpdated_(brief.updatedAt);
+  updatedEl.textContent = mbFmtUpdated_(brief.updatedAt) + (brief._runningAs ? ' · runs as ' + brief._runningAs : '');
   let html = '';
 
   if (brief.weather) {

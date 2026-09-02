@@ -14,6 +14,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
 
 const SAMPLE_BRIEF = {
   updatedAt: '2026-09-03T10:31:00Z',
+  _runningAs: 'andrewjcooper3@gmail.com',
   weather: { location: 'St. Petersburg, FL', high: 91, low: 78, condition: 'Scattered storms', alert: 'Drought advisory in effect' },
   calendar: [{ time: '9:00 AM', title: 'Dentist' }],
   inbox: { categories: [{ name: 'Financial', items: [{ subject: 'Statement ready' }] }] },
@@ -103,6 +104,7 @@ const SAMPLE_BRIEF = {
   check('renders this week\'s events', rendered.includes('Farmers Market') && rendered.includes('Sat 9/6'));
   const updatedText = await page.evaluate(() => document.getElementById('mbUpdated').textContent);
   check('shows an "Updated ..." timestamp', /Updated/.test(updatedText), updatedText);
+  check('shows which Google account it ran as (diagnoses a wrong-account gather)', updatedText.includes('runs as andrewjcooper3@gmail.com'), updatedText);
 
   console.log('\n=== The refresh button re-GENERATES live rather than re-reading the cache ===');
   const REGENERATED_BRIEF = { ...SAMPLE_BRIEF, updatedAt: '2026-09-03T14:00:00Z',
