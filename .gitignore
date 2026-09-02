@@ -3,3 +3,8 @@
 # and this isn't.
 design/trainer-landscape.html
 design/artboards.manifest.json
+
+# Playwright, installed locally for the test/ suite
+node_modules/
+package.json
+package-lock.json
