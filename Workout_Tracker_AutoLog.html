@@ -161,14 +161,38 @@
   .exercise-sets.expanded { display: block; }
   .set-row { position: relative; overflow: hidden; border-bottom: 1px solid var(--border); }
   .set-row:last-child { border-bottom: none; }
-  .set-row-inner { display: grid; grid-template-columns: 40px 1fr 1fr 1fr 70px 30px; gap: 8px; padding: 11px 14px; align-items: center; position: relative; z-index: 1; background: var(--surface); transition: transform 0.2s ease; touch-action: pan-y; }
+  /* Weight and reps get more of the row than the Notes button needs -
+     equal thirds clipped "255 lb" once it went bold/larger below. */
+  .set-row-inner { display: grid; grid-template-columns: 32px 1.15fr 1fr 0.85fr 70px 30px; gap: 8px; padding: 11px 14px; align-items: center; position: relative; z-index: 1; background: var(--surface); transition: transform 0.2s ease; touch-action: pan-y; }
   .set-row-inner.swiping { transition: none; }
   .set-swipe-delete-btn { position: absolute; top: 0; right: 0; bottom: 0; width: 84px; background: #c0392b; color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; }
   .set-num { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; }
-  .set-input-group { display: flex; flex-direction: column; gap: 2px; }
-  .set-input-label { font-family: var(--font); font-size: 9px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  .set-input-group { display: flex; flex-direction: column; gap: 2px; justify-content: center; min-width: 0; }
   .set-input { font-family: var(--font); font-size: 14px; color: var(--text); background: transparent; border: none; border-bottom: 1px solid var(--border); outline: none; padding: 4px 2px; width: 100%; font-variant-numeric: tabular-nums; }
   .set-input:focus { border-bottom-color: var(--accent); }
+  /* Weight and reps: no "WEIGHT"/"REPS" caption above the box anymore -
+     bigger, bolder text in its place, since these are the two numbers you
+     actually glance at mid-set. What the second number MEANS (reps vs a
+     timed hold) moves to one small badge per exercise instead of a label
+     on every row - see .unit-badge on the header - since a real workout
+     never mixes the two within one exercise. */
+  .set-input.big-num { font-size: 19px; font-weight: 800; text-align: center; padding: 6px 2px; }
+  .unit-badge { font-family: var(--font); font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.3px; background: var(--surface2); border-radius: 6px; padding: 3px 6px; flex-shrink: 0; }
+  /* Notes: a button instead of an always-open text box - most sets never
+     get one, so this stays out of the way until you actually want to
+     write something. Filled once a note exists, so a set that already
+     has one is visible without opening it. The actual field lives in
+     .notes-panel, a 7th grid item that spans every column (grid-column:
+     1/-1 wraps it to a new row of its own) rather than trying to cram a
+     real text box into the same narrow third a button fits in. */
+  .notes-btn { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface2);
+    border: none; border-radius: 7px; padding: 7px 4px; width: 100%; cursor: pointer; }
+  .notes-btn.has-note { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface2)); }
+  .notes-panel { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+  .notes-panel .set-input { border: none; border-bottom: 1px solid var(--border); }
+  .notes-panel-done { font-family: var(--font); font-size: 12px; font-weight: 600; color: #fff; background: var(--accent);
+    border: none; border-radius: 7px; padding: 7px 14px; cursor: pointer; flex-shrink: 0; }
   .set-quality { display: flex; gap: 4px; flex-shrink: 0; justify-content: center; }
   .quality-box { width: 20px; height: 20px; border-radius: 6px; cursor: pointer; transition: all 0.15s; box-sizing: border-box; background: transparent; }
   .quality-box.quality-green { border: 2px solid var(--green); }
@@ -4237,14 +4261,25 @@ function renderWeeklyPlan_() {
 
     WEEKLY_PLAN_DATA[day].forEach(ex => {
       const rowsHtml = ex.rows.map((row, i) => {
-        const [weightPh, repsLabel, repsPh, notePh] = row;
+        const [weightPh, , repsPh, notePh] = row;
         const noteAttr = notePh ? ` placeholder="${escapeAttr_(notePh)}"` : '';
-        return `<div class="set-row"><div class="set-num">${i + 1}</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="${escapeAttr_(weightPh)}"></div><div class="set-input-group"><div class="set-input-label">${escapeText_(repsLabel)}</div><input class="set-input" type="text" placeholder="${escapeAttr_(repsPh)}"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"${noteAttr}></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div>`;
+        return `<div class="set-row"><div class="set-num">${i + 1}</div>` +
+          `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(weightPh)}"></div>` +
+          `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(repsPh)}"></div>` +
+          `<div class="set-input-group"><button type="button" class="notes-btn" onclick="toggleSetNotesUI(this)">Notes</button></div>` +
+          `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>` +
+          `<div class="notes-panel" style="display:none;"><input class="set-input notes-input" type="text"${noteAttr} oninput="syncNotesButton_(this)"><button type="button" class="notes-panel-done" onclick="toggleSetNotesUI(this)">Done</button></div>` +
+          `</div>`;
       }).join('');
+
+      // Reps-vs-Time is the same for every set of a real exercise (it's
+      // never "10 reps" on set 1 and "45s" on set 2), so it's a single
+      // badge on the card, not a caption repeated on every row.
+      const unitLabel = (ex.rows[0] && ex.rows[0][1]) || 'Reps';
 
       const card = document.createElement('div');
       card.className = 'exercise-card';
-      card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">${escapeText_(ex.name)}</div><div class="exercise-meta">${escapeText_(ex.meta)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
+      card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">${escapeText_(ex.name)}</div><div class="unit-badge">${escapeText_(unitLabel)}</div><div class="exercise-meta">${escapeText_(ex.meta)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
       panel.insertBefore(card, anchor);
     });
   });
@@ -14337,7 +14372,7 @@ function restoreDay(day, savedDay) {
         const inputs = row.querySelectorAll('.set-input');
         if (inputs[0]) inputs[0].value = savedSet.weight || '';
         if (inputs[1]) inputs[1].value = savedSet.reps || '';
-        if (inputs[2]) inputs[2].value = savedSet.notes || '';
+        if (inputs[2]) { inputs[2].value = savedSet.notes || ''; syncNotesButton_(inputs[2]); }
         if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
         if (savedSet.checkedAt) row.querySelector('.set-checkbox').dataset.checkedAt = savedSet.checkedAt;
         if (savedSet.quality) {
@@ -14372,7 +14407,7 @@ function restoreDay(day, savedDay) {
         const inputs = row.querySelectorAll('.set-input');
         if (inputs[0]) inputs[0].value = savedSet.weight || '';
         if (inputs[1]) inputs[1].value = savedSet.reps || '';
-        if (inputs[2]) inputs[2].value = savedSet.notes || '';
+        if (inputs[2]) { inputs[2].value = savedSet.notes || ''; syncNotesButton_(inputs[2]); }
         if (savedSet.checked) row.querySelector('.set-checkbox').classList.add('checked');
         if (savedSet.checkedAt) row.querySelector('.set-checkbox').dataset.checkedAt = savedSet.checkedAt;
         if (savedSet.quality) {
@@ -19282,6 +19317,37 @@ function toggleSetCheck(el) {
   saveState();
 }
 
+// The note field itself never moved - it's the same .set-input at the
+// same index (inputs[2]) every other function already reads/writes by
+// position, just visually tucked behind a button instead of always
+// shown. Works from either button inside the panel (Notes to open,
+// Done to close), found the same way regardless of which one was
+// tapped.
+function toggleSetNotesUI(btn) {
+  const row = btn.closest('.set-row');
+  const panel = row && row.querySelector('.notes-panel');
+  if (!panel) return;
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? '' : 'none';
+  if (opening) {
+    const input = panel.querySelector('.notes-input');
+    if (input) setTimeout(() => input.focus(), 30);
+  }
+}
+
+// Keeps the Notes button's "already has something written" look in sync
+// with the actual field - called live as you type, and after anything
+// that sets a note's value directly (restoreDay) rather than through
+// typing.
+function syncNotesButton_(input) {
+  const row = input.closest('.set-row');
+  const btn = row && row.querySelector('.notes-btn');
+  if (!btn) return;
+  const has = !!(input.value && input.value.trim());
+  btn.classList.toggle('has-note', has);
+  btn.textContent = has ? 'Notes ●' : 'Notes';
+}
+
 // Per-set quality tag: green = good set/easy weight, yellow = tough weight
 // but got it done, red = too tough - couldn't finish or had to lower the
 // weight. Clicking the already-active box clears it back to unset.
@@ -19726,7 +19792,7 @@ function initSetSwipe(row) {
 }
 
 function onSetSwipeStart(e) {
-  if (e.target.closest('input, textarea, .set-checkbox, .quality-box')) return;
+  if (e.target.closest('input, textarea, button, .set-checkbox, .quality-box')) return;
   // Stops here so a swipe starting on a set-row never also triggers the
   // exercise-level swipe (initExerciseSwipe listens further up the
   // same .exercise-card) - swiping the whole exercise still works by
@@ -19834,10 +19900,11 @@ function addSet(btn) {
   const row = document.createElement('div');
   row.className = 'set-row';
   row.innerHTML = `<div class="set-num">${rows.length + 1}</div>` +
-    `<div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text" placeholder="${weightPlaceholder}"></div>` +
-    `<div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text" placeholder="${repsPlaceholder}"></div>` +
-    `<div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div>` +
-    `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>`;
+    `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${weightPlaceholder}"></div>` +
+    `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${repsPlaceholder}"></div>` +
+    `<div class="set-input-group"><button type="button" class="notes-btn" onclick="toggleSetNotesUI(this)">Notes</button></div>` +
+    `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>` +
+    `<div class="notes-panel" style="display:none;"><input class="set-input notes-input" type="text" oninput="syncNotesButton_(this)"><button type="button" class="notes-panel-done" onclick="toggleSetNotesUI(this)">Done</button></div>`;
   container.insertBefore(row, btn);
   initSetQuality(row);
   initSetSwipe(row);
@@ -20077,8 +20144,14 @@ function addExercise(panel, skipFocus) {
   const card = document.createElement('div');
   card.className = 'exercise-card';
   card.dataset.exId = 'custom-' + Date.now() + '-' + (nextCustomExId++);
-  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><input class="exercise-name-input" type="text" placeholder="Exercise name" onclick="event.stopPropagation()" oninput="updateExerciseHistoryNote(this.closest('.exercise-card'))"></div><div class="exercise-meta">Custom</div></div>` +
-    `<div class="exercise-sets expanded"><div class="set-row"><div class="set-num">1</div><div class="set-input-group"><div class="set-input-label">Weight</div><input class="set-input" type="text"></div><div class="set-input-group"><div class="set-input-label">Reps</div><input class="set-input" type="text"></div><div class="set-input-group"><div class="set-input-label">Notes</div><input class="set-input" type="text"></div><div class="set-checkbox" onclick="toggleSetCheck(this)"></div></div></div>`;
+  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><input class="exercise-name-input" type="text" placeholder="Exercise name" onclick="event.stopPropagation()" oninput="updateExerciseHistoryNote(this.closest('.exercise-card'))"></div><div class="unit-badge">Reps</div><div class="exercise-meta">Custom</div></div>` +
+    `<div class="exercise-sets expanded"><div class="set-row"><div class="set-num">1</div>` +
+    `<div class="set-input-group"><input class="set-input big-num" type="text"></div>` +
+    `<div class="set-input-group"><input class="set-input big-num" type="text"></div>` +
+    `<div class="set-input-group"><button type="button" class="notes-btn" onclick="toggleSetNotesUI(this)">Notes</button></div>` +
+    `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>` +
+    `<div class="notes-panel" style="display:none;"><input class="set-input notes-input" type="text" oninput="syncNotesButton_(this)"><button type="button" class="notes-panel-done" onclick="toggleSetNotesUI(this)">Done</button></div>` +
+    `</div></div>`;
 
   const addBtn = panel.querySelector(':scope > .add-exercise-btn');
   panel.insertBefore(card, addBtn);
