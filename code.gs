@@ -768,10 +768,13 @@ function mbGatherCalendar_() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const cals = CalendarApp.getAllCalendars();
   const events = [];
-  CalendarApp.getAllCalendars().forEach(cal => {
+  let lastError = null;
+  let anySucceeded = false;
+  cals.forEach(cal => {
     let evs;
-    try { evs = cal.getEvents(start, end); } catch (e) { return; }
+    try { evs = cal.getEvents(start, end); anySucceeded = true; } catch (e) { lastError = e; return; }
     evs.forEach(ev => {
       events.push({
         _start: ev.getStartTime().getTime(),
@@ -780,6 +783,10 @@ function mbGatherCalendar_() {
       });
     });
   });
+  // If EVERY calendar failed to read, that's a real problem worth
+  // surfacing in _errors, not a quiet "nothing today" - only swallow a
+  // per-calendar failure when at least one other calendar came through.
+  if (cals.length && !anySucceeded && lastError) throw lastError;
   events.sort((a, b) => a._start - b._start);
   return events.map(e => ({ time: e.time, title: e.title }));
 }
