@@ -1,28 +1,39 @@
-/* A "Morning Brief" card sits at the very top of the Overview tab, above
-   the reorderable ov-blocks grid, and navigates the CURRENT view (not a
-   new tab/window) to the externally-hosted briefing page. This checks
-   it's present before any of the reorderable blocks, carries no
-   target="_blank"/window.open, and that its href actually points at the
-   right page. */
+/* The Morning Brief card at the top of Overview opens an in-app modal
+   rendered from JSON the backend stores (loadMorningBrief_/
+   saveMorningBrief_ in code.gs) - not a navigation to an external page,
+   and not a new tab/popup. This checks the card is present above the
+   reorderable ov-blocks grid, that clicking it opens the modal and fetches
+   from the backend rather than navigating away, that an empty backend
+   response shows the empty state, and that a real brief renders its
+   sections (weather/calendar/inbox/headlines/events). */
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
-const BRIEF_URL = 'https://claude.ai/code/artifact/e106dcb7-2b39-4584-ada5-6a7264f5e1f5';
 let fails = 0;
 const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}${x ? '  ' + x : ''}`); if (!ok) fails++; };
+
+const SAMPLE_BRIEF = {
+  updatedAt: '2026-09-03T10:31:00Z',
+  weather: { location: 'St. Petersburg, FL', high: 91, low: 78, condition: 'Scattered storms', alert: 'Drought advisory in effect' },
+  calendar: [{ time: '9:00 AM', title: 'Dentist' }],
+  inbox: { categories: [{ name: 'Financial', items: [{ subject: 'Statement ready' }] }] },
+  headlines: [{ title: 'Market rallies', summary: 'Stocks closed higher on tech gains.' }],
+  markets: { summary: 'Dow +1.2% · S&P +0.9% · Nasdaq +1.5%' },
+  events: [{ name: 'Farmers Market', date: 'Sat 9/6' }]
+};
 
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const page = await browser.newPage({ viewport: { width: 390, height: 900 } });
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  await page.route('https://script.google.com/**', r =>
-    r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' }));
-  // The sandbox this test runs in has no real network access to claude.ai -
-  // stub the briefing URL so a real navigation can actually complete and be
-  // observed, instead of testing against a network error page.
-  await page.route(BRIEF_URL, r =>
-    r.fulfill({ status: 200, contentType: 'text/html', body: '<title>stub brief</title>' }));
+  await page.route('https://script.google.com/**', route => {
+    const url = route.request().url();
+    if (url.includes('action=loadMorningBrief')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', brief: null }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' });
+  });
 
   await page.goto(URL);
   await page.waitForFunction(() => typeof showAppView === 'function', null, { timeout: 15000 });
@@ -40,19 +51,16 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     return {
       found: true,
       onclick: card.getAttribute('onclick'),
-      target: card.getAttribute('target'),
       isBeforeBlocks: !!(pos & Node.DOCUMENT_POSITION_FOLLOWING),
       title: (card.querySelector('.ov-brief-card-title') || {}).textContent
     };
   });
   check('the card is present', info.found);
-  check('it has no target="_blank"', !info.target, String(info.target));
   check('it sits before the reorderable ov-blocks grid', info.isBeforeBlocks);
   check('it says "Morning Brief"', info.title === 'Morning Brief', info.title);
-  check('its click handler navigates to the briefing page (no new tab)',
-    info.onclick === `location.href='${BRIEF_URL}'`, info.onclick);
+  check('its click handler opens the in-app modal (not a location change)', info.onclick === 'openMorningBriefModal()', info.onclick);
 
-  console.log('\n=== Clicking it navigates the current page, not a popup ===');
+  console.log('\n=== Clicking it opens the modal in-app, no navigation, no popup ===');
   let openedPopup = false;
   page.on('popup', () => { openedPopup = true; });
   const navigations = [];
@@ -60,7 +68,47 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   await page.click('#view-overview .ov-brief-card');
   await page.waitForTimeout(300);
   check('no popup/new tab was opened', !openedPopup);
-  check('the current frame navigated to the briefing URL', navigations.some(u => u === BRIEF_URL), JSON.stringify(navigations));
+  check('the main frame never navigated away', navigations.every(u => u.startsWith('file://')), JSON.stringify(navigations));
+  const isOpen = await page.evaluate(() => document.getElementById('morningBriefOverlay').classList.contains('open'));
+  check('the modal overlay is open', isOpen);
+
+  console.log('\n=== With nothing stored yet, it shows the empty state ===');
+  const emptyText = await page.evaluate(() => document.getElementById('mbContent').textContent);
+  check('shows the "no briefing yet" message', /No briefing yet/.test(emptyText), emptyText);
+
+  console.log('\n=== Close, then reopen with a real stored brief and it renders every section ===');
+  await page.click('#morningBriefOverlay .event-modal-close');
+  await page.waitForTimeout(150);
+  const closedNow = await page.evaluate(() => document.getElementById('morningBriefOverlay').classList.contains('open'));
+  check('Close actually closes it', !closedNow);
+
+  // Playwright routes stack with the earlier handler matching first, so
+  // unroute it before installing the version that returns real data.
+  await page.unroute('https://script.google.com/**');
+  await page.route('https://script.google.com/**', route => {
+    const url = route.request().url();
+    if (url.includes('action=loadMorningBrief')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', brief: SAMPLE_BRIEF }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' });
+  });
+
+  await page.click('#view-overview .ov-brief-card');
+  await page.waitForTimeout(300);
+  const rendered = await page.evaluate(() => document.getElementById('mbContent').innerHTML);
+  check('renders the weather section', rendered.includes('St. Petersburg, FL') && rendered.includes('91') && rendered.includes('Drought advisory'));
+  check('renders the calendar section', rendered.includes('9:00 AM') && rendered.includes('Dentist'));
+  check('renders the inbox section', rendered.includes('Financial') && rendered.includes('Statement ready'));
+  check('renders headlines and markets', rendered.includes('Market rallies') && rendered.includes('Dow +1.2%'));
+  check('renders this week\'s events', rendered.includes('Farmers Market') && rendered.includes('Sat 9/6'));
+  const updatedText = await page.evaluate(() => document.getElementById('mbUpdated').textContent);
+  check('shows an "Updated ..." timestamp', /Updated/.test(updatedText), updatedText);
+
+  console.log('\n=== The refresh button re-fetches without navigating or closing the modal ===');
+  await page.click('#mbRefreshBtn');
+  await page.waitForTimeout(300);
+  const stillOpen = await page.evaluate(() => document.getElementById('morningBriefOverlay').classList.contains('open'));
+  check('the modal is still open after refresh', stillOpen);
 
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 

@@ -818,6 +818,33 @@
   .event-modal-row-value { font-family: var(--font); font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
   .event-modal-close { display: block; width: 100%; background: var(--surface2); border: none; color: var(--text); padding: 13px; border-radius: 14px; font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
   .event-modal-close:active { background: var(--surface2); filter: brightness(1.2); }
+
+  /* Morning Brief modal - everything rendered from one JSON blob the
+     backend stores (see loadMorningBrief_/saveMorningBrief_ in code.gs),
+     into the app's own dark/light theme rather than an external page. */
+  .mb-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .mb-updated { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .mb-refresh-btn { background: var(--surface2); border: none; color: var(--text); width: 34px; height: 34px; border-radius: 12px; font-size: 16px; cursor: pointer; flex-shrink: 0; }
+  .mb-refresh-btn.spinning { animation: mb-spin 0.8s linear infinite; }
+  @keyframes mb-spin { to { transform: rotate(360deg); } }
+  .mb-empty { font-family: var(--font); font-size: 14px; color: var(--muted); text-align: center; padding: 28px 10px; }
+  .mb-section-title { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
+  .mb-weather-row { display: flex; align-items: baseline; gap: 8px; }
+  .mb-weather-temp { font-family: var(--font); font-size: 22px; font-weight: 800; }
+  .mb-weather-cond { font-family: var(--font); font-size: 13px; color: var(--muted); }
+  .mb-alert { font-family: var(--font); font-size: 12.5px; font-weight: 600; color: #e0916f; margin-top: 6px; }
+  .mb-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); }
+  .mb-row:first-child { border-top: none; padding-top: 0; }
+  .mb-row-label { font-family: var(--font); font-size: 13.5px; font-weight: 600; flex-shrink: 0; }
+  .mb-row-value { font-family: var(--font); font-size: 13px; color: var(--muted); text-align: right; }
+  .mb-cat { margin-bottom: 10px; }
+  .mb-cat:last-child { margin-bottom: 0; }
+  .mb-cat-name { font-family: var(--font); font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+  .mb-cat-items { font-family: var(--font); font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .mb-headline { padding: 7px 0; border-top: 1px solid var(--border); }
+  .mb-headline:first-child { border-top: none; padding-top: 0; }
+  .mb-headline-title { font-family: var(--font); font-size: 13.5px; font-weight: 700; margin-bottom: 2px; }
+  .mb-headline-sub { font-family: var(--font); font-size: 12.5px; color: var(--muted); line-height: 1.4; }
   .cal-event-row:last-child { border-bottom: none; }
   .cal-event-time { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--accent); width: 60px; flex-shrink: 0; }
   .cal-event-body { min-width: 0; }
@@ -2333,11 +2360,11 @@
        rather than something you have to trust happened. -->
   <div class="ov-archive-notice" id="ovArchiveNotice" onclick="dismissArchiveNotice_()"></div>
 
-  <!-- Morning Brief: opens the externally-hosted briefing page (weather,
-       calendar, inbox, headlines, local events) in this same view. A
-       scheduled routine refreshes that page every weekday morning; this
-       button is the manual refresh path when you want it sooner. -->
-  <div class="ov-brief-card" onclick="location.href='https://claude.ai/code/artifact/e106dcb7-2b39-4584-ada5-6a7264f5e1f5'">
+  <!-- Morning Brief: opens an in-app modal showing the briefing (weather,
+       calendar, inbox, headlines, local events) gathered by a scheduled
+       routine each weekday morning and stored via the same backend as
+       everything else on this page - not an external page or a new tab. -->
+  <div class="ov-brief-card" onclick="openMorningBriefModal()">
     <div class="ov-brief-card-icon">☀️</div>
     <div class="ov-brief-card-text">
       <div class="ov-brief-card-title">Morning Brief</div>
@@ -3821,6 +3848,21 @@
   </div>
 </div>
 
+<div class="event-modal-overlay" id="morningBriefOverlay" onclick="closeMorningBriefModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="mb-head">
+      <div>
+        <div class="ov-page-title" style="margin-bottom:2px;">☀️ Morning Brief</div>
+        <div class="mb-updated" id="mbUpdated"></div>
+      </div>
+      <button class="mb-refresh-btn" id="mbRefreshBtn" onclick="refreshMorningBrief()" aria-label="Refresh">↻</button>
+    </div>
+    <div id="mbContent"></div>
+    <button class="event-modal-close" onclick="closeMorningBriefModal(event)">Close</button>
+  </div>
+</div>
+
 <div class="event-modal-overlay" id="weekDetailModalOverlay" onclick="closeWeekDetailModal(event)">
   <div class="event-modal-sheet" onclick="event.stopPropagation()">
     <div class="event-modal-handle"></div>
@@ -5189,6 +5231,116 @@ function openSettingsModal() {
 function closeSettingsModal(event) {
   if (event) event.stopPropagation();
   document.getElementById('settingsModalOverlay').classList.remove('open');
+}
+
+// Morning Brief modal - renders whatever the backend has stored
+// (loadMorningBrief_/saveMorningBrief_ in code.gs), gathered and pushed
+// there each weekday morning by a scheduled routine. The refresh button
+// re-fetches from the backend; it doesn't re-run the gather itself (that
+// only happens on the routine's own schedule), so it's for picking up a
+// brief that just landed, not for generating one on demand.
+function openMorningBriefModal() {
+  document.getElementById('morningBriefOverlay').classList.add('open');
+  fetchAndRenderMorningBrief_();
+}
+
+function closeMorningBriefModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('morningBriefOverlay').classList.remove('open');
+}
+
+async function refreshMorningBrief() {
+  const btn = document.getElementById('mbRefreshBtn');
+  if (btn) btn.classList.add('spinning');
+  await fetchAndRenderMorningBrief_();
+  if (btn) btn.classList.remove('spinning');
+}
+
+async function fetchAndRenderMorningBrief_() {
+  const url = getDeploymentUrl();
+  if (!url) { renderMorningBrief_(null); return; }
+  try {
+    const res = await fetch(url + '?action=loadMorningBrief&t=' + Date.now());
+    const data = await res.json();
+    renderMorningBrief_(data.status === 'success' ? data.brief : null);
+  } catch (e) {
+    renderMorningBrief_(null, true);
+  }
+}
+
+function mbFmtUpdated_(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return 'Updated ' + d.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+}
+
+function renderMorningBrief_(brief, offline) {
+  const updatedEl = document.getElementById('mbUpdated');
+  const content = document.getElementById('mbContent');
+  if (!content) return;
+
+  if (!brief) {
+    updatedEl.textContent = '';
+    content.innerHTML = `<div class="mb-empty">${offline
+      ? "Couldn't reach the backend - check your connection and try again."
+      : 'No briefing yet. It refreshes automatically on weekday mornings, or tap ↻ to check now.'}</div>`;
+    return;
+  }
+
+  updatedEl.textContent = mbFmtUpdated_(brief.updatedAt);
+  let html = '';
+
+  if (brief.weather) {
+    const w = brief.weather;
+    html += `<div class="config-box">
+      <div class="mb-section-title">${escapeHtml_(w.location || 'Weather')}</div>
+      <div class="mb-weather-row">
+        <span class="mb-weather-temp">${w.high != null ? escapeHtml_(String(w.high)) + '°' : ''}${w.low != null ? ' / ' + escapeHtml_(String(w.low)) + '°' : ''}</span>
+        <span class="mb-weather-cond">${escapeHtml_(w.condition || '')}</span>
+      </div>
+      ${w.alert ? `<div class="mb-alert">⚠ ${escapeHtml_(w.alert)}</div>` : ''}
+    </div>`;
+  }
+
+  const cal = brief.calendar || [];
+  html += `<div class="config-box">
+    <div class="mb-section-title">Today's Schedule</div>
+    ${cal.length ? cal.map(ev => `<div class="mb-row"><div class="mb-row-label">${escapeHtml_(ev.time || '')}</div><div class="mb-row-value">${escapeHtml_(ev.title || '')}</div></div>`).join('')
+      : '<div class="mb-row-value">Nothing on the calendar today.</div>'}
+  </div>`;
+
+  const cats = (brief.inbox && brief.inbox.categories) || [];
+  html += `<div class="config-box">
+    <div class="mb-section-title">Inbox Overnight</div>
+    ${cats.length ? cats.map(c => `<div class="mb-cat">
+        <div class="mb-cat-name">${escapeHtml_(c.name || '')} <span class="mb-row-value">(${c.count != null ? c.count : (c.items || []).length})</span></div>
+        <div class="mb-cat-items">${(c.items || []).map(i => escapeHtml_(i.subject || '')).join(' · ') || '&mdash;'}</div>
+      </div>`).join('')
+      : '<div class="mb-row-value">Inbox is quiet.</div>'}
+  </div>`;
+
+  const headlines = brief.headlines || [];
+  if (headlines.length || brief.markets) {
+    html += `<div class="config-box">
+      <div class="mb-section-title">Headlines</div>
+      ${brief.markets ? `<div class="mb-row-value" style="margin-bottom:8px;">${escapeHtml_(brief.markets.summary || '')}</div>` : ''}
+      ${headlines.map(h => `<div class="mb-headline">
+          <div class="mb-headline-title">${escapeHtml_(h.title || '')}</div>
+          <div class="mb-headline-sub">${escapeHtml_(h.summary || '')}</div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  const events = brief.events || [];
+  if (events.length) {
+    html += `<div class="config-box" style="margin-bottom:0;">
+      <div class="mb-section-title">Out This Week</div>
+      ${events.map(ev => `<div class="mb-row"><div class="mb-row-label">${escapeHtml_(ev.name || '')}</div><div class="mb-row-value">${escapeHtml_(ev.date || '')}</div></div>`).join('')}
+    </div>`;
+  }
+
+  content.innerHTML = html;
 }
 
 // Shared by the Stats tab's compact chart and the Weight detail modal's

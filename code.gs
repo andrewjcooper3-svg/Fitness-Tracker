@@ -633,6 +633,250 @@ function loadWidgetSummary_() {
   try { return JSON.parse(raw); } catch (e) { return null; }
 }
 
+// ---------- Morning Brief ----------
+//
+// A compact digest (weather, today's calendar, overnight inbox, headlines,
+// local events) gathered by a scheduled Claude session and pushed here so
+// the Overview tab can show it in its own modal - no external page, no new
+// tab. Same store-and-serve role as the widget summary above: this app
+// never gathers the data itself, only holds the latest snapshot.
+const MORNING_BRIEF_KEY = 'MORNING_BRIEF';
+
+function saveMorningBrief_(brief) {
+  if (!brief || typeof brief !== 'object') throw new Error('saveMorningBrief requires a brief object');
+  setPropertyChecked_(PropertiesService.getScriptProperties(), MORNING_BRIEF_KEY, brief);
+}
+
+function loadMorningBrief_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(MORNING_BRIEF_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+// ---------- Morning Brief: automatic native gather ----------
+//
+// Runs entirely inside this Apps Script project (GmailApp/CalendarApp/
+// UrlFetchApp), on a time-based trigger installed by ensureMorningBriefTrigger_
+// below. Deliberately NOT delegated to an external agent - an agent's own
+// sandbox can have its outbound network restricted to an allowlist that a
+// personal news/events site will never be on, while this script's own
+// UrlFetchApp calls come from Google's infrastructure with no such limit.
+//
+// Each section is gathered independently and wrapped in try/catch so one
+// broken source (most likely the two events sites - see mbGatherEvents_)
+// never blocks the reliable sections (weather/calendar/inbox) from saving.
+function refreshMorningBriefAuto_() {
+  const day = new Date().getDay();
+  if (day === 0 || day === 6) return; // weekends: no refresh
+
+  const brief = { updatedAt: new Date().toISOString() };
+  try { const w = mbGatherWeather_(); if (w) brief.weather = w; } catch (e) { console.error('weather: ' + e); }
+  try { const c = mbGatherCalendar_(); if (c.length) brief.calendar = c; } catch (e) { console.error('calendar: ' + e); }
+  try { brief.inbox = mbGatherInbox_(); } catch (e) { console.error('inbox: ' + e); }
+  try {
+    const h = mbGatherHeadlines_();
+    if (h.headlines.length) brief.headlines = h.headlines;
+    if (h.marketsSummary) brief.markets = { summary: h.marketsSummary };
+  } catch (e) { console.error('headlines: ' + e); }
+  try { const ev = mbGatherEvents_(); if (ev.length) brief.events = ev; } catch (e) { console.error('events: ' + e); }
+
+  saveMorningBrief_(mbFitBudget_(brief));
+}
+
+// NWS's public JSON API (api.weather.gov) - no key required, but it does
+// require a real User-Agent identifying the app per their usage policy.
+function mbGatherWeather_() {
+  const lat = 27.7676, lon = -82.6403; // St. Petersburg, FL
+  const opts = { headers: { 'User-Agent': 'FitnessTrackerApp (andrewjcooper3@gmail.com)' }, muteHttpExceptions: true };
+  const points = JSON.parse(UrlFetchApp.fetch('https://api.weather.gov/points/' + lat + ',' + lon, opts).getContentText());
+  const forecastUrl = points.properties && points.properties.forecast;
+  if (!forecastUrl) return null;
+  const forecast = JSON.parse(UrlFetchApp.fetch(forecastUrl, opts).getContentText());
+  const periods = (forecast.properties && forecast.properties.periods) || [];
+  const dayPeriod = periods.find(p => p.isDaytime) || periods[0];
+  const nightPeriod = periods.find(p => !p.isDaytime) || periods[1];
+
+  let alert = null;
+  try {
+    const alerts = JSON.parse(UrlFetchApp.fetch('https://api.weather.gov/alerts/active?point=' + lat + ',' + lon, opts).getContentText());
+    const feature = (alerts.features || [])[0];
+    if (feature) alert = feature.properties.headline;
+  } catch (e) { /* alerts are a bonus, not core */ }
+
+  return {
+    location: 'St. Petersburg, FL',
+    high: dayPeriod ? dayPeriod.temperature : null,
+    low: nightPeriod ? nightPeriod.temperature : null,
+    condition: dayPeriod ? dayPeriod.shortForecast : '',
+    alert: alert
+  };
+}
+
+// Every calendar the account can see, not just the primary one - a solo
+// secondary calendar (e.g. a shared family one) is exactly the kind of
+// thing worth surfacing here.
+function mbGatherCalendar_() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const events = [];
+  CalendarApp.getAllCalendars().forEach(cal => {
+    let evs;
+    try { evs = cal.getEvents(start, end); } catch (e) { return; }
+    evs.forEach(ev => {
+      events.push({
+        _start: ev.getStartTime().getTime(),
+        time: ev.isAllDayEvent() ? 'All day' : Utilities.formatDate(ev.getStartTime(), Session.getScriptTimeZone(), 'h:mm a'),
+        title: ev.getTitle()
+      });
+    });
+  });
+  events.sort((a, b) => a._start - b._start);
+  return events.map(e => ({ time: e.time, title: e.title }));
+}
+
+// Subjects and senders ONLY - this never calls getBody()/getPlainBody() on
+// any message, matching the standing "no email bodies opened" constraint
+// at the API level, not just by convention.
+function mbGatherInbox_() {
+  const threads = GmailApp.search('newer_than:1d in:inbox', 0, 30);
+  const buckets = {};
+  const order = [];
+  threads.forEach(t => {
+    const subject = t.getFirstMessageSubject() || '';
+    const messages = t.getMessages();
+    const from = messages.length ? messages[messages.length - 1].getFrom() : '';
+    const cat = mbCategorizeMail_(from, subject);
+    if (!buckets[cat]) { buckets[cat] = []; order.push(cat); }
+    buckets[cat].push(subject);
+  });
+  return {
+    categories: order.map(name => ({
+      name: name,
+      count: buckets[name].length,
+      items: buckets[name].slice(0, 3).map(s => ({ subject: s }))
+    }))
+  };
+}
+
+function mbCategorizeMail_(from, subject) {
+  const t = (from + ' ' + subject).toLowerCase();
+  if (/security alert|verify your|sign.?in|password|google account|account access/.test(t)) return 'Accounts';
+  if (/vanguard|fidelity|schwab|proxyvote|statement|invoice|investment|bank of|chase\.com/.test(t)) return 'Financial';
+  if (/resident|hoa|community|apartment|maintenance|inspection|portal access/.test(t)) return 'Home/Community';
+  if (/newsletter|digest|alumni|weekly update/.test(t)) return 'Newsletters';
+  if (/shipped|delivered|out for delivery|your order|tracking/.test(t)) return 'Orders';
+  if (/unsubscribe|% off|sale|deal|promo|reward|coupon/.test(t)) return 'Promotions';
+  return 'Other';
+}
+
+// CBS News' public RSS feed and Stooq's keyless CSV quote endpoint - both
+// picked because they're documented data formats rather than page markup,
+// so they're far less likely to silently break than an HTML scrape.
+function mbGatherHeadlines_() {
+  const headlines = [];
+  try {
+    const xml = UrlFetchApp.fetch('https://www.cbsnews.com/latest/rss/main', { muteHttpExceptions: true }).getContentText();
+    const doc = XmlService.parse(xml);
+    const items = doc.getRootElement().getChild('channel').getChildren('item');
+    items.slice(0, 5).forEach(item => {
+      const title = (item.getChildText('title') || '').trim();
+      let summary = (item.getChildText('description') || '').replace(/<[^>]+>/g, '').trim();
+      if (summary.length > 160) summary = summary.slice(0, 157) + '...';
+      if (title) headlines.push({ title: title, summary: summary });
+    });
+  } catch (e) { console.error('cbs rss: ' + e); }
+
+  let marketsSummary = null;
+  try {
+    const csv = UrlFetchApp.fetch('https://stooq.com/q/l/?s=^dji,^spx,^ndq&f=sd2t2ohlc&h&e=csv', { muteHttpExceptions: true }).getContentText();
+    const rows = Utilities.parseCsv(csv).slice(1); // header row first
+    const labels = { '^DJI': 'Dow', '^SPX': 'S&P', '^NDQ': 'Nasdaq' };
+    const parts = rows.map(r => {
+      const symbol = (r[0] || '').toUpperCase();
+      const open = parseFloat(r[3]), close = parseFloat(r[6]);
+      if (!labels[symbol] || !open || !close) return null;
+      const pct = ((close - open) / open * 100).toFixed(1);
+      return labels[symbol] + ' ' + (pct >= 0 ? '+' : '') + pct + '%';
+    }).filter(Boolean);
+    if (parts.length) marketsSummary = parts.join(' · ');
+  } catch (e) { console.error('stooq: ' + e); }
+
+  return { headlines: headlines, marketsSummary: marketsSummary };
+}
+
+// Best-effort HTML scrape of two local-events sites that don't publish a
+// structured feed. This is the most fragile section by far - a markup
+// change on either site can silently zero it out (it's wrapped in
+// try/catch by the caller, so that never breaks the rest of the brief).
+// If this stops finding anything, check Apps Script's Executions log for
+// what these fetches actually returned and adjust the patterns below.
+function mbGatherEvents_() {
+  const events = [];
+  const opts = { muteHttpExceptions: true };
+
+  try {
+    const html = UrlFetchApp.fetch('https://ilovetheburg.com/events/', opts).getContentText();
+    mbExtractEvents_(html).forEach(e => events.push(e));
+  } catch (e) { console.error('ilovetheburg: ' + e); }
+
+  try {
+    const html = UrlFetchApp.fetch('https://tampa-bay.events/', opts).getContentText();
+    mbExtractEvents_(html).forEach(e => events.push(e));
+  } catch (e) { console.error('tampa-bay.events: ' + e); }
+
+  return events.slice(0, 6);
+}
+
+// Looks for schema.org Event microdata first (itemprop="name"/"startDate"),
+// which several event-listing WordPress themes/plugins emit, then falls
+// back to <h2>/<h3> headings paired with a nearby time/date element.
+function mbExtractEvents_(html) {
+  const found = [];
+  const microdataRe = /itemprop=["']name["'][^>]*>([^<]{3,80})<[\s\S]{0,300}?itemprop=["']startDate["'][^>]*(?:datetime|content)=["']([^"']+)["']/gi;
+  let m;
+  while ((m = microdataRe.exec(html)) && found.length < 8) {
+    found.push({ name: mbCleanText_(m[1]), date: mbCleanText_(m[2]) });
+  }
+  if (found.length) return found;
+
+  const headingRe = /<h[23][^>]*>([^<]{3,80})<\/h[23]>[\s\S]{0,200}?<time[^>]*>([^<]{3,40})<\/time>/gi;
+  while ((m = headingRe.exec(html)) && found.length < 8) {
+    found.push({ name: mbCleanText_(m[1]), date: mbCleanText_(m[2]) });
+  }
+  return found;
+}
+
+function mbCleanText_(str) {
+  return String(str || '').replace(/&amp;/g, '&').replace(/&#0?39;/g, "'").replace(/\s+/g, ' ').trim();
+}
+
+// Trims the least-important sections first (events, then headlines) until
+// the stored JSON fits PropertiesService's 9 KB cap, rather than losing the
+// whole brief to one bloated section - mirrors setPropertyChecked_'s limit.
+function mbFitBudget_(brief) {
+  while (JSON.stringify(brief).length > PROP_VALUE_LIMIT_BYTES && brief.events && brief.events.length) {
+    brief.events.pop();
+  }
+  while (JSON.stringify(brief).length > PROP_VALUE_LIMIT_BYTES && brief.headlines && brief.headlines.length) {
+    brief.headlines.pop();
+  }
+  if (!brief.events || !brief.events.length) delete brief.events;
+  if (!brief.headlines || !brief.headlines.length) delete brief.headlines;
+  return brief;
+}
+
+// Installs the daily trigger once, the same lazy-provision-on-first-access
+// pattern getOrCreateSpreadsheet_ uses for the sheet itself. Fires once a
+// day in this Apps Script project's own time zone (File > Project Settings
+// in the script editor) - refreshMorningBriefAuto_ itself no-ops on
+// weekends, so one daily trigger covers the weekday-only schedule.
+function ensureMorningBriefTrigger_() {
+  const already = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'refreshMorningBriefAuto_');
+  if (already) return;
+  ScriptApp.newTrigger('refreshMorningBriefAuto_').timeBased().atHour(6).nearMinute(30).everyDays(1).create();
+}
+
 // ---------- Financial plan (its own property, its own endpoints) ----------
 //
 // The plan is a settings blob, not an append-only log like the starter, so
@@ -1638,6 +1882,15 @@ function backfillWorkoutHistory() {
 function doGet(e) {
   const action = e && e.parameter ? e.parameter.action : null;
 
+  // Lazy, idempotent - same shape as getOrCreateSpreadsheet_ provisioning
+  // the sheet on first use. Wrapped because the very first call after this
+  // deploy needs a fresh OAuth authorization (Gmail/Calendar scopes this
+  // project hasn't used before) that an anonymous web request can't grant -
+  // that one-time approval has to happen in the Apps Script editor (run
+  // ensureMorningBriefTrigger_ once by hand there), so this call should
+  // never take the whole request down while that's still pending.
+  try { ensureMorningBriefTrigger_(); } catch (e2) { /* needs manual authorization once - see comment above */ }
+
   if (action === 'loadDraft') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', draft: loadDraftState_() }))
@@ -1781,6 +2034,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadMorningBrief') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', brief: loadMorningBrief_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId(), backendVersion: BACKEND_BUILD_VERSION }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -1909,6 +2168,13 @@ function doPost(e) {
 
     if (data.action === 'saveApiKeysState') {
       saveApiKeysState_(data.spoonacularKey, data.edamamAppId, data.edamamAppKey);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveMorningBrief') {
+      saveMorningBrief_(data.brief);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
