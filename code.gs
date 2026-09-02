@@ -655,12 +655,14 @@ function loadMorningBrief_() {
 
 // ---------- Morning Brief: automatic native gather ----------
 //
-// Runs entirely inside this Apps Script project (GmailApp/CalendarApp/
-// UrlFetchApp), on a time-based trigger installed by ensureMorningBriefTrigger_
-// below. Deliberately NOT delegated to an external agent - an agent's own
-// sandbox can have its outbound network restricted to an allowlist that a
-// personal news/events site will never be on, while this script's own
-// UrlFetchApp calls come from Google's infrastructure with no such limit.
+// Runs entirely inside this Apps Script project (GmailApp/UrlFetchApp -
+// the calendar section reads the iCloud Worker, not Google Calendar, via
+// UrlFetchApp too), on a time-based trigger installed by
+// ensureMorningBriefTrigger_ below. Deliberately NOT delegated to an
+// external agent - an agent's own sandbox can have its outbound network
+// restricted to an allowlist that a personal news/events site will never
+// be on, while this script's own UrlFetchApp calls come from Google's
+// infrastructure with no such limit.
 //
 // Each section is gathered independently and wrapped in try/catch so one
 // broken source (most likely the two events sites - see mbExtractEvents_)
@@ -711,17 +713,13 @@ function mbRefreshNow_() {
   try { const c = mbGatherCalendar_(); if (c.length) brief.calendar = c; } catch (e) { errors.calendar = String(e); }
   try { brief.inbox = mbGatherInbox_(); } catch (e) { errors.inbox = String(e); }
 
-  // A quiet inbox/calendar with no thrown error could still mean the
-  // real query (today's date window / newer_than:1d) is missing
-  // everything while the underlying service access is fine - these
-  // counts use CalendarApp/GmailApp calls already proven authorized
-  // above, so they can't introduce a NEW permission requirement the way
+  // A quiet inbox with no thrown error could still mean the 1-day query
+  // window is missing everything while Gmail access itself is fine -
+  // this reuses the already-proven-authorized GmailApp.search call
+  // above, so it can't introduce a NEW permission requirement the way
   // the earlier Session.getEffectiveUser() attempt did.
   try {
-    brief._debugCounts = {
-      totalCalendarsVisible: CalendarApp.getAllCalendars().length,
-      totalInboxThreadsAnyAge: GmailApp.search('in:inbox', 0, 5).length
-    };
+    brief._debugCounts = { totalInboxThreadsAnyAge: GmailApp.search('in:inbox', 0, 5).length };
   } catch (e) { brief._debugCounts = { error: String(e) }; }
   try {
     const h = mbParseHeadlines_(cbsRes, stooqRes);
@@ -774,34 +772,63 @@ function mbParseWeather_(pointsRes, alertsRes, opts) {
   };
 }
 
-// Every calendar the account can see, not just the primary one - a solo
-// secondary calendar (e.g. a shared family one) is exactly the kind of
-// thing worth surfacing here.
-function mbGatherCalendar_() {
+// The app's real calendar isn't Google Calendar - the existing Calendar
+// tab reads iCloud via CalDAV through a separate Cloudflare Worker
+// (calendar-worker.js), because Apps Script's UrlFetchApp can't itself
+// issue the PROPFIND/REPORT requests CalDAV needs. Hitting that same
+// Worker here (a plain HTTPS GET, same as the front end's
+// loadCalendarEvents) needs no Google OAuth scope at all, and reads the
+// calendar Andrew actually uses instead of a Google Calendar that may be
+// empty regardless of permissions.
+const CALENDAR_WORKER_URL = 'https://personalassistant.andrewjcooper3.workers.dev';
+
+// Same Eastern-day-boundary math as the front end's getEasternDateRange -
+// duplicated here since this runs server-side with no shared module, and
+// deliberately NOT Apps Script's own project time zone setting, which
+// may not actually be America/New_York.
+function mbEasternDayRange_() {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  const cals = CalendarApp.getAllCalendars();
-  const events = [];
-  let lastError = null;
-  let anySucceeded = false;
-  cals.forEach(cal => {
-    let evs;
-    try { evs = cal.getEvents(start, end); anySucceeded = true; } catch (e) { lastError = e; return; }
-    evs.forEach(ev => {
-      events.push({
-        _start: ev.getStartTime().getTime(),
-        time: ev.isAllDayEvent() ? 'All day' : Utilities.formatDate(ev.getStartTime(), Session.getScriptTimeZone(), 'h:mm a'),
-        title: ev.getTitle()
-      });
-    });
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23'
   });
-  // If EVERY calendar failed to read, that's a real problem worth
-  // surfacing in _errors, not a quiet "nothing today" - only swallow a
-  // per-calendar failure when at least one other calendar came through.
-  if (cals.length && !anySucceeded && lastError) throw lastError;
+  const parts = {};
+  fmt.formatToParts(now).forEach(p => { parts[p.type] = p.value; });
+  const asIfUTC = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second));
+  const offsetMs = asIfUTC - now.getTime();
+  const midnightAsIfUTC = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 0, 0, 0);
+  const start = new Date(midnightAsIfUTC - offsetMs);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end };
+}
+
+function mbGatherCalendar_() {
+  const { start, end } = mbEasternDayRange_();
+  const url = CALENDAR_WORKER_URL + '?start=' + encodeURIComponent(start.toISOString()) + '&end=' + encodeURIComponent(end.toISOString());
+  const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  const data = JSON.parse(res.getContentText());
+  if (data.status !== 'success') throw new Error(data.message || 'calendar worker returned an error');
+  const events = (data.events || []).map(ev => ({
+    _start: new Date(ev.start).getTime(),
+    time: ev.allDay ? 'All day' : Utilities.formatDate(new Date(ev.start), 'America/New_York', 'h:mm a'),
+    title: ev.summary
+  }));
   events.sort((a, b) => a._start - b._start);
   return events.map(e => ({ time: e.time, title: e.title }));
+}
+
+// Run this ONE function by hand from the Apps Script editor (function
+// dropdown, or click inside it and use the ▶ that appears in the gutter)
+// to grant Gmail access - it's the only Google OAuth scope the Morning
+// Brief needs at all now that Calendar reads from the iCloud Worker
+// instead. Apps Script only prompts for the permissions a function's
+// code path actually reaches, so running something unrelated never
+// asks for this one; running this does, because it's all this touches.
+function AUTHORIZE_GMAIL_FOR_MORNING_BRIEF() {
+  const count = GmailApp.search('in:inbox', 0, 1).length;
+  Logger.log('Gmail access granted - found ' + count + ' inbox thread(s), confirming it worked.');
 }
 
 // Subjects and senders ONLY - this never calls getBody()/getPlainBody() on

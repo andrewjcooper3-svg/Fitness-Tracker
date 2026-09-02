@@ -5365,15 +5365,14 @@ function renderMorningBrief_(brief, offline) {
     </div>`;
   }
 
-  // Distinguishes "the query genuinely matches nothing" from "the whole
-  // service is broken" without needing any permission beyond what
-  // Calendar/Inbox already used above successfully.
+  // Distinguishes "the 1-day window genuinely matches nothing" from "Gmail
+  // access itself is broken" without needing any permission beyond what
+  // Inbox already used above successfully.
   const counts = brief._debugCounts;
   if (counts) {
     html += `<div class="config-box" style="margin-bottom:0;">
       <div class="mb-section-title">Diagnostics</div>
-      <div class="mb-row"><div class="mb-row-label">Calendars visible</div><div class="mb-row-value">${escapeHtml_(String(counts.totalCalendarsVisible != null ? counts.totalCalendarsVisible : counts.error || '?'))}</div></div>
-      <div class="mb-row"><div class="mb-row-label">Inbox threads (any age)</div><div class="mb-row-value">${escapeHtml_(String(counts.totalInboxThreadsAnyAge != null ? counts.totalInboxThreadsAnyAge : ''))}</div></div>
+      <div class="mb-row"><div class="mb-row-label">Inbox threads (any age)</div><div class="mb-row-value">${escapeHtml_(String(counts.totalInboxThreadsAnyAge != null ? counts.totalInboxThreadsAnyAge : counts.error || '?'))}</div></div>
     </div>`;
   }
 
