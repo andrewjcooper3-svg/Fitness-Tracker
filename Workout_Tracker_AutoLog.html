@@ -5249,10 +5249,23 @@ function closeMorningBriefModal(event) {
   document.getElementById('morningBriefOverlay').classList.remove('open');
 }
 
+// Refresh actually re-gathers live (weather/calendar/inbox/headlines/
+// events all run fresh server-side in code.gs) rather than just re-
+// reading whatever was last cached - it takes a few seconds since it's
+// making several live calls, hence the spinner staying on for the whole
+// round trip instead of the near-instant plain load below.
 async function refreshMorningBrief() {
   const btn = document.getElementById('mbRefreshBtn');
   if (btn) btn.classList.add('spinning');
-  await fetchAndRenderMorningBrief_();
+  const url = getDeploymentUrl();
+  if (!url) { renderMorningBrief_(null); if (btn) btn.classList.remove('spinning'); return; }
+  try {
+    const res = await fetch(url + '?action=refreshMorningBriefNow&t=' + Date.now());
+    const data = await res.json();
+    renderMorningBrief_(data.status === 'success' ? data.brief : null);
+  } catch (e) {
+    renderMorningBrief_(null, true);
+  }
   if (btn) btn.classList.remove('spinning');
 }
 

@@ -665,10 +665,18 @@ function loadMorningBrief_() {
 // Each section is gathered independently and wrapped in try/catch so one
 // broken source (most likely the two events sites - see mbGatherEvents_)
 // never blocks the reliable sections (weather/calendar/inbox) from saving.
+//
+// Split into a weekday-gated auto path (the trigger) and the actual work
+// (mbRefreshNow_) so the in-app Refresh button can call the same real
+// gather on demand, any day, rather than only ever re-reading whatever
+// happens to be cached.
 function refreshMorningBriefAuto_() {
   const day = new Date().getDay();
-  if (day === 0 || day === 6) return; // weekends: no refresh
+  if (day === 0 || day === 6) return; // weekends: no automatic refresh
+  mbRefreshNow_();
+}
 
+function mbRefreshNow_() {
   const brief = { updatedAt: new Date().toISOString() };
   try { const w = mbGatherWeather_(); if (w) brief.weather = w; } catch (e) { console.error('weather: ' + e); }
   try { const c = mbGatherCalendar_(); if (c.length) brief.calendar = c; } catch (e) { console.error('calendar: ' + e); }
@@ -680,7 +688,9 @@ function refreshMorningBriefAuto_() {
   } catch (e) { console.error('headlines: ' + e); }
   try { const ev = mbGatherEvents_(); if (ev.length) brief.events = ev; } catch (e) { console.error('events: ' + e); }
 
-  saveMorningBrief_(mbFitBudget_(brief));
+  const fitted = mbFitBudget_(brief);
+  saveMorningBrief_(fitted);
+  return fitted;
 }
 
 // NWS's public JSON API (api.weather.gov) - no key required, but it does
@@ -2038,6 +2048,24 @@ function doGet(e) {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', brief: loadMorningBrief_() }))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // The in-app Refresh button's "check now" path: runs the real gather
+  // synchronously (a few seconds - live NWS/Gmail/Calendar/RSS/CSV calls)
+  // and returns the freshly saved brief, rather than just re-reading
+  // whatever was last cached. Reachable by URL, so it also works as a
+  // manual trigger when the Apps Script editor's Run dropdown is being
+  // uncooperative about listing a newly added function.
+  if (action === 'refreshMorningBriefNow') {
+    try {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success', brief: mbRefreshNow_() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'error', message: String(err) }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
   }
 
   return ContentService

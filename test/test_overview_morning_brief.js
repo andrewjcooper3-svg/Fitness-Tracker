@@ -104,11 +104,27 @@ const SAMPLE_BRIEF = {
   const updatedText = await page.evaluate(() => document.getElementById('mbUpdated').textContent);
   check('shows an "Updated ..." timestamp', /Updated/.test(updatedText), updatedText);
 
-  console.log('\n=== The refresh button re-fetches without navigating or closing the modal ===');
+  console.log('\n=== The refresh button re-GENERATES live rather than re-reading the cache ===');
+  const REGENERATED_BRIEF = { ...SAMPLE_BRIEF, updatedAt: '2026-09-03T14:00:00Z',
+    weather: { ...SAMPLE_BRIEF.weather, high: 88 } };
+  const hitActions = [];
+  await page.unroute('https://script.google.com/**');
+  await page.route('https://script.google.com/**', route => {
+    const url = route.request().url();
+    const action = new URLSearchParams(url.split('?')[1]).get('action');
+    hitActions.push(action);
+    if (action === 'refreshMorningBriefNow') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', brief: REGENERATED_BRIEF }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', brief: SAMPLE_BRIEF }) });
+  });
   await page.click('#mbRefreshBtn');
   await page.waitForTimeout(300);
+  check('Refresh calls the live-regenerate action, not the plain cache read', hitActions.includes('refreshMorningBriefNow'), JSON.stringify(hitActions));
   const stillOpen = await page.evaluate(() => document.getElementById('morningBriefOverlay').classList.contains('open'));
   check('the modal is still open after refresh', stillOpen);
+  const afterRefresh = await page.evaluate(() => document.getElementById('mbContent').innerHTML);
+  check('renders the freshly-regenerated data, not the stale cached value', afterRefresh.includes('88') && !afterRefresh.includes('>91'), afterRefresh.match(/mb-weather-temp">[^<]*/)[0]);
 
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 
