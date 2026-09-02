@@ -871,8 +871,13 @@
   .mb-card-title { font-family: var(--mb-serif); font-weight: 600; font-size: 15.5px; color: var(--mb-ink); }
   .mb-card-eyebrow { font-family: var(--mb-mono); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mb-ink-faint); white-space: nowrap; }
 
+  .mb-weather-top { display: flex; align-items: center; gap: 14px; }
+  .mb-weather-icon { width: 44px; height: 44px; flex-shrink: 0; }
   .mb-weather-temp { font-family: var(--mb-mono); font-weight: 500; font-size: 40px; line-height: 1; color: var(--mb-ink); font-variant-numeric: tabular-nums; }
   .mb-weather-cond { font-family: var(--mb-sans); font-size: 13.5px; color: var(--mb-ink-soft); margin-top: 5px; }
+  .mb-weather-rows { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--mb-line); padding-top: 12px; }
+  .mb-weather-row { display: flex; justify-content: space-between; font-family: var(--mb-sans); font-size: 12.5px; color: var(--mb-ink-soft); }
+  .mb-weather-row span:last-child { font-family: var(--mb-mono); color: var(--mb-ink); font-variant-numeric: tabular-nums; }
   .mb-alert { font-family: var(--mb-sans); font-size: 12.5px; font-weight: 600; color: var(--mb-accent); margin-top: 8px; }
 
   .mb-tl-item { display: grid; grid-template-columns: 56px 14px 1fr; gap: 2px; min-height: 40px; }
@@ -5340,6 +5345,23 @@ async function fetchAndRenderMorningBrief_() {
   }
 }
 
+// A small inline sun/cloud/rain/storm icon keyed off NWS's shortForecast
+// text - not a full weather-icon set, just enough visual variety to read
+// at a glance instead of a bare number.
+function mbWeatherIcon_(condition) {
+  const c = (condition || '').toLowerCase();
+  if (/thunder|storm/.test(c)) {
+    return '<svg viewBox="0 0 44 44"><path d="M12 24a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-1 13H12Z" style="fill:var(--mb-ink-faint);opacity:.6"/><path d="M22 22l-4 8h5l-3 7 9-11h-5l3-4z" style="fill:var(--mb-accent)"/></svg>';
+  }
+  if (/rain|shower|drizzle/.test(c)) {
+    return '<svg viewBox="0 0 44 44"><path d="M12 24a8 8 0 0 1 1-16 10 10 0 0 1 19 3 7 7 0 0 1-1 13H12Z" style="fill:var(--mb-ink-faint);opacity:.6"/><g style="stroke:var(--mb-teal);stroke-width:2;stroke-linecap:round"><line x1="16" y1="30" x2="14" y2="37"/><line x1="23" y1="30" x2="21" y2="37"/><line x1="30" y1="30" x2="28" y2="37"/></g></svg>';
+  }
+  if (/cloud|overcast/.test(c)) {
+    return '<svg viewBox="0 0 44 44"><path d="M12 30a9 9 0 0 1 1-18 11 11 0 0 1 21 4 8 8 0 0 1-1 14H12Z" style="fill:var(--mb-ink-faint)"/></svg>';
+  }
+  return '<svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="9" style="fill:var(--mb-accent)"/><g style="stroke:var(--mb-accent);stroke-width:2.5;stroke-linecap:round"><line x1="22" y1="4" x2="22" y2="9"/><line x1="22" y1="35" x2="22" y2="40"/><line x1="4" y1="22" x2="9" y2="22"/><line x1="35" y1="22" x2="40" y2="22"/><line x1="9.5" y1="9.5" x2="13" y2="13"/><line x1="31" y1="31" x2="34.5" y2="34.5"/><line x1="9.5" y1="34.5" x2="13" y2="31"/><line x1="31" y1="13" x2="34.5" y2="9.5"/></g></svg>';
+}
+
 function mbFmtUpdated_(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -5370,8 +5392,19 @@ function renderMorningBrief_(brief, offline) {
         <div class="mb-card-title">Weather</div>
         <div class="mb-card-eyebrow">${escapeHtml_(w.location || '')}</div>
       </div>
-      <div class="mb-weather-temp">${w.high != null ? escapeHtml_(String(w.high)) + '°F' : ''}</div>
-      <div class="mb-weather-cond">${escapeHtml_(w.condition || '')}${w.low != null ? ' · low ' + escapeHtml_(String(w.low)) + '°' : ''}</div>
+      <div class="mb-weather-top">
+        <div class="mb-weather-icon">${mbWeatherIcon_(w.condition)}</div>
+        <div>
+          <div class="mb-weather-temp">${w.high != null ? escapeHtml_(String(w.high)) + '°F' : ''}</div>
+          <div class="mb-weather-cond">${escapeHtml_(w.condition || '')}</div>
+        </div>
+      </div>
+      <div class="mb-weather-rows">
+        <div class="mb-weather-row"><span>High / Low</span><span>${w.high != null ? escapeHtml_(String(w.high)) + '°' : '—'} / ${w.low != null ? escapeHtml_(String(w.low)) + '°' : '—'}</span></div>
+        <div class="mb-weather-row"><span>Rain chance</span><span>${w.rainChance != null ? escapeHtml_(String(w.rainChance)) + '%' : '—'}</span></div>
+        <div class="mb-weather-row"><span>Wind</span><span>${w.wind ? escapeHtml_(w.wind) : '—'}</span></div>
+        <div class="mb-weather-row"><span>Alerts</span><span>${w.alert ? 'See below' : 'None'}</span></div>
+      </div>
       ${w.alert ? `<div class="mb-alert">⚠ ${escapeHtml_(w.alert)}</div>` : ''}
     </div>`;
   }

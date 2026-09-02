@@ -761,6 +761,8 @@ function mbGatherWeather_() {
     high: dayPeriod ? dayPeriod.temperature : null,
     low: nightPeriod ? nightPeriod.temperature : null,
     condition: dayPeriod ? dayPeriod.shortForecast : '',
+    rainChance: dayPeriod && dayPeriod.probabilityOfPrecipitation ? dayPeriod.probabilityOfPrecipitation.value : null,
+    wind: dayPeriod && dayPeriod.windSpeed ? ((dayPeriod.windDirection ? dayPeriod.windDirection + ' ' : '') + dayPeriod.windSpeed) : null,
     alert: alert
   };
 }
@@ -886,7 +888,8 @@ function mbGatherHeadlines_() {
     // %5E, not a literal "^" - Stooq's ticker syntax for indices.
     const stooqRes = UrlFetchApp.fetch('https://stooq.com/q/l/?s=%5Edji,%5Espx,%5Endq&f=sd2t2ohlc&h&e=csv', { muteHttpExceptions: true });
     if (stooqRes.getResponseCode() !== 200) throw new Error('Stooq request failed (HTTP ' + stooqRes.getResponseCode() + ')');
-    const rows = Utilities.parseCsv(stooqRes.getContentText()).slice(1); // header row first
+    const rawCsv = stooqRes.getContentText();
+    const rows = Utilities.parseCsv(rawCsv).slice(1); // header row first
     const labels = { '^DJI': 'Dow', '^SPX': 'S&P', '^NDQ': 'Nasdaq' };
     const parts = rows.map(r => {
       const symbol = (r[0] || '').toUpperCase();
@@ -895,7 +898,12 @@ function mbGatherHeadlines_() {
       const pct = ((close - open) / open * 100).toFixed(1);
       return labels[symbol] + ' ' + (pct >= 0 ? '+' : '') + pct + '%';
     }).filter(Boolean);
-    if (parts.length) marketsSummary = parts.join(' · ');
+    // A 200 response with rows that all fail the label/number checks
+    // (e.g. Stooq returning "N/D" placeholders, or blocking Apps Script's
+    // request) previously left marketsSummary silently null - now it's a
+    // real, diagnosable error with the actual response body attached.
+    if (!parts.length) throw new Error('Stooq returned no usable rows: ' + rawCsv.slice(0, 200));
+    marketsSummary = parts.join(' · ');
   } catch (e) { stooqError = String(e); }
 
   return { headlines: headlines, marketsSummary: marketsSummary, cbsError: cbsError, stooqError: stooqError };
