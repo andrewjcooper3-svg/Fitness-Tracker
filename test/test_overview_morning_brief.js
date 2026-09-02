@@ -14,9 +14,16 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
 
 const SAMPLE_BRIEF = {
   updatedAt: '2026-09-03T10:31:00Z',
-  weather: { location: 'St. Petersburg, FL', high: 91, low: 78, condition: 'Scattered storms', alert: 'Drought advisory in effect' },
+  weather: {
+    location: 'St. Petersburg, FL', high: 91, low: 78, condition: 'Scattered storms', alert: 'Drought advisory in effect',
+    rainChance: 60, wind: 'SE 12 mph',
+    hourly: [
+      { time: '9am', temp: 82, precip: 10 }, { time: '10am', temp: 85, precip: 20 }, { time: '11am', temp: 88, precip: 30 },
+      { time: '12pm', temp: 90, precip: 40 }, { time: '1pm', temp: 91, precip: 50 }, { time: '2pm', temp: 91, precip: 60 }
+    ]
+  },
   calendar: [{ time: '9:00 AM', title: 'Dentist' }],
-  inbox: { categories: [{ name: 'Financial', items: [{ subject: 'Statement ready' }] }] },
+  inbox: { categories: [{ name: 'Financial', count: 1, items: [{ subject: 'Statement ready', from: 'Vanguard' }] }] },
   headlines: [{ title: 'Market rallies', summary: 'Stocks closed higher on tech gains.' }],
   markets: { summary: 'Dow +1.2% · S&P +0.9% · Nasdaq +1.5%' },
   events: [{ name: 'Farmers Market', date: 'Sat 9/6' }]
@@ -98,11 +105,25 @@ const SAMPLE_BRIEF = {
   const rendered = await page.evaluate(() => document.getElementById('mbContent').innerHTML);
   check('renders the weather section', rendered.includes('St. Petersburg, FL') && rendered.includes('91') && rendered.includes('Drought advisory'));
   check('renders the calendar section', rendered.includes('9:00 AM') && rendered.includes('Dentist'));
-  check('renders the inbox section', rendered.includes('Financial') && rendered.includes('Statement ready'));
+  check('renders the inbox section with the sender, not just the category', rendered.includes('Financial') && rendered.includes('Vanguard') && rendered.includes('Statement ready'));
   check('renders headlines and markets', rendered.includes('Market rallies') && rendered.includes('Dow +1.2%'));
   check('renders this week\'s events', rendered.includes('Farmers Market') && rendered.includes('Sat 9/6'));
   const updatedText = await page.evaluate(() => document.getElementById('mbUpdated').textContent);
   check('shows an "Updated ..." timestamp', /Updated/.test(updatedText), updatedText);
+
+  console.log('\n=== The hourly weather chart toggles between temp and rain ===');
+  const hourlyInfo = await page.evaluate(() => {
+    const chart = document.getElementById('mbHourlyChart');
+    const before = chart ? chart.innerHTML : '';
+    const rainBtn = [...document.querySelectorAll('.mb-hourly-btn')].find(b => b.textContent.trim() === 'Rain');
+    rainBtn.click();
+    const after = chart ? chart.innerHTML : '';
+    return { hasChart: !!chart, beforeHasSvg: /<svg/.test(before), beforeShowsTemp: /82°/.test(before), afterShowsRain: /10%/.test(after), rainBtnActive: rainBtn.classList.contains('active') };
+  });
+  check('the hourly chart renders an SVG by default', hourlyInfo.hasChart && hourlyInfo.beforeHasSvg);
+  check('defaults to showing temperature values', hourlyInfo.beforeShowsTemp);
+  check('tapping Rain switches the chart to precipitation values', hourlyInfo.afterShowsRain);
+  check('tapping Rain marks it active', hourlyInfo.rainBtnActive);
 
   console.log('\n=== The refresh button re-GENERATES live rather than re-reading the cache ===');
   const REGENERATED_BRIEF = { ...SAMPLE_BRIEF, updatedAt: '2026-09-03T14:00:00Z',
@@ -124,7 +145,8 @@ const SAMPLE_BRIEF = {
   const stillOpen = await page.evaluate(() => document.getElementById('morningBriefOverlay').classList.contains('open'));
   check('the modal is still open after refresh', stillOpen);
   const afterRefresh = await page.evaluate(() => document.getElementById('mbContent').innerHTML);
-  check('renders the freshly-regenerated data, not the stale cached value', afterRefresh.includes('88') && !afterRefresh.includes('>91'), afterRefresh.match(/mb-weather-temp">[^<]*/)[0]);
+  const bigTempMatch = afterRefresh.match(/mb-weather-temp">([^<]*)</);
+  check('renders the freshly-regenerated data, not the stale cached value', bigTempMatch && bigTempMatch[1] === '88°F', bigTempMatch && bigTempMatch[1]);
 
   console.log('\n=== A section that failed server-side shows its real error, not a silent empty state ===');
   const BRIEF_WITH_ERRORS = {

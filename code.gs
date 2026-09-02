@@ -756,6 +756,26 @@ function mbGatherWeather_() {
     }
   } catch (e) { /* alerts are a bonus, not core */ }
 
+  // The next 12 hours of temperature/precipitation, for the modal's
+  // hour-by-hour toggle - a bonus alongside the daily summary above, not
+  // core, so a failure here never takes down the rest of the weather card.
+  let hourly = [];
+  try {
+    const hourlyUrl = points.properties && points.properties.forecastHourly;
+    if (hourlyUrl) {
+      const hourlyRes = UrlFetchApp.fetch(hourlyUrl, opts);
+      if (hourlyRes.getResponseCode() === 200) {
+        const hourlyData = JSON.parse(hourlyRes.getContentText());
+        const hourlyPeriods = (hourlyData.properties && hourlyData.properties.periods) || [];
+        hourly = hourlyPeriods.slice(0, 12).map(p => ({
+          time: Utilities.formatDate(new Date(p.startTime), 'America/New_York', 'ha').toLowerCase(),
+          temp: p.temperature,
+          precip: p.probabilityOfPrecipitation ? p.probabilityOfPrecipitation.value : 0
+        }));
+      }
+    }
+  } catch (e) { /* hourly is a bonus, not core */ }
+
   return {
     location: 'St. Petersburg, FL',
     high: dayPeriod ? dayPeriod.temperature : null,
@@ -763,6 +783,7 @@ function mbGatherWeather_() {
     condition: dayPeriod ? dayPeriod.shortForecast : '',
     rainChance: dayPeriod && dayPeriod.probabilityOfPrecipitation ? dayPeriod.probabilityOfPrecipitation.value : null,
     wind: dayPeriod && dayPeriod.windSpeed ? ((dayPeriod.windDirection ? dayPeriod.windDirection + ' ' : '') + dayPeriod.windSpeed) : null,
+    hourly: hourly,
     alert: alert
   };
 }
@@ -839,15 +860,23 @@ function mbGatherInbox_() {
     const from = messages.length ? messages[messages.length - 1].getFrom() : '';
     const cat = mbCategorizeMail_(from, subject);
     if (!buckets[cat]) { buckets[cat] = []; order.push(cat); }
-    buckets[cat].push(subject);
+    buckets[cat].push({ subject: subject, from: mbCleanSender_(from) });
   });
   return {
     categories: order.map(name => ({
       name: name,
       count: buckets[name].length,
-      items: buckets[name].slice(0, 3).map(s => ({ subject: s }))
+      items: buckets[name].slice(0, 3)
     }))
   };
+}
+
+// GmailMessage.getFrom() returns the raw header, typically
+// '"Some Name" <addr@example.com>' - just the display name reads far
+// better in a briefing than the full header or a bare address.
+function mbCleanSender_(from) {
+  const match = String(from || '').match(/^"?([^"<]+?)"?\s*<[^>]+>$/);
+  return (match ? match[1] : from || '').trim();
 }
 
 function mbCategorizeMail_(from, subject) {
