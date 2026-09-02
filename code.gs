@@ -678,51 +678,26 @@ function refreshMorningBriefAuto_() {
   mbRefreshNow_();
 }
 
-// Every UrlFetchApp call that doesn't depend on another one's result runs
-// as ONE parallel batch via fetchAll, instead of ~6 sequential round
-// trips. That sequential version is exactly what produced "Executions
-// says Completed, but the app says couldn't reach the backend" - the
-// combined calls easily passed 30-60 seconds, long enough for the
-// browser's fetch to give up while Apps Script kept working regardless.
-// Only the actual NWS forecast fetch is still sequential, since it needs
-// the "points" response's URL first.
+// Each external source gets its own plain, independent UrlFetchApp.fetch()
+// call rather than one batched UrlFetchApp.fetchAll() - the batched
+// version produced an unexplainable, unreproducible-from-here failure
+// (every request in the batch reporting "never completed" with no
+// underlying exception ever surfacing, even after fixing the one
+// concrete bug found in it), and this codebase has no way to see Apps
+// Script's own execution logs to diagnose that kind of thing further.
+// Slower (up to ~6 sequential round trips instead of ~2), but each
+// failure is now independently attributable and this exact pattern is
+// already proven reliable elsewhere (mbGatherCalendar_'s single fetch).
 function mbRefreshNow_() {
   const brief = { updatedAt: new Date().toISOString() };
-  const lat = 27.7676, lon = -82.6403; // St. Petersburg, FL
-  const nwsOpts = { headers: { 'User-Agent': 'FitnessTrackerApp (andrewjcooper3@gmail.com)' }, muteHttpExceptions: true };
-
-  const requests = [
-    Object.assign({ url: 'https://api.weather.gov/points/' + lat + ',' + lon }, nwsOpts),
-    Object.assign({ url: 'https://api.weather.gov/alerts/active?point=' + lat + ',' + lon }, nwsOpts),
-    { url: 'https://www.cbsnews.com/latest/rss/main', muteHttpExceptions: true },
-    // %5E, not a literal "^" - muteHttpExceptions only suppresses bad HTTP
-    // status codes, not a malformed-URL rejection, and an unescaped "^" in
-    // a query string is exactly the kind of thing that can fail URL
-    // validation for the WHOLE fetchAll batch before any request is even
-    // sent, taking every other request in the batch down with it (which is
-    // exactly what "request never completed" on every section meant).
-    { url: 'https://stooq.com/q/l/?s=%5Edji,%5Espx,%5Endq&f=sd2t2ohlc&h&e=csv', muteHttpExceptions: true },
-    { url: 'https://ilovetheburg.com/events/', muteHttpExceptions: true },
-    { url: 'https://tampa-bay.events/', muteHttpExceptions: true }
-  ];
   const errors = {};
-  let responses = [];
-  try {
-    responses = UrlFetchApp.fetchAll(requests);
-  } catch (e) {
-    // Recorded so a batch-wide failure is visible too, not just each
-    // downstream section's generic "never completed" - this is the
-    // actual reason, whatever it turns out to be.
-    errors.network = String(e);
-  }
-  const [pointsRes, alertsRes, cbsRes, stooqRes, burgRes, tbayRes] = responses;
 
   // Recorded per-section rather than just console.error'd - an empty
   // section (e.g. "Inbox is quiet") and a SWALLOWED FAILURE look
   // identical in the modal otherwise, and Andrew has no easy way to see
   // Apps Script's Executions log from his phone. This surfaces the real
   // reason right in the UI instead.
-  try { const w = mbParseWeather_(pointsRes, alertsRes, nwsOpts); if (w) brief.weather = w; } catch (e) { errors.weather = String(e); }
+  try { const w = mbGatherWeather_(); if (w) brief.weather = w; } catch (e) { errors.weather = String(e); }
   try { const c = mbGatherCalendar_(); if (c.length) brief.calendar = c; } catch (e) { errors.calendar = String(e); }
   try { brief.inbox = mbGatherInbox_(); } catch (e) { errors.inbox = String(e); }
 
@@ -735,18 +710,13 @@ function mbRefreshNow_() {
     brief._debugCounts = { totalInboxThreadsAnyAge: GmailApp.search('in:inbox', 0, 5).length };
   } catch (e) { brief._debugCounts = { error: String(e) }; }
   try {
-    const h = mbParseHeadlines_(cbsRes, stooqRes);
+    const h = mbGatherHeadlines_();
     if (h.headlines.length) brief.headlines = h.headlines;
     if (h.marketsSummary) brief.markets = { summary: h.marketsSummary };
     if (h.cbsError) errors.headlines = h.cbsError;
     if (h.stooqError) errors.markets = h.stooqError;
   } catch (e) { errors.headlines = String(e); }
-  try {
-    const ev = [];
-    if (burgRes) mbExtractEvents_(burgRes.getContentText()).forEach(e => ev.push(e));
-    if (tbayRes) mbExtractEvents_(tbayRes.getContentText()).forEach(e => ev.push(e));
-    if (ev.length) brief.events = ev.slice(0, 6);
-  } catch (e) { errors.events = String(e); }
+  try { const ev = mbGatherEvents_(); if (ev.length) brief.events = ev; } catch (e) { errors.events = String(e); }
   if (Object.keys(errors).length) brief._errors = errors;
 
   const fitted = mbFitBudget_(brief);
@@ -756,15 +726,11 @@ function mbRefreshNow_() {
 
 // NWS's public JSON API (api.weather.gov) - no key required, but it does
 // require a real User-Agent identifying the app per their usage policy.
-// Takes the already-fetched points/alerts responses from the parallel
-// batch above; only the forecast fetch (needs the points response's own
-// URL first) still happens here, sequentially.
-function mbParseWeather_(pointsRes, alertsRes, opts) {
-  // Every failure path here throws instead of returning null - a silent
-  // null return looked identical to "nothing to show" and never made it
-  // into _errors the way a real calendar/inbox failure does, so weather
-  // could vanish from the brief with zero indication why.
-  if (!pointsRes) throw new Error('NWS points request never completed (the parallel fetchAll batch may have failed entirely)');
+function mbGatherWeather_() {
+  const lat = 27.7676, lon = -82.6403; // St. Petersburg, FL
+  const opts = { headers: { 'User-Agent': 'FitnessTrackerApp (andrewjcooper3@gmail.com)' }, muteHttpExceptions: true };
+
+  const pointsRes = UrlFetchApp.fetch('https://api.weather.gov/points/' + lat + ',' + lon, opts);
   if (pointsRes.getResponseCode() !== 200) {
     throw new Error('NWS points request failed (HTTP ' + pointsRes.getResponseCode() + '): ' + pointsRes.getContentText().slice(0, 200));
   }
@@ -782,7 +748,8 @@ function mbParseWeather_(pointsRes, alertsRes, opts) {
 
   let alert = null;
   try {
-    if (alertsRes) {
+    const alertsRes = UrlFetchApp.fetch('https://api.weather.gov/alerts/active?point=' + lat + ',' + lon, opts);
+    if (alertsRes.getResponseCode() === 200) {
       const alerts = JSON.parse(alertsRes.getContentText());
       const feature = (alerts.features || [])[0];
       if (feature) alert = feature.properties.headline;
@@ -894,17 +861,14 @@ function mbCategorizeMail_(from, subject) {
 
 // CBS News' public RSS feed and Stooq's keyless CSV quote endpoint - both
 // picked because they're documented data formats rather than page markup,
-// so they're far less likely to silently break than an HTML scrape. Takes
-// the already-fetched responses from the parallel batch in mbRefreshNow_.
-function mbParseHeadlines_(cbsRes, stooqRes) {
-  // Each source records its OWN error rather than just console.error'ing
-  // it - the same silent-swallow gap mbParseWeather_ had, where a real
-  // failure and a source that's just quiet today looked identical with
-  // nothing in _errors to tell them apart.
+// so they're far less likely to silently break than an HTML scrape. Each
+// source's own fetch and its error are kept independent, so headlines can
+// still show up even if markets fails, or vice versa.
+function mbGatherHeadlines_() {
   const headlines = [];
   let cbsError = null;
   try {
-    if (!cbsRes) throw new Error('CBS RSS request never completed (the parallel fetchAll batch may have failed entirely)');
+    const cbsRes = UrlFetchApp.fetch('https://www.cbsnews.com/latest/rss/main', { muteHttpExceptions: true });
     if (cbsRes.getResponseCode() !== 200) throw new Error('CBS RSS request failed (HTTP ' + cbsRes.getResponseCode() + ')');
     const doc = XmlService.parse(cbsRes.getContentText());
     const items = doc.getRootElement().getChild('channel').getChildren('item');
@@ -919,7 +883,8 @@ function mbParseHeadlines_(cbsRes, stooqRes) {
   let marketsSummary = null;
   let stooqError = null;
   try {
-    if (!stooqRes) throw new Error('Stooq request never completed (the parallel fetchAll batch may have failed entirely)');
+    // %5E, not a literal "^" - Stooq's ticker syntax for indices.
+    const stooqRes = UrlFetchApp.fetch('https://stooq.com/q/l/?s=%5Edji,%5Espx,%5Endq&f=sd2t2ohlc&h&e=csv', { muteHttpExceptions: true });
     if (stooqRes.getResponseCode() !== 200) throw new Error('Stooq request failed (HTTP ' + stooqRes.getResponseCode() + ')');
     const rows = Utilities.parseCsv(stooqRes.getContentText()).slice(1); // header row first
     const labels = { '^DJI': 'Dow', '^SPX': 'S&P', '^NDQ': 'Nasdaq' };
@@ -942,7 +907,20 @@ function mbParseHeadlines_(cbsRes, stooqRes) {
 // this so that never breaks the rest of the brief). If this stops
 // finding anything, check Apps Script's Executions log for what those
 // fetches actually returned and adjust the patterns below.
-//
+function mbGatherEvents_() {
+  const events = [];
+  const opts = { muteHttpExceptions: true };
+  try {
+    const html = UrlFetchApp.fetch('https://ilovetheburg.com/events/', opts).getContentText();
+    mbExtractEvents_(html).forEach(e => events.push(e));
+  } catch (e) { console.error('ilovetheburg: ' + e); }
+  try {
+    const html = UrlFetchApp.fetch('https://tampa-bay.events/', opts).getContentText();
+    mbExtractEvents_(html).forEach(e => events.push(e));
+  } catch (e) { console.error('tampa-bay.events: ' + e); }
+  return events.slice(0, 6);
+}
+
 // Looks for schema.org Event microdata first (itemprop="name"/"startDate"),
 // which several event-listing WordPress themes/plugins emit, then falls
 // back to <h2>/<h3> headings paired with a nearby time/date element.
