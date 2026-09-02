@@ -663,7 +663,7 @@ function loadMorningBrief_() {
 // UrlFetchApp calls come from Google's infrastructure with no such limit.
 //
 // Each section is gathered independently and wrapped in try/catch so one
-// broken source (most likely the two events sites - see mbGatherEvents_)
+// broken source (most likely the two events sites - see mbExtractEvents_)
 // never blocks the reliable sections (weather/calendar/inbox) from saving.
 //
 // Split into a weekday-gated auto path (the trigger) and the actual work
@@ -676,17 +676,45 @@ function refreshMorningBriefAuto_() {
   mbRefreshNow_();
 }
 
+// Every UrlFetchApp call that doesn't depend on another one's result runs
+// as ONE parallel batch via fetchAll, instead of ~6 sequential round
+// trips. That sequential version is exactly what produced "Executions
+// says Completed, but the app says couldn't reach the backend" - the
+// combined calls easily passed 30-60 seconds, long enough for the
+// browser's fetch to give up while Apps Script kept working regardless.
+// Only the actual NWS forecast fetch is still sequential, since it needs
+// the "points" response's URL first.
 function mbRefreshNow_() {
   const brief = { updatedAt: new Date().toISOString() };
-  try { const w = mbGatherWeather_(); if (w) brief.weather = w; } catch (e) { console.error('weather: ' + e); }
+  const lat = 27.7676, lon = -82.6403; // St. Petersburg, FL
+  const nwsOpts = { headers: { 'User-Agent': 'FitnessTrackerApp (andrewjcooper3@gmail.com)' }, muteHttpExceptions: true };
+
+  const requests = [
+    Object.assign({ url: 'https://api.weather.gov/points/' + lat + ',' + lon }, nwsOpts),
+    Object.assign({ url: 'https://api.weather.gov/alerts/active?point=' + lat + ',' + lon }, nwsOpts),
+    { url: 'https://www.cbsnews.com/latest/rss/main', muteHttpExceptions: true },
+    { url: 'https://stooq.com/q/l/?s=^dji,^spx,^ndq&f=sd2t2ohlc&h&e=csv', muteHttpExceptions: true },
+    { url: 'https://ilovetheburg.com/events/', muteHttpExceptions: true },
+    { url: 'https://tampa-bay.events/', muteHttpExceptions: true }
+  ];
+  let responses = [];
+  try { responses = UrlFetchApp.fetchAll(requests); } catch (e) { console.error('fetchAll: ' + e); }
+  const [pointsRes, alertsRes, cbsRes, stooqRes, burgRes, tbayRes] = responses;
+
+  try { const w = mbParseWeather_(pointsRes, alertsRes, nwsOpts); if (w) brief.weather = w; } catch (e) { console.error('weather: ' + e); }
   try { const c = mbGatherCalendar_(); if (c.length) brief.calendar = c; } catch (e) { console.error('calendar: ' + e); }
   try { brief.inbox = mbGatherInbox_(); } catch (e) { console.error('inbox: ' + e); }
   try {
-    const h = mbGatherHeadlines_();
+    const h = mbParseHeadlines_(cbsRes, stooqRes);
     if (h.headlines.length) brief.headlines = h.headlines;
     if (h.marketsSummary) brief.markets = { summary: h.marketsSummary };
   } catch (e) { console.error('headlines: ' + e); }
-  try { const ev = mbGatherEvents_(); if (ev.length) brief.events = ev; } catch (e) { console.error('events: ' + e); }
+  try {
+    const ev = [];
+    if (burgRes) mbExtractEvents_(burgRes.getContentText()).forEach(e => ev.push(e));
+    if (tbayRes) mbExtractEvents_(tbayRes.getContentText()).forEach(e => ev.push(e));
+    if (ev.length) brief.events = ev.slice(0, 6);
+  } catch (e) { console.error('events: ' + e); }
 
   const fitted = mbFitBudget_(brief);
   saveMorningBrief_(fitted);
@@ -695,10 +723,12 @@ function mbRefreshNow_() {
 
 // NWS's public JSON API (api.weather.gov) - no key required, but it does
 // require a real User-Agent identifying the app per their usage policy.
-function mbGatherWeather_() {
-  const lat = 27.7676, lon = -82.6403; // St. Petersburg, FL
-  const opts = { headers: { 'User-Agent': 'FitnessTrackerApp (andrewjcooper3@gmail.com)' }, muteHttpExceptions: true };
-  const points = JSON.parse(UrlFetchApp.fetch('https://api.weather.gov/points/' + lat + ',' + lon, opts).getContentText());
+// Takes the already-fetched points/alerts responses from the parallel
+// batch above; only the forecast fetch (needs the points response's own
+// URL first) still happens here, sequentially.
+function mbParseWeather_(pointsRes, alertsRes, opts) {
+  if (!pointsRes) return null;
+  const points = JSON.parse(pointsRes.getContentText());
   const forecastUrl = points.properties && points.properties.forecast;
   if (!forecastUrl) return null;
   const forecast = JSON.parse(UrlFetchApp.fetch(forecastUrl, opts).getContentText());
@@ -708,9 +738,11 @@ function mbGatherWeather_() {
 
   let alert = null;
   try {
-    const alerts = JSON.parse(UrlFetchApp.fetch('https://api.weather.gov/alerts/active?point=' + lat + ',' + lon, opts).getContentText());
-    const feature = (alerts.features || [])[0];
-    if (feature) alert = feature.properties.headline;
+    if (alertsRes) {
+      const alerts = JSON.parse(alertsRes.getContentText());
+      const feature = (alerts.features || [])[0];
+      if (feature) alert = feature.properties.headline;
+    }
   } catch (e) { /* alerts are a bonus, not core */ }
 
   return {
@@ -782,62 +814,49 @@ function mbCategorizeMail_(from, subject) {
 
 // CBS News' public RSS feed and Stooq's keyless CSV quote endpoint - both
 // picked because they're documented data formats rather than page markup,
-// so they're far less likely to silently break than an HTML scrape.
-function mbGatherHeadlines_() {
+// so they're far less likely to silently break than an HTML scrape. Takes
+// the already-fetched responses from the parallel batch in mbRefreshNow_.
+function mbParseHeadlines_(cbsRes, stooqRes) {
   const headlines = [];
   try {
-    const xml = UrlFetchApp.fetch('https://www.cbsnews.com/latest/rss/main', { muteHttpExceptions: true }).getContentText();
-    const doc = XmlService.parse(xml);
-    const items = doc.getRootElement().getChild('channel').getChildren('item');
-    items.slice(0, 5).forEach(item => {
-      const title = (item.getChildText('title') || '').trim();
-      let summary = (item.getChildText('description') || '').replace(/<[^>]+>/g, '').trim();
-      if (summary.length > 160) summary = summary.slice(0, 157) + '...';
-      if (title) headlines.push({ title: title, summary: summary });
-    });
+    if (cbsRes) {
+      const doc = XmlService.parse(cbsRes.getContentText());
+      const items = doc.getRootElement().getChild('channel').getChildren('item');
+      items.slice(0, 5).forEach(item => {
+        const title = (item.getChildText('title') || '').trim();
+        let summary = (item.getChildText('description') || '').replace(/<[^>]+>/g, '').trim();
+        if (summary.length > 160) summary = summary.slice(0, 157) + '...';
+        if (title) headlines.push({ title: title, summary: summary });
+      });
+    }
   } catch (e) { console.error('cbs rss: ' + e); }
 
   let marketsSummary = null;
   try {
-    const csv = UrlFetchApp.fetch('https://stooq.com/q/l/?s=^dji,^spx,^ndq&f=sd2t2ohlc&h&e=csv', { muteHttpExceptions: true }).getContentText();
-    const rows = Utilities.parseCsv(csv).slice(1); // header row first
-    const labels = { '^DJI': 'Dow', '^SPX': 'S&P', '^NDQ': 'Nasdaq' };
-    const parts = rows.map(r => {
-      const symbol = (r[0] || '').toUpperCase();
-      const open = parseFloat(r[3]), close = parseFloat(r[6]);
-      if (!labels[symbol] || !open || !close) return null;
-      const pct = ((close - open) / open * 100).toFixed(1);
-      return labels[symbol] + ' ' + (pct >= 0 ? '+' : '') + pct + '%';
-    }).filter(Boolean);
-    if (parts.length) marketsSummary = parts.join(' · ');
+    if (stooqRes) {
+      const rows = Utilities.parseCsv(stooqRes.getContentText()).slice(1); // header row first
+      const labels = { '^DJI': 'Dow', '^SPX': 'S&P', '^NDQ': 'Nasdaq' };
+      const parts = rows.map(r => {
+        const symbol = (r[0] || '').toUpperCase();
+        const open = parseFloat(r[3]), close = parseFloat(r[6]);
+        if (!labels[symbol] || !open || !close) return null;
+        const pct = ((close - open) / open * 100).toFixed(1);
+        return labels[symbol] + ' ' + (pct >= 0 ? '+' : '') + pct + '%';
+      }).filter(Boolean);
+      if (parts.length) marketsSummary = parts.join(' · ');
+    }
   } catch (e) { console.error('stooq: ' + e); }
 
   return { headlines: headlines, marketsSummary: marketsSummary };
 }
 
 // Best-effort HTML scrape of two local-events sites that don't publish a
-// structured feed. This is the most fragile section by far - a markup
-// change on either site can silently zero it out (it's wrapped in
-// try/catch by the caller, so that never breaks the rest of the brief).
-// If this stops finding anything, check Apps Script's Executions log for
-// what these fetches actually returned and adjust the patterns below.
-function mbGatherEvents_() {
-  const events = [];
-  const opts = { muteHttpExceptions: true };
-
-  try {
-    const html = UrlFetchApp.fetch('https://ilovetheburg.com/events/', opts).getContentText();
-    mbExtractEvents_(html).forEach(e => events.push(e));
-  } catch (e) { console.error('ilovetheburg: ' + e); }
-
-  try {
-    const html = UrlFetchApp.fetch('https://tampa-bay.events/', opts).getContentText();
-    mbExtractEvents_(html).forEach(e => events.push(e));
-  } catch (e) { console.error('tampa-bay.events: ' + e); }
-
-  return events.slice(0, 6);
-}
-
+// structured feed - the most fragile section by far, since a markup
+// change on either site can silently zero it out (mbRefreshNow_ wraps
+// this so that never breaks the rest of the brief). If this stops
+// finding anything, check Apps Script's Executions log for what those
+// fetches actually returned and adjust the patterns below.
+//
 // Looks for schema.org Event microdata first (itemprop="name"/"startDate"),
 // which several event-listing WordPress themes/plugins emit, then falls
 // back to <h2>/<h3> headings paired with a nearby time/date element.
