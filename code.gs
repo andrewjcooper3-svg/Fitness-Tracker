@@ -695,12 +695,26 @@ function mbRefreshNow_() {
     Object.assign({ url: 'https://api.weather.gov/points/' + lat + ',' + lon }, nwsOpts),
     Object.assign({ url: 'https://api.weather.gov/alerts/active?point=' + lat + ',' + lon }, nwsOpts),
     { url: 'https://www.cbsnews.com/latest/rss/main', muteHttpExceptions: true },
-    { url: 'https://stooq.com/q/l/?s=^dji,^spx,^ndq&f=sd2t2ohlc&h&e=csv', muteHttpExceptions: true },
+    // %5E, not a literal "^" - muteHttpExceptions only suppresses bad HTTP
+    // status codes, not a malformed-URL rejection, and an unescaped "^" in
+    // a query string is exactly the kind of thing that can fail URL
+    // validation for the WHOLE fetchAll batch before any request is even
+    // sent, taking every other request in the batch down with it (which is
+    // exactly what "request never completed" on every section meant).
+    { url: 'https://stooq.com/q/l/?s=%5Edji,%5Espx,%5Endq&f=sd2t2ohlc&h&e=csv', muteHttpExceptions: true },
     { url: 'https://ilovetheburg.com/events/', muteHttpExceptions: true },
     { url: 'https://tampa-bay.events/', muteHttpExceptions: true }
   ];
+  const errors = {};
   let responses = [];
-  try { responses = UrlFetchApp.fetchAll(requests); } catch (e) { console.error('fetchAll: ' + e); }
+  try {
+    responses = UrlFetchApp.fetchAll(requests);
+  } catch (e) {
+    // Recorded so a batch-wide failure is visible too, not just each
+    // downstream section's generic "never completed" - this is the
+    // actual reason, whatever it turns out to be.
+    errors.network = String(e);
+  }
   const [pointsRes, alertsRes, cbsRes, stooqRes, burgRes, tbayRes] = responses;
 
   // Recorded per-section rather than just console.error'd - an empty
@@ -708,7 +722,6 @@ function mbRefreshNow_() {
   // identical in the modal otherwise, and Andrew has no easy way to see
   // Apps Script's Executions log from his phone. This surfaces the real
   // reason right in the UI instead.
-  const errors = {};
   try { const w = mbParseWeather_(pointsRes, alertsRes, nwsOpts); if (w) brief.weather = w; } catch (e) { errors.weather = String(e); }
   try { const c = mbGatherCalendar_(); if (c.length) brief.calendar = c; } catch (e) { errors.calendar = String(e); }
   try { brief.inbox = mbGatherInbox_(); } catch (e) { errors.inbox = String(e); }
