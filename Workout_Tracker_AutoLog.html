@@ -332,6 +332,11 @@
   .app-views-viewport { overflow: hidden; position: relative; transition: height 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
   .app-views-track { display: flex; align-items: flex-start; will-change: transform; }
   .app-view { flex: 0 0 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+  /* Negative so it paints leftmost before JS/applyTabOrder_() runs,
+     without renumbering the rest of this fallback block - the real
+     order (from TAB_ORDER_DEFAULT_) is what actually governs it after
+     boot, same as every other view here. */
+  #view-briefing { order: -1; }
   #view-overview { order: 0; }
   #view-tracker { order: 1; }
   #view-kitchen { order: 2; }
@@ -476,19 +481,6 @@
   #view-overview .ov-note { margin-top: 6px; }
   .ov-hero-card { border-radius: 20px; padding: 11px 14px; margin-bottom: 8px; color: var(--text); background: var(--surface); border: 1.5px solid var(--border); cursor: pointer; position: relative; }
   .ov-hero-card:active { opacity: 0.92; }
-  /* Static, always at the very top of Overview (not part of the
-     reorderable ov-blocks grid) - navigates the current view to the
-     externally-hosted Morning Brief page, refreshed by a scheduled
-     routine each weekday morning. Deliberately a plain link-style
-     navigation (no target="_blank"/window.open) so it replaces this
-     page rather than opening a new tab. */
-  .ov-brief-card { border-radius: 20px; padding: 11px 14px; margin-bottom: 8px; color: var(--text); background: var(--surface); border: 1.5px solid var(--border); cursor: pointer; display: flex; align-items: center; gap: 10px; }
-  .ov-brief-card:active { opacity: 0.92; }
-  .ov-brief-card-icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
-  .ov-brief-card-text { flex: 1; min-width: 0; }
-  .ov-brief-card-title { font-family: var(--font); font-size: 14px; font-weight: 800; }
-  .ov-brief-card-sub { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); margin-top: 1px; }
-  .ov-brief-card-chevron { color: var(--muted); opacity: 0.5; font-size: 18px; flex-shrink: 0; }
   /* Category color now lives only in the border, matching the smaller
      glance-tile treatment below - a quieter, lower-eyestrain read. */
   .ov-hero-pushup { border-color: #e0916f; }
@@ -822,15 +814,16 @@
   .event-modal-close { display: block; width: 100%; background: var(--surface2); border: none; color: var(--text); padding: 13px; border-radius: 14px; font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
   .event-modal-close:active { background: var(--surface2); filter: brightness(1.2); }
 
-  /* Morning Brief modal - everything rendered from one JSON blob the
-     backend stores (see loadMorningBrief_/saveMorningBrief_ in code.gs).
-     Deliberately its OWN scoped palette/type system (--mb-*, Fraunces +
-     IBM Plex) matching a reference briefing page's editorial look,
-     rather than the rest of the app's system-font UI chrome - kept
-     scoped to #morningBriefOverlay so nothing else on the page is
-     affected. Follows the same dark-default / light-override pattern as
-     the app's own :root theme vars above, just under its own names. */
-  #morningBriefOverlay {
+  /* Morning Brief - its own full tab now (view-briefing, leftmost),
+     everything rendered from one JSON blob the backend stores (see
+     loadMorningBrief_/saveMorningBrief_ in code.gs). Deliberately its
+     OWN scoped palette/type system (--mb-*, Fraunces + IBM Plex)
+     matching a reference briefing page's editorial look, rather than
+     the rest of the app's system-font UI chrome - kept scoped to
+     #view-briefing so nothing else on the page is affected. Follows the
+     same dark-default / light-override pattern as the app's own :root
+     theme vars above, just under its own names. */
+  #view-briefing {
     --mb-bg: #0E1517; --mb-surface: #161F22; --mb-surface-soft: #1C262A;
     --mb-ink: #EDF3F2; --mb-ink-soft: #A9B8B9; --mb-ink-faint: #7C8C90;
     --mb-line: #293739; --mb-accent: #FF9A65; --mb-accent-soft: #3A2A1F;
@@ -838,23 +831,25 @@
     --mb-serif: 'Fraunces', Georgia, serif;
     --mb-sans: 'IBM Plex Sans', var(--font);
     --mb-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    display: block;
+    background: var(--mb-bg);
+    border-radius: 16px;
+    padding: 14px 14px 4px;
   }
   @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) #morningBriefOverlay {
+    :root:not([data-theme="dark"]) #view-briefing {
       --mb-bg: #F4F6F5; --mb-surface: #FFFFFF; --mb-surface-soft: #EDF2F1;
       --mb-ink: #142027; --mb-ink-soft: #4E6266; --mb-ink-faint: #7E8E92;
       --mb-line: #DCE3E2; --mb-accent: #FF7A3D; --mb-accent-soft: #FFE4D3;
       --mb-teal: #146B64; --mb-teal-soft: #DCEFEC;
     }
   }
-  :root[data-theme="light"] #morningBriefOverlay {
+  :root[data-theme="light"] #view-briefing {
     --mb-bg: #F4F6F5; --mb-surface: #FFFFFF; --mb-surface-soft: #EDF2F1;
     --mb-ink: #142027; --mb-ink-soft: #4E6266; --mb-ink-faint: #7E8E92;
     --mb-line: #DCE3E2; --mb-accent: #FF7A3D; --mb-accent-soft: #FFE4D3;
     --mb-teal: #146B64; --mb-teal-soft: #DCEFEC;
   }
-  #morningBriefOverlay .event-modal-sheet { background: var(--mb-bg); }
-  #morningBriefOverlay .event-modal-handle { background: var(--mb-line); }
 
   .mb-badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mb-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mb-accent); background: var(--mb-accent-soft); border-radius: 999px; padding: 4px 11px 4px 9px; }
   .mb-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mb-accent); display: inline-block; }
@@ -2420,6 +2415,16 @@
 <div class="app-views-viewport" id="appViewsViewport">
 <div class="app-views-track" id="appViewsTrack">
 
+<div id="view-briefing" class="app-view">
+  <div class="mb-head">
+    <span class="mb-badge">Morning Brief</span>
+    <button class="mb-refresh-btn" id="mbRefreshBtn" onclick="refreshMorningBrief()" aria-label="Refresh">↻</button>
+  </div>
+  <div class="mb-h1" id="mbGreeting">Good morning.</div>
+  <div class="mb-updated" id="mbUpdated"></div>
+  <div id="mbContent"></div>
+</div>
+
 <div id="view-overview" class="app-view active">
   <!-- No title - the tab bar already says which tab this is. What is left
        is the live week label and the actions, on one line. -->
@@ -2437,19 +2442,6 @@
   <!-- Shown once after a week rolls over, so the archive is visible
        rather than something you have to trust happened. -->
   <div class="ov-archive-notice" id="ovArchiveNotice" onclick="dismissArchiveNotice_()"></div>
-
-  <!-- Morning Brief: opens an in-app modal showing the briefing (weather,
-       calendar, inbox, headlines, local events) gathered by a scheduled
-       routine each weekday morning and stored via the same backend as
-       everything else on this page - not an external page or a new tab. -->
-  <div class="ov-brief-card" onclick="openMorningBriefModal()">
-    <div class="ov-brief-card-icon">☀️</div>
-    <div class="ov-brief-card-text">
-      <div class="ov-brief-card-title">Morning Brief</div>
-      <div class="ov-brief-card-sub">Weather, calendar, inbox &amp; news</div>
-    </div>
-    <div class="ov-brief-card-chevron">›</div>
-  </div>
 
   <!-- Every block on this page lives in one grid so any of them can be
        moved anywhere in the order - the two big cards span all the columns
@@ -3926,20 +3918,6 @@
   </div>
 </div>
 
-<div class="event-modal-overlay" id="morningBriefOverlay" onclick="closeMorningBriefModal(event)">
-  <div class="event-modal-sheet" onclick="event.stopPropagation()">
-    <div class="event-modal-handle"></div>
-    <div class="mb-head">
-      <span class="mb-badge">Morning Brief</span>
-      <button class="mb-refresh-btn" id="mbRefreshBtn" onclick="refreshMorningBrief()" aria-label="Refresh">↻</button>
-    </div>
-    <div class="mb-h1" id="mbGreeting">Good morning.</div>
-    <div class="mb-updated" id="mbUpdated"></div>
-    <div id="mbContent"></div>
-    <button class="event-modal-close" onclick="closeMorningBriefModal(event)">Close</button>
-  </div>
-</div>
-
 <div class="event-modal-overlay" id="weekDetailModalOverlay" onclick="closeWeekDetailModal(event)">
   <div class="event-modal-sheet" onclick="event.stopPropagation()">
     <div class="event-modal-handle"></div>
@@ -4267,6 +4245,9 @@
 </div>
 
 <div class="app-tabs" id="appTabs">
+  <div class="app-tab" data-view="briefing" onclick="showAppView('briefing')">
+    <div class="app-tab-label">Brief</div>
+  </div>
   <div class="app-tab active" data-view="overview" onclick="showAppView('overview')">
     <div class="app-tab-label">Overview</div>
   </div>
@@ -4321,6 +4302,10 @@
   <div class="app-sidebar-brand">
     <div class="app-sidebar-brand-title">AJC</div>
     <div class="app-sidebar-brand-sub">Balanced Growth</div>
+  </div>
+  <div class="app-sidebar-item" data-view="briefing" onclick="showAppView('briefing')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"></path></svg>
+    <div class="app-sidebar-item-label">Brief</div>
   </div>
   <div class="app-sidebar-item active" data-view="overview" onclick="showAppView('overview')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="2"></rect><rect x="14" y="3" width="7" height="5" rx="2"></rect><rect x="14" y="12" width="7" height="9" rx="2"></rect><rect x="3" y="16" width="7" height="5" rx="2"></rect></svg>
@@ -5310,21 +5295,12 @@ function closeSettingsModal(event) {
   document.getElementById('settingsModalOverlay').classList.remove('open');
 }
 
-// Morning Brief modal - renders whatever the backend has stored
-// (loadMorningBrief_/saveMorningBrief_ in code.gs), gathered and pushed
-// there each weekday morning by a scheduled routine. The refresh button
-// re-fetches from the backend; it doesn't re-run the gather itself (that
-// only happens on the routine's own schedule), so it's for picking up a
-// brief that just landed, not for generating one on demand.
-function openMorningBriefModal() {
-  document.getElementById('morningBriefOverlay').classList.add('open');
-  fetchAndRenderMorningBrief_();
-}
-
-function closeMorningBriefModal(event) {
-  if (event) event.stopPropagation();
-  document.getElementById('morningBriefOverlay').classList.remove('open');
-}
+// Morning Brief - its own tab now (view-briefing); loading on activation
+// is wired through renderActiveViewContent() rather than an open/close
+// pair like the modal this used to be. Renders whatever the backend has
+// stored (loadMorningBrief_/saveMorningBrief_ in code.gs). The refresh
+// button re-runs the actual gather live (see refreshMorningBrief below);
+// just switching to this tab only re-reads whatever's cached.
 
 // Refresh actually re-gathers live (weather/calendar/inbox/headlines/
 // events all run fresh server-side in code.gs) rather than just re-
@@ -15046,11 +15022,15 @@ function dismissArchiveNotice_() {
 // keeping its mini chart fresh.
 // Reassigned by applyTabOrder_() once a saved custom order is resolved -
 // the array literal here is only the default/reset target.
-let viewOrder = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
+let viewOrder = ['overview', 'briefing', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
 let currentViewIndex = 0;
 
 function renderActiveViewContent(view) {
   if (view === 'overview') renderOverview();
+  // Loads the cached brief instantly (same as opening used to); a live
+  // regenerate still only happens on an explicit tap of the Refresh icon,
+  // not just from swiping onto this tab.
+  if (view === 'briefing') fetchAndRenderMorningBrief_();
   if (view === 'tracker') { renderTrainerStats(); renderPushupsTab(); loadRemotePushupLedger(); }
   if (view === 'calendar') ensureCalendarLoaded();
   if (view === 'music') renderMusicTab();
@@ -15131,9 +15111,9 @@ function showAppView(view) {
    added after someone already customized their order) is appended at the
    end rather than silently missing from their bar. */
 const STORAGE_TAB_ORDER_KEY = 'WORKOUT_TAB_ORDER';
-const TAB_ORDER_DEFAULT_ = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
+const TAB_ORDER_DEFAULT_ = ['briefing', 'overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
 const TAB_LABELS_ = {
-  overview: 'Overview', tracker: 'Trainer', kitchen: 'Kitchen', music: 'Music',
+  briefing: 'Brief', overview: 'Overview', tracker: 'Trainer', kitchen: 'Kitchen', music: 'Music',
   calendar: 'Calendar', stats: 'History', financial: 'Future', routines: 'Routines'
 };
 
@@ -15149,6 +15129,13 @@ function saveTabOrder_(order) {
 function tabOrderResolved_() {
   const saved = (loadTabOrderRaw_() || []).filter(v => TAB_ORDER_DEFAULT_.includes(v));
   const missing = TAB_ORDER_DEFAULT_.filter(v => !saved.includes(v));
+  // Brief is meant to be the leftmost tab even for someone who already
+  // customized their order before it existed - everything else missing
+  // still appends at the end, the general "don't reorder what wasn't
+  // asked for" rule this function otherwise follows.
+  if (missing.includes('briefing')) {
+    return ['briefing'].concat(saved, missing.filter(v => v !== 'briefing'));
+  }
   return saved.concat(missing);
 }
 
@@ -20946,6 +20933,7 @@ renderWeeklyPlan_();
 // place - .header vs .ov-page-head vs .cal-header, some with buttons,
 // one with a decorative SVG, Music with no header at all.
 const TOP_BAR_VIEW_INFO = {
+  briefing: { title: 'Morning Brief', meta: '' },
   overview: { title: 'Overview', meta: getWeekLabelShort },
   tracker:  { title: 'TRAINER',  meta: getWeekLabelShort },
   kitchen:  { title: 'Kitchen',  meta: '' },

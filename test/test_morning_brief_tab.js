@@ -1,11 +1,13 @@
-/* The Morning Brief card at the top of Overview opens an in-app modal
-   rendered from JSON the backend stores (loadMorningBrief_/
-   saveMorningBrief_ in code.gs) - not a navigation to an external page,
-   and not a new tab/popup. This checks the card is present above the
-   reorderable ov-blocks grid, that clicking it opens the modal and fetches
-   from the backend rather than navigating away, that an empty backend
-   response shows the empty state, and that a real brief renders its
-   sections (weather/calendar/inbox/headlines/events). */
+/* Morning Brief is its own tab now (view-briefing), leftmost in the tab
+   bar/sidebar and swipeable from Overview, rendered from JSON the
+   backend stores (loadMorningBrief_/saveMorningBrief_ in code.gs) - not
+   a modal, not an external page. This checks: Brief is the leftmost tab
+   in both the tab bar and sidebar, the app still boots on Overview
+   despite that, switching to Brief loads the cached data automatically
+   (no explicit action needed), an empty backend response shows the
+   empty state, a real brief renders every section, the hourly chart
+   toggle, on-demand email preview + archive/trash, the refresh button's
+   live-regenerate behavior, and per-section error surfacing. */
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
@@ -45,52 +47,37 @@ const SAMPLE_BRIEF = {
   await page.goto(URL);
   await page.waitForFunction(() => typeof showAppView === 'function', null, { timeout: 15000 });
   await page.waitForTimeout(1200);
-  await page.evaluate(() => showAppView('overview'));
-  await page.waitForTimeout(300);
 
-  console.log('=== The Morning Brief card exists, above the reorderable blocks ===');
-  const info = await page.evaluate(() => {
-    const view = document.getElementById('view-overview');
-    const card = view.querySelector('.ov-brief-card');
-    const blocks = document.getElementById('ovBlocks');
-    if (!card) return { found: false };
-    const pos = card.compareDocumentPosition(blocks);
-    return {
-      found: true,
-      onclick: card.getAttribute('onclick'),
-      isBeforeBlocks: !!(pos & Node.DOCUMENT_POSITION_FOLLOWING),
-      title: (card.querySelector('.ov-brief-card-title') || {}).textContent
-    };
-  });
-  check('the card is present', info.found);
-  check('it sits before the reorderable ov-blocks grid', info.isBeforeBlocks);
-  check('it says "Morning Brief"', info.title === 'Morning Brief', info.title);
-  check('its click handler opens the in-app modal (not a location change)', info.onclick === 'openMorningBriefModal()', info.onclick);
+  console.log('=== Brief is the leftmost tab, but the app still boots on Overview ===');
+  const bootInfo = await page.evaluate(() => ({
+    activeView: viewOrder[currentViewIndex],
+    overviewViewIsActive: document.getElementById('view-overview').classList.contains('active'),
+    tabOrder: [...document.querySelectorAll('.app-tab')].map(t => t.dataset.view),
+    sidebarOrder: [...document.querySelectorAll('.app-sidebar-item')].map(t => t.dataset.view)
+  }));
+  check('boots on the overview view, not briefing', bootInfo.activeView === 'overview' && bootInfo.overviewViewIsActive, bootInfo.activeView);
+  check('Brief is the leftmost tab in the tab bar', bootInfo.tabOrder[0] === 'briefing', JSON.stringify(bootInfo.tabOrder));
+  check('Brief is the leftmost item in the sidebar too', bootInfo.sidebarOrder[0] === 'briefing', JSON.stringify(bootInfo.sidebarOrder));
 
-  console.log('\n=== Clicking it opens the modal in-app, no navigation, no popup ===');
+  console.log('\n=== Switching to the Brief tab loads automatically, no button tap needed ===');
   let openedPopup = false;
   page.on('popup', () => { openedPopup = true; });
   const navigations = [];
   page.on('framenavigated', f => { if (f === page.mainFrame()) navigations.push(f.url()); });
-  await page.click('#view-overview .ov-brief-card');
+  await page.evaluate(() => showAppView('briefing'));
   await page.waitForTimeout(300);
   check('no popup/new tab was opened', !openedPopup);
   check('the main frame never navigated away', navigations.every(u => u.startsWith('file://')), JSON.stringify(navigations));
-  const isOpen = await page.evaluate(() => document.getElementById('morningBriefOverlay').classList.contains('open'));
-  check('the modal overlay is open', isOpen);
+  const briefingActive = await page.evaluate(() => viewOrder[currentViewIndex] === 'briefing' && document.querySelector('.app-tab[data-view="briefing"]').classList.contains('active'));
+  check('the briefing view is now active', briefingActive);
 
   console.log('\n=== With nothing stored yet, it shows the empty state ===');
   const emptyText = await page.evaluate(() => document.getElementById('mbContent').textContent);
   check('shows the "no briefing yet" message', /No briefing yet/.test(emptyText), emptyText);
 
-  console.log('\n=== Close, then reopen with a real stored brief and it renders every section ===');
-  await page.click('#morningBriefOverlay .event-modal-close');
-  await page.waitForTimeout(150);
-  const closedNow = await page.evaluate(() => document.getElementById('morningBriefOverlay').classList.contains('open'));
-  check('Close actually closes it', !closedNow);
-
-  // Playwright routes stack with the earlier handler matching first, so
-  // unroute it before installing the version that returns real data.
+  console.log('\n=== Swiping back to Overview and back to Brief re-loads it (renderActiveViewContent) ===');
+  await page.evaluate(() => showAppView('overview'));
+  await page.waitForTimeout(200);
   await page.unroute('https://script.google.com/**');
   await page.route('https://script.google.com/**', route => {
     const url = route.request().url();
@@ -99,8 +86,7 @@ const SAMPLE_BRIEF = {
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' });
   });
-
-  await page.click('#view-overview .ov-brief-card');
+  await page.evaluate(() => showAppView('briefing'));
   await page.waitForTimeout(300);
   const rendered = await page.evaluate(() => document.getElementById('mbContent').innerHTML);
   check('renders the weather section', rendered.includes('St. Petersburg, FL') && rendered.includes('91') && rendered.includes('Drought advisory'));
@@ -155,7 +141,6 @@ const SAMPLE_BRIEF = {
   await page.click('.mb-inbox-row');
   await page.waitForTimeout(150);
   await page.route('https://script.google.com/**', route => {
-    const url = route.request().url();
     const body = route.request().postData();
     if (body && body.includes('emailAction')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success' }) });
@@ -215,8 +200,8 @@ const SAMPLE_BRIEF = {
   await page.click('#mbRefreshBtn');
   await page.waitForTimeout(300);
   check('Refresh calls the live-regenerate action, not the plain cache read', hitActions.includes('refreshMorningBriefNow'), JSON.stringify(hitActions));
-  const stillOpen = await page.evaluate(() => document.getElementById('morningBriefOverlay').classList.contains('open'));
-  check('the modal is still open after refresh', stillOpen);
+  const stillOnBriefing = await page.evaluate(() => viewOrder[currentViewIndex] === 'briefing');
+  check('still on the briefing tab after refresh', stillOnBriefing);
   const afterRefresh = await page.evaluate(() => document.getElementById('mbContent').innerHTML);
   const bigTempMatch = afterRefresh.match(/mb-weather-temp">([^<]*)</);
   check('renders the freshly-regenerated data, not the stale cached value', bigTempMatch && bigTempMatch[1] === '88°F', bigTempMatch && bigTempMatch[1]);

@@ -21,7 +21,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve(__dirname, '../Workout_Tracker_AutoLog.html');
-const DEFAULT_ORDER = ['overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
+const DEFAULT_ORDER = ['briefing', 'overview', 'tracker', 'kitchen', 'music', 'calendar', 'stats', 'financial', 'routines'];
 let fails = 0;
 const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}${x ? '  ' + x : ''}`); if (!ok) fails++; };
 
@@ -39,7 +39,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   await page.evaluate(() => openSettingsModal());
   await page.waitForTimeout(200);
   const labels = await page.evaluate(() => [...document.querySelectorAll('#tabOrderList .hx-layout-name span')].map(s => s.textContent));
-  check('all 8 tabs are listed', labels.length === 8, JSON.stringify(labels));
+  check('all 9 tabs are listed', labels.length === 9, JSON.stringify(labels));
   const upDisabled = await page.evaluate(() => document.querySelector('#tabOrderList .hx-layout-row .hx-layout-move[aria-label="Move up"]').disabled);
   const downDisabled = await page.evaluate(() => {
     const rows = [...document.querySelectorAll('#tabOrderList .hx-layout-row')];
@@ -48,7 +48,10 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('the first row cannot move up, the last cannot move down', upDisabled && downDisabled);
 
   console.log('\n=== Moving a tab keeps the array, CSS order, and nav buttons in lockstep ===');
-  await page.evaluate(() => { for (let i = 0; i < 7; i++) moveTabOrder('routines', -1); });
+  // 8 moves, not 7 - Brief occupies the lead slot on a fresh/uncustomized
+  // order (tabOrderResolved_ pins it there for anyone whose saved order
+  // predates it), so Routines needs one extra move to overtake it too.
+  await page.evaluate(() => { for (let i = 0; i < 8; i++) moveTabOrder('routines', -1); });
   await page.waitForTimeout(150);
   const state = await page.evaluate(() => ({
     viewOrder: viewOrder.slice(),
@@ -89,7 +92,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     applyTabOrder_();
     return viewOrder.slice();
   });
-  check('a tab missing from a stale saved order is appended, not dropped', reconciled.length === 8 && reconciled.includes('routines'), JSON.stringify(reconciled));
+  check('tabs missing from a stale saved order are restored (briefing pinned first, routines appended)', reconciled.length === 9 && reconciled.includes('routines') && reconciled[0] === 'briefing', JSON.stringify(reconciled));
 
   await browser.close();
   console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);
