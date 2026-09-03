@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-09-01-routine-excused';
+const BACKEND_BUILD_VERSION = '2026-09-03-morning-brief-actions';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
