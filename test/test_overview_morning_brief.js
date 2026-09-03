@@ -23,7 +23,7 @@ const SAMPLE_BRIEF = {
     ]
   },
   calendar: [{ time: '9:00 AM', title: 'Dentist' }],
-  inbox: { categories: [{ name: 'Financial', count: 1, items: [{ subject: 'Statement ready', from: 'Vanguard' }] }] },
+  inbox: { categories: [{ name: 'Financial', count: 1, items: [{ subject: 'Statement ready', from: 'Vanguard', threadId: 'thread-abc123' }] }] },
   headlines: [{ title: 'Market rallies', summary: 'Stocks closed higher on tech gains.' }],
   markets: { summary: 'Dow +1.2% · S&P +0.9% · Nasdaq +1.5%' },
   events: [{ name: 'Farmers Market', date: 'Sat 9/6' }]
@@ -124,6 +124,79 @@ const SAMPLE_BRIEF = {
   check('defaults to showing temperature values', hourlyInfo.beforeShowsTemp);
   check('tapping Rain switches the chart to precipitation values', hourlyInfo.afterShowsRain);
   check('tapping Rain marks it active', hourlyInfo.rainBtnActive);
+
+  console.log('\n=== Tapping an inbox row opens a preview, fetched only on demand ===');
+  const previewHits = [];
+  await page.route('https://script.google.com/**', route => {
+    const url = route.request().url();
+    if (url.includes('action=getEmailPreview')) {
+      previewHits.push(url);
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', preview: { subject: 'Statement ready', from: 'Vanguard', snippet: 'Your September statement is now available online.' } }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', brief: SAMPLE_BRIEF }) });
+  });
+  await page.click('.mb-inbox-row');
+  await page.waitForTimeout(300);
+  const afterOpenDetail = await page.evaluate(() => {
+    const item = document.querySelector('.mb-inbox-item');
+    const detail = item.querySelector('.mb-inbox-detail');
+    return { visible: detail.style.display !== 'none', isOpen: item.classList.contains('open'), snippet: detail.querySelector('.mb-inbox-snippet').textContent };
+  });
+  check('the detail panel opens on tap', afterOpenDetail.visible && afterOpenDetail.isOpen);
+  check('fetched exactly one preview for the tapped thread', previewHits.length === 1 && previewHits[0].includes('thread-abc123'), JSON.stringify(previewHits));
+  check('shows the fetched snippet text', afterOpenDetail.snippet.includes('September statement'), afterOpenDetail.snippet);
+
+  await page.click('.mb-inbox-row');
+  await page.waitForTimeout(150);
+  const afterCloseDetail = await page.evaluate(() => document.querySelector('.mb-inbox-detail').style.display);
+  check('tapping again closes it without re-fetching', afterCloseDetail === 'none' && previewHits.length === 1);
+
+  console.log('\n=== Archive removes the row immediately, no confirmation needed ===');
+  await page.click('.mb-inbox-row');
+  await page.waitForTimeout(150);
+  await page.route('https://script.google.com/**', route => {
+    const url = route.request().url();
+    const body = route.request().postData();
+    if (body && body.includes('emailAction')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success' }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', brief: SAMPLE_BRIEF }) });
+  });
+  await page.click('.mb-inbox-action-btn:not(.mb-inbox-action-trash)');
+  await page.waitForTimeout(400);
+  const stillThere = await page.evaluate(() => !!document.querySelector('.mb-inbox-item'));
+  check('the row is gone from the DOM after archiving, no dialog required', !stillThere);
+
+  console.log('\n=== Trash asks for confirmation first ===');
+  await page.unroute('https://script.google.com/**');
+  await page.route('https://script.google.com/**', route => {
+    const url = route.request().url();
+    if (url.includes('action=loadMorningBrief') || url.includes('action=refreshMorningBriefNow')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success', brief: SAMPLE_BRIEF }) });
+    }
+    const body = route.request().postData();
+    if (body && body.includes('emailAction')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'success' }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' });
+  });
+  await page.click('#mbRefreshBtn');
+  await page.waitForTimeout(300);
+  let dialogSeen = false;
+  page.once('dialog', d => { dialogSeen = true; d.dismiss(); });
+  await page.click('.mb-inbox-row');
+  await page.waitForTimeout(150);
+  await page.click('.mb-inbox-action-trash');
+  await page.waitForTimeout(200);
+  const rowStillThereAfterDismiss = await page.evaluate(() => !!document.querySelector('.mb-inbox-item'));
+  check('Trash triggers a confirmation dialog', dialogSeen);
+  check('dismissing the confirmation keeps the row', rowStillThereAfterDismiss);
+
+  page.once('dialog', d => d.accept());
+  await page.click('.mb-inbox-action-trash');
+  await page.waitForTimeout(400);
+  const rowGoneAfterAccept = await page.evaluate(() => !!document.querySelector('.mb-inbox-item'));
+  check('accepting the confirmation removes the row', !rowGoneAfterAccept);
 
   console.log('\n=== The refresh button re-GENERATES live rather than re-reading the cache ===');
   const REGENERATED_BRIEF = { ...SAMPLE_BRIEF, updatedAt: '2026-09-03T14:00:00Z',

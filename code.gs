@@ -860,7 +860,7 @@ function mbGatherInbox_() {
     const from = messages.length ? messages[messages.length - 1].getFrom() : '';
     const cat = mbCategorizeMail_(from, subject);
     if (!buckets[cat]) { buckets[cat] = []; order.push(cat); }
-    buckets[cat].push({ subject: subject, from: mbCleanSender_(from) });
+    buckets[cat].push({ subject: subject, from: mbCleanSender_(from), threadId: t.getId() });
   });
   return {
     categories: order.map(name => ({
@@ -869,6 +869,33 @@ function mbGatherInbox_() {
       items: buckets[name].slice(0, 3)
     }))
   };
+}
+
+// On-demand preview (not pre-fetched into the brief - only when the user
+// actually taps a message) and trash/archive. These are the first WRITE
+// actions this whole feature has needed - moveToTrash_/moveToArchive_
+// need broader Gmail permission than the read-only search() above, so
+// deploying this requires one more authorization pass the same way the
+// original Gmail read access did.
+function getEmailPreview_(threadId) {
+  const thread = GmailApp.getThreadById(threadId);
+  if (!thread) throw new Error('Thread not found (it may have been moved or deleted since the brief was generated)');
+  const messages = thread.getMessages();
+  const last = messages[messages.length - 1];
+  const body = (last.getPlainBody() || '').replace(/\s+/g, ' ').trim();
+  return {
+    subject: thread.getFirstMessageSubject() || '',
+    from: mbCleanSender_(last.getFrom()),
+    snippet: body.slice(0, 500)
+  };
+}
+
+function applyEmailAction_(threadId, op) {
+  const thread = GmailApp.getThreadById(threadId);
+  if (!thread) throw new Error('Thread not found (it may have been moved or deleted since the brief was generated)');
+  if (op === 'trash') thread.moveToTrash();
+  else if (op === 'archive') thread.moveToArchive();
+  else throw new Error('Unknown email action: ' + op);
 }
 
 // GmailMessage.getFrom() returns the raw header, typically
@@ -2188,6 +2215,22 @@ function doGet(e) {
     }
   }
 
+  // Fetched only when the user actually taps an inbox row in the Morning
+  // Brief modal - never pre-loaded into the stored brief, so opening a
+  // preview stays a deliberate action rather than something that happens
+  // to every message on every refresh.
+  if (action === 'getEmailPreview') {
+    try {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success', preview: getEmailPreview_(e.parameter.threadId) }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'error', message: String(err) }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ status: 'ok', sheetUrl: getSheetId(), backendVersion: BACKEND_BUILD_VERSION }))
     .setMimeType(ContentService.MimeType.JSON);
@@ -2326,6 +2369,22 @@ function doPost(e) {
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Trash/archive from the Morning Brief modal's inbox rows - a real
+    // write against Gmail, not just a read, so it needs the broader
+    // permission the original read-only inbox section never required.
+    if (data.action === 'emailAction') {
+      try {
+        applyEmailAction_(data.threadId, data.op);
+        return ContentService
+          .createTextOutput(JSON.stringify({ status: 'success' }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } catch (err) {
+        return ContentService
+          .createTextOutput(JSON.stringify({ status: 'error', message: String(err) }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
     }
 
     if (data.action === 'saveSettingsState') {
