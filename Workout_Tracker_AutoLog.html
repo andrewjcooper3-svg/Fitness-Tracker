@@ -300,12 +300,33 @@
 
   .app-tabs {
     position: fixed; left: 0; right: 0; top: 0; margin: 0 auto; max-width: 480px;
-    display: flex; align-items: center; justify-content: center; gap: 2px; z-index: 50;
+    display: flex; align-items: center; justify-content: flex-start; gap: 2px; z-index: 50;
     height: 44px; box-sizing: content-box;
     background: var(--nav-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
-    padding: calc(env(safe-area-inset-top, 0px)) max(6px, env(safe-area-inset-right, 0px)) 0 max(6px, env(safe-area-inset-left, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: 0;
+    /* The extra + var(--tab-center-pad) on each side is phantom scroll
+       room before the first tab and after the last one, sized (in
+       initTabBarCentering_) to half the bar's own width minus half a
+       tab's width - without it, centering the FIRST or LAST tab would
+       need scrollLeft to go negative or past the natural max, which a
+       scroll container can't do, so edge tabs would just clamp against
+       whichever bound they hit instead of ever truly centering. */
+    padding-right: calc(max(6px, env(safe-area-inset-right, 0px)) + var(--tab-center-pad, 0px));
+    padding-left: calc(max(6px, env(safe-area-inset-left, 0px)) + var(--tab-center-pad, 0px));
     overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+    /* justify-content was "center" before, which fought the active-tab
+       centering centerActiveTab_() now does via scrollLeft (centering an
+       already-overflowing flex row makes part of its content only
+       reachable by scrolling past 0, which isn't how scroll containers
+       work) - flex-start plus JS-driven centering is what actually
+       leaves it freely, correctly scrollable in both directions.
+       The fade itself: same mask on both engines, transparent at the
+       very edges so a partially-visible neighboring tab reads as
+       "peeking in" rather than being hard-cropped. */
+    mask-image: linear-gradient(to right, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, black 28px, black calc(100% - 28px), transparent 100%);
   }
   .app-tabs::-webkit-scrollbar { display: none; }
   .app-tab { flex: 0 0 auto; width: 64px; height: 36px; display: flex; align-items: center; justify-content: center; padding: 0 10px; border-radius: 12px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
@@ -1965,7 +1986,10 @@
       max-width: 1080px;
       left: max(6px, env(safe-area-inset-left, 0px));
       right: max(6px, env(safe-area-inset-right, 0px));
-      padding: env(safe-area-inset-top, 0px) 8px 0;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: 0;
+      padding-right: calc(8px + var(--tab-center-pad, 0px));
+      padding-left: calc(8px + var(--tab-center-pad, 0px));
     }
 
     .day-title { font-size: 17px; }
@@ -15064,6 +15088,38 @@ function updateViewportHeight(view, animate) {
   }
 }
 
+// Sizes the phantom scroll padding (--tab-center-pad, consumed by the
+// .app-tabs padding-left/right rules above) that lets even the FIRST and
+// LAST tab reach a truly centered scroll position - without it, centering
+// either would need scrollLeft to go negative or past the natural max,
+// which no scroll container allows, so edge tabs would just clamp
+// against whichever bound they hit. Run at boot (before the first
+// goToView/centerActiveTab_ call, so the padding is already in place for
+// it) and again on resize/orientation change, re-centering whatever's
+// currently active since a size change makes the old scroll position stale.
+function initTabBarCentering_() {
+  const bar = document.getElementById('appTabs');
+  const firstTab = bar && bar.querySelector('.app-tab');
+  if (!bar || !firstTab) return;
+  const pad = Math.max(0, (bar.clientWidth - firstTab.getBoundingClientRect().width) / 2);
+  bar.style.setProperty('--tab-center-pad', pad + 'px');
+  const active = bar.querySelector('.app-tab.active');
+  if (active) centerActiveTab_(active, false);
+}
+
+// Keeps whichever tab is active centered in the (still freely, manually
+// scrollable/draggable) tab bar, with its neighbors peeking in at the
+// edges under the bar's own fade mask - rather than leaving it wherever
+// tapping or swiping happened to land it, which is how a 9-tab bar on a
+// phone-width screen could put the active tab hard against an edge or
+// off-screen entirely.
+function centerActiveTab_(tabEl, animate) {
+  const bar = document.getElementById('appTabs');
+  if (!bar || !tabEl) return;
+  const target = tabEl.offsetLeft - (bar.clientWidth - tabEl.offsetWidth) / 2;
+  bar.scrollTo({ left: Math.max(0, target), behavior: animate ? 'smooth' : 'instant' });
+}
+
 function goToView(view, animate) {
   const idx = viewOrder.indexOf(view);
   if (idx === -1) return;
@@ -15075,7 +15131,9 @@ function goToView(view, animate) {
   track.style.transform = `translateX(${-idx * 100}%)`;
 
   document.querySelectorAll('.app-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector(`.app-tab[data-view="${view}"]`).classList.add('active');
+  const activeTabEl = document.querySelector(`.app-tab[data-view="${view}"]`);
+  activeTabEl.classList.add('active');
+  centerActiveTab_(activeTabEl, animate);
 
   document.querySelectorAll('.app-sidebar-item').forEach(t => t.classList.remove('active'));
   const sidebarItem = document.querySelector(`.app-sidebar-item[data-view="${view}"]`);
@@ -21100,6 +21158,8 @@ initHistoryRange_();
 initMuscleWindow_();
 initMuscleMode_();
 loadHistoryLayout_();
+initTabBarCentering_();
+window.addEventListener('resize', initTabBarCentering_);
 applyTabOrder_();
 finLoad_();
 initInbody_();
