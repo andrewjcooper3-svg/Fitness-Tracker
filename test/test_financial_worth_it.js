@@ -104,6 +104,93 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   });
   check('hand-editing a field reverts the profile picker to Custom', revertedToCustom === 'custom', revertedToCustom);
 
+  console.log('\n=== Already-have-one and necessity reshape the verdict, on top of the raw math ===');
+  await page.evaluate(() => {
+    document.getElementById('wiPrice').value = '30';       // cheap enough that raw math alone says "Buy it"
+    document.getElementById('wiPrice').dispatchEvent(new Event('input'));
+  });
+  const baseline = await page.evaluate(() => document.getElementById('wiVerdictBadge').textContent);
+  check('a cheap item reads "Buy it" on the raw numbers alone', baseline === 'Buy it', baseline);
+
+  const dupState = await page.evaluate(() => {
+    document.getElementById('wiHaveSimilar').value = 'works';
+    document.getElementById('wiHaveSimilar').dispatchEvent(new Event('change'));
+    return {
+      badge: document.getElementById('wiVerdictBadge').textContent,
+      line3: document.getElementById('wiVerdictLine3').textContent,
+      line3Visible: document.getElementById('wiVerdictLine3').style.display !== 'none'
+    };
+  });
+  check('owning a working duplicate overrides the verdict to Skip it', dupState.badge === 'Skip it', dupState.badge);
+  check('the override reason is shown', dupState.line3Visible && /duplicate/i.test(dupState.line3), dupState.line3);
+
+  await page.evaluate(() => { document.getElementById('wiHaveSimilar').value = 'none'; document.getElementById('wiHaveSimilar').dispatchEvent(new Event('change')); });
+  const brokenState = await page.evaluate(() => {
+    document.getElementById('wiPrice').value = '900';      // pricey enough that raw math alone says "Skip it"
+    document.getElementById('wiPrice').dispatchEvent(new Event('input'));
+    const before = document.getElementById('wiVerdictBadge').textContent;
+    document.getElementById('wiHaveSimilar').value = 'broken';
+    document.getElementById('wiHaveSimilar').dispatchEvent(new Event('change'));
+    return { before, after: document.getElementById('wiVerdictBadge').textContent, line3: document.getElementById('wiVerdictLine3').textContent };
+  });
+  check('an expensive item alone reads Skip it', brokenState.before === 'Skip it', brokenState.before);
+  check('marking the old one broken nudges the verdict up a tier', brokenState.after === 'Worth considering', brokenState.after);
+  check('the replacement reasoning is shown', /replace something broken/i.test(brokenState.line3), brokenState.line3);
+  await page.evaluate(() => { document.getElementById('wiHaveSimilar').value = 'none'; document.getElementById('wiHaveSimilar').dispatchEvent(new Event('change')); document.getElementById('wiPrice').value = '380'; document.getElementById('wiPrice').dispatchEvent(new Event('input')); });
+
+  console.log('\n=== Log this item, then open, edit and delete it from the list ===');
+  await page.evaluate(() => document.getElementById('wiLogItemBtn').click());
+  await page.waitForTimeout(100);
+  let logState = await page.evaluate(() => ({
+    count: WI_LOG.items.length,
+    cardVisible: document.getElementById('wiLogListCard').style.display !== 'none',
+    rowName: document.querySelector('#wiLogList .wi-log-row-name') ? document.querySelector('#wiLogList .wi-log-row-name').textContent : null
+  }));
+  check('logging the item adds it to WI_LOG', logState.count === 1, logState.count);
+  check('the logged-items card becomes visible', logState.cardVisible);
+  check('the row shows the item name', logState.rowName === 'Stand mixer', logState.rowName);
+
+  await page.evaluate(() => document.querySelector('#wiLogList .wi-log-row').click());
+  await page.waitForTimeout(100);
+  const detail = await page.evaluate(() => ({
+    modalVisible: document.getElementById('wiDetailModal').style.display !== 'none',
+    name: document.getElementById('wiDetailName').textContent,
+    price: document.getElementById('wiDetailPrice').textContent
+  }));
+  check('clicking the row opens the detail modal with its data', detail.modalVisible && detail.name === 'Stand mixer' && detail.price === '$380.00', JSON.stringify(detail));
+
+  await page.evaluate(() => document.getElementById('wiEditLogBtn').click());
+  await page.waitForTimeout(100);
+  const editState = await page.evaluate(() => ({
+    modalClosed: document.getElementById('wiDetailModal').style.display === 'none',
+    priceInForm: document.getElementById('wiPrice').value,
+    btnLabel: document.getElementById('wiLogItemBtn').textContent
+  }));
+  check('Edit closes the modal and loads the item back into the form', editState.modalClosed && editState.priceInForm === '380', JSON.stringify(editState));
+  check('the log button now reads "update" instead of "log"', /update/i.test(editState.btnLabel), editState.btnLabel);
+
+  await page.evaluate(() => {
+    document.getElementById('wiPrice').value = '420';
+    document.getElementById('wiPrice').dispatchEvent(new Event('input'));
+    document.getElementById('wiLogItemBtn').click();
+  });
+  await page.waitForTimeout(100);
+  logState = await page.evaluate(() => ({ count: WI_LOG.items.length, price: WI_LOG.items[0].price, btnLabel: document.getElementById('wiLogItemBtn').textContent }));
+  check('re-logging updates the existing entry rather than adding a new one', logState.count === 1 && logState.price === 420, JSON.stringify(logState));
+  check('the log button reverts to "Log this item" after saving', logState.btnLabel === 'Log this item', logState.btnLabel);
+
+  await page.evaluate(() => document.querySelector('#wiLogList .wi-log-row').click());
+  await page.waitForTimeout(100);
+  await page.evaluate(() => document.getElementById('wiDeleteLogBtn').click());
+  await page.waitForTimeout(100);
+  logState = await page.evaluate(() => ({
+    count: WI_LOG.items.length,
+    cardVisible: document.getElementById('wiLogListCard').style.display !== 'none',
+    modalClosed: document.getElementById('wiDetailModal').style.display === 'none'
+  }));
+  check('Delete removes the entry and closes the modal', logState.count === 0 && logState.modalClosed, JSON.stringify(logState));
+  check('the logged-items card hides again once empty', !logState.cardVisible);
+
   console.log('\n=== Abbey\'s Silly Calculator: under vs. over the $20 line ===');
   await page.evaluate(() => wiSetMode_('silly'));
   await page.waitForTimeout(100);

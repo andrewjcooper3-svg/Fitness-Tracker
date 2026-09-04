@@ -1491,6 +1491,15 @@
   .wi-btn-ghost { background: var(--surface2); color: var(--muted); }
   .wi-btn-primary { background: var(--accent); color: #fff; }
 
+  .wi-log-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 4px; border-top: 1px solid var(--border); cursor: pointer;
+  }
+  .wi-log-row:first-child { border-top: none; }
+  .wi-log-row:active { background: var(--surface2); }
+  .wi-log-row-name { font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .wi-log-row-meta { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
   /* The edit sheet. Same modal furniture as everywhere else. */
   .fin-group { margin-bottom: 18px; }
   .fin-group h4 { font-family: var(--font); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
@@ -3378,6 +3387,29 @@
             </select>
           </div>
         </div>
+
+        <!-- The raw cost math doesn't know whether this duplicates
+             something that already works, or replaces something broken -
+             wiRecalc_ folds these two into the verdict on top of the
+             cost/budget ratios, not instead of them. -->
+        <div class="wi-row" style="margin-top:12px;">
+          <div class="wi-field">
+            <label for="wiHaveSimilar">Do you already have something like this?</label>
+            <select class="wi-select" id="wiHaveSimilar">
+              <option value="none" selected>No, nothing similar</option>
+              <option value="works">Yes, and it still works fine</option>
+              <option value="broken">Yes, but it's broken or worn out</option>
+            </select>
+          </div>
+          <div class="wi-field">
+            <label for="wiNeedLevel">How needed is this?</label>
+            <select class="wi-select" id="wiNeedLevel">
+              <option value="want">Just want it</option>
+              <option value="helps" selected>Would genuinely help</option>
+              <option value="necessary">Necessary</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div class="stats-card" id="wiLedgerCard">
@@ -3406,7 +3438,18 @@
           <span class="fin-pill" id="wiVerdictBadge">Buy it</span>
           <p id="wiVerdictLine1"></p>
           <p id="wiVerdictLine2"></p>
+          <p id="wiVerdictLine3" style="display:none;"></p>
         </div>
+
+        <button type="button" class="wi-btn-primary" id="wiLogItemBtn" style="width:100%; margin-top:14px;">Log this item</button>
+      </div>
+
+      <div class="stats-card" id="wiLogListCard" style="display:none;">
+        <div class="wi-panel-head">
+          <div class="stats-card-title" style="margin-bottom:0;">Logged items</div>
+          <div class="sd-sync-line" id="wiLogSyncLine" onclick="wiSyncLogToRemote()" title="Tap to sync now" style="font-size:11px;"></div>
+        </div>
+        <div id="wiLogList"></div>
       </div>
 
       <div class="stats-card" id="wiPayPanel">
@@ -3616,6 +3659,46 @@
     <div class="wi-modal-actions">
       <button type="button" class="wi-btn-ghost" id="wiCancelProfilesBtn">Cancel</button>
       <button type="button" class="wi-btn-primary" id="wiSaveProfilesBtn">Save profiles</button>
+    </div>
+  </div>
+</div>
+
+<div class="wi-modal-overlay" id="wiDetailModal" style="display:none;">
+  <div class="wi-modal-panel">
+    <div class="wi-modal-head">
+      <h3 id="wiDetailName">—</h3>
+      <button type="button" class="wi-icon-btn" id="wiCloseDetailBtn" aria-label="Close">&times;</button>
+    </div>
+    <div class="wi-modal-sub" id="wiDetailLoggedAt"></div>
+
+    <div class="wi-headline">
+      <div class="lbl">Cost per use</div>
+      <div class="val" id="wiDetailCostPerUse">$0.00</div>
+    </div>
+
+    <div class="wi-line"><div class="k">Price</div><div class="v" id="wiDetailPrice">$0.00</div></div>
+    <div class="wi-line"><div class="k">Used</div><div class="v" id="wiDetailFreq">—</div></div>
+    <div class="wi-line"><div class="k">Expected to last</div><div class="v" id="wiDetailLife">—</div></div>
+    <div class="wi-line"><div class="k">Ongoing cost</div><div class="v" id="wiDetailRecur">—</div></div>
+
+    <div class="wi-divider"></div>
+
+    <div class="wi-line"><div class="k">Hours of regular work</div><div class="v" id="wiDetailHoursReg" style="color:var(--chart-1);">—</div></div>
+    <div class="wi-line"><div class="k">Share of that month's wants</div><div class="v" id="wiDetailWantsPct" style="color:var(--amber);">—</div></div>
+    <div class="wi-line"><div class="k">Already have one?</div><div class="v" id="wiDetailHaveSimilar">—</div></div>
+    <div class="wi-line"><div class="k">How needed</div><div class="v" id="wiDetailNeedLevel">—</div></div>
+
+    <div class="wi-verdict good" id="wiDetailVerdict" style="margin-top:12px;">
+      <span class="fin-pill" id="wiDetailVerdictBadge">Buy it</span>
+      <p id="wiDetailVerdictLine1"></p>
+      <p id="wiDetailVerdictLine2"></p>
+      <p id="wiDetailVerdictLine3" style="display:none;"></p>
+    </div>
+
+    <div class="wi-modal-actions">
+      <button type="button" class="wi-btn-ghost" id="wiDeleteLogBtn" style="color:var(--red);">Delete</button>
+      <button type="button" class="wi-btn-ghost" id="wiCloseDetailBtn2">Close</button>
+      <button type="button" class="wi-btn-primary" id="wiEditLogBtn">Edit</button>
     </div>
   </div>
 </div>
@@ -6224,6 +6307,19 @@ function wiFmtNum_(n, decimals) {
   return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+const WI_TIER_ORDER = ['bad', 'warn', 'good'];
+function wiBumpTier_(tier, delta) {
+  const idx = Math.max(0, Math.min(WI_TIER_ORDER.length - 1, WI_TIER_ORDER.indexOf(tier) + delta));
+  return WI_TIER_ORDER[idx];
+}
+const WI_HAVE_SIMILAR_LABELS = { none: 'No, nothing similar', works: 'Yes, and it still works fine', broken: "Yes, but it's broken or worn out" };
+const WI_NEED_LEVEL_LABELS = { want: 'Just want it', helps: 'Would genuinely help', necessary: 'Necessary' };
+
+// The last computed result, kept so "Log this item" can save exactly what
+// is on screen without recomputing (and without the log ever drifting
+// from what the ledger actually showed when it was logged).
+let wiLastSnapshot_ = null;
+
 function wiRecalc_() {
   const wage = parseFloat(wi$('wiWage').value) || 0;
   const taxKeep = (parseFloat(wi$('wiTaxKeep').value) || 0) / 100;
@@ -6231,6 +6327,7 @@ function wiRecalc_() {
   const otMult = parseFloat(wi$('wiOtMult').value) || 1;
   const wants = parseFloat(wi$('wiWants').value) || 0;
 
+  const name = wi$('wiItemName').value.trim() || 'This item';
   const price = parseFloat(wi$('wiPrice').value) || 0;
   const freqVal = parseFloat(wi$('wiFreqVal').value) || 0;
   const freqUnit = wi$('wiFreqUnit').value;
@@ -6239,6 +6336,8 @@ function wiRecalc_() {
   const hasRecur = wi$('wiHasRecur').checked;
   const recurVal = hasRecur ? (parseFloat(wi$('wiRecurVal').value) || 0) : 0;
   const recurUnit = wi$('wiRecurUnit').value;
+  const haveSimilar = wi$('wiHaveSimilar').value;
+  const needLevel = wi$('wiNeedLevel').value;
 
   // 80% take-home and 6% to 401(k) are both taken as a share of GROSS
   // pay, not compounded on each other - a flat 74% multiplier, applied
@@ -6281,10 +6380,6 @@ function wiRecalc_() {
   const costRatio = netHourly > 0 ? costPerUse / netHourly : 1;
   const priceRatio = wants > 0 ? price / wants : 1;
 
-  const v = wi$('wiVerdict');
-  const badgeEl = wi$('wiVerdictBadge');
-  v.classList.remove('good', 'warn', 'bad');
-  badgeEl.classList.remove('warn', 'bad');
   let tier, badge, line1, line2;
   if (costRatio < 0.12 && priceRatio < 0.35) {
     tier = 'good'; badge = 'Buy it';
@@ -6299,11 +6394,50 @@ function wiRecalc_() {
     line1 = 'At ' + wiFmtUSD_(costPerUse) + ' per use, that’s ' + wiFmtNum_(costRatio * 100, 0) + '% of an hour’s net pay every time - the math only works out if you use it far more than planned.';
     line2 = 'And the price alone is ' + wiFmtNum_(priceRatio * 100, 0) + '% of a month’s wants money - either wait, or plan for it over more than one month.';
   }
+
+  // The raw cost/budget math doesn't know whether this duplicates
+  // something that already works, or replaces something broken - those
+  // reshape the case on top of the ratios above, not instead of them.
+  // Already owning a working one is a hard override (a duplicate is a
+  // duplicate at any price); a genuine replacement or necessity nudges
+  // the tier up instead, since it doesn't erase the cost.
+  let line3 = '';
+  if (haveSimilar === 'works') {
+    tier = 'bad'; badge = 'Skip it';
+    line3 = 'You already have something similar that still works - this would likely be a duplicate, whatever the numbers above say.';
+  } else {
+    if (haveSimilar === 'broken') {
+      tier = wiBumpTier_(tier, 1);
+      line3 = 'This would replace something broken, which strengthens the case beyond the raw numbers.';
+    }
+    if (needLevel === 'necessary') {
+      tier = wiBumpTier_(tier, 1);
+      line3 = line3 ? line3 + ' Marked as necessary too, which weighs in its favor as well.'
+                     : 'You marked this as necessary, which weighs in its favor beyond the raw numbers.';
+      badge = tier === 'good' ? 'Buy it' : tier === 'warn' ? 'Worth considering' : 'Skip it';
+    } else if (haveSimilar === 'broken') {
+      badge = tier === 'good' ? 'Buy it' : tier === 'warn' ? 'Worth considering' : 'Skip it';
+    }
+  }
+
+  const v = wi$('wiVerdict');
+  const badgeEl = wi$('wiVerdictBadge');
+  v.classList.remove('good', 'warn', 'bad');
+  badgeEl.classList.remove('warn', 'bad');
   v.classList.add(tier);
   if (tier !== 'good') badgeEl.classList.add(tier);
   badgeEl.textContent = badge;
   wi$('wiVerdictLine1').textContent = line1;
   wi$('wiVerdictLine2').textContent = line2;
+  wi$('wiVerdictLine3').textContent = line3;
+  wi$('wiVerdictLine3').style.display = line3 ? '' : 'none';
+
+  wiLastSnapshot_ = {
+    name, price, freqVal, freqUnit, lifeVal, lifeUnit, hasRecur, recurVal, recurUnit,
+    haveSimilar, needLevel,
+    netHourly, netOt, totalCost, totalUses, hoursReg, hoursOt, wantsPct, costPerUse,
+    tier, badge, line1, line2, line3
+  };
 
   wiSavePay_();
 }
@@ -6467,6 +6601,228 @@ function wiRenderSilly_() {
   if (viewOrder[currentViewIndex] === 'financial') updateViewportHeight('financial', true);
 }
 
+// ---- the log: proposed/weighed items kept for later, synced like the
+// Financial plan and the habit list - a whole blob, last-write-wins,
+// guarded by savedAt so a device that hasn't pulled yet can't clobber a
+// newer edit made elsewhere. ----
+const STORAGE_WORTH_IT_LOG_KEY = 'WORTH_IT_LOG_LOCAL';
+let WI_LOG = wiLoadLogLocal_();
+let wiLogSyncTimer_ = null;
+let wiLogSyncState_ = { status: null, at: null, message: '' };
+let wiEditingLogId_ = null;   // set while the form holds a logged entry's data for re-saving
+let wiDetailLogId_ = null;    // which entry the detail modal is currently showing
+
+function wiLoadLogLocal_() {
+  try {
+    const raw = localStorage.getItem(STORAGE_WORTH_IT_LOG_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && Array.isArray(parsed.items)) return parsed;
+  } catch (e) {}
+  return { items: [], savedAt: null };
+}
+function wiSaveLogLocal_() { try { localStorage.setItem(STORAGE_WORTH_IT_LOG_KEY, JSON.stringify(WI_LOG)); } catch (e) {} }
+
+// Call after any real local edit (log/edit/delete) - stamps a new savedAt
+// so this device's copy wins the next sync comparison, then kicks off a
+// push. Adopting a REMOTE copy must never call this, or it would
+// immediately re-stamp and re-push what was just pulled.
+function wiLogChanged_() {
+  WI_LOG.savedAt = new Date().toISOString();
+  wiSaveLogLocal_();
+  wiRenderLogList_();
+  wiSyncLogToRemote();
+}
+
+function wiSetLogSyncState_(status, message) {
+  wiLogSyncState_ = { status, at: new Date(), message: message || '' };
+  wiRenderLogSyncLine_();
+}
+function wiRenderLogSyncLine_() {
+  const el = wi$('wiLogSyncLine');
+  if (!el) return;
+  el.classList.remove('err');
+  const when = wiLogSyncState_.at ? wiLogSyncState_.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+  switch (wiLogSyncState_.status) {
+    case 'syncing': el.textContent = '↻ Syncing…'; break;
+    case 'ok': el.textContent = `✓ Saved to your other devices${when ? ' at ' + when : ''} · tap to sync now`; break;
+    case 'pulled': el.textContent = '✓ Loaded the newer log from another device'; break;
+    case 'offline':
+    case 'error':
+      el.textContent = '⚠ ' + wiLogSyncState_.message;
+      el.classList.add('err');
+      break;
+    default: el.textContent = WI_LOG.savedAt ? 'Tap to sync now' : '';
+  }
+}
+async function wiFetchLogState_(url) {
+  const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=loadWorthItLog');
+  const data = await res.json();
+  if (data.status !== 'success') return null;
+  return data.log || null;
+}
+// Whole-list, last-write-wins - the log is edited rarely enough (log/
+// edit/delete) that splicing two devices' lists together risks
+// resurrecting an entry one of them deleted.
+function wiAdoptRemoteLog_(remote) {
+  if (!remote || typeof remote !== 'object' || !Array.isArray(remote.items)) return false;
+  const mine = WI_LOG.savedAt || '';
+  if (!remote.savedAt || String(remote.savedAt) <= String(mine)) return false;
+  WI_LOG = { items: remote.items, savedAt: remote.savedAt };
+  wiSaveLogLocal_();
+  return true;
+}
+function wiSyncLogToRemote() {
+  clearTimeout(wiLogSyncTimer_);
+  wiLogSyncTimer_ = setTimeout(async () => {
+    const url = getDeploymentUrl();
+    if (!url) return wiSetLogSyncState_('error', 'No backend URL configured — set it in Settings.');
+    if (!navigator.onLine) return wiSetLogSyncState_('offline', 'Offline — saved on this device, will sync later.');
+    if (!WI_LOG.savedAt) return; // nothing of yours to push yet
+
+    wiSetLogSyncState_('syncing');
+    try {
+      // Read before write: another device may have edited more recently,
+      // and a blind push would throw that away.
+      const remote = await wiFetchLogState_(url);
+      if (wiAdoptRemoteLog_(remote)) { wiRenderLogList_(); return wiSetLogSyncState_('pulled'); }
+      const res = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'saveWorthItLog', log: WI_LOG })
+      });
+      const data = await res.json();
+      if (data.status === 'success' && data.log) return wiSetLogSyncState_('ok');
+      wiSetLogSyncState_('error', data.message
+        ? String(data.message)
+        : 'The backend refused the save — it may predate this feature.');
+    } catch (e) {
+      wiSetLogSyncState_('error', 'Could not reach the backend.');
+    }
+  }, 600);
+}
+// On load: take the other device's log if it is newer than this one's.
+async function wiPullLogFromRemote() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  try {
+    const remote = await wiFetchLogState_(url);
+    if (wiAdoptRemoteLog_(remote)) { wiSetLogSyncState_('pulled'); wiRenderLogList_(); }
+    else wiRenderLogSyncLine_();
+  } catch (e) { /* local log stands; the next edit will try again */ }
+}
+
+function wiFmtLogMeta_(item) {
+  const freqUnitLabel = item.freqUnit === 'year' ? '/yr' : item.freqUnit === 'month' ? '/mo' : '/wk';
+  return item.freqVal + freqUnitLabel + ' · ' + wiFmtNum_(item.lifeVal, 0) + (item.lifeUnit === 'year' ? (item.lifeVal == 1 ? ' year' : ' years') : (item.lifeVal == 1 ? ' month' : ' months'));
+}
+
+function wiRenderLogList_() {
+  const card = wi$('wiLogListCard');
+  const list = wi$('wiLogList');
+  const items = WI_LOG.items || [];
+  card.style.display = items.length ? '' : 'none';
+  if (!items.length) { list.innerHTML = ''; return; }
+  const sorted = items.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  list.innerHTML = sorted.map(item => `
+    <div class="wi-log-row" data-id="${item.id}">
+      <div class="wi-log-row-main">
+        <div class="wi-log-row-name">${wiEscapeHtml_(item.name)}</div>
+        <div class="wi-log-row-meta">${wiEscapeHtml_(wiFmtUSD_(item.price))} · ${wiEscapeHtml_(wiFmtLogMeta_(item))}</div>
+      </div>
+      <span class="fin-pill${item.tier !== 'good' ? ' ' + item.tier : ''}">${wiEscapeHtml_(item.badge)}</span>
+    </div>`).join('');
+  list.querySelectorAll('.wi-log-row').forEach(row => {
+    row.addEventListener('click', () => wiOpenDetailModal_(row.dataset.id));
+  });
+}
+
+function wiLogCurrentItem_() {
+  if (!wiLastSnapshot_) return;
+  const now = new Date().toISOString();
+  if (wiEditingLogId_) {
+    const idx = WI_LOG.items.findIndex(it => it.id === wiEditingLogId_);
+    if (idx >= 0) {
+      WI_LOG.items[idx] = { ...WI_LOG.items[idx], ...wiLastSnapshot_, updatedAt: now };
+      wiEditingLogId_ = null;
+      wi$('wiLogItemBtn').textContent = 'Log this item';
+      wiLogChanged_();
+      return;
+    }
+    wiEditingLogId_ = null;
+  }
+  const entry = { id: 'wi' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...wiLastSnapshot_, createdAt: now, updatedAt: now };
+  WI_LOG.items.push(entry);
+  wiLogChanged_();
+}
+
+function wiOpenDetailModal_(id) {
+  const item = WI_LOG.items.find(it => it.id === id);
+  if (!item) return;
+  wiDetailLogId_ = id;
+  wi$('wiDetailName').textContent = item.name;
+  const logged = new Date(item.updatedAt || item.createdAt);
+  wi$('wiDetailLoggedAt').textContent = (item.updatedAt !== item.createdAt ? 'Updated ' : 'Logged ') + logged.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  wi$('wiDetailCostPerUse').textContent = wiFmtUSD_(item.costPerUse);
+  wi$('wiDetailPrice').textContent = wiFmtUSD_(item.price);
+  wi$('wiDetailFreq').textContent = item.freqVal + '/' + item.freqUnit;
+  wi$('wiDetailLife').textContent = wiFmtNum_(item.lifeVal, 0) + ' ' + (item.lifeUnit === 'year' ? 'years' : 'months');
+  wi$('wiDetailRecur').textContent = item.hasRecur ? wiFmtUSD_(item.recurVal) + '/' + item.recurUnit : 'None';
+  wi$('wiDetailHoursReg').textContent = wiFmtNum_(item.hoursReg, 1) + ' hrs';
+  wi$('wiDetailWantsPct').textContent = wiFmtNum_(item.wantsPct, 0) + '%';
+  wi$('wiDetailHaveSimilar').textContent = WI_HAVE_SIMILAR_LABELS[item.haveSimilar] || '—';
+  wi$('wiDetailNeedLevel').textContent = WI_NEED_LEVEL_LABELS[item.needLevel] || '—';
+
+  const dv = wi$('wiDetailVerdict');
+  dv.classList.remove('good', 'warn', 'bad');
+  dv.classList.add(item.tier);
+  const dBadge = wi$('wiDetailVerdictBadge');
+  dBadge.classList.remove('warn', 'bad');
+  if (item.tier !== 'good') dBadge.classList.add(item.tier);
+  dBadge.textContent = item.badge;
+  wi$('wiDetailVerdictLine1').textContent = item.line1;
+  wi$('wiDetailVerdictLine2').textContent = item.line2;
+  wi$('wiDetailVerdictLine3').textContent = item.line3 || '';
+  wi$('wiDetailVerdictLine3').style.display = item.line3 ? '' : 'none';
+
+  wi$('wiDetailModal').style.display = 'flex';
+}
+function wiCloseDetailModal_() { wi$('wiDetailModal').style.display = 'none'; wiDetailLogId_ = null; }
+
+function wiEditLoggedItem_() {
+  const item = WI_LOG.items.find(it => it.id === wiDetailLogId_);
+  if (!item) return;
+  wiCloseDetailModal_();
+  wiSetMode_('regular');
+  wi$('wiItemName').value = item.name;
+  wi$('wiPrice').value = item.price;
+  wi$('wiFreqVal').value = item.freqVal;
+  wi$('wiFreqUnit').value = item.freqUnit;
+  wi$('wiLifeVal').value = item.lifeVal;
+  wi$('wiLifeUnit').value = item.lifeUnit;
+  wi$('wiHasRecur').checked = item.hasRecur;
+  wi$('wiRecurFields').style.display = item.hasRecur ? '' : 'none';
+  wi$('wiRecurVal').value = item.recurVal;
+  wi$('wiRecurUnit').value = item.recurUnit;
+  wi$('wiHaveSimilar').value = item.haveSimilar;
+  wi$('wiNeedLevel').value = item.needLevel;
+  wi$('wiProfileSelect').value = 'custom';
+  wiEditingLogId_ = item.id;
+  wi$('wiLogItemBtn').textContent = 'Update logged item';
+  wiRecalc_();
+  if (viewOrder[currentViewIndex] === 'financial') updateViewportHeight('financial', true);
+  wi$('wiItemPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function wiDeleteLoggedItem_() {
+  if (!wiDetailLogId_) return;
+  WI_LOG.items = WI_LOG.items.filter(it => it.id !== wiDetailLogId_);
+  if (wiEditingLogId_ === wiDetailLogId_) {
+    wiEditingLogId_ = null;
+    wi$('wiLogItemBtn').textContent = 'Log this item';
+  }
+  wiCloseDetailModal_();
+  wiLogChanged_();
+}
+
 function wiInit_() {
   wi$('wiProfileSelect').addEventListener('change', () => {
     const id = wi$('wiProfileSelect').value;
@@ -6527,6 +6883,13 @@ function wiInit_() {
     if (viewOrder[currentViewIndex] === 'financial') updateViewportHeight('financial', true);
   });
 
+  wi$('wiLogItemBtn').addEventListener('click', wiLogCurrentItem_);
+  wi$('wiCloseDetailBtn').addEventListener('click', wiCloseDetailModal_);
+  wi$('wiCloseDetailBtn2').addEventListener('click', wiCloseDetailModal_);
+  wi$('wiDetailModal').addEventListener('click', e => { if (e.target === wi$('wiDetailModal')) wiCloseDetailModal_(); });
+  wi$('wiEditLogBtn').addEventListener('click', wiEditLoggedItem_);
+  wi$('wiDeleteLogBtn').addEventListener('click', wiDeleteLoggedItem_);
+
   wiLoadPay_();
   wiInitPresetPair_('wiWagePreset', 'wiWage');
   wiInitPresetPair_('wiTaxKeepPreset', 'wiTaxKeep');
@@ -6536,6 +6899,7 @@ function wiInit_() {
   wiRebuildProfileSelect_();
   wiRecalc_();
   wiRenderSilly_();
+  wiRenderLogList_();
 }
 
 /* ================= Financial Future =================
@@ -15801,7 +16165,7 @@ function renderActiveViewContent(view) {
   // Draw from what this device holds first, then reconcile - the tab is
   // usable instantly and corrects itself a moment later if another device
   // has been editing, rather than sitting blank on a network round trip.
-  if (view === 'financial') { renderFinancialTab(); pullFinancialFromRemote(); }
+  if (view === 'financial') { renderFinancialTab(); pullFinancialFromRemote(); wiPullLogFromRemote(); }
   if (view === 'routines') { rtRenderAll(); pullRoutinesFromRemote(); }
 }
 
@@ -20678,7 +21042,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-09-03-morning-brief-actions';
+const EXPECTED_BACKEND_VERSION = '2026-09-04-worth-it-log';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');

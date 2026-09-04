@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-09-03-morning-brief-actions';
+const BACKEND_BUILD_VERSION = '2026-09-04-worth-it-log';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1063,6 +1063,28 @@ function loadFinancialState_() {
   try { return JSON.parse(raw); } catch (e) { return null; }
 }
 
+// ---------- Worth It log (the list of purchases weighed/proposed from
+// the Financials > Worth It sub-tab) - same whole-list, last-write-wins
+// trade-off as the habit list below: the log is edited rarely (log/edit/
+// delete), so splicing two devices' lists together risks resurrecting an
+// entry one of them deleted. ----------
+const WORTH_IT_LOG_KEY = 'WORTH_IT_LOG_STATE';
+
+function saveWorthItLog_(log) {
+  if (!log || typeof log !== 'object') throw new Error('No log supplied.');
+  if (!log.savedAt) throw new Error('Refusing to store a log that was never edited.');
+  const current = loadWorthItLog_();
+  if (current && current.savedAt && String(current.savedAt) > String(log.savedAt)) return current;
+  setPropertyChecked_(PropertiesService.getScriptProperties(), WORTH_IT_LOG_KEY, log);
+  return log;
+}
+
+function loadWorthItLog_() {
+  const raw = PropertiesService.getScriptProperties().getProperty(WORTH_IT_LOG_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
 // ---------- Routines (habit/task list - its own property; the daily
 // check-off log itself lives in the Routines Log sheet above) ----------
 const ROUTINES_HABITS_STATE_KEY = 'ROUTINES_HABITS_STATE';
@@ -2066,6 +2088,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'loadWorthItLog') {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', log: loadWorthItLog_() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadStarterState') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', starter: loadStarterState_() }))
@@ -2326,6 +2354,13 @@ function doPost(e) {
       const stored = saveFinancialState_(data.financial);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success', financial: stored }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === 'saveWorthItLog') {
+      const stored = saveWorthItLog_(data.log);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success', log: stored }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
