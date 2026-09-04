@@ -1412,6 +1412,85 @@
     font-variant-numeric: tabular-nums; }
   .fin-table td.num { text-align: right; padding-right: 0; }
 
+  /* ---- Worth It: the Financials sub-tab that weighs a purchase against
+     pay and budget, plus Abbey's Silly Calculator. Built from the app's
+     own tokens (stats-card, rt-seg, fin-pill) rather than a new palette. */
+  .wi-field { margin-bottom: 12px; }
+  .wi-field:last-child { margin-bottom: 0; }
+  .wi-field label { display: block; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+  .wi-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .wi-row:last-child { margin-bottom: 0; }
+  .wi-row .wi-field { flex: 1 1 120px; margin-bottom: 0; }
+  .wi-row .wi-field.grow { flex: 2 1 200px; }
+  .wi-soc { display: flex; gap: 8px; }
+  .wi-soc select, .wi-soc .wi-input-unit { flex: 1; min-width: 0; }
+  .wi-input-unit { position: relative; }
+  .wi-input-unit .wi-prefix, .wi-input-unit .wi-suffix {
+    position: absolute; top: 50%; transform: translateY(-50%); font-family: var(--font);
+    font-size: 13px; color: var(--muted); pointer-events: none; }
+  .wi-input-unit .wi-prefix { left: 11px; }
+  .wi-input-unit .wi-suffix { right: 11px; }
+  .wi-input, .wi-select {
+    width: 100%; box-sizing: border-box; font-family: var(--font); font-size: 13.5px; color: var(--text);
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; outline: none; }
+  .wi-input-unit .wi-input { padding-left: 24px; }
+  .wi-input-unit.suffixed .wi-input { padding-right: 30px; }
+  .wi-input:focus, .wi-select:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .wi-input:disabled { opacity: 0.55; }
+  .wi-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b96ad' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; }
+  .wi-toggle { display: flex; align-items: center; gap: 8px; font-family: var(--font); font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; user-select: none; }
+  .wi-toggle input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+  .wi-link-btn { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; }
+  .wi-panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .wi-hint { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin: -6px 0 12px; line-height: 1.4; }
+
+  .wi-headline { background: var(--surface2); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+  .wi-headline .lbl { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .wi-headline .val { font-family: var(--font); font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: var(--chart-1); font-variant-numeric: tabular-nums; }
+  .wi-headline .val .unit { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 6px; }
+
+  .wi-line { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); font-family: var(--font); font-size: 13px; }
+  .wi-line:first-of-type { border-top: none; }
+  .wi-line .k { color: var(--muted); }
+  .wi-line .k small { display: block; font-size: 10.5px; color: var(--muted); opacity: 0.75; margin-top: 1px; }
+  .wi-line .v { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .wi-divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+  .wi-verdict { margin-top: 14px; border-radius: 14px; padding: 14px 16px; }
+  .wi-verdict p { margin: 0; font-family: var(--font); font-size: 13px; line-height: 1.5; color: var(--text); }
+  .wi-verdict p + p { margin-top: 7px; }
+  .wi-verdict.good { background: color-mix(in srgb, var(--chart-good) 14%, transparent); }
+  .wi-verdict.warn { background: color-mix(in srgb, var(--chart-warn) 16%, transparent); }
+  .wi-verdict.bad { background: color-mix(in srgb, var(--red) 14%, transparent); }
+
+  .wi-under { background: color-mix(in srgb, var(--chart-good) 14%, transparent); }
+  .wi-under h3 { margin: 0 0 6px; font-family: var(--font); font-size: 16px; font-weight: 700; color: var(--text); }
+  .wi-under p { margin: 0; font-family: var(--font); font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .wi-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); font-family: var(--font); font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .wi-check input { width: 15px; height: 15px; margin-top: 2px; accent-color: var(--chart-good); cursor: pointer; flex-shrink: 0; }
+  .wi-warn-note { margin-top: 9px; font-family: var(--font); font-size: 12px; color: var(--chart-warn); font-weight: 600; }
+  .wi-summary { margin: 12px 0 0; font-family: var(--font); font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .wi-chart-wrap { margin-top: 14px; }
+  .wi-chart-wrap svg { width: 100%; height: auto; display: block; }
+
+  .wi-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 9999; }
+  .wi-modal-panel { background: var(--surface); border-radius: 18px; padding: 20px; max-width: 600px; width: 100%; max-height: 82vh; overflow-y: auto; border: 1px solid var(--border); }
+  .wi-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .wi-modal-head h3 { margin: 0; font-family: var(--font); font-size: 17px; font-weight: 700; color: var(--text); }
+  .wi-icon-btn { width: 26px; height: 26px; border-radius: 8px; border: none; background: var(--surface2); color: var(--muted); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .wi-modal-sub { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin: 0 0 14px; line-height: 1.4; }
+  .wi-profiles-head, .wi-profile-row { display: grid; grid-template-columns: 1.4fr 0.55fr 0.85fr 0.55fr 0.85fr auto; gap: 6px; align-items: center; }
+  .wi-profiles-head { font-family: var(--font); font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 0 2px 5px; }
+  .wi-profiles-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; }
+  .wi-profile-row input, .wi-profile-row select { font-size: 12px; padding: 6px 8px; }
+  .wi-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .wi-btn-ghost, .wi-btn-primary { font-family: var(--font); font-size: 13px; font-weight: 600; padding: 9px 15px; border-radius: 10px; cursor: pointer; border: none; }
+  .wi-btn-ghost { background: var(--surface2); color: var(--muted); }
+  .wi-btn-primary { background: var(--accent); color: #fff; }
+
   /* The edit sheet. Same modal furniture as everywhere else. */
   .fin-group { margin-bottom: 18px; }
   .fin-group h4 { font-family: var(--font); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
@@ -3214,58 +3293,331 @@
 
 <div id="view-financial" class="app-view">
 
-  <div class="ov-page-head ov-page-head-bare">
-    <div class="fin-window" id="finWindow"></div>
-    <div class="ov-page-head-actions">
-      <button class="ov-gear-btn" id="finEditBtn" onclick="openFinancialEdit()" aria-label="Edit assumptions" title="Edit your numbers">Edit</button>
+  <!-- Worth It opens by default - Future is one tap away, not the other
+       way around. finSetTab_ swaps which of the two sits underneath and
+       re-measures the carousel's height for whichever is now showing. -->
+  <div class="rt-seg" id="finTopSeg" style="margin-bottom:12px;">
+    <button type="button" data-fin-tab="worthit" class="active" onclick="finSetTab_('worthit')">Worth It</button>
+    <button type="button" data-fin-tab="future" onclick="finSetTab_('future')">Future</button>
+  </div>
+
+  <div id="finTabWorthIt">
+
+    <div class="rt-seg" id="wiModeSeg" style="margin-bottom:12px;">
+      <button type="button" data-wi-mode="regular" class="active" onclick="wiSetMode_('regular')">Regular purchase</button>
+      <button type="button" data-wi-mode="silly" onclick="wiSetMode_('silly')">Abbey's Silly Calculator</button>
+    </div>
+
+    <div id="wiRegularMode">
+
+      <div class="stats-card" id="wiItemPanel">
+        <div class="wi-panel-head">
+          <div class="stats-card-title" style="margin-bottom:0;">The item</div>
+          <button type="button" class="wi-link-btn" id="wiEditProfilesBtn">Edit usage profiles</button>
+        </div>
+        <div class="wi-hint">Example filled in below - edit for your own, or start from a usage profile.</div>
+
+        <div class="wi-row">
+          <div class="wi-field grow">
+            <label for="wiItemName">What is it?</label>
+            <input type="text" class="wi-input" id="wiItemName" value="Stand mixer" placeholder="e.g. Stand mixer">
+          </div>
+          <div class="wi-field">
+            <label for="wiPrice">Price</label>
+            <div class="wi-input-unit"><span class="wi-prefix">$</span><input type="number" class="wi-input" id="wiPrice" value="380" min="0" step="1"></div>
+          </div>
+        </div>
+
+        <div class="wi-row">
+          <div class="wi-field grow">
+            <label for="wiProfileSelect">Use profile</label>
+            <select class="wi-select" id="wiProfileSelect"><option value="custom">Custom</option></select>
+          </div>
+        </div>
+
+        <div class="wi-row">
+          <div class="wi-field">
+            <label for="wiFreqVal">Used about</label>
+            <input type="number" class="wi-input" id="wiFreqVal" value="3" min="0" step="1">
+          </div>
+          <div class="wi-field">
+            <label for="wiFreqUnit">Per</label>
+            <select class="wi-select" id="wiFreqUnit">
+              <option value="week">week</option>
+              <option value="month" selected>month</option>
+              <option value="year">year</option>
+            </select>
+          </div>
+          <div class="wi-field">
+            <label for="wiLifeVal">Expect to keep it</label>
+            <input type="number" class="wi-input" id="wiLifeVal" value="6" min="0" step="1">
+          </div>
+          <div class="wi-field">
+            <label for="wiLifeUnit">Unit</label>
+            <select class="wi-select" id="wiLifeUnit">
+              <option value="month">months</option>
+              <option value="year" selected>years</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="wi-toggle">
+          <input type="checkbox" id="wiHasRecur">
+          Has an ongoing cost (subscription, filters, maintenance)
+        </label>
+        <div class="wi-row" id="wiRecurFields" style="display:none; margin-top:12px;">
+          <div class="wi-field">
+            <label for="wiRecurVal">Costs</label>
+            <div class="wi-input-unit"><span class="wi-prefix">$</span><input type="number" class="wi-input" id="wiRecurVal" value="0" min="0" step="1"></div>
+          </div>
+          <div class="wi-field">
+            <label for="wiRecurUnit">Per</label>
+            <select class="wi-select" id="wiRecurUnit">
+              <option value="month" selected>month</option>
+              <option value="year">year</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-card" id="wiLedgerCard">
+        <div class="wi-headline">
+          <div class="lbl">Cost per use</div>
+          <div class="val" id="wiStatCostPerUse">$0.00</div>
+        </div>
+
+        <div class="stats-card-title" style="margin-bottom:6px;">The math</div>
+
+        <div class="wi-line"><div class="k">Net hourly<small>after tax + 401(k)</small></div><div class="v" id="wiLineNetHourly">$0.00</div></div>
+        <div class="wi-line"><div class="k">Net overtime hourly<small id="wiLineOtLabel">1.5&times; rate</small></div><div class="v" id="wiLineNetOt">$0.00</div></div>
+
+        <div class="wi-divider"></div>
+
+        <div class="wi-line"><div class="k">Total cost<small id="wiLineTotalCostSub">price only</small></div><div class="v" id="wiLineTotalCost">$0.00</div></div>
+        <div class="wi-line"><div class="k">Expected uses<small id="wiLineUsesSub">over its lifetime</small></div><div class="v" id="wiLineUses">0</div></div>
+
+        <div class="wi-divider"></div>
+
+        <div class="wi-line"><div class="k">Hours of regular work</div><div class="v" id="wiLineHoursReg" style="color:var(--chart-1);">0.0 hrs</div></div>
+        <div class="wi-line"><div class="k">Hours of overtime</div><div class="v" id="wiLineHoursOt" style="color:var(--chart-1);">0.0 hrs</div></div>
+        <div class="wi-line"><div class="k">Share of this month's wants</div><div class="v" id="wiLineWantsPct" style="color:var(--amber);">0%</div></div>
+
+        <div class="wi-verdict good" id="wiVerdict">
+          <span class="fin-pill" id="wiVerdictBadge">Buy it</span>
+          <p id="wiVerdictLine1"></p>
+          <p id="wiVerdictLine2"></p>
+        </div>
+      </div>
+
+      <div class="stats-card" id="wiPayPanel">
+        <div class="stats-card-title">Your pay</div>
+        <div class="wi-hint">Set this up once - it's saved on this device.</div>
+
+        <div class="wi-field">
+          <label for="wiWage">Hourly wage, pre-tax</label>
+          <div class="wi-soc">
+            <select class="wi-select" id="wiWagePreset">
+              <option value="12">$12</option>
+              <option value="15">$15</option>
+              <option value="18">$18</option>
+              <option value="20">$20</option>
+              <option value="22">$22</option>
+              <option value="25">$25</option>
+              <option value="28">$28</option>
+              <option value="30">$30</option>
+              <option value="33">$33</option>
+              <option value="36">$36</option>
+              <option value="39" selected>$39</option>
+              <option value="42">$42</option>
+              <option value="45">$45</option>
+              <option value="50">$50</option>
+              <option value="55">$55</option>
+              <option value="60">$60</option>
+              <option value="70">$70</option>
+              <option value="80">$80</option>
+              <option value="custom">Custom&hellip;</option>
+            </select>
+            <div class="wi-input-unit"><span class="wi-prefix">$</span><input type="number" class="wi-input" id="wiWage" value="39" min="0" step="0.25"></div>
+          </div>
+        </div>
+
+        <div class="wi-field">
+          <label for="wiTaxKeep">Take-home after tax</label>
+          <div class="wi-soc">
+            <select class="wi-select" id="wiTaxKeepPreset">
+              <option value="90">90%</option>
+              <option value="85">85%</option>
+              <option value="80" selected>80%</option>
+              <option value="75">75%</option>
+              <option value="70">70%</option>
+              <option value="65">65%</option>
+              <option value="60">60%</option>
+              <option value="55">55%</option>
+              <option value="custom">Custom&hellip;</option>
+            </select>
+            <div class="wi-input-unit suffixed"><input type="number" class="wi-input" id="wiTaxKeep" value="80" min="0" max="100" step="1"><span class="wi-suffix">%</span></div>
+          </div>
+        </div>
+
+        <div class="wi-field">
+          <label for="wiK401">To Roth 401(k)</label>
+          <div class="wi-soc">
+            <select class="wi-select" id="wiK401Preset">
+              <option value="0">0%</option>
+              <option value="2">2%</option>
+              <option value="3">3%</option>
+              <option value="4">4%</option>
+              <option value="5">5%</option>
+              <option value="6" selected>6%</option>
+              <option value="8">8%</option>
+              <option value="10">10%</option>
+              <option value="12">12%</option>
+              <option value="15">15%</option>
+              <option value="custom">Custom&hellip;</option>
+            </select>
+            <div class="wi-input-unit suffixed"><input type="number" class="wi-input" id="wiK401" value="6" min="0" max="100" step="0.5"><span class="wi-suffix">%</span></div>
+          </div>
+        </div>
+
+        <div class="wi-field">
+          <label for="wiOtMult">Overtime multiplier</label>
+          <div class="wi-soc">
+            <select class="wi-select" id="wiOtMultPreset">
+              <option value="1">1&times;</option>
+              <option value="1.25">1.25&times;</option>
+              <option value="1.5" selected>1.5&times;</option>
+              <option value="1.75">1.75&times;</option>
+              <option value="2">2&times;</option>
+              <option value="custom">Custom&hellip;</option>
+            </select>
+            <div class="wi-input-unit suffixed"><input type="number" class="wi-input" id="wiOtMult" value="1.5" min="1" step="0.25"><span class="wi-suffix">&times;</span></div>
+          </div>
+        </div>
+
+        <div class="wi-field">
+          <label for="wiWants">Monthly wants budget</label>
+          <div class="wi-input-unit"><span class="wi-prefix">$</span><input type="number" class="wi-input" id="wiWants" value="745" min="0" step="5"></div>
+        </div>
+
+        <div class="wi-hint" id="wiPayNote" style="margin:12px 0 0; padding-top:12px; border-top:1px dashed var(--border);"></div>
+      </div>
+
+    </div>
+
+    <div id="wiSillyMode" style="display:none;">
+      <div class="stats-card">
+        <div class="stats-card-title">Abbey's Silly Calculator</div>
+        <div class="wi-hint">Every purchase has a silliness limit. This just measures it.</div>
+        <div class="wi-row">
+          <div class="wi-field grow">
+            <label for="wiSillyItemName">What is it?</label>
+            <input type="text" class="wi-input" id="wiSillyItemName" value="Inflatable dinosaur costume" placeholder="e.g. Inflatable dinosaur costume">
+          </div>
+          <div class="wi-field">
+            <label for="wiSillyPrice">Price</label>
+            <div class="wi-input-unit"><span class="wi-prefix">$</span><input type="number" class="wi-input" id="wiSillyPrice" value="65" min="0" step="1"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-card wi-under" id="wiSillyUnderPanel" style="display:none;">
+        <h3 id="wiSillyUnderHeadline"></h3>
+        <p>Anything under $20 is small enough that it's not worth agonizing over - that's what the one-a-month allowance is for.</p>
+        <label class="wi-check">
+          <input type="checkbox" id="wiSillyUsedCheckbox">
+          I've already bought my one silly item this month
+        </label>
+        <div class="wi-warn-note" id="wiSillyWarnNote" style="display:none;">Heads up - this would be a second silly buy this month. Maybe let it ride till next month.</div>
+      </div>
+
+      <div class="stats-card" id="wiSillyOverPanel">
+        <div class="wi-headline">
+          <div class="lbl">Silliness score</div>
+          <div class="val" id="wiSillyScoreValue" style="color:var(--purple);">0.0</div>
+        </div>
+        <span class="fin-pill" id="wiSillyTierBadge">Reasonable</span>
+        <p class="wi-summary" id="wiSillySummary"></p>
+        <div class="wi-chart-wrap" id="wiSillyChartWrap"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="finTabFuture" style="display:none;">
+
+    <div class="ov-page-head ov-page-head-bare">
+      <div class="fin-window" id="finWindow"></div>
+      <div class="ov-page-head-actions">
+        <button class="ov-gear-btn" id="finEditBtn" onclick="openFinancialEdit()" aria-label="Edit assumptions" title="Edit your numbers">Edit</button>
+      </div>
+    </div>
+
+    <!-- Whether this device has got the plan onto the backend, where the
+         others can reach it. Silent until there is something of yours to
+         sync; loud when a save did not land. -->
+    <div class="sd-sync-line" id="finSyncLine" onclick="syncFinancialToRemote()" title="Tap to sync now"></div>
+
+    <div class="stats-card">
+      <span class="fin-pill" id="finPill">—</span>
+      <div class="fin-verdict" id="finVerdict"></div>
+      <div class="fin-hero" id="finHero">—</div>
+      <div class="fin-hero-sub" id="finHeroSub"></div>
+    </div>
+
+    <!-- What the projection has to clear. The hero above is what you are on
+         course for; this is the bar it has to get over, worked out from the
+         same engine rather than a rule of thumb. -->
+    <div class="stats-card" id="finNeedCard" style="display:none;">
+      <div class="stats-card-title">The minimum you need to retire</div>
+      <div class="fin-need-row"><span>Needed by <b id="finNeedAge">—</b></span>
+        <span class="n" id="finNeedValue">—</span></div>
+      <div class="fin-need-meter"><i id="finNeedFill"></i></div>
+      <div class="fin-need-row"><span>On course for</span>
+        <span class="n" id="finNeedHave">—</span></div>
+      <div class="fin-need-note" id="finNeedNote"></div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">Projected net worth · today's dollars</div>
+      <svg viewBox="0 0 320 200" class="stats-chart" id="finCone" role="img"
+           aria-label="Projected net worth, a median line inside a 10th to 90th percentile band"></svg>
+      <div class="stats-chart-detail" id="finReadout"></div>
+      <div class="hx-legend" id="finLegend"></div>
+    </div>
+
+
+    <div class="stats-card">
+      <div class="stats-card-title">Where the money sits</div>
+      <div class="fin-mix" id="finMix"></div>
+      <div id="finMixRows"></div>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-title">Where it lands</div>
+      <div id="finTable"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="wi-modal-overlay" id="wiProfilesModal" style="display:none;">
+  <div class="wi-modal-panel">
+    <div class="wi-modal-head">
+      <h3>Usage profiles</h3>
+      <button type="button" class="wi-icon-btn" id="wiCloseProfilesBtn" aria-label="Close">&times;</button>
+    </div>
+    <div class="wi-modal-sub">Presets for how often you'd use something and how long it typically lasts - pick one from the item panel, or tune them here.</div>
+    <div class="wi-profiles-head">
+      <div>Name</div><div>Used</div><div>Per</div><div>Lasts</div><div>Unit</div><div></div>
+    </div>
+    <div class="wi-profiles-list" id="wiProfilesList"></div>
+    <button type="button" class="wi-link-btn" id="wiAddProfileBtn">+ Add profile</button>
+    <div class="wi-modal-actions">
+      <button type="button" class="wi-btn-ghost" id="wiCancelProfilesBtn">Cancel</button>
+      <button type="button" class="wi-btn-primary" id="wiSaveProfilesBtn">Save profiles</button>
     </div>
   </div>
-
-  <!-- Whether this device has got the plan onto the backend, where the
-       others can reach it. Silent until there is something of yours to
-       sync; loud when a save did not land. -->
-  <div class="sd-sync-line" id="finSyncLine" onclick="syncFinancialToRemote()" title="Tap to sync now"></div>
-
-  <div class="stats-card">
-    <span class="fin-pill" id="finPill">—</span>
-    <div class="fin-verdict" id="finVerdict"></div>
-    <div class="fin-hero" id="finHero">—</div>
-    <div class="fin-hero-sub" id="finHeroSub"></div>
-  </div>
-
-  <!-- What the projection has to clear. The hero above is what you are on
-       course for; this is the bar it has to get over, worked out from the
-       same engine rather than a rule of thumb. -->
-  <div class="stats-card" id="finNeedCard" style="display:none;">
-    <div class="stats-card-title">The minimum you need to retire</div>
-    <div class="fin-need-row"><span>Needed by <b id="finNeedAge">—</b></span>
-      <span class="n" id="finNeedValue">—</span></div>
-    <div class="fin-need-meter"><i id="finNeedFill"></i></div>
-    <div class="fin-need-row"><span>On course for</span>
-      <span class="n" id="finNeedHave">—</span></div>
-    <div class="fin-need-note" id="finNeedNote"></div>
-  </div>
-
-  <div class="stats-card">
-    <div class="stats-card-title">Projected net worth · today's dollars</div>
-    <svg viewBox="0 0 320 200" class="stats-chart" id="finCone" role="img"
-         aria-label="Projected net worth, a median line inside a 10th to 90th percentile band"></svg>
-    <div class="stats-chart-detail" id="finReadout"></div>
-    <div class="hx-legend" id="finLegend"></div>
-  </div>
-
-
-  <div class="stats-card">
-    <div class="stats-card-title">Where the money sits</div>
-    <div class="fin-mix" id="finMix"></div>
-    <div id="finMixRows"></div>
-  </div>
-
-  <div class="stats-card">
-    <div class="stats-card-title">Where it lands</div>
-    <div id="finTable"></div>
-  </div>
-
 </div>
 
 <div id="view-routines" class="app-view">
@@ -5799,6 +6151,391 @@ function showHistorySection(name) {
     b.classList.toggle('active', b.dataset.hx === name));
   renderHistoryTab();
   updateViewportHeight('stats', true);
+}
+
+/* ================= Worth It (Financials sub-tab) =================
+   A purchase calculator wired to real pay, tax and 401(k) numbers, plus
+   Abbey's Silly Calculator for anything that clears the wants budget by
+   a mile. Lives inside #view-financial as a second sub-tab beside Future
+   - finSetTab_ toggles which of the two shows, wiSetMode_ toggles the
+   two Worth-It modes, and both re-measure the carousel via
+   updateViewportHeight since the sub-tabs differ a lot in height. */
+
+function finSetTab_(tab) {
+  document.querySelectorAll('#finTopSeg button').forEach(b => b.classList.toggle('active', b.dataset.finTab === tab));
+  document.getElementById('finTabWorthIt').style.display = tab === 'worthit' ? '' : 'none';
+  document.getElementById('finTabFuture').style.display = tab === 'future' ? '' : 'none';
+  if (viewOrder[currentViewIndex] === 'financial') updateViewportHeight('financial', true);
+}
+
+function wiSetMode_(mode) {
+  document.querySelectorAll('#wiModeSeg button').forEach(b => b.classList.toggle('active', b.dataset.wiMode === mode));
+  document.getElementById('wiRegularMode').style.display = mode === 'regular' ? '' : 'none';
+  document.getElementById('wiSillyMode').style.display = mode === 'silly' ? '' : 'none';
+  if (mode === 'silly') wiRenderSilly_(); else wiRecalc_();
+  if (viewOrder[currentViewIndex] === 'financial') updateViewportHeight('financial', true);
+}
+
+const WI_PERIODS_PER_YEAR = { week: 52, month: 12, year: 1 };
+const WI_STORAGE_KEY = 'worthit_pay_v1';
+const WI_PROFILES_KEY = 'worthit_profiles_v1';
+const WI_SILLY_KEY = 'worthit_silly_month_v1';
+const wi$ = id => document.getElementById(id);
+const WI_PAY_FIELDS = ['wiWage', 'wiTaxKeep', 'wiK401', 'wiOtMult', 'wiWants'];
+let wiApplyingProfile_ = false;
+
+function wiEscapeHtml_(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function wiLoadPay_() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WI_STORAGE_KEY) || 'null');
+    if (saved) WI_PAY_FIELDS.forEach(id => { if (saved[id] != null) wi$(id).value = saved[id]; });
+  } catch (e) {}
+}
+function wiSavePay_() {
+  try {
+    const data = {};
+    WI_PAY_FIELDS.forEach(id => data[id] = wi$(id).value);
+    localStorage.setItem(WI_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
+
+function wiInitPresetPair_(presetId, inputId) {
+  const preset = wi$(presetId), input = wi$(inputId);
+  function apply() {
+    if (preset.value === 'custom') { input.disabled = false; }
+    else { input.value = preset.value; input.disabled = true; }
+  }
+  const val = String(parseFloat(input.value));
+  const hasMatch = [...preset.options].some(o => o.value === val);
+  preset.value = hasMatch ? val : 'custom';
+  apply();
+  preset.addEventListener('change', () => { apply(); wiRecalc_(); });
+}
+
+function wiFmtUSD_(n) {
+  if (!isFinite(n)) return '$0.00';
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function wiFmtNum_(n, decimals) {
+  if (!isFinite(n)) return '0';
+  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function wiRecalc_() {
+  const wage = parseFloat(wi$('wiWage').value) || 0;
+  const taxKeep = (parseFloat(wi$('wiTaxKeep').value) || 0) / 100;
+  const k401 = (parseFloat(wi$('wiK401').value) || 0) / 100;
+  const otMult = parseFloat(wi$('wiOtMult').value) || 1;
+  const wants = parseFloat(wi$('wiWants').value) || 0;
+
+  const price = parseFloat(wi$('wiPrice').value) || 0;
+  const freqVal = parseFloat(wi$('wiFreqVal').value) || 0;
+  const freqUnit = wi$('wiFreqUnit').value;
+  const lifeVal = parseFloat(wi$('wiLifeVal').value) || 0;
+  const lifeUnit = wi$('wiLifeUnit').value;
+  const hasRecur = wi$('wiHasRecur').checked;
+  const recurVal = hasRecur ? (parseFloat(wi$('wiRecurVal').value) || 0) : 0;
+  const recurUnit = wi$('wiRecurUnit').value;
+
+  // 80% take-home and 6% to 401(k) are both taken as a share of GROSS
+  // pay, not compounded on each other - a flat 74% multiplier, applied
+  // the same way to overtime pay.
+  const netMultiplier = taxKeep - k401;
+  const netHourly = wage * netMultiplier;
+  const netOt = wage * otMult * netMultiplier;
+
+  const lifespanYears = lifeVal / (WI_PERIODS_PER_YEAR[lifeUnit] || 1);
+  const usesPerYear = freqVal * (WI_PERIODS_PER_YEAR[freqUnit] || 1);
+  const totalUses = Math.max(0, usesPerYear * lifespanYears);
+
+  const recurPerYear = recurVal * (WI_PERIODS_PER_YEAR[recurUnit] || 1);
+  const totalRecur = hasRecur ? recurPerYear * lifespanYears : 0;
+  const totalCost = price + totalRecur;
+
+  const costPerUse = totalUses > 0 ? totalCost / totalUses : totalCost;
+  const hoursReg = netHourly > 0 ? totalCost / netHourly : 0;
+  const hoursOt = netOt > 0 ? totalCost / netOt : 0;
+  const wantsPct = wants > 0 ? (price / wants) * 100 : 0;
+
+  wi$('wiLineNetHourly').textContent = wiFmtUSD_(netHourly);
+  wi$('wiLineOtLabel').textContent = otMult + '× rate, after tax + 401(k)';
+  wi$('wiLineNetOt').textContent = wiFmtUSD_(netOt);
+  wi$('wiLineTotalCost').textContent = wiFmtUSD_(totalCost);
+  wi$('wiLineTotalCostSub').textContent = hasRecur ? 'price + upkeep over its life' : 'price only';
+  wi$('wiLineUses').textContent = wiFmtNum_(totalUses, totalUses < 20 ? 1 : 0);
+  wi$('wiLineUsesSub').textContent = 'over ' + wiFmtNum_(lifeVal, 0) + ' ' + (lifeUnit === 'year' ? (lifeVal == 1 ? 'year' : 'years') : (lifeVal == 1 ? 'month' : 'months'));
+  wi$('wiLineHoursReg').textContent = wiFmtNum_(hoursReg, 1) + ' hrs';
+  wi$('wiLineHoursOt').textContent = wiFmtNum_(hoursOt, 1) + ' hrs';
+  wi$('wiLineWantsPct').textContent = wiFmtNum_(wantsPct, 0) + '%';
+  wi$('wiStatCostPerUse').innerHTML = wiFmtUSD_(costPerUse) + (totalUses > 0 ? '<span class="unit">/ use</span>' : '');
+
+  wi$('wiPayNote').textContent = 'Effective take-home: ' + wiFmtNum_(netMultiplier * 100, 1) + '% of gross → ' + wiFmtUSD_(netHourly) + '/hr net.';
+
+  // Verdict: weighs how a single use's cost sits against an hour of net
+  // pay, and how the sticker price sits against a month of wants money -
+  // the two questions "is this cheap to use" and "can this month absorb
+  // it" are different, and a purchase can fail either one on its own.
+  const costRatio = netHourly > 0 ? costPerUse / netHourly : 1;
+  const priceRatio = wants > 0 ? price / wants : 1;
+
+  const v = wi$('wiVerdict');
+  const badgeEl = wi$('wiVerdictBadge');
+  v.classList.remove('good', 'warn', 'bad');
+  badgeEl.classList.remove('warn', 'bad');
+  let tier, badge, line1, line2;
+  if (costRatio < 0.12 && priceRatio < 0.35) {
+    tier = 'good'; badge = 'Buy it';
+    line1 = 'At ' + wiFmtUSD_(costPerUse) + ' per use, this costs about ' + wiFmtNum_(costRatio * 100, 0) + '% of an hour’s net pay each time you’d use it - cheap relative to the value.';
+    line2 = 'The price is ' + wiFmtNum_(priceRatio * 100, 0) + '% of this month’s wants budget, so it fits comfortably alongside everything else.';
+  } else if (costRatio < 0.4 && priceRatio < 0.85) {
+    tier = 'warn'; badge = 'Worth considering';
+    line1 = 'At ' + wiFmtUSD_(costPerUse) + ' per use (' + wiFmtNum_(costRatio * 100, 0) + '% of an hour’s net pay), it’s a reasonable trade if you’re confident about how often you’ll actually use it.';
+    line2 = 'It would take ' + wiFmtNum_(priceRatio * 100, 0) + '% of this month’s wants budget - doable, but it will crowd out other things this month.';
+  } else {
+    tier = 'bad'; badge = 'Skip it';
+    line1 = 'At ' + wiFmtUSD_(costPerUse) + ' per use, that’s ' + wiFmtNum_(costRatio * 100, 0) + '% of an hour’s net pay every time - the math only works out if you use it far more than planned.';
+    line2 = 'And the price alone is ' + wiFmtNum_(priceRatio * 100, 0) + '% of a month’s wants money - either wait, or plan for it over more than one month.';
+  }
+  v.classList.add(tier);
+  if (tier !== 'good') badgeEl.classList.add(tier);
+  badgeEl.textContent = badge;
+  wi$('wiVerdictLine1').textContent = line1;
+  wi$('wiVerdictLine2').textContent = line2;
+
+  wiSavePay_();
+}
+
+// ---- usage profiles ----
+const WI_DEFAULT_PROFILES = [
+  { id: 'sneakers', name: 'Sneakers / athletic shoes', freqVal: 4, freqUnit: 'week', lifeVal: 1, lifeUnit: 'year' },
+  { id: 'pants', name: 'Everyday jeans or pants', freqVal: 4, freqUnit: 'week', lifeVal: 2, lifeUnit: 'year' },
+  { id: 'tshirts', name: 'Casual T-shirts', freqVal: 3, freqUnit: 'week', lifeVal: 18, lifeUnit: 'month' },
+  { id: 'dressshirts', name: 'Collared / dress shirts', freqVal: 1, freqUnit: 'week', lifeVal: 3, lifeUnit: 'year' },
+  { id: 'dressshoes', name: 'Dress shoes', freqVal: 2, freqUnit: 'week', lifeVal: 3, lifeUnit: 'year' },
+  { id: 'coat', name: 'Winter coat / jacket', freqVal: 2, freqUnit: 'week', lifeVal: 5, lifeUnit: 'year' },
+  { id: 'bag', name: 'Backpack or bag', freqVal: 5, freqUnit: 'week', lifeVal: 3, lifeUnit: 'year' },
+  { id: 'appliance', name: 'Small kitchen appliance', freqVal: 3, freqUnit: 'month', lifeVal: 6, lifeUnit: 'year' },
+  { id: 'gadget', name: 'Electronics / gadget', freqVal: 7, freqUnit: 'week', lifeVal: 3, lifeUnit: 'year' }
+];
+let wiProfiles_ = [];
+
+function wiLoadProfiles_() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WI_PROFILES_KEY) || 'null');
+    wiProfiles_ = Array.isArray(saved) && saved.length ? saved : WI_DEFAULT_PROFILES.map(p => ({ ...p }));
+  } catch (e) { wiProfiles_ = WI_DEFAULT_PROFILES.map(p => ({ ...p })); }
+}
+function wiSaveProfiles_() { try { localStorage.setItem(WI_PROFILES_KEY, JSON.stringify(wiProfiles_)); } catch (e) {} }
+
+function wiRebuildProfileSelect_() {
+  const sel = wi$('wiProfileSelect');
+  const current = sel.value;
+  sel.innerHTML = '<option value="custom">Custom</option>' +
+    wiProfiles_.map(p => `<option value="${p.id}">${wiEscapeHtml_(p.name)}</option>`).join('');
+  sel.value = wiProfiles_.some(p => p.id === current) ? current : 'custom';
+}
+
+let wiDraftProfiles_ = [];
+function wiRenderProfileRows_() {
+  wi$('wiProfilesList').innerHTML = wiDraftProfiles_.map((p, i) => `
+    <div class="wi-profile-row" data-i="${i}">
+      <input type="text" class="p-name" value="${wiEscapeHtml_(p.name)}">
+      <input type="number" class="p-freq-val" value="${p.freqVal}" min="0" step="1">
+      <select class="p-freq-unit">
+        <option value="week" ${p.freqUnit === 'week' ? 'selected' : ''}>week</option>
+        <option value="month" ${p.freqUnit === 'month' ? 'selected' : ''}>month</option>
+        <option value="year" ${p.freqUnit === 'year' ? 'selected' : ''}>year</option>
+      </select>
+      <input type="number" class="p-life-val" value="${p.lifeVal}" min="0" step="1">
+      <select class="p-life-unit">
+        <option value="month" ${p.lifeUnit === 'month' ? 'selected' : ''}>months</option>
+        <option value="year" ${p.lifeUnit === 'year' ? 'selected' : ''}>years</option>
+      </select>
+      <button type="button" class="wi-icon-btn p-remove" aria-label="Remove profile">&times;</button>
+    </div>`).join('');
+  wi$('wiProfilesList').querySelectorAll('.p-remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const i = Number(e.target.closest('.wi-profile-row').dataset.i);
+      wiDraftProfiles_.splice(i, 1);
+      wiRenderProfileRows_();
+    });
+  });
+}
+function wiOpenProfilesModal_() {
+  wiDraftProfiles_ = wiProfiles_.map(p => ({ ...p }));
+  wiRenderProfileRows_();
+  wi$('wiProfilesModal').style.display = 'flex';
+}
+function wiCloseProfilesModal_() { wi$('wiProfilesModal').style.display = 'none'; }
+
+// ---- Abbey's Silly Calculator ----
+function wiCurrentMonthKey_() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function wiLoadSillyMonth_() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WI_SILLY_KEY) || 'null');
+    if (saved && saved.month === wiCurrentMonthKey_()) return !!saved.used;
+  } catch (e) {}
+  return false;
+}
+function wiSaveSillyUsed_(used) {
+  try { localStorage.setItem(WI_SILLY_KEY, JSON.stringify({ month: wiCurrentMonthKey_(), used })); } catch (e) {}
+}
+
+function wiSillyScore_(excess) { return excess <= 0 ? 0 : Math.exp(excess / 40) - 1; }
+const WI_SILLY_TIERS = [
+  { max: 2, label: 'Reasonable', cls: '' },
+  { max: 8, label: 'Getting silly', cls: 'warn' },
+  { max: 25, label: 'Pretty silly', cls: 'warn' },
+  { max: Infinity, label: 'Absurd', cls: 'bad' }
+];
+function wiSillyTierFor_(score) { return WI_SILLY_TIERS.find(t => score < t.max) || WI_SILLY_TIERS[WI_SILLY_TIERS.length - 1]; }
+
+function wiBuildSillyChart_(excess, score) {
+  // A hard xMax floor made small, everyday-priced items plot as a flat
+  // line pinned near the origin - the buffer has to scale WITH excess,
+  // not toward a fixed far ceiling, or the interesting part of the curve
+  // gets squeezed into a corner.
+  const xMax = Math.max(20, Math.ceil((excess * 1.4) / 10) * 10);
+  const yMax = wiSillyScore_(xMax);
+  const W = 600, H = 260, mL = 46, mR = 16, mT = 16, mB = 36;
+  const pw = W - mL - mR, ph = H - mT - mB;
+  const xs = v => mL + (v / xMax) * pw;
+  const ys = v => mT + ph - (v / yMax) * ph;
+  const N = 60;
+  let d = '';
+  for (let i = 0; i <= N; i++) {
+    const x = xMax * i / N, y = wiSillyScore_(x);
+    d += (i === 0 ? 'M' : 'L') + xs(x).toFixed(1) + ',' + ys(y).toFixed(1) + ' ';
+  }
+  const yDecimals = yMax < 10 ? 1 : 0;
+  let xticks = '', yticks = '';
+  for (let i = 0; i <= 4; i++) {
+    const xv = Math.round(xMax * i / 4), px = xs(xv);
+    xticks += `<line x1="${px}" y1="${mT}" x2="${px}" y2="${mT + ph}" stroke="var(--border)" stroke-width="1"/>`;
+    xticks += `<text x="${px}" y="${mT + ph + 15}" font-size="10" fill="var(--muted)" text-anchor="middle" font-family="var(--font)">+$${xv}</text>`;
+  }
+  for (let i = 0; i <= 4; i++) {
+    const yv = yMax * i / 4, py = ys(yv);
+    yticks += `<text x="${mL - 7}" y="${py + 3}" font-size="10" fill="var(--muted)" text-anchor="end" font-family="var(--font)">${yv.toFixed(yDecimals)}</text>`;
+  }
+  let tierLines = '';
+  [2, 8, 25].forEach(tv => {
+    if (tv < yMax) {
+      const py = ys(tv);
+      tierLines += `<line x1="${mL}" y1="${py}" x2="${mL + pw}" y2="${py}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3,3" opacity="0.45"/>`;
+    }
+  });
+  const mx = xs(excess), my = ys(score);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Silliness score versus dollars over $20">
+    ${tierLines}
+    <line x1="${mL}" y1="${mT + ph}" x2="${mL + pw}" y2="${mT + ph}" stroke="var(--muted)" stroke-width="1.2"/>
+    <line x1="${mL}" y1="${mT}" x2="${mL}" y2="${mT + ph}" stroke="var(--muted)" stroke-width="1.2"/>
+    ${xticks}${yticks}
+    <path d="${d.trim()}" fill="none" stroke="var(--purple)" stroke-width="2.5"/>
+    <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="5" fill="var(--purple)" stroke="var(--surface)" stroke-width="2"/>
+    <text x="${mL + pw / 2}" y="${H - 4}" font-size="10.5" fill="var(--muted)" text-anchor="middle" font-family="var(--font)">Dollars over $20</text>
+    <text x="12" y="${mT + ph / 2}" font-size="10.5" fill="var(--muted)" text-anchor="middle" font-family="var(--font)" transform="rotate(-90 12 ${mT + ph / 2})">Silly score</text>
+  </svg>`;
+}
+
+function wiRenderSilly_() {
+  const price = parseFloat(wi$('wiSillyPrice').value) || 0;
+  const name = wi$('wiSillyItemName').value.trim() || 'This item';
+  const under = price < 20;
+  wi$('wiSillyUnderPanel').style.display = under ? '' : 'none';
+  wi$('wiSillyOverPanel').style.display = under ? 'none' : '';
+  if (under) {
+    wi$('wiSillyUnderHeadline').textContent = name + ' is ' + wiFmtUSD_(price) + ' - under the $20 line.';
+    const used = wiLoadSillyMonth_();
+    wi$('wiSillyUsedCheckbox').checked = used;
+    wi$('wiSillyWarnNote').style.display = used ? '' : 'none';
+  } else {
+    const excess = price - 20;
+    const score = wiSillyScore_(excess);
+    const tier = wiSillyTierFor_(score);
+    wi$('wiSillyScoreValue').textContent = wiFmtNum_(score, 1);
+    const badgeEl = wi$('wiSillyTierBadge');
+    badgeEl.classList.remove('warn', 'bad');
+    if (tier.cls) badgeEl.classList.add(tier.cls);
+    badgeEl.textContent = tier.label;
+    wi$('wiSillySummary').textContent = name + ' at ' + wiFmtUSD_(price) + ' is ' + wiFmtUSD_(excess) + ' over the line - a silliness score of ' + wiFmtNum_(score, 1) + ' (' + tier.label.toLowerCase() + ').';
+    wi$('wiSillyChartWrap').innerHTML = wiBuildSillyChart_(excess, score);
+  }
+  if (viewOrder[currentViewIndex] === 'financial') updateViewportHeight('financial', true);
+}
+
+function wiInit_() {
+  wi$('wiProfileSelect').addEventListener('change', () => {
+    const id = wi$('wiProfileSelect').value;
+    if (id === 'custom') return;
+    const p = wiProfiles_.find(pr => pr.id === id);
+    if (!p) return;
+    wiApplyingProfile_ = true;
+    wi$('wiFreqVal').value = p.freqVal;
+    wi$('wiFreqUnit').value = p.freqUnit;
+    wi$('wiLifeVal').value = p.lifeVal;
+    wi$('wiLifeUnit').value = p.lifeUnit;
+    wiApplyingProfile_ = false;
+    wiRecalc_();
+  });
+  ['wiFreqVal', 'wiFreqUnit', 'wiLifeVal', 'wiLifeUnit'].forEach(id => {
+    wi$(id).addEventListener('input', () => { if (!wiApplyingProfile_) wi$('wiProfileSelect').value = 'custom'; });
+    wi$(id).addEventListener('change', () => { if (!wiApplyingProfile_) wi$('wiProfileSelect').value = 'custom'; });
+  });
+
+  wi$('wiEditProfilesBtn').addEventListener('click', wiOpenProfilesModal_);
+  wi$('wiCloseProfilesBtn').addEventListener('click', wiCloseProfilesModal_);
+  wi$('wiCancelProfilesBtn').addEventListener('click', wiCloseProfilesModal_);
+  wi$('wiProfilesModal').addEventListener('click', e => { if (e.target === wi$('wiProfilesModal')) wiCloseProfilesModal_(); });
+  wi$('wiAddProfileBtn').addEventListener('click', () => {
+    wiDraftProfiles_.push({ id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: 'New item', freqVal: 1, freqUnit: 'week', lifeVal: 1, lifeUnit: 'year' });
+    wiRenderProfileRows_();
+  });
+  wi$('wiSaveProfilesBtn').addEventListener('click', () => {
+    const rows = [...wi$('wiProfilesList').querySelectorAll('.wi-profile-row')];
+    wiProfiles_ = rows.map((row, i) => ({
+      id: wiDraftProfiles_[i].id,
+      name: row.querySelector('.p-name').value.trim() || 'Untitled',
+      freqVal: parseFloat(row.querySelector('.p-freq-val').value) || 0,
+      freqUnit: row.querySelector('.p-freq-unit').value,
+      lifeVal: parseFloat(row.querySelector('.p-life-val').value) || 0,
+      lifeUnit: row.querySelector('.p-life-unit').value
+    }));
+    wiSaveProfiles_();
+    wiRebuildProfileSelect_();
+    wiCloseProfilesModal_();
+  });
+
+  wi$('wiSillyItemName').addEventListener('input', wiRenderSilly_);
+  wi$('wiSillyPrice').addEventListener('input', wiRenderSilly_);
+  wi$('wiSillyPrice').addEventListener('change', wiRenderSilly_);
+  wi$('wiSillyUsedCheckbox').addEventListener('change', () => {
+    wiSaveSillyUsed_(wi$('wiSillyUsedCheckbox').checked);
+    wi$('wiSillyWarnNote').style.display = wi$('wiSillyUsedCheckbox').checked ? '' : 'none';
+  });
+
+  document.querySelectorAll('#wiPayPanel input, #wiItemPanel input, #wiItemPanel select').forEach(el => {
+    el.addEventListener('input', wiRecalc_);
+    el.addEventListener('change', wiRecalc_);
+  });
+  wi$('wiHasRecur').addEventListener('change', () => {
+    wi$('wiRecurFields').style.display = wi$('wiHasRecur').checked ? '' : 'none';
+    wiRecalc_();
+    if (viewOrder[currentViewIndex] === 'financial') updateViewportHeight('financial', true);
+  });
+
+  wiLoadPay_();
+  wiInitPresetPair_('wiWagePreset', 'wiWage');
+  wiInitPresetPair_('wiTaxKeepPreset', 'wiTaxKeep');
+  wiInitPresetPair_('wiK401Preset', 'wiK401');
+  wiInitPresetPair_('wiOtMultPreset', 'wiOtMult');
+  wiLoadProfiles_();
+  wiRebuildProfileSelect_();
+  wiRecalc_();
+  wiRenderSilly_();
 }
 
 /* ================= Financial Future =================
@@ -21162,6 +21899,7 @@ initTabBarCentering_();
 window.addEventListener('resize', initTabBarCentering_);
 applyTabOrder_();
 finLoad_();
+wiInit_();
 initInbody_();
 initTabBarViewportPin();
 // Local order first, so the page is already arranged on this device
