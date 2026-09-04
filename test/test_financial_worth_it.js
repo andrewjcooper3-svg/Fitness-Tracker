@@ -138,6 +138,18 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('the replacement reasoning is shown', /replace something broken/i.test(brokenState.line3), brokenState.line3);
   await page.evaluate(() => { document.getElementById('wiHaveSimilar').value = 'none'; document.getElementById('wiHaveSimilar').dispatchEvent(new Event('change')); document.getElementById('wiPrice').value = '380'; document.getElementById('wiPrice').dispatchEvent(new Event('input')); });
 
+  console.log('\n=== Saved links: add one to the item, normalized and hostname-labeled ===');
+  const linkState = await page.evaluate(() => {
+    const input = document.getElementById('wiLinkInput');
+    input.value = 'amazon.com/dp/B00FLYWNYQ';
+    document.getElementById('wiAddLinkBtn').click();
+    const row = document.querySelector('#wiLinksList .wi-link-row a');
+    return { href: row ? row.getAttribute('href') : null, text: row ? row.textContent : null, snapshotLinks: wiLastSnapshot_.links };
+  });
+  check('a bare domain gets an https:// prefix', linkState.href === 'https://amazon.com/dp/B00FLYWNYQ', linkState.href);
+  check('the link shows a readable hostname label', /amazon\.com/.test(linkState.text), linkState.text);
+  check('the link is threaded into the live snapshot', linkState.snapshotLinks.length === 1, JSON.stringify(linkState.snapshotLinks));
+
   console.log('\n=== Log this item, then open, edit and delete it from the list ===');
   await page.evaluate(() => document.getElementById('wiLogItemBtn').click());
   await page.waitForTimeout(100);
@@ -154,14 +166,18 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   await page.waitForTimeout(100);
   const detail = await page.evaluate(() => {
     const rect = document.getElementById('wiDetailModal').getBoundingClientRect();
+    const linkChip = document.querySelector('#wiDetailLinksList a');
     return {
       modalVisible: document.getElementById('wiDetailModal').style.display !== 'none',
       name: document.getElementById('wiDetailName').textContent,
       price: document.getElementById('wiDetailPrice').textContent,
+      linksBlockVisible: document.getElementById('wiDetailLinksBlock').style.display !== 'none',
+      linkHref: linkChip ? linkChip.getAttribute('href') : null,
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
     };
   });
   check('clicking the row opens the detail modal with its data', detail.modalVisible && detail.name === 'Stand mixer' && detail.price === '$380.00', JSON.stringify(detail));
+  check('the saved link shows up as a clickable chip in the detail view', detail.linksBlockVisible && detail.linkHref === 'https://amazon.com/dp/B00FLYWNYQ', JSON.stringify(detail));
   // #view-financial sits well into the swipe carousel (index 7 of 9), so
   // translateX(-700%) is in effect - if the modal were still nested inside
   // #appViewsTrack, a transformed ancestor becomes its containing block and
@@ -178,9 +194,11 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   const editState = await page.evaluate(() => ({
     modalClosed: document.getElementById('wiDetailModal').style.display === 'none',
     priceInForm: document.getElementById('wiPrice').value,
-    btnLabel: document.getElementById('wiLogItemBtn').textContent
+    btnLabel: document.getElementById('wiLogItemBtn').textContent,
+    linkRowInForm: document.querySelector('#wiLinksList .wi-link-row a') ? document.querySelector('#wiLinksList .wi-link-row a').getAttribute('href') : null
   }));
   check('Edit closes the modal and loads the item back into the form', editState.modalClosed && editState.priceInForm === '380', JSON.stringify(editState));
+  check('Edit also reloads the saved link back into the item panel', editState.linkRowInForm === 'https://amazon.com/dp/B00FLYWNYQ', editState.linkRowInForm);
   check('the log button now reads "update" instead of "log"', /update/i.test(editState.btnLabel), editState.btnLabel);
 
   await page.evaluate(() => {

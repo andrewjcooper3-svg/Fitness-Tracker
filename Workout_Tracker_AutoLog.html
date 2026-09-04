@@ -1500,6 +1500,20 @@
   .wi-log-row-name { font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--text); }
   .wi-log-row-meta { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
+  .wi-links-list { margin-top: 6px; }
+  .wi-link-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--border); }
+  .wi-link-row:first-child { border-top: none; }
+  .wi-link-text {
+    font-family: var(--font); font-size: 12.5px; font-weight: 600; color: var(--accent); text-decoration: none;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
+  .wi-link-text:active { opacity: 0.7; }
+  .wi-link-chip {
+    display: inline-flex; align-items: center; gap: 5px; font-family: var(--font); font-size: 12px; font-weight: 600;
+    color: var(--accent); background: var(--surface2); border-radius: 8px; padding: 6px 10px; margin: 0 6px 6px 0;
+    text-decoration: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
   /* The edit sheet. Same modal furniture as everywhere else. */
   .fin-group { margin-bottom: 18px; }
   .fin-group h4 { font-family: var(--font); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
@@ -3337,6 +3351,17 @@
           </div>
         </div>
 
+        <div class="wi-field">
+          <label for="wiLinkInput">Saved links</label>
+          <div class="wi-row" style="margin-bottom:0;">
+            <div class="wi-field grow" style="margin-bottom:0;">
+              <input type="url" class="wi-input" id="wiLinkInput" placeholder="Paste a link - the listing, a review, a price comparison...">
+            </div>
+            <button type="button" class="wi-btn-ghost" id="wiAddLinkBtn" style="flex:0 0 auto; align-self:flex-start;">Add</button>
+          </div>
+          <div class="wi-links-list" id="wiLinksList"></div>
+        </div>
+
         <div class="wi-row">
           <div class="wi-field grow">
             <label for="wiProfileSelect">Use profile</label>
@@ -4184,6 +4209,11 @@
     <div class="wi-line"><div class="k">Share of that month's wants</div><div class="v" id="wiDetailWantsPct" style="color:var(--amber);">—</div></div>
     <div class="wi-line"><div class="k">Already have one?</div><div class="v" id="wiDetailHaveSimilar">—</div></div>
     <div class="wi-line"><div class="k">How needed</div><div class="v" id="wiDetailNeedLevel">—</div></div>
+
+    <div id="wiDetailLinksBlock" style="display:none; margin-top:12px;">
+      <div class="wi-hint" style="margin:0 0 4px;">Saved links</div>
+      <div id="wiDetailLinksList"></div>
+    </div>
 
     <div class="wi-verdict good" id="wiDetailVerdict" style="margin-top:12px;">
       <span class="fin-pill" id="wiDetailVerdictBadge">Buy it</span>
@@ -6326,6 +6356,44 @@ const WI_NEED_LEVEL_LABELS = { want: 'Just want it', helps: 'Would genuinely hel
 // is on screen without recomputing (and without the log ever drifting
 // from what the ledger actually showed when it was logged).
 let wiLastSnapshot_ = null;
+// The links list for whatever item is currently in the form - not read
+// from any input's .value, so it has to be threaded into the snapshot
+// explicitly rather than picked up by the generic input/select scan.
+let wiCurrentLinks_ = [];
+
+function wiNormalizeUrl_(raw) {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : 'https://' + trimmed;
+}
+function wiHostFromUrl_(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return url; }
+}
+function wiRenderLinksList_() {
+  const wrap = wi$('wiLinksList');
+  if (!wiCurrentLinks_.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = wiCurrentLinks_.map((link, i) => `
+    <div class="wi-link-row" data-i="${i}">
+      <a href="${wiEscapeHtml_(link.url)}" target="_blank" rel="noopener noreferrer" class="wi-link-text">↗ ${wiEscapeHtml_(link.label)}</a>
+      <button type="button" class="wi-icon-btn wi-link-remove" aria-label="Remove link">&times;</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.wi-link-remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const i = Number(e.target.closest('.wi-link-row').dataset.i);
+      wiCurrentLinks_.splice(i, 1);
+      wiRenderLinksList_();
+      wiRecalc_();
+    });
+  });
+}
+function wiAddCurrentLink_() {
+  const url = wiNormalizeUrl_(wi$('wiLinkInput').value);
+  if (!url) return;
+  wiCurrentLinks_.push({ url, label: wiHostFromUrl_(url) });
+  wi$('wiLinkInput').value = '';
+  wiRenderLinksList_();
+  wiRecalc_();
+}
 
 function wiRecalc_() {
   const wage = parseFloat(wi$('wiWage').value) || 0;
@@ -6441,7 +6509,7 @@ function wiRecalc_() {
 
   wiLastSnapshot_ = {
     name, price, freqVal, freqUnit, lifeVal, lifeUnit, hasRecur, recurVal, recurUnit,
-    haveSimilar, needLevel,
+    haveSimilar, needLevel, links: wiCurrentLinks_.slice(),
     netHourly, netOt, totalCost, totalUses, hoursReg, hoursOt, wantsPct, costPerUse,
     tier, badge, line1, line2, line3
   };
@@ -6719,7 +6787,9 @@ async function wiPullLogFromRemote() {
 
 function wiFmtLogMeta_(item) {
   const freqUnitLabel = item.freqUnit === 'year' ? '/yr' : item.freqUnit === 'month' ? '/mo' : '/wk';
-  return item.freqVal + freqUnitLabel + ' · ' + wiFmtNum_(item.lifeVal, 0) + (item.lifeUnit === 'year' ? (item.lifeVal == 1 ? ' year' : ' years') : (item.lifeVal == 1 ? ' month' : ' months'));
+  const base = item.freqVal + freqUnitLabel + ' · ' + wiFmtNum_(item.lifeVal, 0) + (item.lifeUnit === 'year' ? (item.lifeVal == 1 ? ' year' : ' years') : (item.lifeVal == 1 ? ' month' : ' months'));
+  const linkCount = (item.links || []).length;
+  return base + (linkCount ? ' · ' + linkCount + (linkCount === 1 ? ' link' : ' links') : '');
 }
 
 function wiRenderLogList_() {
@@ -6778,6 +6848,16 @@ function wiOpenDetailModal_(id) {
   wi$('wiDetailHaveSimilar').textContent = WI_HAVE_SIMILAR_LABELS[item.haveSimilar] || '—';
   wi$('wiDetailNeedLevel').textContent = WI_NEED_LEVEL_LABELS[item.needLevel] || '—';
 
+  const linksBlock = wi$('wiDetailLinksBlock');
+  if (item.links && item.links.length) {
+    wi$('wiDetailLinksList').innerHTML = item.links.map(l =>
+      `<a href="${wiEscapeHtml_(l.url)}" target="_blank" rel="noopener noreferrer" class="wi-link-chip">↗ ${wiEscapeHtml_(l.label)}</a>`
+    ).join('');
+    linksBlock.style.display = '';
+  } else {
+    linksBlock.style.display = 'none';
+  }
+
   const dv = wi$('wiDetailVerdict');
   dv.classList.remove('good', 'warn', 'bad');
   dv.classList.add(item.tier);
@@ -6812,6 +6892,8 @@ function wiEditLoggedItem_() {
   wi$('wiHaveSimilar').value = item.haveSimilar;
   wi$('wiNeedLevel').value = item.needLevel;
   wi$('wiProfileSelect').value = 'custom';
+  wiCurrentLinks_ = (item.links || []).map(l => ({ ...l }));
+  wiRenderLinksList_();
   wiEditingLogId_ = item.id;
   wi$('wiLogItemBtn').textContent = 'Update logged item';
   wiRecalc_();
@@ -6847,6 +6929,11 @@ function wiInit_() {
   ['wiFreqVal', 'wiFreqUnit', 'wiLifeVal', 'wiLifeUnit'].forEach(id => {
     wi$(id).addEventListener('input', () => { if (!wiApplyingProfile_) wi$('wiProfileSelect').value = 'custom'; });
     wi$(id).addEventListener('change', () => { if (!wiApplyingProfile_) wi$('wiProfileSelect').value = 'custom'; });
+  });
+
+  wi$('wiAddLinkBtn').addEventListener('click', wiAddCurrentLink_);
+  wi$('wiLinkInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); wiAddCurrentLink_(); }
   });
 
   wi$('wiEditProfilesBtn').addEventListener('click', wiOpenProfilesModal_);
