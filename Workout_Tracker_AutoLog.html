@@ -3644,65 +3644,6 @@
 
 </div>
 
-<div class="wi-modal-overlay" id="wiProfilesModal" style="display:none;">
-  <div class="wi-modal-panel">
-    <div class="wi-modal-head">
-      <h3>Usage profiles</h3>
-      <button type="button" class="wi-icon-btn" id="wiCloseProfilesBtn" aria-label="Close">&times;</button>
-    </div>
-    <div class="wi-modal-sub">Presets for how often you'd use something and how long it typically lasts - pick one from the item panel, or tune them here.</div>
-    <div class="wi-profiles-head">
-      <div>Name</div><div>Used</div><div>Per</div><div>Lasts</div><div>Unit</div><div></div>
-    </div>
-    <div class="wi-profiles-list" id="wiProfilesList"></div>
-    <button type="button" class="wi-link-btn" id="wiAddProfileBtn">+ Add profile</button>
-    <div class="wi-modal-actions">
-      <button type="button" class="wi-btn-ghost" id="wiCancelProfilesBtn">Cancel</button>
-      <button type="button" class="wi-btn-primary" id="wiSaveProfilesBtn">Save profiles</button>
-    </div>
-  </div>
-</div>
-
-<div class="wi-modal-overlay" id="wiDetailModal" style="display:none;">
-  <div class="wi-modal-panel">
-    <div class="wi-modal-head">
-      <h3 id="wiDetailName">—</h3>
-      <button type="button" class="wi-icon-btn" id="wiCloseDetailBtn" aria-label="Close">&times;</button>
-    </div>
-    <div class="wi-modal-sub" id="wiDetailLoggedAt"></div>
-
-    <div class="wi-headline">
-      <div class="lbl">Cost per use</div>
-      <div class="val" id="wiDetailCostPerUse">$0.00</div>
-    </div>
-
-    <div class="wi-line"><div class="k">Price</div><div class="v" id="wiDetailPrice">$0.00</div></div>
-    <div class="wi-line"><div class="k">Used</div><div class="v" id="wiDetailFreq">—</div></div>
-    <div class="wi-line"><div class="k">Expected to last</div><div class="v" id="wiDetailLife">—</div></div>
-    <div class="wi-line"><div class="k">Ongoing cost</div><div class="v" id="wiDetailRecur">—</div></div>
-
-    <div class="wi-divider"></div>
-
-    <div class="wi-line"><div class="k">Hours of regular work</div><div class="v" id="wiDetailHoursReg" style="color:var(--chart-1);">—</div></div>
-    <div class="wi-line"><div class="k">Share of that month's wants</div><div class="v" id="wiDetailWantsPct" style="color:var(--amber);">—</div></div>
-    <div class="wi-line"><div class="k">Already have one?</div><div class="v" id="wiDetailHaveSimilar">—</div></div>
-    <div class="wi-line"><div class="k">How needed</div><div class="v" id="wiDetailNeedLevel">—</div></div>
-
-    <div class="wi-verdict good" id="wiDetailVerdict" style="margin-top:12px;">
-      <span class="fin-pill" id="wiDetailVerdictBadge">Buy it</span>
-      <p id="wiDetailVerdictLine1"></p>
-      <p id="wiDetailVerdictLine2"></p>
-      <p id="wiDetailVerdictLine3" style="display:none;"></p>
-    </div>
-
-    <div class="wi-modal-actions">
-      <button type="button" class="wi-btn-ghost" id="wiDeleteLogBtn" style="color:var(--red);">Delete</button>
-      <button type="button" class="wi-btn-ghost" id="wiCloseDetailBtn2">Close</button>
-      <button type="button" class="wi-btn-primary" id="wiEditLogBtn">Edit</button>
-    </div>
-  </div>
-</div>
-
 <div id="view-routines" class="app-view">
 
   <div class="sd-sync-line" id="rtSyncLine" onclick="syncRoutinesHabitsToRemote()" title="Tap to sync now"></div>
@@ -4190,6 +4131,72 @@
 
     <button class="ov-open-btn" style="width:100%;" onclick="rtSaveHabit()" id="rtSheetSaveBtn">Add habit</button>
     <button class="rt-sheet-cancel" onclick="rtCloseSheet()">Cancel</button>
+  </div>
+</div>
+
+<!-- Placed here, outside #appViewsTrack, deliberately - a position:fixed
+     descendant of the swipe carousel is positioned relative to whichever
+     ancestor has the translateX() transform (goToView/the drag handler),
+     not the viewport, so it would render shifted off-screen by that same
+     amount instead of centered over the page. Every other modal in the
+     app (finEditOverlay, weekDetailModalOverlay, settingsModalOverlay,
+     etc.) lives out here for the same reason. -->
+<div class="wi-modal-overlay" id="wiProfilesModal" style="display:none;">
+  <div class="wi-modal-panel">
+    <div class="wi-modal-head">
+      <h3>Usage profiles</h3>
+      <button type="button" class="wi-icon-btn" id="wiCloseProfilesBtn" aria-label="Close">&times;</button>
+    </div>
+    <div class="wi-modal-sub">Presets for how often you'd use something and how long it typically lasts - pick one from the item panel, or tune them here.</div>
+    <div class="wi-profiles-head">
+      <div>Name</div><div>Used</div><div>Per</div><div>Lasts</div><div>Unit</div><div></div>
+    </div>
+    <div class="wi-profiles-list" id="wiProfilesList"></div>
+    <button type="button" class="wi-link-btn" id="wiAddProfileBtn">+ Add profile</button>
+    <div class="wi-modal-actions">
+      <button type="button" class="wi-btn-ghost" id="wiCancelProfilesBtn">Cancel</button>
+      <button type="button" class="wi-btn-primary" id="wiSaveProfilesBtn">Save profiles</button>
+    </div>
+  </div>
+</div>
+
+<div class="wi-modal-overlay" id="wiDetailModal" style="display:none;">
+  <div class="wi-modal-panel">
+    <div class="wi-modal-head">
+      <h3 id="wiDetailName">—</h3>
+      <button type="button" class="wi-icon-btn" id="wiCloseDetailBtn" aria-label="Close">&times;</button>
+    </div>
+    <div class="wi-modal-sub" id="wiDetailLoggedAt"></div>
+
+    <div class="wi-headline">
+      <div class="lbl">Cost per use</div>
+      <div class="val" id="wiDetailCostPerUse">$0.00</div>
+    </div>
+
+    <div class="wi-line"><div class="k">Price</div><div class="v" id="wiDetailPrice">$0.00</div></div>
+    <div class="wi-line"><div class="k">Used</div><div class="v" id="wiDetailFreq">—</div></div>
+    <div class="wi-line"><div class="k">Expected to last</div><div class="v" id="wiDetailLife">—</div></div>
+    <div class="wi-line"><div class="k">Ongoing cost</div><div class="v" id="wiDetailRecur">—</div></div>
+
+    <div class="wi-divider"></div>
+
+    <div class="wi-line"><div class="k">Hours of regular work</div><div class="v" id="wiDetailHoursReg" style="color:var(--chart-1);">—</div></div>
+    <div class="wi-line"><div class="k">Share of that month's wants</div><div class="v" id="wiDetailWantsPct" style="color:var(--amber);">—</div></div>
+    <div class="wi-line"><div class="k">Already have one?</div><div class="v" id="wiDetailHaveSimilar">—</div></div>
+    <div class="wi-line"><div class="k">How needed</div><div class="v" id="wiDetailNeedLevel">—</div></div>
+
+    <div class="wi-verdict good" id="wiDetailVerdict" style="margin-top:12px;">
+      <span class="fin-pill" id="wiDetailVerdictBadge">Buy it</span>
+      <p id="wiDetailVerdictLine1"></p>
+      <p id="wiDetailVerdictLine2"></p>
+      <p id="wiDetailVerdictLine3" style="display:none;"></p>
+    </div>
+
+    <div class="wi-modal-actions">
+      <button type="button" class="wi-btn-ghost" id="wiDeleteLogBtn" style="color:var(--red);">Delete</button>
+      <button type="button" class="wi-btn-ghost" id="wiCloseDetailBtn2">Close</button>
+      <button type="button" class="wi-btn-primary" id="wiEditLogBtn">Edit</button>
+    </div>
   </div>
 </div>
 
@@ -21042,7 +21049,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-09-04-worth-it-log';
+const EXPECTED_BACKEND_VERSION = '2026-09-04-day-notes-upload';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
@@ -21814,11 +21821,13 @@ document.addEventListener('input', function (e) {
 function buildPayload(day) {
   const panel = document.getElementById('day-' + day);
   const exercises = Array.from(panel.querySelectorAll('.exercise-card')).map(parseExerciseCard);
+  const dayNotesEl = panel.querySelector('.day-notes-input');
 
   return {
     day: dayNames[day],
     week: getWeekLabel(),
     exercises: exercises,
+    notes: dayNotesEl ? dayNotesEl.value : '',
     timestamp: new Date().toISOString()
   };
 }

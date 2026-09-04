@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-09-04-worth-it-log';
+const BACKEND_BUILD_VERSION = '2026-09-04-day-notes-upload';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1727,6 +1727,17 @@ function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
   function formatQuality_(quality) {
     if (!quality) return '';
     return quality.charAt(0).toUpperCase() + quality.slice(1);
+  }
+
+  // The day-level "general notes" box (energy, sleep, soreness - not tied
+  // to a specific set) has nowhere to live in the per-set Notes column
+  // once a day has real exercise rows, so it gets its own placeholder row
+  // up front, the same shape as the empty-day fallback below - blank
+  // exercise/set fields, notes in the Notes column. Skipped when there is
+  // nothing written, so a day without notes looks exactly as it did before.
+  if (exercises.length > 0 && notes) {
+    appendRow([timestamp, day, '', '', '', '', '', '', '', notes, '', '']);
+    rowsAdded++;
   }
 
   if (exercises.length > 0) {

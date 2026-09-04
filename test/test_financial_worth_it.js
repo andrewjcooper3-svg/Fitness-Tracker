@@ -152,12 +152,26 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
 
   await page.evaluate(() => document.querySelector('#wiLogList .wi-log-row').click());
   await page.waitForTimeout(100);
-  const detail = await page.evaluate(() => ({
-    modalVisible: document.getElementById('wiDetailModal').style.display !== 'none',
-    name: document.getElementById('wiDetailName').textContent,
-    price: document.getElementById('wiDetailPrice').textContent
-  }));
+  const detail = await page.evaluate(() => {
+    const rect = document.getElementById('wiDetailModal').getBoundingClientRect();
+    return {
+      modalVisible: document.getElementById('wiDetailModal').style.display !== 'none',
+      name: document.getElementById('wiDetailName').textContent,
+      price: document.getElementById('wiDetailPrice').textContent,
+      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+    };
+  });
   check('clicking the row opens the detail modal with its data', detail.modalVisible && detail.name === 'Stand mixer' && detail.price === '$380.00', JSON.stringify(detail));
+  // #view-financial sits well into the swipe carousel (index 7 of 9), so
+  // translateX(-700%) is in effect - if the modal were still nested inside
+  // #appViewsTrack, a transformed ancestor becomes its containing block and
+  // position:fixed would render it off in that transformed space instead
+  // of over the actual viewport (display:flex would still pass, but no
+  // pixel of it would be on screen). This is the check that actually
+  // catches that, where a visibility check alone would not.
+  check('the modal actually renders on screen, not off in transformed carousel space',
+    detail.rect.width > 0 && detail.rect.left >= 0 && detail.rect.left < 390 && detail.rect.top >= 0 && detail.rect.top < 844,
+    JSON.stringify(detail.rect));
 
   await page.evaluate(() => document.getElementById('wiEditLogBtn').click());
   await page.waitForTimeout(100);
