@@ -387,7 +387,8 @@
      says which tab you are on. The class stays for the modals and for
      Overview's week label, which carry something the title does not. */
   .ov-page-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 4px 2px 16px; }
-  .ov-page-week { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); }
+  .ov-page-week { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); cursor: pointer; }
+  .ov-page-week::after { content: ' \25BE'; font-size: 10px; opacity: 0.75; }
   .ov-page-title { font-family: var(--font); font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-top: 2px; }
   /* Tab headers only. The same classes dress the modal sheets, where a
      28px title is the established weight and there is no wasted column of
@@ -1213,6 +1214,25 @@
   .weight-history-row:last-child { border-bottom: none; }
   .weight-history-date { font-family: var(--font); font-size: 13px; color: var(--muted); flex: 1; min-width: 0; }
   .weight-history-value { font-family: var(--font); font-size: 14px; font-weight: 700; white-space: nowrap; }
+
+  /* ---- Week history modal (full exercise/set breakdown, any past week) ---- */
+  .wh-modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .wh-back-btn { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; }
+  .wh-week-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 2px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .wh-week-row:last-child { border-bottom: none; }
+  .wh-week-row:active { background: var(--surface2); }
+  .wh-week-label { font-family: var(--font); font-size: 14px; font-weight: 700; color: var(--text); }
+  .wh-week-meta { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .wh-current-tag { font-family: var(--font); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 6px; padding: 2px 6px; margin-left: 6px; }
+  .wh-chev { font-size: 18px; color: var(--muted); flex-shrink: 0; }
+  .wh-day-block { margin-bottom: 16px; }
+  .wh-day-block:last-child { margin-bottom: 0; }
+  .wh-day-label { font-family: var(--font); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 6px; }
+  .wh-ex-row { padding: 8px 0; border-top: 1px solid var(--border); }
+  .wh-ex-row:first-child { border-top: none; }
+  .wh-ex-name { font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .wh-ex-meta { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .wh-empty { font-family: var(--font); font-size: 13px; color: var(--muted); padding: 20px 0; text-align: center; }
   .weight-history-del { background: none; border: none; color: var(--muted); font-size: 19px; line-height: 1; cursor: pointer; padding: 4px 2px; flex-shrink: 0; }
   .weight-history-edit { background: none; border: none; color: var(--accent); font-family: var(--font); font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 4px; flex-shrink: 0; }
 
@@ -2557,7 +2577,7 @@
        is the live week label and the actions, on one line. -->
   <div class="ov-page-head ov-page-head-bare">
     <div>
-      <div class="ov-page-week" id="ovWeekLabel"></div>
+      <div class="ov-page-week" id="ovWeekLabel" onclick="openWeekHistoryModal()" title="See a previous week"></div>
     </div>
     <div class="ov-page-head-actions">
       <button class="ov-gear-btn" id="ovEditBtn" onclick="toggleOverviewEdit()" title="Rearrange the blocks on this page">Edit</button>
@@ -4441,6 +4461,24 @@
   </div>
 </div>
 
+<!-- Full workout history by week - every exercise/set logged, not just
+     the pushup-only summary weekDetailModalOverlay above shows. Reads
+     historyRows_ (the same cross-week rollup the History tab's charts
+     already pull from), so there is nothing new to fetch until that
+     cache is empty. -->
+<div class="event-modal-overlay" id="weekHistoryModalOverlay" onclick="closeWeekHistoryModal(event)">
+  <div class="event-modal-sheet" onclick="event.stopPropagation()">
+    <div class="event-modal-handle"></div>
+    <div class="wh-modal-head">
+      <button type="button" class="wh-back-btn" id="whBackBtn" onclick="whShowWeekList_()" style="display:none;">‹ Weeks</button>
+      <div class="ov-page-title" style="margin-bottom:0;" id="whModalTitle">Select a week</div>
+    </div>
+    <div id="whWeekList"></div>
+    <div id="whWeekDetail" style="display:none;"></div>
+    <button class="event-modal-close" onclick="closeWeekHistoryModal(event)">Close</button>
+  </div>
+</div>
+
 <!-- Arranging the Overview cards.
      A list rather than dragging the cards themselves: Overview is a CSS
      columns flow, so "up" on screen is not a direction the cards have -
@@ -6268,6 +6306,115 @@ async function loadWorkoutHistory(force) {
   } catch (e) {
     setHistoryStatus_(String(e.message || e) + (historyRows_ ? ' — showing the last copy.' : ''), true);
   }
+}
+
+/* ---------- Week history modal (Overview's week-label click) ----------
+   Full exercise/set breakdown for any past week, not just a pushup-reps
+   summary - reuses historyRows_, the same cross-week rollup the History
+   tab's own charts already read, so there is no new backend endpoint and
+   nothing to fetch beyond what loadWorkoutHistory() already keeps fresh. */
+function openWeekHistoryModal() {
+  document.getElementById('weekHistoryModalOverlay').classList.add('open');
+  whShowWeekList_();
+  whRenderWeekList_();
+  loadWorkoutHistory().then(whRenderWeekList_);
+}
+
+function closeWeekHistoryModal(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('weekHistoryModalOverlay').classList.remove('open');
+}
+
+function whShowWeekList_() {
+  document.getElementById('whModalTitle').textContent = 'Select a week';
+  document.getElementById('whBackBtn').style.display = 'none';
+  document.getElementById('whWeekList').style.display = '';
+  document.getElementById('whWeekDetail').style.display = 'none';
+}
+
+// Weeks sorted newest-first by the earliest date logged in each, not by
+// sorting the label text itself - "Week of Dec 29" vs "Week of Jan 5"
+// (or any year change) would not sort correctly as strings.
+function whWeeksAvailable_() {
+  const earliest = new Map();
+  (historyRows_ || []).forEach(r => {
+    if (!r.week || !r.date) return;
+    if (!earliest.has(r.week) || r.date < earliest.get(r.week)) earliest.set(r.week, r.date);
+  });
+  return Array.from(earliest.entries()).sort((a, b) => b[1].localeCompare(a[1])).map(pair => pair[0]);
+}
+
+function whRenderWeekList_() {
+  const listEl = document.getElementById('whWeekList');
+  const weeks = whWeeksAvailable_();
+  if (!weeks.length) {
+    listEl.innerHTML = '<div class="wh-empty">Nothing logged yet - this fills in as weeks are completed.</div>';
+    return;
+  }
+  const currentWeek = getWeekLabel();
+  listEl.innerHTML = weeks.map(week => {
+    const rows = historyRows_.filter(r => r.week === week);
+    const exerciseCount = new Set(rows.map(r => r.exercise)).size;
+    const setsDone = rows.reduce((sum, r) => sum + (r.done || 0), 0);
+    return `<div class="wh-week-row" data-week="${escapeAttr_(week)}">
+      <div>
+        <div class="wh-week-label">${escapeHtml_(week)}${week === currentWeek ? '<span class="wh-current-tag">Current</span>' : ''}</div>
+        <div class="wh-week-meta">${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'} logged · ${setsDone} set${setsDone === 1 ? '' : 's'} done</div>
+      </div>
+      <span class="wh-chev">›</span>
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('.wh-week-row').forEach(row => {
+    row.addEventListener('click', () => whShowWeekDetail_(row.dataset.week));
+  });
+}
+
+function whFormatExerciseMeta_(r) {
+  const parts = [`${r.done}/${r.sets} sets`];
+  if (r.totalReps) parts.push(`${r.totalReps} reps`);
+  if (r.topWeight) parts.push(`top ${r.topWeight} lb`);
+  if (r.est1RM) parts.push(`est. 1RM ${r.est1RM}`);
+  const quality = [
+    r.green ? `${r.green} good` : '',
+    r.yellow ? `${r.yellow} tough` : '',
+    r.red ? `${r.red} too tough` : ''
+  ].filter(Boolean).join(', ');
+  if (quality) parts.push(quality);
+  return parts.join(' · ');
+}
+
+function whShowWeekDetail_(week) {
+  document.getElementById('whModalTitle').textContent = week;
+  document.getElementById('whBackBtn').style.display = '';
+  document.getElementById('whWeekList').style.display = 'none';
+  const detailEl = document.getElementById('whWeekDetail');
+  detailEl.style.display = '';
+
+  const rows = (historyRows_ || []).filter(r => r.week === week);
+  const byDate = new Map();
+  rows.forEach(r => {
+    if (!byDate.has(r.date)) byDate.set(r.date, []);
+    byDate.get(r.date).push(r);
+  });
+  const dates = Array.from(byDate.keys()).sort();
+
+  if (!dates.length) {
+    detailEl.innerHTML = '<div class="wh-empty">Nothing logged this week.</div>';
+    return;
+  }
+
+  detailEl.innerHTML = dates.map(date => {
+    const dayLabel = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    const exercisesHtml = byDate.get(date).map(r => `
+      <div class="wh-ex-row">
+        <div class="wh-ex-name">${escapeHtml_(r.exercise)}</div>
+        <div class="wh-ex-meta">${escapeHtml_(whFormatExerciseMeta_(r))}</div>
+      </div>`).join('');
+    return `<div class="wh-day-block">
+      <div class="wh-day-label">${dayLabel}</div>
+      ${exercisesHtml}
+    </div>`;
+  }).join('');
 }
 
 function showHistorySection(name) {
