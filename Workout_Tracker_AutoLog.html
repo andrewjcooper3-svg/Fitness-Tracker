@@ -2677,6 +2677,21 @@
     </div>
   </div>
 
+  <div class="ov-hero-card ov-hero-starter" data-block="starter" onclick="showAppView('kitchen'); showKitchenSection('starter');">
+    <div class="ov-hero-main">
+      <div class="ov-hero-head" onclick="toggleStarterChart_(event)">
+        <div class="ov-hero-card-label">🫙 Starter <span class="ov-hero-chevron" id="ovStarterChevron">▸</span></div>
+      </div>
+      <div class="ov-hero-card-number" id="ovStarterNumber">—</div>
+      <div class="ov-hero-card-sub" id="ovStarterSub"></div>
+      <div class="ov-hero-progress"><div class="ov-hero-progress-fill" id="ovStarterBar" style="width:0%"></div></div>
+      <div class="ov-hero-card-status" id="ovStarterStatus"></div>
+    </div>
+    <div class="ov-pu-chart-wrap" id="ovStarterChartWrap" onclick="event.stopPropagation()">
+      <div id="ovStarterStatusHost"></div>
+    </div>
+  </div>
+
   <div class="ov-hero-card ov-hero-routines" data-block="routines">
     <div class="ov-hero-main">
       <div class="ov-hero-head" onclick="toggleOvRoutinesCal_(event)">
@@ -12049,25 +12064,26 @@ function renderStarterSupplies_() {
   ).join('');
 }
 
-function renderStarterStatus_(st) {
-  const host = document.getElementById('sdStatusHost');
-  if (!host) return;
+// Builds the status card's markup without touching the DOM, so the exact
+// same card can be dropped into both the Kitchen tab's own host and the
+// Overview hero card's expanded detail without computing it twice or
+// letting the two drift apart.
+function buildStarterStatusHtml_(st) {
   const now = new Date();
   const stage = st.stage || 'none';
 
   if (stage === 'none') {
-    host.innerHTML = `<div class="sd-status">
+    return `<div class="sd-status">
       <div class="sd-status-label">Sourdough starter</div>
       <div class="sd-status-headline">Nothing going yet</div>
       <div class="sd-status-sub">Two weeks of flour and water and you have a starter that lasts for years. Everything you need is below.</div>
     </div>`;
-    return;
   }
 
   if (stage === 'building') {
     const dayNum = starterBuildDay_(st);
     const done = Object.keys(st.build || {}).length;
-    host.innerHTML = `<div class="sd-status soon">
+    return `<div class="sd-status soon">
       <div class="sd-status-top">
         <div class="sd-status-label">${escapeHtml_(st.name || 'Your starter')} · building</div>
         <div class="sd-badge soon">Day ${dayNum} of 14</div>
@@ -12076,17 +12092,15 @@ function renderStarterStatus_(st) {
       <div class="sd-status-sub">${escapeHtml_(SD_BUILD_DAYS[Math.min(dayNum, 14) - 1].do)}</div>
       <div class="sd-status-sub">${done} of 14 days ticked off.</div>
     </div>`;
-    return;
   }
 
   const status = starterStatus_(st, now);
   if (status.level === 'none') {
-    host.innerHTML = `<div class="sd-status soon">
+    return `<div class="sd-status soon">
       <div class="sd-status-label">${escapeHtml_(st.name || 'Your starter')}</div>
       <div class="sd-status-headline">Log its first feed</div>
       <div class="sd-status-sub">Once there is a feed on record this becomes a clock: when it peaks, and when it is next owed.</div>
     </div>`;
-    return;
   }
 
   const badge = { ok: 'Fed', soon: 'Due soon', due: 'Feed it', overdue: 'Overdue' }[status.level];
@@ -12110,7 +12124,7 @@ function renderStarterStatus_(st) {
       : `It peaked around ${sdClock_(status.peakAt)} and is on its way down. Still usable, just slower and sourer. Next feed ${sdRel_(status.dueAt, now)}.`;
   }
 
-  host.innerHTML = `<div class="sd-status ${status.level}">
+  return `<div class="sd-status ${status.level}">
     <div class="sd-status-top">
       <div class="sd-status-label">${escapeHtml_(st.name || 'Your starter')} · ${st.location === 'fridge' ? 'fridge' : 'counter'}</div>
       <div class="sd-badge ${status.level}">${badge}</div>
@@ -12121,6 +12135,14 @@ function renderStarterStatus_(st) {
       <button class="sd-btn" onclick="openStarterFeedForm()">Log a feed</button>
     </div>
   </div>`;
+}
+
+function renderStarterStatus_(st) {
+  const html = buildStarterStatusHtml_(st);
+  const host = document.getElementById('sdStatusHost');
+  if (host) host.innerHTML = html;
+  const ovHost = document.getElementById('ovStarterStatusHost');
+  if (ovHost) ovHost.innerHTML = html;
 }
 
 // Which build day you are on by the calendar, not by how many boxes are
@@ -16812,6 +16834,7 @@ function renderOverview() {
   renderOverviewPushupMini();
   renderOverviewWeightPreview();
   renderOverviewWaterWidget();
+  renderOverviewStarterMini_();
   renderOverviewKitchenPreview();
   renderOverviewShoppingPreview();
   renderOverviewRoutinesWidget_();
@@ -18388,6 +18411,79 @@ function renderOverviewPushupMini() {
   }
 
   renderPushupWeekChart_(days);
+}
+
+// Same shape as the Pushups card: a big number, a progress bar, and a
+// one-line status underneath - here the "goal" is the feed interval
+// rather than a weekly rep count, so the number is hours since the last
+// feed and the bar fills toward that interval instead of toward 100%.
+function renderOverviewStarterMini_() {
+  const numEl = document.getElementById('ovStarterNumber');
+  if (!numEl || typeof loadStarter_ !== 'function') return;
+
+  const st = loadStarter_();
+  const stage = st.stage || 'none';
+  const subEl = document.getElementById('ovStarterSub');
+  const barEl = document.getElementById('ovStarterBar');
+  const statusEl = document.getElementById('ovStarterStatus');
+
+  if (stage === 'none') {
+    numEl.textContent = '—';
+    subEl.textContent = 'not started';
+    barEl.style.width = '0%';
+    statusEl.textContent = 'Tap to set one up';
+  } else if (stage === 'building') {
+    const dayNum = Math.min(starterBuildDay_(st), 14);
+    numEl.textContent = dayNum;
+    subEl.textContent = 'of 14 days';
+    barEl.style.width = Math.round(dayNum / 14 * 100) + '%';
+    statusEl.textContent = SD_BUILD_DAYS[dayNum - 1].title;
+  } else {
+    const now = new Date();
+    const status = starterStatus_(st, now);
+    if (status.level === 'none') {
+      numEl.textContent = '0h';
+      subEl.textContent = 'since fed';
+      barEl.style.width = '0%';
+      statusEl.textContent = 'Log its first feed';
+    } else {
+      numEl.textContent = Math.round(status.hoursSince) + 'h';
+      subEl.textContent = 'of ~' + Math.round(status.intervalH) + 'h';
+      barEl.style.width = Math.min(100, Math.round(status.hoursSince / status.intervalH * 100)) + '%';
+      const badge = { ok: 'Fed', soon: 'Due soon', due: 'Feed it', overdue: 'Overdue' }[status.level];
+      statusEl.textContent = st.location === 'fridge'
+        ? `${badge} · next feed ${sdDayClock_(status.dueAt, now)}`
+        : `${badge} · ${status.peakAt > now ? 'peaks ' + sdClock_(status.peakAt) : 'past peak'}`;
+    }
+  }
+
+  // Restore the open/closed state chosen last time, same reason as the
+  // Pushups card - renderOverview() runs on every view switch.
+  const wrap = document.getElementById('ovStarterChartWrap');
+  const chevron = document.getElementById('ovStarterChevron');
+  if (wrap && !wrap.dataset.restored) {
+    wrap.dataset.restored = '1';
+    let open = false;
+    try { open = localStorage.getItem(STORAGE_STARTER_CHART_OPEN) === '1'; } catch (e) {}
+    wrap.classList.toggle('expanded', open);
+    if (chevron) chevron.textContent = open ? '▾' : '▸';
+    if (open) renderStarterStatus_(st);
+  }
+}
+
+const STORAGE_STARTER_CHART_OPEN = 'WORKOUT_OV_STARTER_CHART_OPEN';
+
+function toggleStarterChart_(event) {
+  if (heroChartsPinned_()) return;
+  if (event) event.stopPropagation();
+  const wrap = document.getElementById('ovStarterChartWrap');
+  const chevron = document.getElementById('ovStarterChevron');
+  if (!wrap) return;
+  const expanded = wrap.classList.toggle('expanded');
+  if (chevron) chevron.textContent = expanded ? '▾' : '▸';
+  try { localStorage.setItem(STORAGE_STARTER_CHART_OPEN, expanded ? '1' : '0'); } catch (e) {}
+  if (expanded) renderStarterStatus_(loadStarter_());
+  updateViewportHeight('overview', true);
 }
 
 // The Pushups card's drop-down, mirroring the water card's. Both hero
