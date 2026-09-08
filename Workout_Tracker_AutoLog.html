@@ -15973,6 +15973,40 @@ function restoreDay(day, savedDay) {
   if (!savedDay) return;
   const panel = document.getElementById('day-' + day);
 
+  // Exercise ids are assigned purely by position ('ex0', 'ex1', ...) - see
+  // tagExerciseIds() - not by exercise identity. That is fine while a
+  // day's built-in exercise list stays the same shape week to week, but
+  // the moment a plan edit adds, removes, or moves exercises between days
+  // (a new split, a swapped exercise, a day that's now a rest day), the
+  // OLD saved ids point at completely different exercises than the FRESH
+  // cards renderWeeklyPlan_() just built for this day. Restoring against
+  // them then does real damage: cards that are correct for today get
+  // pruned as "not in the saved state", and the old exercises come back
+  // as bare custom cards with their old weights - a stale plan visibly
+  // fighting the new one. Comparing the saved and current exercise NAMES
+  // catches exactly that case; when they no longer line up, the saved
+  // snapshot predates a plan change and is skipped entirely rather than
+  // reconciled - the freshly rendered defaults (already carrying whatever
+  // progression the plan edit intended) stand as they are.
+  const defaultNames = (WEEKLY_PLAN_DATA[day] || []).map(ex => ex.name);
+  const savedNames = (savedDay.exercises || []).map(ex => ex.name);
+  const planChanged = savedNames.length !== defaultNames.length ||
+    savedNames.some((n, i) => n !== defaultNames[i]);
+
+  if (planChanged) {
+    const checkItems = panel.querySelectorAll('.check-item');
+    checkItems.forEach((item, i) => {
+      const saved = (savedDay.checkItems || [])[i];
+      if (saved && saved.checked) {
+        item.classList.add('checked');
+        item.querySelector('.checkbox').textContent = '✓';
+      }
+    });
+    const dayNotesEl = panel.querySelector('.day-notes-input');
+    if (dayNotesEl && savedDay.dayNotes) dayNotesEl.value = savedDay.dayNotes;
+    return;
+  }
+
   // Saved state from before exercise ids existed (or a day that's never had
   // any exercises, like a rest day) has no ids at all - in either case there
   // is nothing safe to prune or restore against, so leave the freshly
