@@ -115,6 +115,36 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('the trend line has one point per slot', withHistory.pointCount === 48, withHistory.pointCount); // 30-min slots by default
   check('the "usual pace" caption becomes visible', withHistory.noteVisible);
 
+  console.log('\n=== Water chart: a second line for an even pace across waking hours ===');
+  const evenPace = await page.evaluate(() => {
+    const fmt = d => { const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; };
+    const ledger = {};
+    for (let i = 1; i <= 4; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      ledger[fmt(d)] = 80; // a steady 80oz/day baseline
+    }
+    ledger[fmt(new Date())] = 0; // today itself must not count toward its own "usual"
+    localStorage.setItem('WORKOUT_WATER_LEDGER', JSON.stringify(ledger));
+    renderOverviewWaterWidget();
+    const svgHtml = document.getElementById('wtHourlyChart').innerHTML;
+    const polylines = [...svgHtml.matchAll(/<polyline points="([^"]*)"[^>]*stroke="([^"]*)"/g)];
+    const teal = polylines.find(m => m[2] === 'var(--teal)');
+    const heights = teal ? teal[1].trim().split(' ').map(p => Number(p.split(',')[1])) : [];
+    // 30-minute slots: index 14 = 7:00am (first waking slot), index 45 = 10:30pm
+    // (last waking slot), index 46 = 11:00pm (first slot back outside the window).
+    return {
+      lineCount: polylines.length,
+      note: document.getElementById('wtChartAvgNote').textContent,
+      beforeWaking: heights[13],
+      duringWaking: [heights[14], heights[30], heights[45]],
+      afterWaking: heights[46]
+    };
+  });
+  check('both the usual-pace and even-pace lines are drawn', evenPace.lineCount === 2, evenPace.lineCount);
+  check('the caption names both lines', /usual pace/.test(evenPace.note) && /even pace/.test(evenPace.note), evenPace.note);
+  check('the even-pace line sits flat (same height) across all of 7am-11pm', new Set(evenPace.duringWaking).size === 1, JSON.stringify(evenPace.duringWaking));
+  check('the even-pace line drops to the chart floor just before 7am and right at 11pm', evenPace.beforeWaking > evenPace.duringWaking[0] && evenPace.afterWaking > evenPace.duringWaking[0], JSON.stringify(evenPace));
+
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 
   await browser.close();

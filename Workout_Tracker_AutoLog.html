@@ -18253,6 +18253,34 @@ function waterSlotAverages_(slotMin, slotCount, excludeDay) {
   return sums.map(total => total / otherDays.length);
 }
 
+// A second, distinct reference line: not "what a slot usually looks like"
+// (lumpy - nobody drinks at 3am) but "what an even pace across a normal
+// waking day would look like" - the average daily total, spread flat
+// across 7am-11pm and zero outside it. Reads the day-total ledger rather
+// than the short-lived entry store, since it needs a stable average, not
+// slot-level detail, and the ledger holds far more history.
+const WATER_WAKE_START_MIN = 7 * 60;   // 7am
+const WATER_WAKE_END_MIN = 23 * 60;    // 11pm
+
+function waterEvenPaceSlots_(slotMin, slotCount, excludeDay) {
+  const ledger = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
+  // A day with nothing logged is far more likely a day this device just
+  // never opened than a real zero - counting it would drag the "normal"
+  // average down for no real reason, so only days with something on
+  // record contribute.
+  const days = Object.keys(ledger).filter(k => k !== excludeDay && ledger[k] > 0);
+  if (!days.length) return null;
+
+  const avgDailyTotal = days.reduce((sum, k) => sum + ledger[k], 0) / days.length;
+  const wakeMinutes = WATER_WAKE_END_MIN - WATER_WAKE_START_MIN;
+  const perSlot = avgDailyTotal * (slotMin / wakeMinutes);
+
+  return new Array(slotCount).fill(0).map((_, i) => {
+    const slotStart = i * slotMin;
+    return (slotStart >= WATER_WAKE_START_MIN && slotStart < WATER_WAKE_END_MIN) ? perSlot : 0;
+  });
+}
+
 // Each bar carries a second, invisible rect on top purely as a hit target.
 // At 15 minutes a bar is under 3px wide, so the target is widened to a
 // thumb-friendly minimum and centred on its bar - adjacent targets overlap
@@ -18269,7 +18297,9 @@ function renderWaterHourlyChart(entries) {
 
   waterChartHourEntries_ = computeSlotBuckets_(entries, slotMin, slotCount);
   const slotTotals = waterChartHourEntries_.map(list => list.reduce((sum, e) => sum + e.hydrationOz, 0));
-  const avgTotals = waterSlotAverages_(slotMin, slotCount, wtViewDay ? dateKey(wtViewDay) : dateKey(new Date()));
+  const viewDayKey = wtViewDay ? dateKey(wtViewDay) : dateKey(new Date());
+  const avgTotals = waterSlotAverages_(slotMin, slotCount, viewDayKey);
+  const evenPaceSlots = waterEvenPaceSlots_(slotMin, slotCount, viewDayKey);
 
   // Measured, not stretched - same reason as the pushup row above.
   const box = fitChartBox_(svg, 320, 64);
@@ -18278,7 +18308,7 @@ function renderWaterHourlyChart(entries) {
   // Finer slots hold less each, so a fixed floor would flatten the chart.
   // Scaling the floor with the slot width keeps the shape comparable
   // whichever resolution you are looking at.
-  const maxVal = Math.max(...slotTotals, ...(avgTotals || []), 8 * (slotMin / 60));
+  const maxVal = Math.max(...slotTotals, ...(avgTotals || []), ...(evenPaceSlots || []), 8 * (slotMin / 60));
   const hitW = Math.max(barW, 7);
 
   let bars = '';
@@ -18296,21 +18326,32 @@ function renderWaterHourlyChart(entries) {
     bars += `<rect x="${hx.toFixed(2)}" y="0" width="${hitW.toFixed(2)}" height="${chartH}" fill="transparent" style="cursor:pointer;" onclick="showWaterHourDetail(${i})" onmouseenter="showWaterHourDetail(${i})"></rect>`;
   });
 
+  const slotPoints_ = vals => vals.map((oz, i) => {
+    const x = i * (barW + barGap) + barW / 2;
+    const y = chartH - (oz / maxVal) * chartH;
+    return x.toFixed(2) + ',' + y.toFixed(1);
+  }).join(' ');
+
   let trendPath = '';
-  const avgNote = document.getElementById('wtChartAvgNote');
   if (avgTotals) {
-    const points = avgTotals.map((oz, i) => {
-      const x = i * (barW + barGap) + barW / 2;
-      const y = chartH - (oz / maxVal) * chartH;
-      return x.toFixed(2) + ',' + y.toFixed(1);
-    });
-    trendPath = `<polyline points="${points.join(' ')}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="1,3" stroke-linecap="round"></polyline>`;
-    if (avgNote) avgNote.style.display = '';
-  } else if (avgNote) {
-    avgNote.style.display = 'none';
+    trendPath = `<polyline points="${slotPoints_(avgTotals)}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="1,3" stroke-linecap="round"></polyline>`;
   }
 
-  svg.innerHTML = bars + trendPath;
+  let evenPacePath = '';
+  if (evenPaceSlots) {
+    evenPacePath = `<polyline points="${slotPoints_(evenPaceSlots)}" fill="none" stroke="var(--teal)" stroke-width="1.5" stroke-dasharray="5,3" stroke-linecap="round"></polyline>`;
+  }
+
+  const avgNote = document.getElementById('wtChartAvgNote');
+  if (avgNote) {
+    const parts = [];
+    if (avgTotals) parts.push('<span style="color:var(--muted)">┄┄┄</span> usual pace');
+    if (evenPaceSlots) parts.push('<span style="color:var(--teal)">╌╌╌</span> even pace, 7a–11p');
+    avgNote.innerHTML = parts.join('&nbsp;&nbsp;');
+    avgNote.style.display = parts.length ? '' : 'none';
+  }
+
+  svg.innerHTML = bars + trendPath + evenPacePath;
 
   const detailEl = document.getElementById('wtChartDetail');
   if (detailEl) detailEl.textContent = '';
