@@ -638,6 +638,7 @@
   .wt-chart-wrap.expanded { display: block; }
   .wt-chart { width: 100%; height: 26px; display: block; overflow: visible; }
   .wt-chart-labels { display: flex; justify-content: space-between; font-family: var(--font); font-size: 9.5px; color: var(--muted); margin-top: 2px; }
+  .wt-chart-avg-note { font-family: var(--font); font-size: 9.5px; color: var(--muted); margin-top: 3px; letter-spacing: 0.02em; }
   .wt-chart-detail { font-family: var(--font); font-size: 10.5px; color: var(--text); margin-top: 4px; min-height: 13px; }
   .wt-btn-row { display: flex; align-items: stretch; gap: 6px; }
   .wt-btn-row .wt-add-btn { flex: 1; }
@@ -2671,6 +2672,7 @@
       <div class="wt-chart-slots" id="wtChartSlots"></div>
       <svg viewBox="0 0 320 64" class="wt-chart" id="wtHourlyChart" preserveAspectRatio="none"></svg>
       <div class="wt-chart-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span></div>
+      <div class="wt-chart-avg-note" id="wtChartAvgNote" style="display:none;">┄┄┄ your usual pace</div>
       <div class="wt-chart-detail" id="wtChartDetail"></div>
     </div>
   </div>
@@ -2935,17 +2937,17 @@
      flow is unaffected. -->
 <div class="tracker-main-col">
 <div class="day-tabs">
-  <div class="day-tab home active" onclick="showDay('mon')"><div class="tab-lbl">Mon</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
-  <div class="day-tab gym" onclick="showDay('tue')"><div class="tab-lbl">Tue</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
-  <div class="day-tab home" onclick="showDay('wed')"><div class="tab-lbl">Wed</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
-  <div class="day-tab gym" onclick="showDay('thu')"><div class="tab-lbl">Thu</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
-  <div class="day-tab home" onclick="showDay('fri')"><div class="tab-lbl">Fri</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
+  <div class="day-tab rest active" onclick="showDay('mon')"><div class="tab-lbl">Mon</div><div class="tab-dot"></div><div class="tab-type">Rest</div></div>
+  <div class="day-tab home" onclick="showDay('tue')"><div class="tab-lbl">Tue</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
+  <div class="day-tab gym" onclick="showDay('wed')"><div class="tab-lbl">Wed</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
+  <div class="day-tab home" onclick="showDay('thu')"><div class="tab-lbl">Thu</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
+  <div class="day-tab gym" onclick="showDay('fri')"><div class="tab-lbl">Fri</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
   <div class="day-tab travel" onclick="showDay('sat')"><div class="tab-lbl">Sat</div><div class="tab-dot"></div><div class="tab-type">Mob</div></div>
   <div class="day-tab rest" onclick="showDay('sun')"><div class="tab-lbl">Sun</div><div class="tab-dot"></div><div class="tab-type">Rest</div></div>
 </div>
 
 <!-- MONDAY -->
-<div id="day-mon" class="day-panel active" data-pushup-target="165">
+<div id="day-mon" class="day-panel active" data-pushup-target="0">
 
   <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Gym moved to Tue/Thu this week (Sat is recovery). Pushups at 165/day baseline.</span></div></div>
 
@@ -3715,7 +3717,7 @@
       </div>
 
       <div id="rtMonthView">
-        <div class="rt-month-dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+        <div class="rt-month-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
         <div class="rt-month-grid" id="rtMonthGrid"></div>
       </div>
       <div id="rtYearView" style="display:none;">
@@ -4862,9 +4864,10 @@ const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday',
 // every day. Extracted losslessly from the prior static HTML via an
 // automated parse-render-diff round-trip (verified byte-for-byte
 // identical, not retyped by hand), so these are exactly the values that
-// were already live. Sunday has no entry - it's a fixed rest day with
-// no exercise list at all, same as before.
-const WEEKLY_PLAN_DATA = {"mon":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Bodyweight day now that lifting moved to Tuesday/Thursday"],["BW","Reps","55",null],["BW","Reps","55",null]]}],"tue":[{"name":"Leg Press","meta":"255 lb · 3 × 10","rows":[["255 lb","Reps","10","Holding 255 - sets 2 and 3 were tough again"],["255 lb","Reps","10",null],["255 lb","Reps","10",null]]},{"name":"Leg Extension","meta":"110 lb · 3 × 12","rows":[["110 lb","Reps","12","Holding 110 - all four sets tough again"],["110 lb","Reps","12",null],["110 lb","Reps","12",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 12","rows":[["80 lb","Reps","12","Holding 80 - sets 2 and 3 tough"],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Machine Chest Press","meta":"95 lb · 2 × 10","rows":[["95 lb","Reps","10","Up from 90 - both sets clean"],["95 lb","Reps","10",null]]},{"name":"Glute Kickback","meta":"30 lb · 4 × 10","rows":[["30 lb","Reps","10","Each leg - holding 30, all four tough, reps crept to 12 on the first"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"]]},{"name":"Tricep Pushdown","meta":"40 lb · 3 × 12","rows":[["40 lb","Reps","12","Holding 40 - all three tough again"],["40 lb","Reps","12",null],["40 lb","Reps","12",null]]},{"name":"Cable Bicep Curl","meta":"40 lb · 3 × 12","rows":[["40 lb","Reps","12","Holding 40 - sets 2 and 3 tough"],["40 lb","Reps","12",null],["40 lb","Reps","12",null]]},{"name":"Single Arm DB Row (Left Emphasis)","meta":"50 lb · 3 × 10","rows":[["50 lb","Reps","10","Holding 50 - all three tough, still adjusting to the new weight. LEFT catch-up"],["50 lb","Reps","10",null],["50 lb","Reps","10",null]]},{"name":"Lateral Raise","meta":"15 lb · 3 × 12","rows":[["15 lb","Reps","12","Holding 15 - shoulder health, last set tough again"],["15 lb","Reps","12",null],["15 lb","Reps","12",null]]},{"name":"Reverse Crunch","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Skipped again - not getting to this before running out of time"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Plank","meta":"BW · 3 × 65s","rows":[["BW","Time","65s","Up from 60s - two of three clean, building back up"],["BW","Time","65s",null],["BW","Time","65s",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"wed":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Bodyweight day now that lifting moved to Tuesday/Thursday"],["BW","Reps","55",null],["BW","Reps","55",null]]}],"thu":[{"name":"Leg Press","meta":"265 lb · 3 × 10","rows":[["265 lb","Reps","10","Up from 255 - all three clean"],["265 lb","Reps","10",null],["265 lb","Reps","10",null]]},{"name":"Dumbbell Romanian Deadlift","meta":"90 lb · 3 × 10","rows":[["90 lb","Reps","10","Switched to a bar and plates after set 1 felt awkward with just dumbbells - sets 2 and 3 were noticeably smoother and clean. Sticking with the bar"],["90 lb","Reps","10",null],["90 lb","Reps","10",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 12","rows":[["80 lb","Reps","12","Holding 80 - sets 2 and 3 tough"],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Lat Pulldown","meta":"110 lb · 3 × 10","rows":[["110 lb","Reps","10","Holding 110 - set 1 was an accidental 125, set 3 corrected down to 90. Aim for 110 clean across all three"],["110 lb","Reps","10",null],["110 lb","Reps","10",null]]},{"name":"CS DB Row (Left Arm Focus)","meta":"45 lb ea · 4 × 10","rows":[["45 lb ea","Reps","10","Holding 45 - last set went red, getting fatigued by the fourth. LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"]]},{"name":"Inclined Dumbbell Chest Press","meta":"45 lb · 3 × 10","rows":[["45 lb","Reps","10","Holding 45 - all three tough again"],["45 lb","Reps","10",null],["45 lb","Reps","10",null]]},{"name":"Face Pull","meta":"35 lb · 3 × 15","rows":[["35 lb","Reps","15","Up from 30 - still new, but all three were clean already"],["35 lb","Reps","15",null],["35 lb","Reps","15",null]]},{"name":"Tricep Pulldown","meta":"45 lb · 3 × 10","rows":[["45 lb","Reps","10","Holding 45 - set 2 wasn't completed, sets 1 and 3 mixed"],["45 lb","Reps","10",null],["45 lb","Reps","10",null]]},{"name":"Cable Bicep Curl","meta":"45 lb · 3 × 12","rows":[["45 lb","Reps","12","Holding 45 - all three tough again"],["45 lb","Reps","12",null],["45 lb","Reps","12",null]]},{"name":"Standing Calf Raise","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Skipped mid-session again but caught up afterward with all three clean - keep it in the flow"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Cable Crunch","meta":"60 lb · 3 × 12","rows":[["60 lb","Reps","12","Up from 55 - all three clean, adding some back now that the deload paid off"],["60 lb","Reps","12",null],["60 lb","Reps","12",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]}],"fri":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","One set of 55 last week - the other two are the easiest 110 of the week"],["BW","Reps","55",null],["BW","Reps","55",null]]}],"sat":[{"name":"Pushups","meta":"BW · 4 × 55 · Rest 60s","rows":[["BW","Reps","55","455 on Saturday last week. Impressive, but it is covering for Tue/Thu"],["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55","Catch-up set for the year deficit"]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]},{"name":"Sauna","meta":"BW · 1 × 10-20 min","rows":[["BW","Time","10-20 min","Post-workout, not counted in workout time"]]}]};
+// were already live. Monday and Sunday have no entry - both are fixed
+// rest days with no exercise list at all. Gym days are Wednesday/Friday;
+// Tuesday/Thursday are bodyweight-only pushup days.
+const WEEKLY_PLAN_DATA = {"tue":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Bodyweight day now that lifting moved to Wednesday/Friday"],["BW","Reps","55",null],["BW","Reps","55",null]]}],"wed":[{"name":"Leg Press","meta":"255 lb · 3 × 10","rows":[["255 lb","Reps","10","Holding 255 - sets 2 and 3 were tough again"],["255 lb","Reps","10",null],["255 lb","Reps","10",null]]},{"name":"Leg Extension","meta":"110 lb · 3 × 12","rows":[["110 lb","Reps","12","Holding 110 - all four sets tough again"],["110 lb","Reps","12",null],["110 lb","Reps","12",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 12","rows":[["80 lb","Reps","12","Holding 80 - sets 2 and 3 tough"],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Machine Chest Press","meta":"95 lb · 2 × 10","rows":[["95 lb","Reps","10","Up from 90 - both sets clean"],["95 lb","Reps","10",null]]},{"name":"Glute Kickback","meta":"30 lb · 4 × 10","rows":[["30 lb","Reps","10","Each leg - holding 30, all four tough, reps crept to 12 on the first"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"]]},{"name":"Tricep Pushdown","meta":"40 lb · 2 × 12","rows":[["40 lb","Reps","12","Trimmed to 2 sets - pushups already load the triceps most days, no need to stack more on top"],["40 lb","Reps","12",null]]},{"name":"Cable Bicep Curl","meta":"40 lb · 3 × 12","rows":[["40 lb","Reps","12","Holding 40 - sets 2 and 3 tough"],["40 lb","Reps","12",null],["40 lb","Reps","12",null]]},{"name":"Single Arm DB Row (Left Emphasis)","meta":"50 lb · 3 × 10","rows":[["50 lb","Reps","10","Holding 50 - all three tough, still adjusting to the new weight. LEFT catch-up"],["50 lb","Reps","10",null],["50 lb","Reps","10",null]]},{"name":"Lateral Raise","meta":"15 lb · 3 × 12","rows":[["15 lb","Reps","12","Holding 15 - shoulder health, last set tough again"],["15 lb","Reps","12",null],["15 lb","Reps","12",null]]},{"name":"Reverse Pec Deck Fly","meta":"40 lb · 3 × 15","rows":[["40 lb","Reps","15","New addition - more rear delt volume, light to start and adjust from here"],["40 lb","Reps","15",null],["40 lb","Reps","15",null]]},{"name":"Reverse Crunch","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Skipped again - not getting to this before running out of time"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Plank","meta":"BW · 3 × 65s","rows":[["BW","Time","65s","Up from 60s - two of three clean, building back up"],["BW","Time","65s",null],["BW","Time","65s",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"thu":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Bodyweight day now that lifting moved to Wednesday/Friday"],["BW","Reps","55",null],["BW","Reps","55",null]]}],"fri":[{"name":"Leg Press","meta":"265 lb · 3 × 10","rows":[["265 lb","Reps","10","Up from 255 - all three clean"],["265 lb","Reps","10",null],["265 lb","Reps","10",null]]},{"name":"Dumbbell Romanian Deadlift","meta":"90 lb · 3 × 10","rows":[["90 lb","Reps","10","Switched to a bar and plates after set 1 felt awkward with just dumbbells - sets 2 and 3 were noticeably smoother and clean. Sticking with the bar"],["90 lb","Reps","10",null],["90 lb","Reps","10",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 12","rows":[["80 lb","Reps","12","Holding 80 - sets 2 and 3 tough"],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Lat Pulldown","meta":"110 lb · 3 × 10","rows":[["110 lb","Reps","10","Holding 110 - set 1 was an accidental 125, set 3 corrected down to 90. Aim for 110 clean across all three"],["110 lb","Reps","10",null],["110 lb","Reps","10",null]]},{"name":"CS DB Row (Left Arm Focus)","meta":"45 lb ea · 4 × 10","rows":[["45 lb ea","Reps","10","Holding 45 - last set went red, getting fatigued by the fourth. LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"]]},{"name":"Inclined Dumbbell Chest Press","meta":"45 lb · 3 × 10","rows":[["45 lb","Reps","10","Holding 45 - all three tough again"],["45 lb","Reps","10",null],["45 lb","Reps","10",null]]},{"name":"Face Pull","meta":"35 lb · 4 × 15","rows":[["35 lb","Reps","15","Adding a 4th set - more rear delt volume this week"],["35 lb","Reps","15",null],["35 lb","Reps","15",null],["35 lb","Reps","15",null]]},{"name":"Tricep Pulldown","meta":"45 lb · 2 × 10","rows":[["45 lb","Reps","10","Trimmed to 2 sets - between pushups and the pressing work above, triceps get plenty without stacking more here"],["45 lb","Reps","10",null]]},{"name":"Cable Bicep Curl","meta":"45 lb · 3 × 12","rows":[["45 lb","Reps","12","Holding 45 - all three tough again"],["45 lb","Reps","12",null],["45 lb","Reps","12",null]]},{"name":"Standing Calf Raise","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Skipped mid-session again but caught up afterward with all three clean - keep it in the flow"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Cable Crunch","meta":"60 lb · 3 × 12","rows":[["60 lb","Reps","12","Up from 55 - all three clean, adding some back now that the deload paid off"],["60 lb","Reps","12",null],["60 lb","Reps","12",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]}],"sat":[{"name":"Pushups","meta":"BW · 4 × 55 · Rest 60s","rows":[["BW","Reps","55","455 on Saturday last week. Impressive, but it is covering for Tue/Thu"],["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55","Catch-up set for the year deficit"]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]},{"name":"Sauna","meta":"BW · 1 × 10-20 min","rows":[["BW","Time","10-20 min","Post-workout, not counted in workout time"]]}]};
 
 function escapeAttr_(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
 function escapeText_(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -8675,7 +8678,11 @@ function rtCadenceLabel(h) {
   if (h.cadence === 'week') return h.weekTarget + '×/week';
   return '';
 }
-function rtWeekStart(d) { const x = new Date(d); x.setDate(x.getDate() - x.getDay()); return x; }
+// Monday-first, same as everywhere else the app draws a week boundary
+// (getWeekMondayFor, the History weekly-pushup chart) - this used to be
+// its own Sunday-based formula, the one place in the app a "week" still
+// started on Sunday.
+function rtWeekStart(d) { return getWeekMondayFor(d); }
 function rtWeekCountSoFar(h, refDate) {
   const start = rtWeekStart(refDate);
   let n = 0;
@@ -8893,7 +8900,7 @@ function rtRenderWeek() {
     const cells = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(ws.getTime() + i * ROUTINES_DAY_MS);
       const on = rtIsDoneOn(h, dateKey(d));
-      return `<span class="${on ? 'on' : ''} ${dateKey(d) === dateKey(rtToday) ? 'today-mark' : ''}" title="${RT_DOW[i]}"></span>`;
+      return `<span class="${on ? 'on' : ''} ${dateKey(d) === dateKey(rtToday) ? 'today-mark' : ''}" title="${RT_DOW[d.getDay()]}"></span>`;
     }).join('');
     return `<div class="rt-week-row">
       <div class="rt-week-row-top">
@@ -8980,7 +8987,7 @@ function rtRenderHistory() {
 }
 function rtRenderMonthGrid() {
   const y = rtViewMonth.getFullYear(), m = rtViewMonth.getMonth();
-  const firstDow = new Date(y, m, 1).getDay();
+  const firstDow = (new Date(y, m, 1).getDay() + 6) % 7; // Monday-first, matching the header row and the rest of the app
   const daysInMonth = new Date(y, m + 1, 0).getDate();
   const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
   let html = '';
@@ -16818,7 +16825,7 @@ function renderOvRoutinesCalendar_() {
     const ws = rtWeekStart(rtToday);
     let cells = '';
     for (let i = 0; i < 7; i++) cells += ovRoutinesDayCellHtml_(new Date(ws.getTime() + i * ROUTINES_DAY_MS));
-    grid.innerHTML = `<div class="rt-month-dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+    grid.innerHTML = `<div class="rt-month-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
       <div class="rt-month-grid">${cells}</div>`;
     return;
   }
@@ -17984,6 +17991,64 @@ function waterSlotLabel_(index, slotMin) {
   return slotMin >= 60 ? fmt(startMin) : fmt(startMin) + '–' + fmt(endMin);
 }
 
+// Shared by today's bars and the historical-average trendline below - a
+// drink with an end time is divided across the slots it actually spans,
+// in proportion to how much of the window falls in each (a 12oz coffee
+// sipped 9:00-10:30 spreads across those slots instead of dumping the
+// whole thing at 9:00). Drinks with no end time land wholly in their own
+// slot. Returns both the per-slot totals and (for the caller that wants
+// it) the entries backing each slot.
+function computeSlotBuckets_(entries, slotMin, slotCount) {
+  const slotMs = slotMin * 60000;
+  const buckets = new Array(slotCount).fill(null).map(() => []);
+  entries.forEach(e => {
+    const start = new Date(e.loggedAt);
+    if (isNaN(start.getTime())) return;
+    const end = e.endAt ? new Date(e.endAt) : null;
+    const spanMs = (end && !isNaN(end.getTime())) ? (end - start) : 0;
+    const dayStart = new Date(start); dayStart.setHours(0, 0, 0, 0);
+
+    if (spanMs <= 0) {
+      const idx = Math.floor((start - dayStart) / slotMs);
+      if (idx >= 0 && idx < slotCount) buckets[idx].push(e);
+      return;
+    }
+
+    for (let i = 0; i < slotCount; i++) {
+      const slotStart = new Date(dayStart.getTime() + i * slotMs);
+      const slotEnd = new Date(slotStart.getTime() + slotMs);
+      const overlap = Math.min(end, slotEnd) - Math.max(start, slotStart);
+      if (overlap <= 0) continue;
+      const share = overlap / spanMs;
+      buckets[i].push(Object.assign({}, e, {
+        hydrationOz: e.hydrationOz * share,
+        rawOz: e.rawOz * share,
+        partialOfSpan: true
+      }));
+    }
+  });
+  return buckets;
+}
+
+// The dotted trend line: average oz-per-slot across whatever other days
+// are still in the (locally short-lived, see WATER_ENTRY_RETENTION_DAYS)
+// entry store, excluding the day currently on screen so "usual" is never
+// computed partly from itself. Same slot resolution as the bars, so a
+// bar sitting below the dotted line at the same x really does mean
+// behind pace for that time of day, not an artifact of different bucketing.
+function waterSlotAverages_(slotMin, slotCount, excludeDay) {
+  const store = getWaterEntryStore_();
+  const otherDays = Object.keys(store.days || {}).filter(k => k !== excludeDay);
+  if (!otherDays.length) return null;
+
+  const sums = new Array(slotCount).fill(0);
+  otherDays.forEach(day => {
+    const buckets = computeSlotBuckets_(store.days[day] || [], slotMin, slotCount);
+    buckets.forEach((list, i) => { sums[i] += list.reduce((sum, e) => sum + e.hydrationOz, 0); });
+  });
+  return sums.map(total => total / otherDays.length);
+}
+
 // Each bar carries a second, invisible rect on top purely as a hit target.
 // At 15 minutes a bar is under 3px wide, so the target is widened to a
 // thumb-friendly minimum and centred on its bar - adjacent targets overlap
@@ -17996,42 +18061,11 @@ function renderWaterHourlyChart(entries) {
 
   const slotMin = waterChartSlotMin_();
   const slotCount = (24 * 60) / slotMin;
-  const slotMs = slotMin * 60000;
   const opt = WATER_SLOT_OPTIONS.find(o => o.min === slotMin) || WATER_SLOT_OPTIONS[1];
 
-  // A drink with an end time is divided across the slots it actually
-  // spans, in proportion to how much of the window falls in each - a 12oz
-  // coffee sipped 9:00-10:30 spreads across those slots instead of dumping
-  // the whole thing at 9:00 and implying you downed it at once. Drinks
-  // with no end time land wholly in their own slot.
-  waterChartHourEntries_ = new Array(slotCount).fill(null).map(() => []);
-  entries.forEach(e => {
-    const start = new Date(e.loggedAt);
-    if (isNaN(start.getTime())) return;
-    const end = e.endAt ? new Date(e.endAt) : null;
-    const spanMs = (end && !isNaN(end.getTime())) ? (end - start) : 0;
-    const dayStart = new Date(start); dayStart.setHours(0, 0, 0, 0);
-
-    if (spanMs <= 0) {
-      const idx = Math.floor((start - dayStart) / slotMs);
-      if (idx >= 0 && idx < slotCount) waterChartHourEntries_[idx].push(e);
-      return;
-    }
-
-    for (let i = 0; i < slotCount; i++) {
-      const slotStart = new Date(dayStart.getTime() + i * slotMs);
-      const slotEnd = new Date(slotStart.getTime() + slotMs);
-      const overlap = Math.min(end, slotEnd) - Math.max(start, slotStart);
-      if (overlap <= 0) continue;
-      const share = overlap / spanMs;
-      waterChartHourEntries_[i].push(Object.assign({}, e, {
-        hydrationOz: e.hydrationOz * share,
-        rawOz: e.rawOz * share,
-        partialOfSpan: true
-      }));
-    }
-  });
+  waterChartHourEntries_ = computeSlotBuckets_(entries, slotMin, slotCount);
   const slotTotals = waterChartHourEntries_.map(list => list.reduce((sum, e) => sum + e.hydrationOz, 0));
+  const avgTotals = waterSlotAverages_(slotMin, slotCount, wtViewDay ? dateKey(wtViewDay) : dateKey(new Date()));
 
   // Measured, not stretched - same reason as the pushup row above.
   const box = fitChartBox_(svg, 320, 64);
@@ -18040,7 +18074,7 @@ function renderWaterHourlyChart(entries) {
   // Finer slots hold less each, so a fixed floor would flatten the chart.
   // Scaling the floor with the slot width keeps the shape comparable
   // whichever resolution you are looking at.
-  const maxVal = Math.max(...slotTotals, 8 * (slotMin / 60));
+  const maxVal = Math.max(...slotTotals, ...(avgTotals || []), 8 * (slotMin / 60));
   const hitW = Math.max(barW, 7);
 
   let bars = '';
@@ -18057,7 +18091,22 @@ function renderWaterHourlyChart(entries) {
     const hx = Math.max(0, Math.min(chartW - hitW, x + barW / 2 - hitW / 2));
     bars += `<rect x="${hx.toFixed(2)}" y="0" width="${hitW.toFixed(2)}" height="${chartH}" fill="transparent" style="cursor:pointer;" onclick="showWaterHourDetail(${i})" onmouseenter="showWaterHourDetail(${i})"></rect>`;
   });
-  svg.innerHTML = bars;
+
+  let trendPath = '';
+  const avgNote = document.getElementById('wtChartAvgNote');
+  if (avgTotals) {
+    const points = avgTotals.map((oz, i) => {
+      const x = i * (barW + barGap) + barW / 2;
+      const y = chartH - (oz / maxVal) * chartH;
+      return x.toFixed(2) + ',' + y.toFixed(1);
+    });
+    trendPath = `<polyline points="${points.join(' ')}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="1,3" stroke-linecap="round"></polyline>`;
+    if (avgNote) avgNote.style.display = '';
+  } else if (avgNote) {
+    avgNote.style.display = 'none';
+  }
+
+  svg.innerHTML = bars + trendPath;
 
   const detailEl = document.getElementById('wtChartDetail');
   if (detailEl) detailEl.textContent = '';
@@ -18582,14 +18631,15 @@ function computePushupStats() {
   const weekStats = computeWeekStats();
   const weekTotals = weekStats.totals;
 
-  // This month: baseline pace (165/day, every day but Sunday) across the
-  // whole calendar month, actual pulled from whatever's logged so far.
+  // This month: baseline pace (165/day, every day but Sunday and Monday -
+  // both fixed rest days now) across the whole calendar month, actual
+  // pulled from whatever's logged so far.
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   let monthActual = 0, monthTarget = 0, monthTargetSoFar = 0;
   for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
     monthActual += ledger[dateKey(d)] || 0;
-    if (d.getDay() !== 0) {
+    if (d.getDay() !== 0 && d.getDay() !== 1) {
       monthTarget += PUSHUP_DAILY_BASELINE;
       if (d <= today) monthTargetSoFar += PUSHUP_DAILY_BASELINE;
     }
