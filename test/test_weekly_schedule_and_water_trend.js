@@ -145,6 +145,27 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('the even-pace line sits flat (same height) across all of 7am-11pm', new Set(evenPace.duringWaking).size === 1, JSON.stringify(evenPace.duringWaking));
   check('the even-pace line drops to the chart floor just before 7am and right at 11pm', evenPace.beforeWaking > evenPace.duringWaking[0] && evenPace.afterWaking > evenPace.duringWaking[0], JSON.stringify(evenPace));
 
+  console.log('\n=== Hovering a slot reads off both trend lines\' actual numbers, not just their pixel height ===');
+  const hover = await page.evaluate(() => {
+    showWaterHourDetail(30); // 3:00pm - well inside waking hours, nothing logged there
+    const withNothingLogged = document.getElementById('wtChartDetail').textContent;
+    return { withNothingLogged };
+  });
+  check('an empty slot still reports both trend values', /usual [\d.]+oz/.test(hover.withNothingLogged) && /even pace [\d.]+oz/.test(hover.withNothingLogged), hover.withNothingLogged);
+  check('the even-pace figure at 3pm matches the flat 80oz/16h baseline (2.5oz per 30-min slot)', /even pace 2\.5oz/.test(hover.withNothingLogged), hover.withNothingLogged);
+
+  const hoverWithDrink = await page.evaluate(() => {
+    const morning = new Date(); morning.setHours(9, 0, 0, 0);
+    const entries = { ...JSON.parse(localStorage.getItem('WORKOUT_WATER_ENTRIES')) };
+    const todayKey = (() => { const d = new Date(), y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; })();
+    entries.days[todayKey] = [{ id: 'today1', loggedAt: morning.toISOString(), hydrationOz: 12, rawOz: 12, type: 'water' }];
+    localStorage.setItem('WORKOUT_WATER_ENTRIES', JSON.stringify(entries));
+    renderOverviewWaterWidget();
+    showWaterHourDetail(18); // 9:00am slot
+    return document.getElementById('wtChartDetail').textContent;
+  });
+  check('a slot with real intake logged still appends both trend values alongside it', /12oz/.test(hoverWithDrink) && /usual [\d.]+oz/.test(hoverWithDrink) && /even pace [\d.]+oz/.test(hoverWithDrink), hoverWithDrink);
+
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
 
   await browser.close();

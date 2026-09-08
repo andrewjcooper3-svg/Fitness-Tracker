@@ -18141,6 +18141,11 @@ function renderCaffeineDrinkList_(entries) {
 // showWaterHourDetail below reads straight from this rather than
 // re-deriving it from scratch on every tap/hover.
 let waterChartHourEntries_ = new Array(24).fill(null).map(() => []);
+// The two trend lines' per-slot values, kept alongside the entries so
+// showWaterHourDetail() can read off "where the lines are" for whichever
+// slot is under the pointer, not just what was actually logged there.
+let waterAvgTrendTotals_ = null;
+let waterEvenPaceTotals_ = null;
 
 function formatHour12_(h) {
   const period = h < 12 ? 'AM' : 'PM';
@@ -18300,6 +18305,8 @@ function renderWaterHourlyChart(entries) {
   const viewDayKey = wtViewDay ? dateKey(wtViewDay) : dateKey(new Date());
   const avgTotals = waterSlotAverages_(slotMin, slotCount, viewDayKey);
   const evenPaceSlots = waterEvenPaceSlots_(slotMin, slotCount, viewDayKey);
+  waterAvgTrendTotals_ = avgTotals;
+  waterEvenPaceTotals_ = evenPaceSlots;
 
   // Measured, not stretched - same reason as the pushup row above.
   const box = fitChartBox_(svg, 320, 64);
@@ -18360,22 +18367,40 @@ function renderWaterHourlyChart(entries) {
 // Groups an hour's entries by drink type (a busy hour might have two
 // waters and a coffee) so the preview reads as "Water 64oz, Coffee 8oz
 // net" rather than one line per individual tap.
+// Spread drinks contribute fractions of an ounce to an hour, so these are
+// rounded for display (whole numbers stay whole) - the underlying ledger
+// still uses the exact values.
+const waterOzFmt_ = n => (Math.round(n * 10) / 10).toString();
+
+// The two trend lines only mean anything as numbers once you can read
+// them off at a given slot - a bar can look "close to the dotted line"
+// at chart scale and be off by several ounces, so hovering has to answer
+// exactly, not just visually.
+function waterTrendPartsFor_(hour) {
+  const parts = [];
+  if (waterAvgTrendTotals_ && waterAvgTrendTotals_[hour] != null) {
+    parts.push(`usual ${waterOzFmt_(waterAvgTrendTotals_[hour])}oz`);
+  }
+  if (waterEvenPaceTotals_ && waterEvenPaceTotals_[hour] != null) {
+    parts.push(`even pace ${waterOzFmt_(waterEvenPaceTotals_[hour])}oz`);
+  }
+  return parts;
+}
+
 function showWaterHourDetail(hour) {
   const detailEl = document.getElementById('wtChartDetail');
   if (!detailEl) return;
   const entries = waterChartHourEntries_[hour] || [];
   const label = waterSlotLabel_(hour, waterChartSlotMin_());
+  const trendParts = waterTrendPartsFor_(hour);
 
   if (!entries.length) {
-    detailEl.textContent = label + ' — no intake logged';
+    const suffix = trendParts.length ? ` (${trendParts.join(', ')})` : '';
+    detailEl.textContent = `${label} — no intake logged${suffix}`;
     return;
   }
 
-  // Spread drinks contribute fractions of an ounce to an hour, so these
-  // are rounded for display (whole numbers stay whole) - the underlying
-  // ledger still uses the exact values.
-  const oz = n => (Math.round(n * 10) / 10).toString();
-
+  const oz = waterOzFmt_;
   const byType = {};
   entries.forEach(e => {
     if (!byType[e.type]) byType[e.type] = { hydrationOz: 0, rawOz: 0, partial: false };
@@ -18394,7 +18419,8 @@ function showWaterHourDetail(hour) {
       : `${prefix}${drinkLabel} ${oz(t.hydrationOz)}oz`;
   });
   const total = entries.reduce((sum, e) => sum + e.hydrationOz, 0);
-  detailEl.textContent = `${label} — ${oz(total)}oz: ${parts.join(', ')}`;
+  const suffix = trendParts.length ? ` (${trendParts.join(', ')})` : '';
+  detailEl.textContent = `${label} — ${oz(total)}oz: ${parts.join(', ')}${suffix}`;
 }
 
 // `type` omitted means "whatever the drink dropdown is showing" - the
