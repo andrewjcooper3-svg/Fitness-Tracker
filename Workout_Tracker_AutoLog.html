@@ -9077,21 +9077,54 @@ function rtRenderWeek() {
 // One vertical section per due habit, filling left to right in a fixed
 // order (done, then today's still-open, then a real miss) so the color
 // story reads as one glance across the cell.
+// A weekly-target habit isn't "due" on any particular day, so a shortfall
+// has no day of its own to land on the way a daily/specific-days miss
+// does - it only exists once the week is over and the count came up
+// short. Rather than let that just disappear, the deficit (target minus
+// however many days it was actually done) gets attributed to that many
+// of the week's OTHER days, working backward from Sunday so the marks
+// land where the week ran out rather than at the start of it. Only ever
+// computed for a week that has already ended - rtCurrentStreak uses the
+// same "current week is never judged" rule, since there's still time to
+// hit the target until the week is actually over.
+function rtWeekMissDays_(h, weekStart) {
+  if (h.created && weekStart < new Date(h.created + 'T00:00:00')) return new Set(); // didn't exist for this whole week
+  const doneKeys = new Set();
+  for (let i = 0; i < 7; i++) {
+    const dk = dateKey(new Date(weekStart.getTime() + i * ROUTINES_DAY_MS));
+    if (rtIsDoneOn(h, dk)) doneKeys.add(dk);
+  }
+  const deficit = Math.max(0, (h.weekTarget || 0) - doneKeys.size);
+  if (!deficit) return new Set();
+  const missable = [];
+  for (let i = 6; i >= 0; i--) {
+    const dk = dateKey(new Date(weekStart.getTime() + i * ROUTINES_DAY_MS));
+    if (!doneKeys.has(dk)) missable.push(dk);
+  }
+  return new Set(missable.slice(0, deficit));
+}
+
 function rtDaySections(k, d, tiny) {
   const isToday = dateKey(d) === dateKey(rtToday);
   const due = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
   // A weekly-target habit isn't "due" on any particular day, so it never
-  // adds a pending/missed section - but the day it actually got checked
-  // off is real progress, so THAT day earns a green section same as any
-  // other completed habit.
+  // adds a pending/missed section on its own - but the day it actually
+  // got checked off is real progress, so THAT day earns a green section
+  // same as any other completed habit.
   const weeklyDone = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtIsDoneOn(h, k));
-  const all = due.concat(weeklyDone);
+  const weekStart = rtWeekStart(d);
+  const weekIsOver = weekStart.getTime() < rtWeekStart(rtToday).getTime();
+  const weeklyMissed = weekIsOver
+    ? RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtWeekMissDays_(h, weekStart).has(k))
+    : [];
+  const all = due.concat(weeklyDone).concat(weeklyMissed);
   if (!all.length) return '';
   const order = { 'rt-sec-done': 0, 'rt-sec-excused': 1, 'rt-sec-pending': 2, 'rt-sec-miss': 3 };
   const items = all.map(h => {
     const doneOn = rtIsDoneOn(h, k);
     const excused = h.cadence !== 'week' && rtIsExcusedOn(h, k) && !doneOn;
-    const cls = excused ? 'rt-sec-excused'
+    const cls = weeklyMissed.includes(h) ? 'rt-sec-miss'
+      : excused ? 'rt-sec-excused'
       : h.cadence === 'week' ? 'rt-sec-done' : (doneOn ? 'rt-sec-done' : (isToday ? 'rt-sec-pending' : 'rt-sec-miss'));
     return { cls, name: h.name };
   }).sort((a, b) => order[a.cls] - order[b.cls]);
@@ -9191,15 +9224,21 @@ function rtRenderHeatDetail() {
   const d = new Date(rtSelectedDay + 'T00:00:00');
   const fixedDue = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
   const weeklyDone = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtIsDoneOn(h, rtSelectedDay));
-  const due = fixedDue.concat(weeklyDone);
+  const weekStart = rtWeekStart(d);
+  const weekIsOver = weekStart.getTime() < rtWeekStart(rtToday).getTime();
+  const weeklyMissed = weekIsOver
+    ? RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtWeekMissDays_(h, weekStart).has(rtSelectedDay))
+    : [];
+  const due = fixedDue.concat(weeklyDone).concat(weeklyMissed);
   const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   if (!due.length) { box.innerHTML = `<div class="rt-heat-detail-date">${label}</div><div class="rt-empty">Nothing scheduled.</div>`; return; }
   const isToday = rtSelectedDay === dateKey(rtToday);
   box.innerHTML = `<div class="rt-heat-detail-date">${label}</div>` + due.map(h => {
     const on = rtIsDoneOn(h, rtSelectedDay);
-    const excused = rtIsExcusedOn(h, rtSelectedDay) && !on;
-    const cls = excused ? 'excused' : (on ? 'on' : (isToday ? 'pending' : 'miss'));
-    const doneTime = on ? rtCompletedTimeText_(h, rtSelectedDay) : (excused ? 'On vacation' : '');
+    const excused = h.cadence !== 'week' && rtIsExcusedOn(h, rtSelectedDay) && !on;
+    const isWeeklyMiss = weeklyMissed.includes(h);
+    const cls = isWeeklyMiss ? 'miss' : excused ? 'excused' : (on ? 'on' : (isToday ? 'pending' : 'miss'));
+    const doneTime = on ? rtCompletedTimeText_(h, rtSelectedDay) : (excused ? 'On vacation' : (isWeeklyMiss ? 'Weekly target missed' : ''));
     return `<div class="rt-heat-detail-item ${cls}"><span class="rt-heat-detail-dot ${cls}"></span>` +
       `<span class="rt-heat-detail-name">${escapeText_(h.name)}</span>` +
       (doneTime ? `<span class="rt-heat-detail-time">${doneTime}</span>` : '') + `</div>`;
@@ -9216,8 +9255,11 @@ function rtRenderHabits() {
     const strip = Array.from({ length: 28 }, (_, i) => {
       const d = new Date(rtToday.getTime() - (27 - i) * ROUTINES_DAY_MS);
       if (h.cadence === 'week') {
-        const on = rtIsDoneOn(h, dateKey(d));
-        return `<span class="${on ? 'on' : ''}" title="${dateKey(d)}"></span>`;
+        const dk = dateKey(d);
+        const on = rtIsDoneOn(h, dk);
+        const ws = rtWeekStart(d);
+        const missed = !on && ws.getTime() < rtWeekStart(rtToday).getTime() && rtWeekMissDays_(h, ws).has(dk);
+        return `<span class="${on ? 'on' : (missed ? 'miss' : '')}" title="${dk}${missed ? ' (weekly target missed)' : ''}"></span>`;
       }
       if (!rtIsDue(h, d)) return `<span class="future" title="not scheduled"></span>`;
       const dk = dateKey(d);
