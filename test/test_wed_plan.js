@@ -1,5 +1,5 @@
-// Two independent things used to live in this file, both about
-// WEEKLY_PLAN_DATA changing under someone's feet:
+// Two independent things live in this file, both about WEEKLY_PLAN_DATA
+// changing under someone's feet:
 //
 // 1) The Aug 24 Wednesday rewrite (RDL and Standing Calf Raise in, Machine
 //    Chest Press and Hanging Knee Raise out) needed a one-time migration
@@ -9,17 +9,17 @@
 //    lined up. That migration is hardcoded to 'wed' and its flag is
 //    already set in real user data; it isn't going anywhere, so it's still
 //    worth a smoke test that it does not corrupt whatever Wednesday's
-//    CURRENT template happens to be.
+//    CURRENT template happens to be - regardless of how many times the
+//    schedule has moved since (Mon/Wed -> Tue/Thu -> Wed/Fri, each of
+//    those later moves handled by their own migration, or - for the most
+//    recent Wed/Fri move - by restoreDay's generic saved-name-vs-current-
+//    plan comparison guard instead of a new one-time migration).
 //
-// 2) The gym schedule itself later moved from Mon/Wed to Tue/Thu (this
-//    file's original subject: Monday's and Wednesday's exercise lists).
-//    That move needed no migration of its own - WORKOUT_TRACKER_STATE
-//    resets to fresh at every week boundary (restoreState() compares
-//    saved.week against getWeekLabel()), and the move landed exactly on
-//    one such boundary, so there was never any stale per-day state to
-//    reconcile against the new day assignment. This is just a content
-//    check: Tuesday and Thursday now hold what Monday and Wednesday used
-//    to.
+// 2) The gym schedule itself has moved twice more since this file's
+//    original subject (Mon/Wed, this file's namesake). This is now just a
+//    content check against the CURRENT rotation: Monday/Sunday rest,
+//    Tuesday/Thursday a single Pushups card, Wednesday/Friday the full
+//    gym sessions, Saturday a short Pushups/Walk/Sauna day.
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve('/home/user/Fitness-Tracker/Workout_Tracker_AutoLog.html');
@@ -34,47 +34,57 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   await page.route('https://script.google.com/**', r =>
     r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' }));
 
-  console.log('=== Tuesday and Thursday now hold the gym content Monday/Wednesday used to ===');
+  console.log('=== The current rotation: Mon/Sun rest, Tue/Thu Pushups-only, Wed/Fri gym, Sat light ===');
   await page.goto(URL);
   await page.waitForFunction(() => typeof showAppView === 'function', null, { timeout: 15000 });
   await page.waitForTimeout(1200);
 
-  const tue = await page.evaluate(() =>
-    [...document.querySelectorAll('#day-tue .exercise-card .exercise-name')].map(e => e.textContent));
-  const thu = await page.evaluate(() =>
-    [...document.querySelectorAll('#day-thu .exercise-card .exercise-name')].map(e => e.textContent));
-  const mon = await page.evaluate(() =>
-    [...document.querySelectorAll('#day-mon .exercise-card .exercise-name')].map(e => e.textContent));
-  const wed = await page.evaluate(() =>
-    [...document.querySelectorAll('#day-wed .exercise-card .exercise-name')].map(e => e.textContent));
-
-  console.log('  Tuesday:', tue.length, 'cards -', tue.join(', '));
-  check('Tuesday is the old Monday gym day (12 cards)', tue.length === 12 && tue[0] === 'Leg Press'
-    && tue.includes('Machine Chest Press') && tue.includes('Lateral Raise'), tue.join(', '));
-
-  console.log('  Thursday:', thu.length, 'cards -', thu.join(', '));
-  check('Thursday renders all 13 of the old Wednesday cards', thu.length === 13, String(thu.length));
-  ['Leg Press', 'Dumbbell Romanian Deadlift', 'Leg Curl', 'Lat Pulldown',
-   'CS DB Row (Left Arm Focus)', 'Inclined Dumbbell Chest Press', 'Face Pull',
-   'Tricep Pulldown', 'Cable Bicep Curl', 'Standing Calf Raise', 'Cable Crunch',
-   'Pushups', 'Walk'].forEach(n =>
-    check(`  ${n} is there`, thu.includes(n)));
-  check('Machine Chest Press is gone from Thursday', !thu.includes('Machine Chest Press'));
-  check('Hanging Knee Raise is gone from Thursday', !thu.includes('Hanging Knee Raise'));
+  const cardsFor = async (day) => page.evaluate((d) =>
+    [...document.querySelectorAll(`#day-${d} .exercise-card .exercise-name`)].map(e => e.textContent), day);
+  const mon = await cardsFor('mon');
+  const tue = await cardsFor('tue');
+  const wed = await cardsFor('wed');
+  const thu = await cardsFor('thu');
+  const fri = await cardsFor('fri');
+  const sat = await cardsFor('sat');
+  const sun = await cardsFor('sun');
 
   console.log('  Monday:', mon.length, 'cards -', mon.join(', '));
-  check('Monday is now a light bodyweight day, not the gym day', mon.length === 1 && mon[0] === 'Pushups', mon.join(', '));
+  check('Monday is a rest day (no cards)', mon.length === 0, mon.join(', '));
+
+  console.log('  Tuesday:', tue.length, 'cards -', tue.join(', '));
+  check('Tuesday is a single Pushups card', tue.length === 1 && tue[0] === 'Pushups', tue.join(', '));
+
   console.log('  Wednesday:', wed.length, 'cards -', wed.join(', '));
-  check('Wednesday is now a light bodyweight day, not the gym day', wed.length === 1 && wed[0] === 'Pushups', wed.join(', '));
+  check('Wednesday is the 14-card gym day, pulling exercises included', wed.length === 14 && wed[0] === 'Leg Press'
+    && wed.includes('Lat Pulldown') && wed.includes('Face Pull') && wed.includes('Pull-ups'), wed.join(', '));
+  check('Machine Chest Press and Tricep Pushdown are gone from Wednesday',
+    !wed.includes('Machine Chest Press') && !wed.includes('Tricep Pushdown'), wed.join(', '));
+
+  console.log('  Thursday:', thu.length, 'cards -', thu.join(', '));
+  check('Thursday is a single Pushups card', thu.length === 1 && thu[0] === 'Pushups', thu.join(', '));
+
+  console.log('  Friday:', fri.length, 'cards -', fri.join(', '));
+  check('Friday is the 11-card gym day, pulling exercises included', fri.length === 11 && fri[0] === 'Leg Press'
+    && fri.includes('Dumbbell Romanian Deadlift') && fri.includes('Lat Pulldown') && fri.includes('Face Pull'), fri.join(', '));
+  check('Inclined Dumbbell Chest Press and Tricep Pulldown are gone from Friday',
+    !fri.includes('Inclined Dumbbell Chest Press') && !fri.includes('Tricep Pulldown'), fri.join(', '));
+
+  console.log('  Saturday:', sat.length, 'cards -', sat.join(', '));
+  check('Saturday is the short Pushups/Walk/Sauna day',
+    sat.length === 3 && sat.includes('Pushups') && sat.includes('Walk') && sat.includes('Sauna'), sat.join(', '));
+
+  console.log('  Sunday:', sun.length, 'cards -', sun.join(', '));
+  check('Sunday is a rest day (no cards)', sun.length === 0, sun.join(', '));
 
   const tabTypes = await page.evaluate(() => [...document.querySelectorAll('.day-tab .tab-type')].map(t => t.textContent));
-  check('the day-tab badges read PU/Gym/PU/Gym for Mon-Thu',
-    JSON.stringify(tabTypes.slice(0, 4)) === JSON.stringify(['PU', 'Gym', 'PU', 'Gym']), JSON.stringify(tabTypes));
+  check('the day-tab badges read Rest/PU/Gym/PU/Gym/Mob/Rest for Mon-Sun',
+    JSON.stringify(tabTypes) === JSON.stringify(['Rest', 'PU', 'Gym', 'PU', 'Gym', 'Mob', 'Rest']), JSON.stringify(tabTypes));
 
   const groups = await page.evaluate(() => ['Dumbbell Romanian Deadlift', 'Standing Calf Raise', 'Face Pull']
     .map(n => n + ' -> ' + muscleFor_(n)));
   groups.forEach(g => console.log('  ', g));
-  check('the moved exercises still classify correctly',
+  check('the exercises still classify correctly',
     groups[0].endsWith('Hamstrings') && groups[1].endsWith('Calves') && groups[2].endsWith('Shoulders'),
     groups.join(' | '));
 
@@ -83,8 +93,9 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     // Pretend the 24th migration has not run yet, and lay down a saved
     // state shaped like the old (pre-Aug-24) twelve-card Wednesday - the
     // exact shape that migration exists to clear out. Wednesday's CURRENT
-    // template is unrelated (now a 1-card Pushups day); the migration
-    // should still wipe the stale array rather than try to merge it in.
+    // template is unrelated (now the 14-card gym day with pulling work);
+    // the migration should still wipe the stale array rather than try to
+    // merge it in.
     localStorage.removeItem('WORKOUT_DAY_TEMPLATE_MIGRATED_20260824');
     const state = JSON.parse(localStorage.getItem('WORKOUT_TRACKER_STATE') || '{"days":{}}');
     state.days = state.days || {};
@@ -95,11 +106,10 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   await page.waitForFunction(() => typeof showAppView === 'function', null, { timeout: 15000 });
   await page.waitForTimeout(1200);
 
-  const wedAfterMigration = await page.evaluate(() =>
-    [...document.querySelectorAll('#day-wed .exercise-card .exercise-name')].map(e => e.textContent));
+  const wedAfterMigration = await cardsFor('wed');
   console.log('  Wednesday after migration:', wedAfterMigration.join(', '));
-  check('the stale 12-card Wednesday is cleared, showing the current (Pushups-only) template cleanly',
-    wedAfterMigration.length === 1 && wedAfterMigration[0] === 'Pushups', wedAfterMigration.join(', '));
+  check('the stale 12-card Wednesday is cleared, showing the current 14-card gym template cleanly',
+    wedAfterMigration.length === 14 && wedAfterMigration[0] === 'Leg Press', wedAfterMigration.join(', '));
 
   await ctx.close();
   await b.close();

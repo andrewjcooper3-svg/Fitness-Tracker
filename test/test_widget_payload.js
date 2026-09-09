@@ -37,13 +37,15 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('seven days, Monday first', s.pushups.days.length === 7, String(s.pushups.days.length));
   check('exactly one day is flagged today', s.pushups.days.filter(d => d.today).length === 1);
 
-  // Targets come off the plan, not a constant: Sat is four sets, Sun none.
+  // Targets come off the plan, not a constant: Monday is a rest day (moved
+  // off the gym rotation), Sat is four sets, Sun none.
   const t = s.pushups.days.map(d => d.target);
   console.log('  targets Mon..Sun:', t.join(', '));
-  check('weekday targets are 165 (3 x 55)', t.slice(0, 5).every(x => x === 165), t.join(','));
+  check('Monday is 0 - it is the rest day', t[0] === 0, String(t[0]));
+  check('Tue/Wed/Thu/Fri are each 165 (3 x 55)', t.slice(1, 5).every(x => x === 165), t.join(','));
   check('Saturday is 220 (4 x 55)', t[5] === 220, String(t[5]));
   check('Sunday is 0 - it is the rest day', t[6] === 0, String(t[6]));
-  check('the week sums to the 1,045 target', t.reduce((a, x) => a + x, 0) === 1045,
+  check('the week sums to the 880 target', t.reduce((a, x) => a + x, 0) === 880,
     String(t.reduce((a, x) => a + x, 0)));
 
   const done = s.pushups.days.map(d => d.done);
@@ -58,7 +60,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('today and before are not', !s.pushups.days.slice(0, idx + 1).some(d => d.future));
 
   check('the next lift is reported', !!s.lift && !!s.lift.day, JSON.stringify(s.lift));
-  check('and it is a real lifting day', ['Tuesday', 'Thursday'].includes(s.lift.day), s.lift.day);
+  check('and it is a real lifting day', ['Wednesday', 'Friday'].includes(s.lift.day), s.lift.day);
 
   // Derived from the plan, so it must actually follow the plan.
   const derived = await page.evaluate(() => ({
@@ -66,7 +68,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     satPush: planPushupsForDay_('sat'), sunPush: planPushupsForDay_('sun')
   }));
   console.log('  lift days:', derived.lift.join(', '));
-  check('Tue and Thu are the lifting days', derived.lift.join(',') === 'tue,thu', derived.lift.join(','));
+  check('Wed and Fri are the lifting days', derived.lift.join(',') === 'wed,fri', derived.lift.join(','));
   check('a walk-and-sauna Saturday is not a lifting day', !derived.lift.includes('sat'));
 
   await ctx.close();

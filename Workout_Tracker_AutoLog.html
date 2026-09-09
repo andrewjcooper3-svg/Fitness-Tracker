@@ -18315,15 +18315,36 @@ function waterSlotLabel_(index, slotMin) {
 // whole thing at 9:00). Drinks with no end time land wholly in their own
 // slot. Returns both the per-slot totals and (for the caller that wants
 // it) the entries backing each slot.
-function computeSlotBuckets_(entries, slotMin, slotCount) {
+//
+// opts.spreadSpikes (only set by waterSlotAverages_, never by the live
+// per-day bars) treats a large un-ranged entry as a rushed catch-up log
+// rather than a real instant gulp: its true timing is unknowable, so
+// instead of dumping the whole amount into whichever single slot it
+// happened to be tapped in - reading as a sharp, unrealistic spike once
+// averaged into the "usual pace" line - it gets spread across a plausible
+// window centered on the log time, same as any entry that already
+// carries a real start/end range.
+const WATER_SPIKE_SPREAD_THRESHOLD_OZ = 40; // above the biggest single preset (a 32oz water bottle)
+const WATER_SPIKE_SPREAD_MINUTES = 90;
+function computeSlotBuckets_(entries, slotMin, slotCount, opts) {
+  const spreadSpikes = !!(opts && opts.spreadSpikes);
   const slotMs = slotMin * 60000;
   const buckets = new Array(slotCount).fill(null).map(() => []);
   entries.forEach(e => {
-    const start = new Date(e.loggedAt);
-    if (isNaN(start.getTime())) return;
-    const end = e.endAt ? new Date(e.endAt) : null;
-    const spanMs = (end && !isNaN(end.getTime())) ? (end - start) : 0;
-    const dayStart = new Date(start); dayStart.setHours(0, 0, 0, 0);
+    const loggedStart = new Date(e.loggedAt);
+    if (isNaN(loggedStart.getTime())) return;
+    const dayStart = new Date(loggedStart); dayStart.setHours(0, 0, 0, 0);
+
+    let start = loggedStart;
+    let end = e.endAt ? new Date(e.endAt) : null;
+    let spanMs = (end && !isNaN(end.getTime())) ? (end - start) : 0;
+
+    if (spanMs <= 0 && spreadSpikes && e.rawOz > WATER_SPIKE_SPREAD_THRESHOLD_OZ) {
+      const halfSpanMs = (WATER_SPIKE_SPREAD_MINUTES / 2) * 60000;
+      start = new Date(loggedStart.getTime() - halfSpanMs);
+      end = new Date(loggedStart.getTime() + halfSpanMs);
+      spanMs = end - start;
+    }
 
     if (spanMs <= 0) {
       const idx = Math.floor((start - dayStart) / slotMs);
@@ -18353,6 +18374,9 @@ function computeSlotBuckets_(entries, slotMin, slotCount) {
 // computed partly from itself. Same slot resolution as the bars, so a
 // bar sitting below the dotted line at the same x really does mean
 // behind pace for that time of day, not an artifact of different bucketing.
+// spreadSpikes: true - a big rushed catch-up log on some OTHER day
+// shouldn't read as a hard spike in what's supposed to be the normal,
+// expected pace; today's own bars still show exactly what was logged.
 function waterSlotAverages_(slotMin, slotCount, excludeDay) {
   const store = getWaterEntryStore_();
   const otherDays = Object.keys(store.days || {}).filter(k => k !== excludeDay);
@@ -18360,7 +18384,7 @@ function waterSlotAverages_(slotMin, slotCount, excludeDay) {
 
   const sums = new Array(slotCount).fill(0);
   otherDays.forEach(day => {
-    const buckets = computeSlotBuckets_(store.days[day] || [], slotMin, slotCount);
+    const buckets = computeSlotBuckets_(store.days[day] || [], slotMin, slotCount, { spreadSpikes: true });
     buckets.forEach((list, i) => { sums[i] += list.reduce((sum, e) => sum + e.hydrationOz, 0); });
   });
   return sums.map(total => total / otherDays.length);
@@ -19567,7 +19591,7 @@ const WEEKPLAN_PX_PER_HOUR_ = 56;
 // the plan's own Est. time text, and a Pushups block on whichever
 // weekdays actually have pushup history (see wpPushupActiveDows_) rather
 // than assuming every day. Weekends get no work/commute blocks - only
-// Tue/Thu currently count as lift days (isLiftDay_ reads the live plan,
+// Wed/Fri currently count as lift days (isLiftDay_ reads the live plan,
 // so this tracks a future schedule change automatically) and neither
 // falls on a weekend today, but nothing here assumes that.
 function wpGeneratedBlocksForDay_(dayKey, dayIndex, dateObj, cfg) {
