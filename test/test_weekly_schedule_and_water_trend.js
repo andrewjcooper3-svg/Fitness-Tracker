@@ -48,17 +48,43 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('Tuesday\'s tab is classed "home" (bodyweight)', /\bhome\b/.test(plan.tueTab), plan.tueTab);
   check('Wednesday\'s tab is classed "gym"', /\bgym\b/.test(plan.wedTab), plan.wedTab);
 
-  console.log('\n=== Rear delts get more work; daily pushups mean less added tricep isolation ===');
-  const arms = await page.evaluate(() => ({
-    wedHasRearDelt: WEEKLY_PLAN_DATA.wed.some(ex => ex.name === 'Reverse Pec Deck Fly'),
-    wedTricepSets: (WEEKLY_PLAN_DATA.wed.find(ex => ex.name === 'Tricep Pushdown') || {}).rows.length,
-    friFacePullSets: (WEEKLY_PLAN_DATA.fri.find(ex => ex.name === 'Face Pull') || {}).rows.length,
-    friTricepSets: (WEEKLY_PLAN_DATA.fri.find(ex => ex.name === 'Tricep Pulldown') || {}).rows.length
-  }));
-  check('Wednesday gained a dedicated rear-delt exercise', arms.wedHasRearDelt);
-  check('Wednesday\'s tricep pushdown was trimmed from 3 sets to 2', arms.wedTricepSets === 2, arms.wedTricepSets);
-  check('Friday\'s Face Pull (rear delt) went from 3 sets to 4', arms.friFacePullSets === 4, arms.friFacePullSets);
-  check('Friday\'s tricep pulldown was trimmed from 3 sets to 2', arms.friTricepSets === 2, arms.friTricepSets);
+  console.log('\n=== Rear delts and pulling get more work; redundant chest/tricep isolation dropped ===');
+  const arms = await page.evaluate(() => {
+    const wedNames = WEEKLY_PLAN_DATA.wed.map(ex => ex.name);
+    const friNames = WEEKLY_PLAN_DATA.fri.map(ex => ex.name);
+    return {
+      wedHasRearDelt: wedNames.includes('Reverse Pec Deck Fly'),
+      wedHasFacePull: wedNames.includes('Face Pull'),
+      wedHasLatPulldown: wedNames.includes('Lat Pulldown'),
+      wedHasPullups: wedNames.includes('Pull-ups'),
+      friFacePullSets: (WEEKLY_PLAN_DATA.fri.find(ex => ex.name === 'Face Pull') || {}).rows.length,
+      // Both days had direct chest/tricep isolation that only duplicated
+      // what the daily pushups already load - dropped entirely now that
+      // Wednesday picked up real pulling work to spend that time/recovery
+      // budget on instead.
+      wedHasChestPress: wedNames.includes('Machine Chest Press'),
+      wedHasTricepPushdown: wedNames.includes('Tricep Pushdown'),
+      friHasInclinePress: friNames.includes('Inclined Dumbbell Chest Press'),
+      friHasTricepPulldown: friNames.includes('Tricep Pulldown'),
+      // Legs and core were never on the chopping block - explicitly still
+      // there after all the pulling additions.
+      wedHasLegExtension: wedNames.includes('Leg Extension'),
+      wedHasGluteKickback: wedNames.includes('Glute Kickback'),
+      wedHasCore: wedNames.includes('Plank') && wedNames.includes('Reverse Crunch')
+    };
+  });
+  check('Wednesday still has its dedicated rear-delt exercise', arms.wedHasRearDelt);
+  check('Wednesday now also has Face Pull', arms.wedHasFacePull);
+  check('Wednesday now also has Lat Pulldown', arms.wedHasLatPulldown);
+  check('Wednesday now also has Pull-ups', arms.wedHasPullups);
+  check('Friday\'s Face Pull (rear delt) is still at 4 sets', arms.friFacePullSets === 4, arms.friFacePullSets);
+  check('Machine Chest Press was dropped from Wednesday (redundant with daily pushups)', !arms.wedHasChestPress);
+  check('Tricep Pushdown was dropped from Wednesday (redundant with daily pushups)', !arms.wedHasTricepPushdown);
+  check('Incline Chest Press was dropped from Friday (redundant with daily pushups)', !arms.friHasInclinePress);
+  check('Tricep Pulldown was dropped from Friday (redundant with daily pushups)', !arms.friHasTricepPulldown);
+  check('Leg Extension is still on Wednesday - legs were never touched', arms.wedHasLegExtension);
+  check('Glute Kickback is still on Wednesday - legs were never touched', arms.wedHasGluteKickback);
+  check('Core work is still on Wednesday', arms.wedHasCore);
 
   console.log('\n=== Routines: every week view starts on Monday, not Sunday ===');
   const routines = await page.evaluate(() => {
