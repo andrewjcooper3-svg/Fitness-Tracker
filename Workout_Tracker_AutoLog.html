@@ -4188,6 +4188,10 @@
     <div class="rt-field">
       <label for="rtHLink">Link to (optional)</label>
       <select id="rtHLink" class="rt-link-select" onchange="rtOnLinkChange()"></select>
+      <div class="rt-field" id="rtLinkWeeklyRow" style="display:none; margin-top:8px;">
+        <label for="rtHLinkWeekly">Weekly total</label>
+        <input type="number" id="rtHLinkWeekly" class="config-input" min="1" style="width:100%; box-sizing:border-box;" oninput="rtOnLinkWeeklyChange()">
+      </div>
       <div class="rt-link-note" id="rtLinkNote"></div>
     </div>
 
@@ -8701,7 +8705,10 @@ const ROUTINES_LINK_SOURCES = {
   },
   pushups: {
     kind: 'threshold', label: 'Pushups', unit: ' reps',
-    defaultThreshold: () => 100,
+    defaultThreshold: () => 141, // vestigial fallback for pre-weeklyTotal habits; see defaultWeeklyTotal
+    // 990/week is the real number - what's left of the 50k/year goal
+    // spread across the remaining weeks - not an arbitrary round figure.
+    defaultWeeklyTotal: () => 990,
     valueOn: dateStr => {
       try {
         const ledger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
@@ -8754,10 +8761,30 @@ function rtHabitsChanged() {
 let RT_HABITS = rtLoadHabitsLocal();
 let RT_LOG = rtLoadLogLocal();
 
+// How many days a week this habit's daily trigger has to be split across -
+// the denominator for a weekly-total link (see rtLinkEffectiveThreshold_).
+// Accepts either a real habit or the in-progress draft shape from the
+// habit editor, since both carry the same cadence/days/weekTarget fields.
+function rtLinkDaysPerWeek_(h) {
+  if (h.cadence === 'days') return Math.max(1, (h.days || []).length);
+  if (h.cadence === 'week') return Math.max(1, h.weekTarget || 1);
+  return 7;
+}
+// A threshold-linked habit's real per-day trigger. Prefers a weekly total
+// (h.link.weeklyTotal) divided evenly across however many days the habit
+// actually runs on - so changing the cadence (more/fewer days) reshapes
+// the daily number automatically rather than leaving a stale figure
+// behind. Falls back to the older flat per-day h.link.threshold for
+// habits saved before this existed.
+function rtLinkEffectiveThreshold_(h) {
+  const src = ROUTINES_LINK_SOURCES[h.link.source];
+  if (h.link.weeklyTotal) return Math.max(1, Math.round(h.link.weeklyTotal / rtLinkDaysPerWeek_(h)));
+  return h.link.threshold || src.defaultThreshold();
+}
 function rtIsDoneOn(h, dateStr) {
   if (h.link && ROUTINES_LINK_SOURCES[h.link.source]) {
     const src = ROUTINES_LINK_SOURCES[h.link.source];
-    return src.kind === 'logged' ? !!src.doneOn(dateStr) : src.valueOn(dateStr) >= (h.link.threshold || 0);
+    return src.kind === 'logged' ? !!src.doneOn(dateStr) : src.valueOn(dateStr) >= rtLinkEffectiveThreshold_(h);
   }
   return !!(RT_LOG[dateStr] && RT_LOG[dateStr][h.id] && RT_LOG[dateStr][h.id].done);
 }
@@ -8799,7 +8826,7 @@ function rtLinkMetaText_(h, k) {
   const src = ROUTINES_LINK_SOURCES[h.link.source];
   if (!src) return '';
   if (src.kind === 'logged') return rtIsDoneOn(h, k) ? 'Logged today' : 'Not logged yet';
-  return `${src.valueOn(k)}/${h.link.threshold}${src.unit}`;
+  return `${src.valueOn(k)}/${rtLinkEffectiveThreshold_(h)}${src.unit}`;
 }
 // 0-1 fraction of a threshold-linked habit's daily value logged so far -
 // purely for the checkbox's pie-fill visual (see .rt-link-progress). Not
@@ -8810,7 +8837,7 @@ function rtLinkProgressRatio_(h, k) {
   if (!h.link) return null;
   const src = ROUTINES_LINK_SOURCES[h.link.source];
   if (!src || src.kind !== 'threshold') return null;
-  const threshold = h.link.threshold || src.defaultThreshold();
+  const threshold = rtLinkEffectiveThreshold_(h);
   if (!threshold) return null;
   return Math.max(0, Math.min(1, src.valueOn(k) / threshold));
 }
@@ -9367,20 +9394,55 @@ function rtLinkSourceOptionsHtml() {
 function rtOnLinkChange() {
   const source = document.getElementById('rtHLink').value;
   const note = document.getElementById('rtLinkNote');
+  const weeklyRow = document.getElementById('rtLinkWeeklyRow');
   if (!source || !ROUTINES_LINK_SOURCES[source]) {
     rtDraftLink = null;
     note.textContent = '';
+    weeklyRow.style.display = 'none';
     return;
   }
   const src = ROUTINES_LINK_SOURCES[source];
   if (src.kind === 'logged') {
     rtDraftLink = { source };
     note.textContent = `Marked done automatically once a weigh-in is logged that day. Overrides checking it off by hand.`;
+    weeklyRow.style.display = 'none';
     return;
   }
-  const threshold = (rtDraftLink && rtDraftLink.source === source && rtDraftLink.threshold) || src.defaultThreshold();
-  rtDraftLink = { source, threshold };
-  note.textContent = `Marked done automatically once that day's ${src.label.toLowerCase()} reaches ${threshold}${src.unit}. Overrides checking it off by hand.`;
+  // A weekly total divided across however many days the habit runs on,
+  // not a flat per-day figure - so changing the cadence's day count (see
+  // rtRefreshLinkNote_) reshapes the daily trigger instead of leaving a
+  // stale number behind. Carries over an in-progress edit of the same
+  // source; otherwise falls back to the source's real weekly figure, or
+  // (for a habit saved before this existed) its old flat threshold
+  // scaled up to a week.
+  const carried = rtDraftLink && rtDraftLink.source === source ? rtDraftLink.weeklyTotal : null;
+  const weeklyTotal = carried || (src.defaultWeeklyTotal
+    ? src.defaultWeeklyTotal()
+    : (rtDraftLink && rtDraftLink.source === source && rtDraftLink.threshold || src.defaultThreshold())
+        * rtLinkDaysPerWeek_({ cadence: rtDraftCadence, days: rtDraftDays, weekTarget: rtDraftWeekTarget }));
+  rtDraftLink = { source, weeklyTotal };
+  weeklyRow.style.display = '';
+  document.getElementById('rtHLinkWeekly').value = weeklyTotal;
+  rtRefreshLinkNote_();
+}
+function rtOnLinkWeeklyChange() {
+  if (!rtDraftLink) return;
+  rtDraftLink.weeklyTotal = Math.max(1, parseInt(document.getElementById('rtHLinkWeekly').value, 10) || 1);
+  rtRefreshLinkNote_();
+}
+// Recomputes the daily-trigger preview from the current weekly total and
+// however many days the draft cadence covers right now - called both when
+// the weekly total changes and whenever the cadence/day-count changes
+// (rtSetCadence, rtToggleDay, rtBumpWeekTarget), so the note always
+// reflects the live combination of the two.
+function rtRefreshLinkNote_() {
+  if (!rtDraftLink) return;
+  const src = ROUTINES_LINK_SOURCES[rtDraftLink.source];
+  if (!src || src.kind !== 'threshold') return;
+  const days = rtLinkDaysPerWeek_({ cadence: rtDraftCadence, days: rtDraftDays, weekTarget: rtDraftWeekTarget });
+  const perDay = Math.max(1, Math.round((rtDraftLink.weeklyTotal || 0) / days));
+  document.getElementById('rtLinkNote').textContent =
+    `${rtDraftLink.weeklyTotal}${src.unit}/week across ${days} day${days === 1 ? '' : 's'} = marked done once a day's ${src.label.toLowerCase()} reaches ${perDay}${src.unit}. Overrides checking it off by hand.`;
 }
 function rtOpenHabitSheet() {
   rtEditingId = null;
@@ -9391,6 +9453,7 @@ function rtOpenHabitSheet() {
   document.getElementById('rtHLink').innerHTML = rtLinkSourceOptionsHtml();
   document.getElementById('rtHLink').value = '';
   document.getElementById('rtLinkNote').textContent = '';
+  document.getElementById('rtLinkWeeklyRow').style.display = 'none';
   rtSetCadence('daily');
   document.getElementById('rtSheetOverlay').classList.add('open');
   setTimeout(() => document.getElementById('rtHName').focus(), 60);
@@ -9425,15 +9488,18 @@ function rtSetCadence(c) {
     document.getElementById('rtDayPick').innerHTML = RT_DOW.map((d, i) =>
       `<button data-d="${i}" onclick="rtToggleDay(${i})">${d[0]}</button>`).join('');
   }
+  rtRefreshLinkNote_(); // cadence changes how many days a weekly-total link splits across
 }
 function rtToggleDay(i) {
   const idx = rtDraftDays.indexOf(i);
   if (idx >= 0) rtDraftDays.splice(idx, 1); else rtDraftDays.push(i);
   document.querySelectorAll('#rtDayPick button').forEach(b => b.classList.toggle('on', rtDraftDays.includes(+b.dataset.d)));
+  rtRefreshLinkNote_();
 }
 function rtBumpWeekTarget(delta) {
   rtDraftWeekTarget = Math.max(1, Math.min(7, rtDraftWeekTarget + delta));
   document.getElementById('rtWeekTargetN').textContent = rtDraftWeekTarget;
+  rtRefreshLinkNote_();
 }
 function rtSaveHabit() {
   const name = document.getElementById('rtHName').value.trim();
