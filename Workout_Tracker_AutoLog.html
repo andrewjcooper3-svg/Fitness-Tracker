@@ -1520,6 +1520,26 @@
   .wi-log-row:active { background: var(--surface2); }
   .wi-log-row-name { font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--text); }
   .wi-log-row-meta { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .wi-log-row-check { flex-shrink: 0; display: flex; align-items: center; }
+  .wi-log-row-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+  .wi-log-row-main { flex: 1; min-width: 0; }
+  .wi-log-row-rank { flex-shrink: 0; display: flex; align-items: center; gap: 2px; font-family: var(--font); }
+  .wi-log-row-rank button {
+    width: 22px; height: 22px; border: none; border-radius: 6px; background: var(--surface2);
+    color: var(--muted); font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .wi-log-row-rank button:disabled { opacity: 0.35; cursor: default; }
+  .wi-log-row-rank .n { font-size: 11.5px; font-weight: 700; color: var(--text); width: 18px; text-align: center; }
+
+  .wi-plan-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 4px; border-top: 1px solid var(--border);
+  }
+  .wi-plan-row:first-child { border-top: none; }
+  .wi-plan-row-rank { flex-shrink: 0; width: 20px; font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--muted); }
+  .wi-plan-row-main { flex: 1; min-width: 0; }
+  .wi-plan-row-name { font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .wi-plan-row-meta { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
   .wi-links-list { margin-top: 6px; }
   .wi-link-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--border); }
@@ -3506,11 +3526,18 @@
         <button type="button" class="wi-btn-primary" id="wiLogItemBtn" style="width:100%; margin-top:14px;">Log this item</button>
       </div>
 
+      <div class="stats-card" id="wiMonthlyPlanCard" style="display:none;">
+        <div class="stats-card-title" style="margin-bottom:0;">This month's picks</div>
+        <div class="wi-hint" id="wiMonthlyPlanNote" style="margin-top:4px;"></div>
+        <div id="wiMonthlyPlanList" style="margin-top:10px;"></div>
+      </div>
+
       <div class="stats-card" id="wiLogListCard" style="display:none;">
         <div class="wi-panel-head">
           <div class="stats-card-title" style="margin-bottom:0;">Logged items</div>
           <div class="sd-sync-line" id="wiLogSyncLine" onclick="wiSyncLogToRemote()" title="Tap to sync now" style="font-size:11px;"></div>
         </div>
+        <div class="wi-hint" style="margin-bottom:8px;">Check "This month" on anything you're actually weighing buying now - checked items get ranked and compete for the cap above; everything else keeps its own plain verdict.</div>
         <div id="wiLogList"></div>
       </div>
 
@@ -3602,6 +3629,11 @@
         <div class="wi-field">
           <label for="wiWants">Monthly wants budget</label>
           <div class="wi-input-unit"><span class="wi-prefix">$</span><input type="number" class="wi-input" id="wiWants" value="745" min="0" step="5"></div>
+        </div>
+
+        <div class="wi-field">
+          <label for="wiMonthlyCapPct">Max % of wants budget to commit per month</label>
+          <div class="wi-input-unit suffixed"><input type="number" class="wi-input" id="wiMonthlyCapPct" value="50" min="0" max="100" step="5"><span class="wi-suffix">%</span></div>
         </div>
 
         <div class="wi-hint" id="wiPayNote" style="margin:12px 0 0; padding-top:12px; border-top:1px dashed var(--border);"></div>
@@ -6470,7 +6502,7 @@ const WI_STORAGE_KEY = 'worthit_pay_v1';
 const WI_PROFILES_KEY = 'worthit_profiles_v1';
 const WI_SILLY_KEY = 'worthit_silly_month_v1';
 const wi$ = id => document.getElementById(id);
-const WI_PAY_FIELDS = ['wiWage', 'wiTaxKeep', 'wiK401', 'wiOtMult', 'wiWants'];
+const WI_PAY_FIELDS = ['wiWage', 'wiTaxKeep', 'wiK401', 'wiOtMult', 'wiWants', 'wiMonthlyCapPct'];
 let wiApplyingProfile_ = false;
 
 function wiEscapeHtml_(s) {
@@ -6684,6 +6716,10 @@ function wiRecalc_() {
   };
 
   wiSavePay_();
+  // The wants budget and the monthly cap % both live on this same panel,
+  // so any change to either has to reshape the monthly picks too, not
+  // just this one item's own verdict.
+  wiRenderMonthlyPlanCard_();
 }
 
 // ---- usage profiles ----
@@ -6961,21 +6997,107 @@ function wiFmtLogMeta_(item) {
   return base + (linkCount ? ' · ' + linkCount + (linkCount === 1 ? ' link' : ' links') : '');
 }
 
+// Checked items ("This month") compete for a shared monthly cap instead
+// of each getting judged in isolation against the full wants budget -
+// see wiComputeMonthlyPlan_. Rank is a real stored number (not just
+// array position) so it survives independent of how many other items
+// happen to be checked at a given moment; wiBumpRank_ swaps it with a
+// neighbor's rather than renumbering everything.
+function wiMonthlyPlanItems_() {
+  return (WI_LOG.items || []).filter(it => it.inMonthlyPlan)
+    .sort((a, b) => (a.planRank || 0) - (b.planRank || 0));
+}
+function wiToggleMonthlyPlan_(id) {
+  const item = (WI_LOG.items || []).find(it => it.id === id);
+  if (!item) return;
+  item.inMonthlyPlan = !item.inMonthlyPlan;
+  if (item.inMonthlyPlan) {
+    const maxRank = wiMonthlyPlanItems_().reduce((m, it) => Math.max(m, it.planRank || 0), 0);
+    item.planRank = maxRank + 1;
+  }
+  wiLogChanged_();
+}
+function wiBumpRank_(id, direction) {
+  const ranked = wiMonthlyPlanItems_();
+  const idx = ranked.findIndex(it => it.id === id);
+  const swapWith = idx + direction;
+  if (idx < 0 || swapWith < 0 || swapWith >= ranked.length) return;
+  const a = ranked[idx].planRank, b = ranked[swapWith].planRank;
+  ranked[idx].planRank = b;
+  ranked[swapWith].planRank = a;
+  wiLogChanged_();
+}
+// Greedy by rank: running total only ever grows by an item that still
+// fits under the cap, but a lower-priority item skipped over gets no
+// special treatment - the next one is still checked against the same
+// running total, so a cheaper #3 can fit even when #2 didn't (exactly
+// the "buy 1 and 3, hold off on 2" case this was built for).
+function wiComputeMonthlyPlan_() {
+  const wants = parseFloat(wi$('wiWants').value) || 0;
+  const capPct = (parseFloat(wi$('wiMonthlyCapPct').value) || 0) / 100;
+  const cap = wants * capPct;
+  let running = 0;
+  const results = wiMonthlyPlanItems_().map(item => {
+    const buy = running + item.price <= cap + 1e-9;
+    if (buy) running += item.price;
+    return { item, buy };
+  });
+  return { wants, capPct, cap, committed: running, results };
+}
+function wiRenderMonthlyPlanCard_() {
+  const card = wi$('wiMonthlyPlanCard');
+  const plan = wiComputeMonthlyPlan_();
+  card.style.display = plan.results.length ? '' : 'none';
+  if (!plan.results.length) return;
+  wi$('wiMonthlyPlanNote').textContent =
+    wiFmtUSD_(plan.committed) + ' of ' + wiFmtUSD_(plan.cap) + ' committed (' +
+    wiFmtNum_(plan.capPct * 100, 0) + '% of ' + wiFmtUSD_(plan.wants) + ' wants budget)';
+  wi$('wiMonthlyPlanList').innerHTML = plan.results.map((r, i) => `
+    <div class="wi-plan-row">
+      <div class="wi-plan-row-rank">#${i + 1}</div>
+      <div class="wi-plan-row-main">
+        <div class="wi-plan-row-name">${wiEscapeHtml_(r.item.name)}</div>
+        <div class="wi-plan-row-meta">${wiEscapeHtml_(wiFmtUSD_(r.item.price))}</div>
+      </div>
+      <span class="fin-pill${r.buy ? '' : ' warn'}">${r.buy ? 'Buy this month' : 'Hold off'}</span>
+    </div>`).join('');
+}
+
 function wiRenderLogList_() {
   const card = wi$('wiLogListCard');
   const list = wi$('wiLogList');
   const items = WI_LOG.items || [];
   card.style.display = items.length ? '' : 'none';
+  wiRenderMonthlyPlanCard_();
   if (!items.length) { list.innerHTML = ''; return; }
   const sorted = items.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-  list.innerHTML = sorted.map(item => `
+  list.innerHTML = sorted.map(item => {
+    const ranked = item.inMonthlyPlan ? wiMonthlyPlanItems_() : [];
+    const pos = ranked.findIndex(it => it.id === item.id);
+    return `
     <div class="wi-log-row" data-id="${item.id}">
+      <div class="wi-log-row-check">
+        <input type="checkbox" data-toggle-id="${item.id}" ${item.inMonthlyPlan ? 'checked' : ''} title="Weighing this month">
+      </div>
       <div class="wi-log-row-main">
         <div class="wi-log-row-name">${wiEscapeHtml_(item.name)}</div>
         <div class="wi-log-row-meta">${wiEscapeHtml_(wiFmtUSD_(item.price))} · ${wiEscapeHtml_(wiFmtLogMeta_(item))}</div>
       </div>
+      ${item.inMonthlyPlan ? `
+      <div class="wi-log-row-rank">
+        <button data-bump-id="${item.id}" data-bump-dir="-1" ${pos <= 0 ? 'disabled' : ''}>&#9650;</button>
+        <span class="n">${pos + 1}</span>
+        <button data-bump-id="${item.id}" data-bump-dir="1" ${pos < 0 || pos >= ranked.length - 1 ? 'disabled' : ''}>&#9660;</button>
+      </div>` : ''}
       <span class="fin-pill${item.tier !== 'good' ? ' ' + item.tier : ''}">${wiEscapeHtml_(item.badge)}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-toggle-id]').forEach(cb => {
+    cb.addEventListener('click', e => { e.stopPropagation(); wiToggleMonthlyPlan_(cb.dataset.toggleId); });
+  });
+  list.querySelectorAll('[data-bump-id]').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); wiBumpRank_(btn.dataset.bumpId, parseInt(btn.dataset.bumpDir, 10)); });
+  });
   list.querySelectorAll('.wi-log-row').forEach(row => {
     row.addEventListener('click', () => wiOpenDetailModal_(row.dataset.id));
   });
