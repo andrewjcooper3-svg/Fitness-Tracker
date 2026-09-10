@@ -16325,10 +16325,21 @@ function restoreDay(day, savedDay) {
   // every reorder as a permanent, unrecoverable "plan changed" - every
   // future save/reload skipped restoring sets, weights, and checkmarks
   // entirely, forever, once a single drag had happened.
+  //
+  // Only the PRESCRIBED exercises (custom: false) are compared - a
+  // "+ Add Exercise" card was never part of WEEKLY_PLAN_DATA[day] to
+  // begin with, so its presence has nothing to do with whether the
+  // template changed. Comparing the full list including customs meant
+  // adding even one extra exercise permanently changed the saved
+  // count vs. the template's count - every future load treated the
+  // whole day as "plan changed" and discarded ALL of it, prescribed
+  // exercises included, not just the custom one. Real bug report: a
+  // full session logged, one custom exercise added, refreshed - the
+  // entire day (weights, reps, checkmarks) came back blank.
   const defaultNames = (WEEKLY_PLAN_DATA[day] || []).map(ex => ex.name);
-  const savedNames = (savedDay.exercises || []).map(ex => ex.name);
+  const savedPrescribedNames = (savedDay.exercises || []).filter(ex => !ex.custom).map(ex => ex.name);
   const sortedEq = (a, b) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
-  const planChanged = !sortedEq(savedNames, defaultNames);
+  const planChanged = !sortedEq(savedPrescribedNames, defaultNames);
 
   if (planChanged) {
     const checkItems = panel.querySelectorAll('.check-item');
