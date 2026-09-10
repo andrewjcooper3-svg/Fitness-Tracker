@@ -16318,28 +16318,37 @@ function restoreDay(day, savedDay) {
   // reconciled - the freshly rendered defaults (already carrying whatever
   // progression the plan edit intended) stand as they are.
   //
-  // Compared as a SET, not a strict left-to-right sequence: a card can be
-  // dragged to a new position within the day (see the reorder handling
-  // below) without that being a plan change at all - the exact same
-  // exercises, just reshuffled. Comparing position-by-position treated
-  // every reorder as a permanent, unrecoverable "plan changed" - every
-  // future save/reload skipped restoring sets, weights, and checkmarks
-  // entirely, forever, once a single drag had happened.
-  //
-  // Only the PRESCRIBED exercises (custom: false) are compared - a
-  // "+ Add Exercise" card was never part of WEEKLY_PLAN_DATA[day] to
-  // begin with, so its presence has nothing to do with whether the
-  // template changed. Comparing the full list including customs meant
-  // adding even one extra exercise permanently changed the saved
-  // count vs. the template's count - every future load treated the
-  // whole day as "plan changed" and discarded ALL of it, prescribed
-  // exercises included, not just the custom one. Real bug report: a
-  // full session logged, one custom exercise added, refreshed - the
-  // entire day (weights, reps, checkmarks) came back blank.
+  // Checked per exercise, by what its OWN id says the current template
+  // has at that position - not by whether the saved list's overall shape
+  // (length, or even just the set of names) matches the template's.
+  // Three earlier, narrower fixes each failed on a different legitimate
+  // user action before landing on this: reordering a card (drag handle)
+  // changes the saved array's order but not any id, so it's unaffected
+  // by an id-position check; adding a custom "+ Add Exercise" was never
+  // part of the template to begin with (excluded below by `!ex.custom`);
+  // DELETING a prescribed exercise you don't want to do today removes it
+  // from the saved array entirely, but every exercise that's STILL there
+  // keeps its original id and still correctly names the template's
+  // exercise at that id's position. A pure "is every saved name present
+  // somewhere in the template" check (the second fix) missed a sneakier
+  // case: a genuinely stale one-exercise snapshot from a day that used
+  // to be a single Pushups day can coincidentally name-match SOME
+  // exercise elsewhere in the current, much longer template, even though
+  // id 'ex0' now means a completely different exercise there - exactly
+  // the positional drift this whole guard exists to catch. Checking each
+  // id against its own template slot catches that while still allowing
+  // every legitimate action above.
   const defaultNames = (WEEKLY_PLAN_DATA[day] || []).map(ex => ex.name);
-  const savedPrescribedNames = (savedDay.exercises || []).filter(ex => !ex.custom).map(ex => ex.name);
-  const sortedEq = (a, b) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
-  const planChanged = !sortedEq(savedPrescribedNames, defaultNames);
+  const savedPrescribed = (savedDay.exercises || []).filter(ex => !ex.custom);
+  const exIdIndex_ = id => { const m = /^ex(\d+)$/.exec(id || ''); return m ? parseInt(m[1], 10) : -1; };
+  const planChanged = savedPrescribed.some((ex, arrayIdx) => {
+    // Legacy saved data predating ids has no id to check by - fall back
+    // to its position within the (custom-excluded) saved array, the same
+    // positional assumption the id-less restore path below already makes.
+    const i = exIdIndex_(ex.id);
+    const slot = i >= 0 ? i : arrayIdx;
+    return slot >= defaultNames.length || defaultNames[slot] !== ex.name;
+  });
 
   if (planChanged) {
     const checkItems = panel.querySelectorAll('.check-item');
