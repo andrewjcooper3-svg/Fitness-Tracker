@@ -15728,6 +15728,8 @@ function closeBodyHealthDetailModal(event) {
 
 let isRestoringState = false;
 let calendarLoadedOnce = false;
+// Set once, at boot, before restoreState() runs - see that call site for why.
+let bootLocalSavedAt_ = null;
 
 // Baked-in default so the tracker works out of the box (e.g. a Home
 // Screen icon, whose storage doesn't share with regular Safari tabs)
@@ -15840,7 +15842,11 @@ function serializeDay(day) {
 
 function saveState() {
   if (isRestoringState) return;
-  const state = { week: getWeekLabel(), days: {} };
+  // Stamped on every save (so on every keystroke, effectively) - lets
+  // fetchAndApplyRemoteDraft tell whether the cloud's copy actually has
+  // anything newer before overwriting what's on screen with it. See that
+  // function for why this matters.
+  const state = { week: getWeekLabel(), savedAt: new Date().toISOString(), days: {} };
   dayKeys.forEach(day => { state.days[day] = serializeDay(day); });
   localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
   updatePushupLedger();
@@ -15906,6 +15912,32 @@ document.addEventListener('visibilitychange', () => {
 // picks up mid-week edits rather than only whatever this exact device
 // last saved locally. Silently gives up if offline or unconfigured; the
 // already-restored local state stands as-is in that case.
+//
+// Real bug this guards against: saveState() writes to localStorage
+// immediately, but the matching push to the cloud (syncDraftToCloud) is
+// debounced 1.5s and still needs a network round trip. Refresh in that
+// window - a very normal thing to do mid-workout - and this function
+// used to fetch whatever the cloud's last-synced (now stale) draft was
+// and unconditionally overwrite every input with it via restoreDay,
+// discarding the edit that just hadn't finished syncing yet. It looked
+// like "refreshing wipes my inputs," repeatably, since every save
+// re-triggers the same debounce window. Comparing savedAt timestamps -
+// the server's own stamp of when it last received a draft, against this
+// device's own last local save - before applying anything closes that
+// race: the cloud only wins when it genuinely has something newer (the
+// real cross-device case this function exists for), never when it's
+// simply behind on syncing this device's own most recent edit.
+//
+// Compares against bootLocalSavedAt_ (captured before restoreState() ran,
+// at the very top of boot) rather than re-reading localStorage here -
+// restoreState() itself calls saveState() the instant there is no saved
+// state yet for this week, which stamps a brand new savedAt on what is
+// otherwise an empty, just-initialized placeholder. Comparing against
+// THAT would make a device opening the tracker for the first time this
+// week look "newer" than any real remote draft (which, having been saved
+// in a past session, necessarily has an older timestamp) and skip
+// applying it - silently breaking cross-device sync for exactly the
+// device that most needs it.
 async function fetchAndApplyRemoteDraft() {
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
@@ -15914,10 +15946,30 @@ async function fetchAndApplyRemoteDraft() {
     const data = await res.json();
     if (data.status !== 'success' || !data.draft || data.draft.week !== getWeekLabel()) return;
 
-    if (needsDayTemplateMigration20260727) stripStaleDayTemplateExercises_(data.draft.days);
-    if (needsDayTemplateMigration20260824) stripStaleWednesday20260824_(data.draft.days);
-    if (needsDayTemplateMigration20260831) stripStaleGymScheduleMove20260831_(data.draft.days);
+    if (bootLocalSavedAt_ && data.draft.savedAt && data.draft.savedAt <= bootLocalSavedAt_) {
+      // The cloud's copy is not actually newer than what this device
+      // already had before this page load (most likely: this device's
+      // own edit just hasn't finished its debounced push yet) - nothing
+      // to apply.
+      return;
+    }
 
+    // Deliberately NOT calling the one-time stripStale*_ migration
+    // helpers here (unlike the local-state migration functions below,
+    // which do). Those needsDayTemplateMigrationYYYYMMDD_ flags answer
+    // "has THIS DEVICE seen this migration before," which has nothing to
+    // do with whether the REMOTE draft is actually stale - a device with
+    // fresh/cleared localStorage (private browsing, a new browser
+    // profile, a phone that clears site data) looks like it needs every
+    // migration, so this used to unconditionally strip the remote draft's
+    // Wednesday (or Monday/Tuesday/Thursday, depending which migration)
+    // exercises before restoreDay ever got to see them - destroying a
+    // perfectly current, valid cross-device draft, every single time
+    // that device loaded the page. restoreDay's own plan-changed guard
+    // (comparing the saved exercise names against the CURRENT plan)
+    // already protects against a genuinely stale remote draft, based on
+    // the draft's actual content rather than this device's own migration
+    // history - so nothing further is needed here.
     isRestoringState = true;
     dayKeys.forEach(day => restoreDay(day, data.draft.days[day]));
     isRestoringState = false;
@@ -22830,6 +22882,22 @@ forceYearCarryResetJul27();
 migrateStaleDayTemplates20260727();
 migrateStaleDayTemplates20260824();
 migrateStaleDayTemplates20260831();
+// Captured BEFORE restoreState() runs, not read fresh inside
+// fetchAndApplyRemoteDraft() later - restoreState() itself calls
+// saveState() (stamping a brand new savedAt) the moment there is no
+// saved state yet for this week, which would otherwise make an empty,
+// just-initialized local placeholder look "newer" than any real remote
+// draft (which, having been saved in a past session, necessarily carries
+// an older timestamp) purely because of when its bookkeeping timestamp
+// happens to be written - silently breaking "pull my data onto a device
+// that's opening the tracker for the first time this week." See
+// fetchAndApplyRemoteDraft for how this is actually used.
+bootLocalSavedAt_ = (() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null');
+    return (raw && raw.week === getWeekLabel() && raw.savedAt) || null;
+  } catch (e) { return null; }
+})();
 restoreState();
 weekLabelAtLoad_ = getWeekLabel();
 document.addEventListener('visibilitychange', () => {
