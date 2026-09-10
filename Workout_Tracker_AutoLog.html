@@ -16265,10 +16265,18 @@ function restoreDay(day, savedDay) {
   // snapshot predates a plan change and is skipped entirely rather than
   // reconciled - the freshly rendered defaults (already carrying whatever
   // progression the plan edit intended) stand as they are.
+  //
+  // Compared as a SET, not a strict left-to-right sequence: a card can be
+  // dragged to a new position within the day (see the reorder handling
+  // below) without that being a plan change at all - the exact same
+  // exercises, just reshuffled. Comparing position-by-position treated
+  // every reorder as a permanent, unrecoverable "plan changed" - every
+  // future save/reload skipped restoring sets, weights, and checkmarks
+  // entirely, forever, once a single drag had happened.
   const defaultNames = (WEEKLY_PLAN_DATA[day] || []).map(ex => ex.name);
   const savedNames = (savedDay.exercises || []).map(ex => ex.name);
-  const planChanged = savedNames.length !== defaultNames.length ||
-    savedNames.some((n, i) => n !== defaultNames[i]);
+  const sortedEq = (a, b) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
+  const planChanged = !sortedEq(savedNames, defaultNames);
 
   if (planChanged) {
     const checkItems = panel.querySelectorAll('.check-item');
