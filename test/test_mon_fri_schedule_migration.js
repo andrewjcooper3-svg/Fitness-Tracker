@@ -98,6 +98,80 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
 
   check('no page errors across the whole flow', errors.length === 0, errors.join(' | '));
   await browser.close();
+
+  // Second browser: the actual reported follow-up. The local migration
+  // above heals localStorage, but fetchAndApplyRemoteDraft() pulls a
+  // SEPARATE cloud copy straight past it - if that copy was synced
+  // (from an earlier reload, before this fix shipped) with a savedAt
+  // newer than this boot's local snapshot, it wins the race and
+  // re-wipes Monday again, moments after the local fix just applied.
+  // This is a brand-new context (no prior localStorage), isolating it
+  // from everything above.
+  console.log('\n=== The remote-draft path: a still-stale, newer cloud copy must not re-wipe Monday right after the local fix ===');
+  {
+    const browser2 = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+    const page2 = await browser2.newPage({ viewport: { width: 390, height: 950 } });
+    const errors2 = [];
+    page2.on('pageerror', e => errors2.push(String(e)));
+
+    const primer = await browser2.newContext();
+    const primerPage = await primer.newPage();
+    await primerPage.route('https://script.google.com/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' }));
+    await primerPage.goto(URL);
+    await primerPage.waitForFunction(() => typeof getWeekLabel === 'function', null, { timeout: 15000 });
+    const weekLabel = await primerPage.evaluate(() => getWeekLabel());
+    await primer.close();
+
+    await page2.route('https://script.google.com/**', (route) => {
+      if (route.request().url().includes('action=loadDraft')) {
+        route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'success',
+            draft: {
+              week: weekLabel,
+              // Deliberately far in the future - guarantees it reads as
+              // newer than whatever local savedAt this boot captures,
+              // exactly the race window that let a stale cloud copy win.
+              savedAt: new Date(Date.now() + 60000).toISOString(),
+              days: {
+                mon: { exercises: [], checkItems: [], dayNotes: '' } // the same stale, pre-fix shape
+              }
+            }
+          })
+        });
+      } else {
+        route.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"success"}' });
+      }
+    });
+
+    await page2.goto(URL);
+    await page2.waitForFunction(() => typeof showAppView === 'function', null, { timeout: 15000 });
+    await page2.evaluate((wk) => {
+      localStorage.setItem('WORKOUT_TRACKER_STATE', JSON.stringify({
+        week: wk,
+        days: { mon: { exercises: [], checkItems: [], dayNotes: '' } }
+      }));
+      localStorage.setItem('WORKOUT_DAY_TEMPLATE_MIGRATED_20260727', '1');
+      localStorage.setItem('WORKOUT_DAY_TEMPLATE_MIGRATED_20260824', '1');
+      localStorage.setItem('WORKOUT_DAY_TEMPLATE_MIGRATED_20260831', '1');
+      localStorage.removeItem('WORKOUT_DAY_TEMPLATE_MIGRATED_20260914');
+    }, weekLabel);
+
+    await page2.reload();
+    await page2.waitForFunction(() => typeof showAppView === 'function', null, { timeout: 15000 });
+    // Long enough for both the local migration/restore AND the async
+    // fetchAndApplyRemoteDraft() round trip to finish.
+    await page2.waitForTimeout(2500);
+
+    const monCardsAfterRemote = await page2.evaluate(() =>
+      [...document.querySelectorAll('#day-mon .exercise-card .exercise-name')].map(e => e.textContent));
+    check('Monday still shows all 11 cards after a stale-but-newer remote draft is fetched',
+      monCardsAfterRemote.length === 11 && monCardsAfterRemote[0] === 'Leg Press', monCardsAfterRemote.join(', '));
+    check('no page errors', errors2.length === 0, errors2.join(' | '));
+    await browser2.close();
+  }
+
   console.log(fails === 0 ? '\nALL PASS' : `\n${fails} FAILURES`);
   process.exit(fails ? 1 : 0);
 })();

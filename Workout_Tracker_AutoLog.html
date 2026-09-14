@@ -16093,6 +16093,31 @@ async function fetchAndApplyRemoteDraft() {
     // already protects against a genuinely stale remote draft, based on
     // the draft's actual content rather than this device's own migration
     // history - so nothing further is needed here.
+    //
+    // ONE narrow, content-based exception: Monday's own history makes an
+    // empty saved exercises array structurally indistinguishable from a
+    // real "user deleted everything" (see stripStaleGymScheduleMove
+    // 20260914_'s comment) - restoreDay can't safely resolve that from
+    // content alone, so it has to fall on the side of clearing it. The
+    // one-time local migration below handles this device's own
+    // localStorage, but this fetch pulls a SEPARATE, independently-
+    // stamped cloud copy straight past it - if that copy was synced
+    // before the device that wrote it had the fix (very likely right
+    // after this shipped: any reload in the preceding hours would have
+    // re-saved Monday's pre-fix empty state and pushed it to the cloud
+    // with a fresh timestamp), it would win the savedAt comparison above
+    // and re-wipe Monday again on this very page load, moments after the
+    // local migration just fixed it. Unlike the flag-based helpers above,
+    // this check is purely about the fetched draft's own content - once
+    // Monday's cloud copy genuinely holds real exercises (any device has
+    // saved for real since getting the fix), length is no longer 0 and
+    // this stops applying on its own; it does not depend on, or get
+    // confused by, this device's migration history.
+    if (data.draft.days.mon && Array.isArray(data.draft.days.mon.exercises) &&
+        data.draft.days.mon.exercises.length === 0) {
+      delete data.draft.days.mon.exercises;
+    }
+
     isRestoringState = true;
     dayKeys.forEach(day => restoreDay(day, data.draft.days[day]));
     isRestoringState = false;
