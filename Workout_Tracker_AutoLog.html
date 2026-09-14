@@ -16709,10 +16709,47 @@ function savedDayHasWork_(savedDay) {
     (ex.sets || []).some(s => s.checked));
 }
 
+// Same "checked sets only, typed reps else the target" rule sumReps()
+// uses on the live DOM, replayed against a SAVED day snapshot instead -
+// see archiveFinishedWeek_ for why the live version can't be used here.
+function pushupTotalFromSavedDay_(savedDay) {
+  let total = 0;
+  (savedDay && savedDay.exercises || []).forEach(ex => {
+    if ((ex.name || '').toLowerCase() !== 'pushups') return;
+    (ex.sets || []).forEach(s => {
+      if (!s.checked) return;
+      const typed = parseFloat(s.reps);
+      if (!isNaN(typed)) { total += typed; return; }
+      const target = parseFloat(s.targetReps);
+      if (!isNaN(target)) total += target;
+    });
+  });
+  return total;
+}
+
 function archiveFinishedWeek_(saved) {
   const week = saved.week;
   if (!week) return;
   let queued = 0;
+
+  // updatePushupLedger() only ever reads the live, currently-rendered
+  // DOM - by the time this runs, renderWeeklyPlan_() has already built
+  // the NEW week's (empty) cards, so it can no longer see anything from
+  // the week that just ended. Without doing it here, directly from this
+  // saved snapshot, a day's pushups would reach the Sheet correctly (via
+  // queuePendingLog below) but silently vanish from the app's own
+  // ledger - and with it, anything built from that ledger: today's/this
+  // week's ring, the History chart. Written for all 7 days (not just the
+  // ones queued to the Sheet below), since a day can have real pushups
+  // recorded even if nothing else on it was checked off.
+  const oldMonday = new Date(getWeekMonday().getTime() - 7 * ROUTINES_DAY_MS);
+  const pushupLedger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  dayKeys.forEach((day, i) => {
+    const dateObj = new Date(oldMonday.getTime() + i * ROUTINES_DAY_MS);
+    pushupLedger[dateKey(dateObj)] = pushupTotalFromSavedDay_((saved.days || {})[day]);
+  });
+  localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(pushupLedger));
+
   dayKeys.forEach(day => {
     const savedDay = (saved.days || {})[day];
     if (!savedDayHasWork_(savedDay)) return;
