@@ -16200,6 +16200,39 @@ function migrateStaleDayTemplates20260831() {
   }
 }
 
+/* Same problem a fourth time for the Sep 14 gym-schedule move (Friday's
+   full gym content swapped onto Monday; Friday drops to a fixed rest
+   day, like Sunday - the exact reverse of Monday's old role). This one
+   is sharper than the earlier three: Monday goes from NO template at
+   all to an 11-card one, and restoreDay's deletedEverything branch
+   cannot tell "this day never had exercises" apart from "the user just
+   deleted every exercise on it" - both look identical as a saved
+   exercises: [] (every rest day serializes to exactly that, via
+   serializeDay() mapping zero .exercise-card elements). Left alone,
+   Monday's saved [] would be read as a deliberate delete-everything and
+   prune the fresh 11-card template straight back down to zero - which
+   is exactly the bug reported ("I don't see a Monday workout"). Friday
+   is comparatively safe already (its now-empty template makes
+   restoreDay's planChanged guard trip and bail out before touching any
+   cards), but stripped anyway for consistency with the other three
+   migrations and in case a custom exercise was ever added to the old
+   Friday session. */
+const DAY_TEMPLATE_MIGRATION_20260914_KEY = 'WORKOUT_DAY_TEMPLATE_MIGRATED_20260914';
+let needsDayTemplateMigration20260914 = false;
+function stripStaleGymScheduleMove20260914_(days) {
+  ['mon', 'fri'].forEach(day => { if (days && days[day]) delete days[day].exercises; });
+}
+function migrateStaleDayTemplates20260914() {
+  if (localStorage.getItem(DAY_TEMPLATE_MIGRATION_20260914_KEY)) return;
+  needsDayTemplateMigration20260914 = true;
+  localStorage.setItem(DAY_TEMPLATE_MIGRATION_20260914_KEY, '1');
+  const state = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null');
+  if (state && state.days) {
+    stripStaleGymScheduleMove20260914_(state.days);
+    localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
+  }
+}
+
 // Unlike WORKOUT_TRACKER_STATE (which resets every new week), this ledger
 // accumulates indefinitely - it's the only thing that lets the Pushups tab
 // show week/month/year/deficit totals that span past week resets.
@@ -17309,7 +17342,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-08-27-cardio-effort';
+const APP_BUILD_VERSION = '2026-09-14-mon-wed-schedule';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -23062,6 +23095,7 @@ forceYearCarryResetJul27();
 migrateStaleDayTemplates20260727();
 migrateStaleDayTemplates20260824();
 migrateStaleDayTemplates20260831();
+migrateStaleDayTemplates20260914();
 // Captured BEFORE restoreState() runs, not read fresh inside
 // fetchAndApplyRemoteDraft() later - restoreState() itself calls
 // saveState() (stamping a brand new savedAt) the moment there is no
