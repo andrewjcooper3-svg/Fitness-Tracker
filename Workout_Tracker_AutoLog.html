@@ -141,7 +141,14 @@
      still reads as its own line: flex-basis:100% forces it onto a
      second flex line, and the 12px row-gap reproduces exactly the gap
      .day-header's margin-bottom used to give it. */
-  .day-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; column-gap: 10px; row-gap: 12px; margin-bottom: 12px; }
+  /* Hidden - the day name/type/Today status this used to show is now the
+     day picker's job, and duplicating it here just repeats it. Left in
+     the DOM (not removed) rather than display:none'd out of existence:
+     wpEstMinutesForDay_() still reads the "Est. time" text out of the
+     .alert span for the week-plan calendar's duration estimate, and the
+     day picker's own dot/type-label logic reads .day-badge - both need
+     this markup to keep existing even though nothing here is shown. */
+  .day-header { display: none; }
   .day-header > .alert { flex: 0 0 100%; min-width: 0; }
   .day-title { font-family: var(--font); font-size: 22px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.1; }
   .day-badge { font-family: var(--font); font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 10px; white-space: nowrap; }
