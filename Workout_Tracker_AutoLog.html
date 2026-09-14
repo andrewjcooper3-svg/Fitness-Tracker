@@ -100,29 +100,41 @@
   .config-status.ok { color: var(--green); }
   .config-status.warn { color: var(--red); }
 
-  .day-tabs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 14px; background: var(--surface); border-radius: 14px; padding: 4px; }
-  .day-tab { background: transparent; border-radius: 11px; padding: 8px 3px; text-align: center; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
-  .day-tab.gym.active { background: rgba(217, 164, 65, 0.16); }
-  .day-tab.home.active { background: rgba(124, 154, 94, 0.16); }
-  .day-tab.travel.active { background: rgba(91, 154, 148, 0.16); }
-  .day-tab.rest.active { background: rgba(156, 107, 122, 0.16); }
-  .tab-lbl { font-family: var(--font); font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; color: var(--muted); }
-  .day-tab.gym .tab-lbl { color: var(--amber); }
-  .day-tab.home .tab-lbl { color: var(--green); }
-  .day-tab.travel .tab-lbl { color: var(--teal); }
-  .day-tab.rest .tab-lbl { color: var(--purple); }
-  .tab-dot { width: 6px; height: 6px; border-radius: 50%; margin: 0 auto 3px; background: var(--muted); }
-  .day-tab.gym .tab-dot { background: var(--amber); }
-  .day-tab.home .tab-dot { background: var(--green); }
-  .day-tab.travel .tab-dot { background: var(--teal); }
-  .day-tab.rest .tab-dot { background: var(--purple); }
-  .tab-type { font-size: 9px; font-weight: 500; line-height: 1.2; color: var(--muted); }
-  .day-tab.gym .tab-type { color: var(--amber); }
-  .day-tab.home .tab-type { color: var(--green); }
-  .day-tab.travel .tab-type { color: var(--teal); }
-  .day-tab.rest .tab-type { color: var(--purple); }
+  /* Day picker: a single collapsed row showing only the active day,
+     replacing the old always-visible 7-button day-tabs grid. Reuses the
+     gym/home/travel/rest color semantics the day-tab dots and badges
+     already used app-wide. */
+  .day-picker-btn { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .day-picker-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .day-picker-dot.gym { background: var(--amber); }
+  .day-picker-dot.home { background: var(--green); }
+  .day-picker-dot.travel { background: var(--teal); }
+  .day-picker-dot.rest { background: var(--purple); }
+  .day-picker-name { font-family: var(--font); font-size: 16px; font-weight: 700; flex: 1; min-width: 0; }
+  .day-picker-type { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .day-picker-today { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--accent); background: rgba(61, 111, 224, 0.14); border-radius: 6px; padding: 3px 6px; white-space: nowrap; }
+  .day-picker-chevron { color: var(--muted); font-size: 11px; flex-shrink: 0; transition: transform 0.15s; }
+  .day-picker-btn.open .day-picker-chevron { transform: rotate(180deg); }
+  .day-picker-list { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.14); padding: 6px; margin: -8px 0 14px; }
+  .day-picker-opt { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; }
+  .day-picker-opt:hover { background: var(--surface2); }
+  .day-picker-opt.current { background: var(--surface2); }
+  .day-picker-opt-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: var(--muted); }
+  .day-picker-opt-dot.gym { background: var(--amber); }
+  .day-picker-opt-dot.home { background: var(--green); }
+  .day-picker-opt-dot.travel { background: var(--teal); }
+  .day-picker-opt-dot.rest { background: var(--purple); }
+  .day-picker-opt-name { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; }
+  .day-picker-opt-today { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--accent); }
+  .day-picker-opt-type { font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
   .day-panel { display: none; }
   .day-panel.active { display: block; }
+  /* Trainer sub-tabs: Workout (day picker + day panels) and Pushups
+     (deficit/rings/stats). Defaults to Workout showing, Pushups hidden -
+     JS flips these via classes on #view-tracker as soon as it runs, but
+     this is the state before that JS runs too. */
+  #view-tracker.trainer-sub-pushups > .tracker-main-col { display: none; }
+  #view-tracker:not(.trainer-sub-pushups) > .tracker-side-rail { display: none; }
   /* The day's "Est. time / Focus" note (.alert) is a child of this row
      rather than a block below it, so the landscape tier can pull it up
      onto the same line as the title and the GYM/REST badge. Here it
@@ -1979,6 +1991,14 @@
     #view-tracker > .tracker-main-col { grid-column: 1; grid-row: 2; }
     #view-tracker > .tracker-side-rail { grid-column: 2; grid-row: 2; position: sticky; top: 24px; display: flex; flex-direction: column; }
 
+    /* Workout/Pushups are now sub-tabs rather than a permanent
+       side-by-side split - only one of .tracker-main-col /
+       .tracker-side-rail is ever visible, so whichever one is active
+       takes the full grid width instead of leaving the other's column
+       an empty gap. */
+    #view-tracker.trainer-sub-workout > .tracker-main-col { grid-column: 1 / -1; }
+    #view-tracker.trainer-sub-pushups > .tracker-side-rail { grid-column: 1 / -1; position: static; }
+
     /* Overview: the glance-tile grid widens from 2 columns to 3 so more of
        it fits without scrolling. The hero cards span every column of that
        same grid (see .ov-blocks above) rather than sitting side by side -
@@ -2914,12 +2934,16 @@
 
 </div>
 
-<div id="view-tracker" class="app-view">
+<div id="view-tracker" class="app-view trainer-sub-workout">
 
 <!-- No title or tagline - the tab bar says Trainer. The week label stays:
      it is live, and it is what tells you which week you are logging into. -->
 <div class="header">
   <div class="header-week" id="weekLabel"></div>
+  <div class="rt-seg" id="trainerSubSeg">
+    <button data-sub="workout" class="active" onclick="setTrainerSubTab('workout')">Workout</button>
+    <button data-sub="pushups" onclick="setTrainerSubTab('pushups')">Pushups</button>
+  </div>
 </div>
 
 <!-- Pushup deficit tracking - moved here from its own top-level tab,
@@ -2991,15 +3015,14 @@
      its own outside the desktop media query, so portrait/landscape
      flow is unaffected. -->
 <div class="tracker-main-col">
-<div class="day-tabs">
-  <div class="day-tab gym active" onclick="showDay('mon')"><div class="tab-lbl">Mon</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
-  <div class="day-tab home" onclick="showDay('tue')"><div class="tab-lbl">Tue</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
-  <div class="day-tab gym" onclick="showDay('wed')"><div class="tab-lbl">Wed</div><div class="tab-dot"></div><div class="tab-type">Gym</div></div>
-  <div class="day-tab home" onclick="showDay('thu')"><div class="tab-lbl">Thu</div><div class="tab-dot"></div><div class="tab-type">PU</div></div>
-  <div class="day-tab rest" onclick="showDay('fri')"><div class="tab-lbl">Fri</div><div class="tab-dot"></div><div class="tab-type">Rest</div></div>
-  <div class="day-tab travel" onclick="showDay('sat')"><div class="tab-lbl">Sat</div><div class="tab-dot"></div><div class="tab-type">Mob</div></div>
-  <div class="day-tab rest" onclick="showDay('sun')"><div class="tab-lbl">Sun</div><div class="tab-dot"></div><div class="tab-type">Rest</div></div>
+<div class="day-picker-btn" id="dayPickerBtn" onclick="toggleDayPicker()">
+  <div class="day-picker-dot" id="dayPickerDot"></div>
+  <div class="day-picker-name" id="dayPickerName">&nbsp;</div>
+  <div class="day-picker-type" id="dayPickerType"></div>
+  <div class="day-picker-today" id="dayPickerTodayBadge" style="display:none;">Today</div>
+  <div class="day-picker-chevron">▾</div>
 </div>
+<div class="day-picker-list" id="dayPickerList" style="display:none;"></div>
 
 <!-- MONDAY -->
 <div id="day-mon" class="day-panel active" data-pushup-target="165">
@@ -21816,10 +21839,86 @@ function closeDjRecentModal(event) {
 
 function showDay(day) {
   document.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('day-' + day).classList.add('active');
-  document.querySelectorAll('.day-tab')[dayKeys.indexOf(day)].classList.add('active');
+  updateDayPickerButton(day);
 }
+
+function setTrainerSubTab(tab) {
+  document.querySelectorAll('#trainerSubSeg button').forEach(b => b.classList.toggle('active', b.dataset.sub === tab));
+  const vt = document.getElementById('view-tracker');
+  vt.classList.toggle('trainer-sub-workout', tab === 'workout');
+  vt.classList.toggle('trainer-sub-pushups', tab === 'pushups');
+}
+
+const DAY_FULL_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+const DAY_BADGE_CLASS_MAP = { 'badge-gym': 'gym', 'badge-home': 'home', 'badge-travel': 'travel', 'badge-rest': 'rest' };
+
+// Reads the day's type straight off its own .day-badge (the same element
+// a schedule swap already edits by hand) instead of a second, separate
+// table - so the picker can never drift out of sync with the day panel
+// the way the old hardcoded day-tabs row used to.
+function dayPickerInfo_(day) {
+  const badge = document.querySelector('#day-' + day + ' .day-badge');
+  let typeClass = 'rest', typeLabel = '';
+  if (badge) {
+    const cls = Array.from(badge.classList).find(c => DAY_BADGE_CLASS_MAP[c]);
+    if (cls) typeClass = DAY_BADGE_CLASS_MAP[cls];
+    typeLabel = badge.textContent.trim().replace(/^\S+\s+/, '');
+    typeLabel = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1).toLowerCase();
+  }
+  return { name: DAY_FULL_NAMES[day], typeClass, typeLabel };
+}
+
+function updateDayPickerButton(day) {
+  const info = dayPickerInfo_(day);
+  const todayKey = dayKeys[(new Date().getDay() + 6) % 7];
+  document.getElementById('dayPickerDot').className = 'day-picker-dot ' + info.typeClass;
+  document.getElementById('dayPickerName').textContent = info.name;
+  document.getElementById('dayPickerType').textContent = info.typeLabel;
+  document.getElementById('dayPickerTodayBadge').style.display = (day === todayKey) ? '' : 'none';
+}
+
+function renderDayPicker_() {
+  const list = document.getElementById('dayPickerList');
+  const activeDay = dayKeys.find(d => document.getElementById('day-' + d).classList.contains('active')) || dayKeys[0];
+  const todayKey = dayKeys[(new Date().getDay() + 6) % 7];
+  list.innerHTML = dayKeys.map(day => {
+    const info = dayPickerInfo_(day);
+    const isToday = day === todayKey;
+    const isCurrent = day === activeDay;
+    return '<div class="day-picker-opt' + (isCurrent ? ' current' : '') + '" onclick="selectDay(\'' + day + '\')">' +
+      '<div class="day-picker-opt-dot ' + info.typeClass + '"></div>' +
+      '<div class="day-picker-opt-name">' + info.name + (isToday ? ' <span class="day-picker-opt-today">&middot; Today</span>' : '') + '</div>' +
+      '<div class="day-picker-opt-type">' + info.typeLabel + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleDayPicker() {
+  const list = document.getElementById('dayPickerList');
+  const btn = document.getElementById('dayPickerBtn');
+  const opening = list.style.display === 'none';
+  if (opening) renderDayPicker_();
+  list.style.display = opening ? '' : 'none';
+  btn.classList.toggle('open', opening);
+}
+
+function closeDayPicker() {
+  document.getElementById('dayPickerList').style.display = 'none';
+  document.getElementById('dayPickerBtn').classList.remove('open');
+}
+
+function selectDay(day) {
+  showDay(day);
+  closeDayPicker();
+}
+
+document.addEventListener('click', (e) => {
+  const list = document.getElementById('dayPickerList');
+  if (!list || list.style.display === 'none') return;
+  if (e.target.closest('#dayPickerBtn, #dayPickerList')) return;
+  closeDayPicker();
+});
 
 function toggleExercise(header) {
   // Looked up by class rather than assumed to be the very next sibling -
@@ -22957,7 +23056,7 @@ window.addEventListener('online', flushPendingLogs);
       // consistently won (it calls preventDefault() and moves the whole
       // tab), making it look like swipe-to-delete barely worked at all.
       const blocked = startTarget && startTarget.closest &&
-        startTarget.closest('input, textarea, button, .set-checkbox, .checkbox, .exercise-header, .day-tab, .app-tabs, .stats-chart, .set-row, .exercise-card');
+        startTarget.closest('input, textarea, button, .set-checkbox, .checkbox, .exercise-header, .day-picker-btn, .day-picker-list, .app-tabs, .stats-chart, .set-row, .exercise-card');
       const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.4;
       dragging = !blocked && isHorizontal;
       if (dragging) track.style.transition = 'none';
@@ -23181,6 +23280,8 @@ document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
 loadCalendarWorkerUrl();
 flushPendingLogs();
+setTrainerSubTab('workout');
+showDay(dayKeys[(new Date().getDay() + 6) % 7]);
 renderTrainerStats();
 renderStarter();
 // The starter's status is a clock, so it goes stale just sitting there.
