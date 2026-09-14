@@ -256,6 +256,12 @@
   .item-meta { font-family: var(--font); font-size: 13px; color: var(--muted); margin-top: 1px; }
   .summary-btn { background: var(--accent); border: none; color: var(--text); padding: 13px 14px; border-radius: 14px; cursor: pointer; font-family: var(--font); font-size: 15px; font-weight: 600; margin-top: 12px; width: 100%; transition: opacity 0.15s; }
   .summary-btn:hover, .summary-btn:active { opacity: 0.88; }
+  /* Generate button sits inline next to the Day Notes box instead of its
+     own full-width row below the exercise list, per the Trainer Layout
+     Design canvas. */
+  .day-notes-row { display: flex; align-items: stretch; gap: 10px; margin-bottom: 4px; }
+  .day-notes-row .day-notes-input { flex: 1; margin-bottom: 0; }
+  .day-notes-row .summary-btn { width: 120px; flex-shrink: 0; margin-top: 0; padding: 13px 8px; display: flex; align-items: center; justify-content: center; text-align: center; }
   .summary-output { background: var(--surface2); border-radius: 14px; padding: 14px; margin-top: 10px; font-family: 'SF Mono', Menlo, monospace; font-size: 12px; color: var(--text); white-space: pre-wrap; word-break: break-all; display: none; }
   .copy-btn { background: var(--surface); border: none; color: var(--text); padding: 10px 12px; border-radius: 12px; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600; margin-top: 8px; width: 100%; transition: all 0.15s; display: none; }
   .copy-btn:hover, .copy-btn:active { background: var(--surface2); }
@@ -3048,10 +3054,13 @@
   <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Back + Arms. Left arm emphasis. Lifting moved here from Friday.</span></div></div>
 
   <div class="section-label">Day Notes</div>
-  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+  <div class="day-notes-row">
+    <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+    <button class="summary-btn" onclick="generateSummary('mon')">📋 Generate</button>
+  </div>
 
   <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('mon')">Collapse All</button></div>
-  <button class="summary-btn" onclick="generateSummary('mon')">📋 Generate Session Summary</button>
+  <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="mon-summary"></div>
   <button class="copy-btn" id="mon-copy" onclick="copySummary('mon')">📎 Copy to Clipboard</button>
   <div class="log-status" id="mon-log-status"></div>
@@ -3063,10 +3072,13 @@
   <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Arms + Core.</span></div></div>
 
   <div class="section-label">Day Notes</div>
-  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+  <div class="day-notes-row">
+    <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+    <button class="summary-btn" onclick="generateSummary('tue')">📋 Generate</button>
+  </div>
 
   <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('tue')">Collapse All</button></div>
-  <button class="summary-btn" onclick="generateSummary('tue')">📋 Generate Session Summary</button>
+  <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="tue-summary"></div>
   <button class="copy-btn" id="tue-copy" onclick="copySummary('tue')">📎 Copy to Clipboard</button>
   <div class="log-status" id="tue-log-status"></div>
@@ -3077,10 +3089,13 @@
   <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Gym moved to Tue/Thu this week (Sat is recovery). Pushups at 165/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
-  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+  <div class="day-notes-row">
+    <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+    <button class="summary-btn" onclick="generateSummary('wed')">📋 Generate</button>
+  </div>
 
   <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('wed')">Collapse All</button></div>
-  <button class="summary-btn" onclick="generateSummary('wed')">📋 Session Summary</button>
+  <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="wed-summary"></div>
   <button class="copy-btn" id="wed-copy" onclick="copySummary('wed')">📎 Copy to Clipboard</button>
   <div class="log-status" id="wed-log-status"></div>
@@ -3091,10 +3106,13 @@
   <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 45-50 min. Focus: Legs + Back + Chest. Left arm emphasis. Progressing lifts that were completed clean last week; holding anything marked tough.</span></div></div>
 
   <div class="section-label">Day Notes</div>
-  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+  <div class="day-notes-row">
+    <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+    <button class="summary-btn" onclick="generateSummary('thu')">📋 Generate</button>
+  </div>
 
   <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('thu')">Collapse All</button></div>
-  <button class="summary-btn" onclick="generateSummary('thu')">📋 Session Summary</button>
+  <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="thu-summary"></div>
   <button class="copy-btn" id="thu-copy" onclick="copySummary('thu')">📎 Copy to Clipboard</button>
   <div class="log-status" id="thu-log-status"></div>
@@ -3105,10 +3123,13 @@
   <div class="day-header"><div class="day-title">FRIDAY</div><div class="day-badge badge-rest">😴 REST</div><div class="alert amber">🧘 <span>Full rest day — lifting moved to Monday. No lifting, no pushups. Let the week's work absorb.</span></div></div>
 
   <div class="section-label">Day Notes</div>
-  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+  <div class="day-notes-row">
+    <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+    <button class="summary-btn" onclick="generateSummary('fri')">📋 Generate</button>
+  </div>
 
   <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('fri')">Collapse All</button></div>
-  <button class="summary-btn" onclick="generateSummary('fri')">📋 Generate Session Summary</button>
+  <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="fri-summary"></div>
   <button class="copy-btn" id="fri-copy" onclick="copySummary('fri')">📎 Copy to Clipboard</button>
   <div class="log-status" id="fri-log-status"></div>
@@ -3119,7 +3140,10 @@
   <div class="day-header"><div class="day-title">SAT</div><div class="day-badge badge-travel">🧘 RECOVERY</div><div class="alert amber">🧘 <span>Lighter week — lifting paused for Saturday, swapped for stretching + a pushup catch-up set. Back to the normal "C day" (Split Squat/Hinge/Row/Press) next Saturday.</span></div></div>
 
   <div class="section-label">Day Notes</div>
-  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+  <div class="day-notes-row">
+    <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+    <button class="summary-btn" onclick="generateSummary('sat')">📋 Generate</button>
+  </div>
 
   <div class="section-label">Stretching</div>
 
@@ -3133,7 +3157,7 @@
   <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Child's Pose — 60s</div></div></div>
 
   <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sat')">Collapse All</button></div>
-  <button class="summary-btn" onclick="generateSummary('sat')">📋 Session Summary</button>
+  <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="sat-summary"></div>
   <button class="copy-btn" id="sat-copy" onclick="copySummary('sat')">📎 Copy to Clipboard</button>
   <div class="log-status" id="sat-log-status"></div>
@@ -3144,9 +3168,12 @@
   <div class="day-header"><div class="day-title">SUN</div><div class="day-badge badge-rest">😴 REST</div><div class="alert amber">🧘 <span>Full rest day — no lifting, no pushups. Let the week's work absorb.</span></div></div>
 
   <div class="section-label">Day Notes</div>
-  <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+  <div class="day-notes-row">
+    <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
+    <button class="summary-btn" onclick="generateSummary('sun')">📋 Generate</button>
+  </div>
+  <div class="exercise-anchor" style="display:none"></div>
 
-  <button class="summary-btn" onclick="generateSummary('sun')">📋 Generate Week Summary</button>
   <div class="summary-output" id="sun-summary"></div>
   <button class="copy-btn" id="sun-copy" onclick="copySummary('sun')">📎 Copy to Clipboard</button>
   <div class="log-status" id="sun-log-status"></div>
@@ -5016,7 +5043,7 @@ function escapeText_(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, 
 function renderWeeklyPlan_() {
   Object.keys(WEEKLY_PLAN_DATA).forEach(day => {
     const panel = document.getElementById('day-' + day);
-    const anchor = panel && panel.querySelector(':scope > .summary-btn');
+    const anchor = panel && panel.querySelector(':scope > .exercise-anchor');
     if (!panel || !anchor) return;
 
     WEEKLY_PLAN_DATA[day].forEach(ex => {
@@ -23275,8 +23302,8 @@ function initAddExerciseButtons() {
     if (cards.length > 0) {
       cards[cards.length - 1].insertAdjacentElement('afterend', btn);
     } else {
-      const summaryBtn = panel.querySelector(':scope > .summary-btn');
-      panel.insertBefore(btn, summaryBtn);
+      const anchor = panel.querySelector(':scope > .exercise-anchor');
+      panel.insertBefore(btn, anchor);
     }
   });
 }
