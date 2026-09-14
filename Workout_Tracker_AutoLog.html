@@ -172,6 +172,24 @@
   .exercise-history-up { color: var(--green); font-weight: 600; }
   .exercise-history-down { color: var(--red); font-weight: 600; }
   .exercise-history-neutral { color: var(--muted); font-weight: 600; }
+
+  /* Progression Engine: a live, non-committing streak/target readout
+     plus a separate confirm bar that only appears once an actual target
+     change (a bump or a drop) is ready - suggest, then confirm, never
+     silently applied. */
+  .prog-bar { display: none; align-items: center; gap: 10px; padding: 7px 14px; background: rgba(61, 111, 224, 0.07); border-bottom: 1px solid var(--border); font-family: var(--font); font-size: 11.5px; }
+  .prog-bar.flagged { background: rgba(216, 67, 79, 0.10); }
+  .prog-target { font-weight: 700; color: var(--text); white-space: nowrap; }
+  .prog-status { color: var(--muted); flex: 1; min-width: 0; }
+  .prog-flag-btn { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+  .prog-flag-btn.active { color: var(--red); border-color: var(--red); background: rgba(216, 67, 79, 0.10); }
+  .prog-confirm-bar { display: none; align-items: center; gap: 10px; padding: 8px 14px; background: rgba(31, 169, 114, 0.12); border-bottom: 1px solid var(--border); font-family: var(--font); font-size: 12px; }
+  .prog-confirm-bar.down { background: rgba(216, 67, 79, 0.10); }
+  .prog-pending-text { color: var(--text); flex: 1; min-width: 0; }
+  .prog-confirm-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .prog-confirm-btn { font-family: var(--font); font-size: 11.5px; font-weight: 700; background: var(--green); color: #fff; border: none; border-radius: 8px; padding: 6px 11px; cursor: pointer; }
+  .prog-confirm-bar.down .prog-confirm-btn { background: var(--red); }
+  .prog-dismiss-btn { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); background: none; border: none; cursor: pointer; padding: 6px 4px; }
   .exercise-sets { display: none; }
   .exercise-sets.expanded { display: block; }
   .set-row { position: relative; overflow: hidden; border-bottom: 1px solid var(--border); }
@@ -16146,6 +16164,7 @@ async function fetchAndApplyRemoteDraft() {
     isRestoringState = false;
 
     saveState();
+    progRenderAllChips_();
     if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
   } catch (e) {
     // Offline/unreachable - the local-only restore already in place stands.
@@ -21998,6 +22017,8 @@ function toggleSetQuality(box) {
   box.parentElement.querySelectorAll('.quality-box').forEach(b => b.classList.remove('active'));
   if (!wasActive) box.classList.add('active');
   saveState();
+  const card = box.closest('.exercise-card');
+  if (card) progRenderChip_(card);
 }
 
 function collapseAllExercises(day) {
@@ -22295,6 +22316,458 @@ function parseExerciseCard(card) {
   return { name: name, sets: sets };
 }
 
+/* ========== Progression Engine ==========
+   Suggest-then-confirm auto progression, ported from the "Progression
+   Bench" simulator this rule set was tested against before touching a
+   single line of the real tracker. Three exercise types:
+     weighted - double progression: reps climb a 3-rung range, then a
+       second clean streak at the top moves sets up a rung (capped at
+       one step), then a further clean streak at max reps+sets bumps
+       weight and resets reps/sets to the bottom.
+     time (Plank only) - duration climbs with no ceiling; sets stay
+       fixed forever.
+     static (Pushups, Walk, bodyweight/AMRAP accessories) - logged only,
+       no rule defined, never auto-progresses.
+   Every verdict that would change the actual prescribed target (a rep,
+   set, weight or duration bump OR drop) is held as a pendingAction and
+   only takes effect when the lifter taps Confirm - it is never applied
+   automatically. Routine streak bookkeeping (and adopting a typed-lower
+   weight, which just reflects what already happened rather than a
+   calculated recommendation) still updates immediately. State lives in
+   this browser's localStorage only - like the simulator, it does not
+   sync across devices the way logged sets do. */
+
+const PROG_STORE_KEY = 'PROGRESSION_ENGINE_V1';
+let progressionDB = progLoad_();
+
+function progLoad_() {
+  try {
+    const raw = localStorage.getItem(PROG_STORE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.exercises) return parsed;
+    }
+  } catch (e) {}
+  return { exercises: {} };
+}
+function progSave_() {
+  try { localStorage.setItem(PROG_STORE_KEY, JSON.stringify(progressionDB)); } catch (e) {}
+}
+
+function progKey_(day, name) { return day + '::' + String(name).trim().toLowerCase(); }
+
+// Plank is the one named, explicitly time-progressed exercise; anything
+// whose meta doesn't open with a number (bodyweight, "ea", AMRAP) has no
+// rule defined here and stays static rather than guessing one.
+function progClassify_(name, meta) {
+  if (/^plank$/i.test(String(name).trim())) return 'time';
+  if (/^\d/.test(String(meta || '').trim())) return 'weighted';
+  return 'static';
+}
+
+function progBootstrapEntry_(day, planEx) {
+  const type = progClassify_(planEx.name, planEx.meta);
+  const firstRow = planEx.rows && planEx.rows[0];
+  const baseSets = (planEx.rows && planEx.rows.length) || 3;
+
+  if (type === 'time') {
+    const startDuration = parseInt(firstRow && firstRow[2], 10) || 65;
+    return {
+      type: 'time',
+      cfg: { durationIncrement: 10, durationStreakNeeded: 2, sets: baseSets },
+      state: { duration: startDuration, sets: baseSets, durationStreak: 0, shortfallStreak: 0, painFlag: false }
+    };
+  }
+
+  if (type === 'weighted') {
+    const weightMatch = /^(\d+(?:\.\d+)?)/.exec(planEx.meta || '');
+    const weight = weightMatch ? parseFloat(weightMatch[1]) : 0;
+    const baseReps = parseInt(firstRow && firstRow[2], 10);
+    if (!weight || !baseReps) {
+      return { type: 'static', cfg: { fixedSets: baseSets, fixedReps: baseReps || null }, state: { painFlag: false } };
+    }
+    return {
+      type: 'weighted',
+      cfg: {
+        repRange: [baseReps, baseReps + 2, baseReps + 4],
+        setRange: baseSets < 4 ? [baseSets, baseSets + 1] : [baseSets],
+        repStreakNeeded: 2, weightStreakNeeded: 3, weightIncrement: 5
+      },
+      state: { weight: weight, repIdx: 0, setIdx: 0, repStreak: 0, topStreak: 0, shortfallStreak: 0, painFlag: false }
+    };
+  }
+
+  return { type: 'static', cfg: { fixedSets: baseSets, fixedReps: firstRow ? (parseInt(firstRow[2], 10) || null) : null }, state: { painFlag: false } };
+}
+
+function progGetEntry_(day, planEx) {
+  const key = progKey_(day, planEx.name);
+  let entry = progressionDB.exercises[key];
+  if (!entry) {
+    entry = progBootstrapEntry_(day, planEx);
+    progressionDB.exercises[key] = entry;
+    progSave_();
+  }
+  return entry;
+}
+
+/* ---- evaluators - same rules and field names as Progression Bench,
+   except a target-changing verdict returns a pending{text,applyPatch}
+   descriptor instead of mutating the target right away. ---- */
+
+function progEvaluateWeighted_(entry, sets, painFlag) {
+  const cfg = entry.cfg, st = entry.state;
+  let excluded = [];
+  let effective = sets.slice();
+  if (sets.length >= 2) {
+    const counts = {};
+    sets.forEach(function (s) { counts[s.weight] = (counts[s.weight] || 0) + 1; });
+    let modeWeight = null, modeCount = 0;
+    Object.keys(counts).forEach(function (w) { if (counts[w] > modeCount) { modeCount = counts[w]; modeWeight = Number(w); } });
+    if (modeCount >= 2 && modeCount < sets.length) {
+      effective = sets.filter(function (s) {
+        const isOutlier = s.weight !== modeWeight && s.weight > modeWeight;
+        if (isOutlier) excluded.push(s);
+        return !isOutlier;
+      });
+    }
+  }
+
+  // Typed lower than the current target adopts immediately - it's
+  // reflecting what actually happened, not a calculated recommendation,
+  // so unlike a bump or a drop this doesn't wait for confirmation.
+  const typedChecked = effective.filter(function (s) { return s.checked; }).map(function (s) { return s.weight; });
+  if (typedChecked.length) {
+    const minTyped = Math.min.apply(null, typedChecked);
+    if (minTyped < st.weight) st.weight = minTyped;
+  }
+
+  if (painFlag) {
+    st.painFlag = true;
+    return { verdict: 'HOLD_FLAGGED', explain: 'Pain/injury flagged — holding at ' + st.weight + ' lb × ' + cfg.repRange[st.repIdx] + ' × ' + cfg.setRange[st.setIdx] + '.', pending: null };
+  }
+  st.painFlag = false;
+
+  // Every set typed higher, all clean, is real evidence rather than a
+  // single-set loading mistake (already filtered out above) - but it
+  // still changes the prescribed target, so it waits for confirmation
+  // the same as a ladder-climb bump.
+  const checkedEffective = effective.filter(function (s) { return s.checked; });
+  const allHigher = checkedEffective.length > 0 && checkedEffective.every(function (s) { return s.weight > st.weight; });
+  const allCleanToday = effective.length > 0 && effective.every(function (s) { return s.checked && s.quality === 'green'; });
+  if (allHigher && allCleanToday) {
+    const newWeight = Math.min.apply(null, checkedEffective.map(function (s) { return s.weight; }));
+    return {
+      verdict: 'WEIGHT_BUMP_SUSTAINED',
+      explain: 'Every set typed higher this session (' + st.weight + ' → ' + newWeight + ' lb), all clean.',
+      pending: {
+        text: 'Every set was logged higher and clean — adopt ' + newWeight + ' lb as the new working weight? Reps/sets reset to ' + cfg.repRange[0] + '×' + cfg.setRange[0] + '.',
+        applyPatch: { weight: newWeight, repIdx: 0, setIdx: 0, repStreak: 0, topStreak: 0, shortfallStreak: 0 }
+      }
+    };
+  }
+
+  // A rep shortfall alone doesn't move the target or touch the streak -
+  // falling short once just means "try this same target again." Two in
+  // a row is real signal the weight is too heavy, not a fluke.
+  const typedRepsChecked = effective.filter(function (s) { return s.checked; }).map(function (s) { return s.reps; });
+  if (typedRepsChecked.length) {
+    const minReps = Math.min.apply(null, typedRepsChecked);
+    const curTargetReps = cfg.repRange[st.repIdx];
+    if (minReps < curTargetReps) {
+      st.shortfallStreak = (st.shortfallStreak || 0) + 1;
+      if (st.shortfallStreak >= 2) {
+        const droppedWeight = Math.max(cfg.weightIncrement, st.weight - cfg.weightIncrement);
+        return {
+          verdict: 'WEIGHT_DOWN',
+          explain: 'Short of the rep target 2 sessions in a row.',
+          pending: {
+            text: 'Short of ' + curTargetReps + ' reps two sessions running — drop to ' + droppedWeight + ' lb? Reps/sets reset to ' + cfg.repRange[0] + '×' + cfg.setRange[0] + '.',
+            applyPatch: { weight: droppedWeight, repIdx: 0, setIdx: 0, repStreak: 0, topStreak: 0, shortfallStreak: 0 }
+          }
+        };
+      }
+      return { verdict: 'HOLD_SHORTFALL', explain: 'Fell short of ' + curTargetReps + ' reps (got ' + minReps + ') — holding, streak kept. One more short session will propose a drop.', pending: null };
+    }
+  }
+
+  const clean = effective.length > 0 && effective.every(function (s) { return s.checked && s.quality === 'green'; });
+  const curReps = cfg.repRange[st.repIdx], curSets = cfg.setRange[st.setIdx];
+
+  if (!clean) {
+    st.repStreak = 0; st.topStreak = 0; st.shortfallStreak = 0;
+    return { verdict: 'HOLD', explain: 'Not fully clean — holding at ' + st.weight + ' lb × ' + curReps + ' × ' + curSets + '.', pending: null };
+  }
+  st.shortfallStreak = 0;
+
+  const atTopReps = st.repIdx === cfg.repRange.length - 1;
+  if (!atTopReps) {
+    st.repStreak++;
+    if (st.repStreak >= cfg.repStreakNeeded) {
+      const nextReps = cfg.repRange[st.repIdx + 1];
+      return {
+        verdict: 'REP_BUMP', explain: 'Clean streak met.',
+        pending: { text: 'Clean for ' + cfg.repStreakNeeded + ' straight — move reps up to ' + nextReps + '?', applyPatch: { repIdx: st.repIdx + 1, repStreak: 0 } }
+      };
+    }
+    return { verdict: 'HOLD_CLEAN', explain: 'Clean (' + st.repStreak + '/' + cfg.repStreakNeeded + ' toward the next rep step).', pending: null };
+  }
+
+  st.topStreak++;
+  if (st.topStreak >= cfg.weightStreakNeeded) {
+    const atTopSets = st.setIdx === cfg.setRange.length - 1;
+    if (!atTopSets) {
+      const nextSets = cfg.setRange[st.setIdx + 1];
+      return {
+        verdict: 'SET_BUMP', explain: 'Maxed reps clean.',
+        pending: { text: 'Maxed reps clean for ' + cfg.weightStreakNeeded + ' — move sets up to ' + nextSets + ', reps back to ' + cfg.repRange[0] + '?', applyPatch: { setIdx: st.setIdx + 1, repIdx: 0, repStreak: 0, topStreak: 0 } }
+      };
+    }
+    const nextWeight = st.weight + cfg.weightIncrement;
+    return {
+      verdict: 'WEIGHT_BUMP', explain: 'Maxed reps and sets, clean.',
+      pending: { text: 'Maxed reps × sets, clean for ' + cfg.weightStreakNeeded + ' — bump weight to ' + nextWeight + ' lb, reps/sets back to ' + cfg.repRange[0] + '×' + cfg.setRange[0] + '?', applyPatch: { weight: nextWeight, repIdx: 0, setIdx: 0, repStreak: 0, topStreak: 0 } }
+    };
+  }
+  return { verdict: 'HOLD_TOP', explain: 'At max reps × sets, clean (' + st.topStreak + '/' + cfg.weightStreakNeeded + ' toward the next step).', pending: null };
+}
+
+function progEvaluateTime_(entry, sets, painFlag) {
+  const cfg = entry.cfg, st = entry.state;
+  if (painFlag) {
+    st.painFlag = true;
+    return { verdict: 'HOLD_FLAGGED', explain: 'Pain/injury flagged — holding at ' + st.duration + 's × ' + st.sets + '.', pending: null };
+  }
+  st.painFlag = false;
+
+  const typedDursChecked = sets.filter(function (s) { return s.checked; }).map(function (s) { return s.reps; });
+  if (typedDursChecked.length) {
+    const minDur = Math.min.apply(null, typedDursChecked);
+    if (minDur < st.duration) {
+      st.shortfallStreak = (st.shortfallStreak || 0) + 1;
+      if (st.shortfallStreak >= 2) {
+        const droppedDur = Math.max(cfg.durationIncrement, st.duration - cfg.durationIncrement);
+        return {
+          verdict: 'TIME_DOWN', explain: 'Short of the duration target 2 sessions in a row.',
+          pending: { text: 'Short of ' + st.duration + 's two sessions running — drop to ' + droppedDur + 's?', applyPatch: { duration: droppedDur, durationStreak: 0, shortfallStreak: 0 } }
+        };
+      }
+      return { verdict: 'HOLD_SHORTFALL', explain: 'Fell short of ' + st.duration + 's (held ' + minDur + 's) — holding, streak kept. One more short session will propose a drop.', pending: null };
+    }
+  }
+
+  const clean = sets.length > 0 && sets.every(function (s) { return s.checked && s.quality === 'green'; });
+  if (!clean) {
+    st.durationStreak = 0; st.shortfallStreak = 0;
+    return { verdict: 'HOLD', explain: 'Not fully clean — holding at ' + st.duration + 's × ' + st.sets + '.', pending: null };
+  }
+  st.shortfallStreak = 0;
+
+  // Sets stay fixed at cfg.sets always - only duration progresses, with
+  // no ceiling.
+  st.durationStreak++;
+  if (st.durationStreak >= cfg.durationStreakNeeded) {
+    const nextDur = st.duration + cfg.durationIncrement;
+    return {
+      verdict: 'TIME_BUMP', explain: 'Clean streak met.',
+      pending: { text: 'Clean for ' + cfg.durationStreakNeeded + ' straight — move duration up to ' + nextDur + 's?', applyPatch: { duration: nextDur, durationStreak: 0 } }
+    };
+  }
+  return { verdict: 'HOLD_CLEAN', explain: 'Clean (' + st.durationStreak + '/' + cfg.durationStreakNeeded + ' toward the next duration step).', pending: null };
+}
+
+function progReadCardSets_(card, type) {
+  const parsed = parseExerciseCard(card);
+  return parsed.sets.map(function (s) {
+    const weight = typeof s.actualWeight === 'number' ? s.actualWeight : (parseFloat(s.actualWeight) || 0);
+    const reps = parseFloat(s.actualReps) || 0;
+    return { weight: type === 'time' ? 0 : weight, reps: reps, quality: s.quality || '', checked: !!s.completed };
+  });
+}
+
+function progStreakSummary_(entry) {
+  const cfg = entry.cfg, st = entry.state;
+  if (entry.type === 'weighted') {
+    const atTopReps = st.repIdx === cfg.repRange.length - 1;
+    return atTopReps
+      ? ('At max reps × sets (' + st.topStreak + '/' + cfg.weightStreakNeeded + ' toward the next step).')
+      : ('Rep streak: ' + st.repStreak + '/' + cfg.repStreakNeeded + '.');
+  }
+  if (entry.type === 'time') return 'Duration streak: ' + st.durationStreak + '/' + cfg.durationStreakNeeded + '.';
+  return '';
+}
+
+function progTargetLabel_(entry) {
+  const cfg = entry.cfg, st = entry.state;
+  if (entry.type === 'weighted') return 'Target: ' + st.weight + ' lb × ' + cfg.repRange[st.repIdx] + ' × ' + cfg.setRange[st.setIdx];
+  if (entry.type === 'time') return 'Target: ' + st.duration + 's × ' + st.sets;
+  return '';
+}
+
+function progFindPlanEx_(day, name) {
+  const list = WEEKLY_PLAN_DATA[day] || [];
+  for (let i = 0; i < list.length; i++) { if (list[i].name === name) return list[i]; }
+  return null;
+}
+
+function progFindCard_(day, name) {
+  const panel = document.getElementById('day-' + day);
+  if (!panel) return null;
+  const cards = panel.querySelectorAll(':scope > .exercise-card');
+  for (let i = 0; i < cards.length; i++) { if (getExerciseName(cards[i]) === name) return cards[i]; }
+  return null;
+}
+
+// Runs the real (state-mutating) evaluation for every progressable
+// exercise in a day, exactly once per week per exercise - called from
+// generateSummary(), the point the lifter already taps to close out a
+// session. A pending confirmation freezes further evaluation for that
+// exercise (streaks included) until it's confirmed or the banner is
+// dismissed, so an un-acted-on suggestion never silently compounds.
+function progCommitDay_(day) {
+  const panel = document.getElementById('day-' + day);
+  if (!panel) return;
+  const weekLabel = getWeekLabel();
+  panel.querySelectorAll(':scope > .exercise-card').forEach(function (card) {
+    const name = getExerciseName(card);
+    const planEx = progFindPlanEx_(day, name);
+    if (!planEx) return;
+    const entry = progGetEntry_(day, planEx);
+    if (entry.type === 'static') return;
+    if (entry.pendingAction) return;
+    if (entry.lastEvalKey === weekLabel) return;
+
+    const sets = progReadCardSets_(card, entry.type);
+    const painFlag = !!entry.pendingPainFlag;
+    const result = entry.type === 'weighted' ? progEvaluateWeighted_(entry, sets, painFlag) : progEvaluateTime_(entry, sets, painFlag);
+
+    entry.lastEvalKey = weekLabel;
+    entry.lastVerdict = result.verdict;
+    entry.pendingPainFlag = false;
+    if (result.pending) {
+      entry.pendingAction = { verdict: result.verdict, text: result.pending.text, applyPatch: result.pending.applyPatch };
+    }
+  });
+  progSave_();
+  panel.querySelectorAll(':scope > .exercise-card').forEach(function (card) { progRenderChip_(card); });
+}
+
+function progConfirmPending_(day, name) {
+  const entry = progressionDB.exercises[progKey_(day, name)];
+  if (!entry || !entry.pendingAction) return;
+  Object.assign(entry.state, entry.pendingAction.applyPatch);
+  delete entry.pendingAction;
+  progSave_();
+  const card = progFindCard_(day, name);
+  if (card) progRenderChip_(card);
+}
+
+function progTogglePainFlag_(day, name) {
+  const entry = progressionDB.exercises[progKey_(day, name)];
+  if (!entry) return;
+  entry.pendingPainFlag = !entry.pendingPainFlag;
+  progSave_();
+  const card = progFindCard_(day, name);
+  if (card) progRenderChip_(card);
+}
+
+function progEnsureBars_(card) {
+  // Unscoped, like ensureExerciseInfoBar_ - initExerciseSwipe() wraps the
+  // card's real children (including .exercise-header) inside a nested
+  // .exercise-card-inner, so .exercise-header is a descendant, not a
+  // direct child, by the time this runs.
+  let bar = card.querySelector('.prog-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'prog-bar';
+    bar.innerHTML = '<span class="prog-target"></span><span class="prog-status"></span>' +
+      '<button type="button" class="prog-flag-btn" title="Flag pain or injury for this exercise">⚠ Pain</button>';
+    const infoBar = card.querySelector('.exercise-history-note');
+    const anchor = infoBar || card.querySelector('.exercise-header');
+    anchor.insertAdjacentElement('afterend', bar);
+  }
+  let confirmBar = card.querySelector('.prog-confirm-bar');
+  if (!confirmBar) {
+    confirmBar = document.createElement('div');
+    confirmBar.className = 'prog-confirm-bar';
+    confirmBar.innerHTML = '<span class="prog-pending-text"></span><span class="prog-confirm-actions">' +
+      '<button type="button" class="prog-confirm-btn">Confirm</button>' +
+      '<button type="button" class="prog-dismiss-btn">Not now</button></span>';
+    bar.insertAdjacentElement('afterend', confirmBar);
+  }
+  return { bar: bar, confirmBar: confirmBar };
+}
+
+// Non-mutating: previews what committing right now would read as (run
+// on a deep clone), so the chip can show live streak progress while
+// still logging without ever changing the persisted target early.
+function progRenderChip_(card) {
+  const panel = card.closest('.day-panel');
+  if (!panel) return;
+  const day = panel.id.replace('day-', '');
+  const name = getExerciseName(card);
+  const planEx = progFindPlanEx_(day, name);
+
+  const existingBar = card.querySelector('.prog-bar');
+  const existingConfirm = card.querySelector('.prog-confirm-bar');
+  if (!planEx) {
+    if (existingBar) existingBar.style.display = 'none';
+    if (existingConfirm) existingConfirm.style.display = 'none';
+    return;
+  }
+
+  const entry = progGetEntry_(day, planEx);
+  if (entry.type === 'static') {
+    if (existingBar) existingBar.style.display = 'none';
+    if (existingConfirm) existingConfirm.style.display = 'none';
+    return;
+  }
+
+  const bars = progEnsureBars_(card);
+  bars.bar.style.display = 'flex';
+  bars.bar.querySelector('.prog-target').textContent = progTargetLabel_(entry);
+
+  // Once this week's session is already committed (or a confirmation is
+  // waiting), showing a fresh preview against the same still-checked sets
+  // would re-run the rule on top of the just-updated streak and read as
+  // "ready again" a second time in the same week - report the actual
+  // committed state instead of previewing another hypothetical commit.
+  let statusText;
+  if (entry.pendingAction) {
+    statusText = 'Ready — see below.';
+  } else if (entry.lastEvalKey === getWeekLabel()) {
+    statusText = 'Logged for this week. ' + progStreakSummary_(entry);
+  } else {
+    const liveSets = progReadCardSets_(card, entry.type);
+    const clone = JSON.parse(JSON.stringify(entry));
+    const preview = entry.type === 'weighted'
+      ? progEvaluateWeighted_(clone, liveSets, !!entry.pendingPainFlag)
+      : progEvaluateTime_(clone, liveSets, !!entry.pendingPainFlag);
+    statusText = preview.explain;
+  }
+  bars.bar.querySelector('.prog-status').textContent = statusText;
+
+  const flagBtn = bars.bar.querySelector('.prog-flag-btn');
+  flagBtn.classList.toggle('active', !!entry.pendingPainFlag);
+  flagBtn.onclick = function () { progTogglePainFlag_(day, name); };
+  bars.bar.classList.toggle('flagged', !!entry.state.painFlag);
+  bars.bar.title = entry.state.painFlag ? 'Flagged from a previous session — holding, worth a look before next week.' : '';
+
+  if (entry.pendingAction) {
+    bars.confirmBar.style.display = 'flex';
+    bars.confirmBar.classList.toggle('down', entry.pendingAction.verdict === 'WEIGHT_DOWN' || entry.pendingAction.verdict === 'TIME_DOWN');
+    bars.confirmBar.querySelector('.prog-pending-text').textContent = entry.pendingAction.text;
+    bars.confirmBar.querySelector('.prog-confirm-btn').onclick = function () { progConfirmPending_(day, name); };
+    bars.confirmBar.querySelector('.prog-dismiss-btn').onclick = function () { bars.confirmBar.style.display = 'none'; };
+  } else {
+    bars.confirmBar.style.display = 'none';
+  }
+}
+
+function progRenderAllChips_() {
+  document.querySelectorAll('.day-panel .exercise-card').forEach(function (card) { progRenderChip_(card); });
+}
+
 /* ---------- Adding sets / exercises + live totals ---------- */
 
 // What a card is PRESCRIBED, as opposed to sumReps()'s what-you-actually-
@@ -22380,6 +22853,8 @@ function updateExerciseTotal(card) {
     totalEl.textContent = `Total: ${total} reps`;
     totalEl.title = '';
   }
+
+  progRenderChip_(card);
 }
 
 function renumberSets(card) {
@@ -22906,6 +23381,7 @@ function generateSummary(day) {
   out.style.display = 'block';
   btn.style.display = 'block';
 
+  progCommitDay_(day);
   submitWorkout(day, buildPayload(day));
 }
 
@@ -23282,6 +23758,7 @@ loadCalendarWorkerUrl();
 flushPendingLogs();
 setTrainerSubTab('workout');
 showDay(dayKeys[(new Date().getDay() + 6) % 7]);
+progRenderAllChips_();
 renderTrainerStats();
 renderStarter();
 // The starter's status is a clock, so it goes stale just sitting there.
