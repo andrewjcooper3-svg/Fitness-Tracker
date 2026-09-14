@@ -15,11 +15,13 @@
 //    recent Wed/Fri move - by restoreDay's generic saved-name-vs-current-
 //    plan comparison guard instead of a new one-time migration).
 //
-// 2) The gym schedule itself has moved twice more since this file's
-//    original subject (Mon/Wed, this file's namesake). This is now just a
-//    content check against the CURRENT rotation: Monday/Sunday rest,
-//    Tuesday/Thursday a single Pushups card, Wednesday/Friday the full
-//    gym sessions, Saturday a short Pushups/Walk/Sauna day.
+// 2) The gym schedule itself has moved three times now since this file's
+//    original subject (Mon/Wed, this file's namesake) - Mon/Wed -> Tue/Thu
+//    -> Wed/Fri -> and, as of 2026-09-14, back to Mon/Wed (Friday's old
+//    11-card session moved to Monday; Friday is now the rest day). This is
+//    now just a content check against the CURRENT rotation: Friday/Sunday
+//    rest, Tuesday/Thursday a single Pushups card, Monday/Wednesday the
+//    full gym sessions, Saturday a short Pushups/Walk/Sauna day.
 const { chromium } = require('playwright');
 const path = require('path');
 const URL = 'file://' + path.resolve('/home/user/Fitness-Tracker/Workout_Tracker_AutoLog.html');
@@ -34,7 +36,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   await page.route('https://script.google.com/**', r =>
     r.fulfill({ status: 200, contentType: 'application/json', body: '{"status":"error"}' }));
 
-  console.log('=== The current rotation: Mon/Sun rest, Tue/Thu Pushups-only, Wed/Fri gym, Sat light ===');
+  console.log('=== The current rotation: Fri/Sun rest, Tue/Thu Pushups-only, Mon/Wed gym, Sat light ===');
   await page.goto(URL);
   await page.waitForFunction(() => typeof showAppView === 'function', null, { timeout: 15000 });
   await page.waitForTimeout(1200);
@@ -50,7 +52,10 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   const sun = await cardsFor('sun');
 
   console.log('  Monday:', mon.length, 'cards -', mon.join(', '));
-  check('Monday is a rest day (no cards)', mon.length === 0, mon.join(', '));
+  check('Monday is now the 11-card gym day, pulling exercises included', mon.length === 11 && mon[0] === 'Leg Press'
+    && mon.includes('Dumbbell Romanian Deadlift') && mon.includes('Lat Pulldown') && mon.includes('Face Pull'), mon.join(', '));
+  check('Inclined Dumbbell Chest Press and Tricep Pulldown are gone from Monday',
+    !mon.includes('Inclined Dumbbell Chest Press') && !mon.includes('Tricep Pulldown'), mon.join(', '));
 
   console.log('  Tuesday:', tue.length, 'cards -', tue.join(', '));
   check('Tuesday is a single Pushups card', tue.length === 1 && tue[0] === 'Pushups', tue.join(', '));
@@ -65,10 +70,7 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('Thursday is a single Pushups card', thu.length === 1 && thu[0] === 'Pushups', thu.join(', '));
 
   console.log('  Friday:', fri.length, 'cards -', fri.join(', '));
-  check('Friday is the 11-card gym day, pulling exercises included', fri.length === 11 && fri[0] === 'Leg Press'
-    && fri.includes('Dumbbell Romanian Deadlift') && fri.includes('Lat Pulldown') && fri.includes('Face Pull'), fri.join(', '));
-  check('Inclined Dumbbell Chest Press and Tricep Pulldown are gone from Friday',
-    !fri.includes('Inclined Dumbbell Chest Press') && !fri.includes('Tricep Pulldown'), fri.join(', '));
+  check('Friday is now a rest day (no cards)', fri.length === 0, fri.join(', '));
 
   console.log('  Saturday:', sat.length, 'cards -', sat.join(', '));
   check('Saturday is the short Pushups/Walk/Sauna day',
@@ -78,8 +80,8 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('Sunday is a rest day (no cards)', sun.length === 0, sun.join(', '));
 
   const tabTypes = await page.evaluate(() => [...document.querySelectorAll('.day-tab .tab-type')].map(t => t.textContent));
-  check('the day-tab badges read Rest/PU/Gym/PU/Gym/Mob/Rest for Mon-Sun',
-    JSON.stringify(tabTypes) === JSON.stringify(['Rest', 'PU', 'Gym', 'PU', 'Gym', 'Mob', 'Rest']), JSON.stringify(tabTypes));
+  check('the day-tab badges read Gym/PU/Gym/PU/Rest/Mob/Rest for Mon-Sun',
+    JSON.stringify(tabTypes) === JSON.stringify(['Gym', 'PU', 'Gym', 'PU', 'Rest', 'Mob', 'Rest']), JSON.stringify(tabTypes));
 
   const groups = await page.evaluate(() => ['Dumbbell Romanian Deadlift', 'Standing Calf Raise', 'Face Pull']
     .map(n => n + ' -> ' + muscleFor_(n)));

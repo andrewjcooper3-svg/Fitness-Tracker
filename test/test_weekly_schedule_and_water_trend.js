@@ -26,46 +26,51 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   await page.waitForFunction(() => typeof showAppView === 'function', null, { timeout: 15000 });
   await page.waitForTimeout(1200);
 
-  console.log('=== Weekly plan: Monday rest, Wednesday/Friday gym, Tuesday/Thursday pushups ===');
+  console.log('=== Weekly plan: Friday rest, Monday/Wednesday gym, Tuesday/Thursday pushups ===');
+  // As of 2026-09-14 the gym days moved again, from Wednesday/Friday to
+  // Monday/Wednesday - Friday's old 11-card session moved to Monday
+  // wholesale, and Friday became the fixed rest day (Monday's old role).
   const plan = await page.evaluate(() => ({
-    hasMonday: 'mon' in WEEKLY_PLAN_DATA,
+    hasFriday: 'fri' in WEEKLY_PLAN_DATA,
     tueIsPushupOnly: WEEKLY_PLAN_DATA.tue.length === 1 && WEEKLY_PLAN_DATA.tue[0].name === 'Pushups',
     thuIsPushupOnly: WEEKLY_PLAN_DATA.thu.length === 1 && WEEKLY_PLAN_DATA.thu[0].name === 'Pushups',
     wedHasLegPress: WEEKLY_PLAN_DATA.wed.some(ex => ex.name === 'Leg Press'),
-    friHasLegPress: WEEKLY_PLAN_DATA.fri.some(ex => ex.name === 'Leg Press'),
-    monPushupTarget: document.getElementById('day-mon').dataset.pushupTarget,
+    monHasLegPress: WEEKLY_PLAN_DATA.mon.some(ex => ex.name === 'Leg Press'),
+    friPushupTarget: document.getElementById('day-fri').dataset.pushupTarget,
     tueTab: document.querySelector('.day-tab[onclick*="\'tue\'"]').className,
     wedTab: document.querySelector('.day-tab[onclick*="\'wed\'"]').className,
-    monTab: document.querySelector('.day-tab[onclick*="\'mon\'"]').className
+    monTab: document.querySelector('.day-tab[onclick*="\'mon\'"]').className,
+    friTab: document.querySelector('.day-tab[onclick*="\'fri\'"]').className
   }));
-  check('Monday has no plan entry (fixed rest day, like Sunday)', !plan.hasMonday);
-  check('Monday\'s pushup target is 0', plan.monPushupTarget === '0', plan.monPushupTarget);
+  check('Friday has no plan entry (fixed rest day, like Sunday)', !plan.hasFriday);
+  check('Friday\'s pushup target is 0', plan.friPushupTarget === '0', plan.friPushupTarget);
   check('Tuesday is now a plain pushup day', plan.tueIsPushupOnly);
   check('Thursday is now a plain pushup day', plan.thuIsPushupOnly);
-  check('Wednesday picked up the gym content (Leg Press present)', plan.wedHasLegPress);
-  check('Friday picked up the gym content (Leg Press present)', plan.friHasLegPress);
-  check('Monday\'s tab is classed "rest"', /\brest\b/.test(plan.monTab), plan.monTab);
+  check('Wednesday still has the gym content (Leg Press present)', plan.wedHasLegPress);
+  check('Monday picked up the gym content (Leg Press present)', plan.monHasLegPress);
+  check('Friday\'s tab is classed "rest"', /\brest\b/.test(plan.friTab), plan.friTab);
   check('Tuesday\'s tab is classed "home" (bodyweight)', /\bhome\b/.test(plan.tueTab), plan.tueTab);
   check('Wednesday\'s tab is classed "gym"', /\bgym\b/.test(plan.wedTab), plan.wedTab);
+  check('Monday\'s tab is classed "gym"', /\bgym\b/.test(plan.monTab), plan.monTab);
 
   console.log('\n=== Rear delts and pulling get more work; redundant chest/tricep isolation dropped ===');
   const arms = await page.evaluate(() => {
     const wedNames = WEEKLY_PLAN_DATA.wed.map(ex => ex.name);
-    const friNames = WEEKLY_PLAN_DATA.fri.map(ex => ex.name);
+    const monNames = WEEKLY_PLAN_DATA.mon.map(ex => ex.name);
     return {
       wedHasRearDelt: wedNames.includes('Reverse Pec Deck Fly'),
       wedHasFacePull: wedNames.includes('Face Pull'),
       wedHasLatPulldown: wedNames.includes('Lat Pulldown'),
       wedHasPullups: wedNames.includes('Pull-ups'),
-      friFacePullSets: (WEEKLY_PLAN_DATA.fri.find(ex => ex.name === 'Face Pull') || {}).rows.length,
+      monFacePullSets: (WEEKLY_PLAN_DATA.mon.find(ex => ex.name === 'Face Pull') || {}).rows.length,
       // Both days had direct chest/tricep isolation that only duplicated
       // what the daily pushups already load - dropped entirely now that
       // Wednesday picked up real pulling work to spend that time/recovery
       // budget on instead.
       wedHasChestPress: wedNames.includes('Machine Chest Press'),
       wedHasTricepPushdown: wedNames.includes('Tricep Pushdown'),
-      friHasInclinePress: friNames.includes('Inclined Dumbbell Chest Press'),
-      friHasTricepPulldown: friNames.includes('Tricep Pulldown'),
+      monHasInclinePress: monNames.includes('Inclined Dumbbell Chest Press'),
+      monHasTricepPulldown: monNames.includes('Tricep Pulldown'),
       // Legs and core were never on the chopping block - explicitly still
       // there after all the pulling additions.
       wedHasLegExtension: wedNames.includes('Leg Extension'),
@@ -77,11 +82,11 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
   check('Wednesday now also has Face Pull', arms.wedHasFacePull);
   check('Wednesday now also has Lat Pulldown', arms.wedHasLatPulldown);
   check('Wednesday now also has Pull-ups', arms.wedHasPullups);
-  check('Friday\'s Face Pull (rear delt) is still at 4 sets', arms.friFacePullSets === 4, arms.friFacePullSets);
+  check('Monday\'s Face Pull (rear delt) is still at 4 sets', arms.monFacePullSets === 4, arms.monFacePullSets);
   check('Machine Chest Press was dropped from Wednesday (redundant with daily pushups)', !arms.wedHasChestPress);
   check('Tricep Pushdown was dropped from Wednesday (redundant with daily pushups)', !arms.wedHasTricepPushdown);
-  check('Incline Chest Press was dropped from Friday (redundant with daily pushups)', !arms.friHasInclinePress);
-  check('Tricep Pulldown was dropped from Friday (redundant with daily pushups)', !arms.friHasTricepPulldown);
+  check('Incline Chest Press was dropped from Monday (redundant with daily pushups)', !arms.monHasInclinePress);
+  check('Tricep Pulldown was dropped from Monday (redundant with daily pushups)', !arms.monHasTricepPulldown);
   check('Leg Extension is still on Wednesday - legs were never touched', arms.wedHasLegExtension);
   check('Glute Kickback is still on Wednesday - legs were never touched', arms.wedHasGluteKickback);
   check('Core work is still on Wednesday', arms.wedHasCore);

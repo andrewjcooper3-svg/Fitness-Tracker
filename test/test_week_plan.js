@@ -96,9 +96,12 @@ const check = (l, ok, x = '') => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}$
     marker: !!c.querySelector('.wp-marker')
   })));
   check('7 day columns rendered', cols.length === 7, String(cols.length));
-  check('Monday (rest day) has a work block but no workout block', cols[0].work && !cols[0].workout, JSON.stringify(cols[0]));
+  // Gym days moved from Wednesday/Friday to Monday/Wednesday on 2026-09-14;
+  // Friday is now the fixed rest day (Monday's old role).
+  check('Monday (gym day) has both a work block and a workout block', cols[0].work && cols[0].workout, JSON.stringify(cols[0]));
   check('Tuesday (a Pushups-only day, not a lift day) has work but no workout block', cols[1].work && !cols[1].workout, JSON.stringify(cols[1]));
   check('Wednesday (gym day) has both a work block and a workout block', cols[2].work && cols[2].workout, JSON.stringify(cols[2]));
+  check('Friday (rest day) has a work block but no workout block', cols[4].work && !cols[4].workout, JSON.stringify(cols[4]));
   // Pushups now places on the 6 weekdays with the most pushup-ledger
   // history (wpPushupActiveDows_) rather than blindly every day - this
   // app's boot sequence unconditionally seeds some real historical ledger
