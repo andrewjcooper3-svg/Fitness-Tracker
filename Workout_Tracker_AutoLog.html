@@ -1724,6 +1724,25 @@
 
   .hx-empty { font-family: var(--font); font-size: 12px; color: var(--muted); padding: 6px 0; }
 
+  /* Progression tab - one row per tracked exercise, the same target/
+     streak/pending-confirm data the Trainer tab's per-exercise chip
+     reads, just gathered in one place instead of spread across days. */
+  .hx-prog-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .hx-prog-row:last-child { border-bottom: none; }
+  .hx-prog-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .hx-prog-row-name { font-family: var(--font); font-size: 14px; font-weight: 700; }
+  .hx-prog-row-type { font-family: var(--font); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); flex-shrink: 0; }
+  .hx-prog-row-target { font-family: var(--font); font-size: 13px; font-weight: 700; color: var(--accent); margin-top: 3px; }
+  .hx-prog-row-streak { font-family: var(--font); font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .hx-prog-row-flag { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--red); margin-top: 4px; }
+  .hx-prog-pending { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(31, 169, 114, 0.14); font-family: var(--font); font-size: 12px; }
+  .hx-prog-pending.down { background: rgba(216, 67, 79, 0.12); }
+  .hx-prog-pending-text { flex: 1; min-width: 0; color: var(--text); }
+  .hx-prog-pending-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .hx-prog-pending-actions button { font-family: var(--font); font-size: 11.5px; font-weight: 700; border: none; border-radius: 8px; padding: 6px 10px; cursor: pointer; background: var(--green); color: #fff; }
+  .hx-prog-pending.down .hx-prog-pending-actions button.confirm { background: var(--red); }
+  .hx-prog-pending-actions button.ghost { background: none; color: var(--muted); font-weight: 600; padding: 6px 2px; }
+
   .stats-card-clickable { cursor: pointer; transition: background 0.15s; }
   .stats-card-clickable:active { background: var(--surface2); }
 
@@ -3258,6 +3277,7 @@
     <button class="hx-seg-btn active" data-hx="overview" onclick="showHistorySection('overview')">Overview</button>
     <button class="hx-seg-btn" data-hx="exercises" onclick="showHistorySection('exercises')">Exercises</button>
     <button class="hx-seg-btn" data-hx="workouts" onclick="showHistorySection('workouts')">Workouts</button>
+    <button class="hx-seg-btn" data-hx="progression" onclick="showHistorySection('progression')">Progression</button>
     <button class="hx-seg-btn" data-hx="body" onclick="showHistorySection('body')">Body</button>
   </div>
   <div class="hx-range" id="hxRange">
@@ -3408,6 +3428,17 @@
   <!-- ---- Workouts: the feed of session cards ---- -->
   <div class="hx-section" id="hxSectionWorkouts" style="display:none;">
     <div id="hxDayList"></div>
+  </div>
+
+  <!-- ---- Progression: the Progression Engine's tracked state per
+       exercise - target, streak, and any pending bump/drop waiting on
+       confirmation, straight from the same data the Trainer tab's
+       per-exercise chip reads. ---- -->
+  <div class="hx-section" id="hxSectionProgression" style="display:none;">
+    <div class="stats-card">
+      <div class="stats-card-title">Tracked Progressions</div>
+      <div id="hxProgressionList"></div>
+    </div>
   </div>
 
   <!-- ---- Body: the InBody 770 scans ---- -->
@@ -6607,15 +6638,16 @@ function whShowWeekDetail_(week) {
 
 function showHistorySection(name) {
   historySection_ = name;
-  ['overview', 'exercises', 'workouts', 'body'].forEach(k => {
+  ['overview', 'exercises', 'workouts', 'progression', 'body'].forEach(k => {
     const el = document.getElementById('hxSection' + k.charAt(0).toUpperCase() + k.slice(1));
     if (el) el.style.display = k === name ? '' : 'none';
   });
   // The range chips and the sheet-status line scope the workout history.
-  // On the Body segment they describe nothing that is on screen.
+  // On the Body and Progression segments they describe nothing on screen -
+  // Progression isn't a date-range view, it's always "right now."
   ['hxRange', 'hxStatus'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = name === 'body' ? 'none' : '';
+    if (el) el.style.display = (name === 'body' || name === 'progression') ? 'none' : '';
   });
   // Only Overview has arrangeable cards.
   const layoutBtn = document.getElementById('hxLayoutBtn');
@@ -11271,6 +11303,56 @@ function openHistoryExercise(name) {
   updateViewportHeight('stats', true);
 }
 
+// Every exercise the Progression Engine is tracking, with its current
+// target, streak, and any bump/drop waiting on confirmation - the same
+// per-exercise state the Trainer tab's chip shows, gathered in one place
+// instead of spread across whichever day each exercise happens to sit on
+// (it's tracked per exercise now, not per day - see progGetEntry_).
+// Static (no-progression) exercises are left out - there's nothing here
+// for them to show.
+function renderHistoryProgression_() {
+  const container = document.getElementById('hxProgressionList');
+  if (!container) return;
+
+  const keys = Object.keys(progressionDB.exercises).filter(k => progressionDB.exercises[k].type !== 'static');
+  if (!keys.length) {
+    container.innerHTML = '<div class="hx-empty">No tracked progressions yet - they show up here once an exercise has been logged and evaluated at least once.</div>';
+    return;
+  }
+
+  const displayName = key => {
+    const planEx = progFindAnyPlanEx_(key);
+    return (planEx && planEx.name) || titleCaseExerciseName_(key);
+  };
+  keys.sort((a, b) => displayName(a).localeCompare(displayName(b)));
+
+  container.innerHTML = keys.map(key => {
+    const entry = progressionDB.exercises[key];
+    const name = displayName(key);
+    const typeLabel = entry.type === 'weighted' ? 'Weighted' : 'Timed';
+    const pending = entry.pendingAction;
+
+    let html = '<div class="hx-prog-row">';
+    html += '<div class="hx-prog-row-top"><span class="hx-prog-row-name">' + escapeHtml_(name) + '</span><span class="hx-prog-row-type">' + typeLabel + '</span></div>';
+    html += '<div class="hx-prog-row-target">' + escapeHtml_(progTargetLabel_(entry)) + '</div>';
+    html += '<div class="hx-prog-row-streak">' + escapeHtml_(pending ? 'Ready — see below.' : progStreakSummary_(entry)) + '</div>';
+    if (entry.state.painFlag) {
+      html += '<div class="hx-prog-row-flag">⚠ Flagged from a previous session — worth a look.</div>';
+    }
+    if (pending) {
+      const down = pending.verdict === 'WEIGHT_DOWN' || pending.verdict === 'TIME_DOWN';
+      html += '<div class="hx-prog-pending' + (down ? ' down' : '') + '">' +
+        '<span class="hx-prog-pending-text">' + escapeHtml_(pending.text) + '</span>' +
+        '<span class="hx-prog-pending-actions">' +
+          '<button type="button" class="confirm" onclick="progConfirmPending_(\'' + escapeHtml_(escapeJsAttr_(key)) + '\')">Confirm</button>' +
+          '<button type="button" class="ghost" onclick="this.closest(\'.hx-prog-pending\').style.display=\'none\'">Not now</button>' +
+        '</span></div>';
+    }
+    html += '</div>';
+    return html;
+  }).join('');
+}
+
 function closeHistoryExercise() {
   historyExercise_ = null;
   document.getElementById('hxExerciseListCard').style.display = '';
@@ -11553,6 +11635,7 @@ function renderHistoryTab() {
   else if (historySection_ === 'exercises') {
     if (historyExercise_) renderHistoryExercise(); else renderHistoryExerciseList();
   } else if (historySection_ === 'body') renderInbodyTab_();
+  else if (historySection_ === 'progression') renderHistoryProgression_();
   else renderHistoryWorkouts_(rows);
 }
 
@@ -22877,7 +22960,8 @@ function progTargetLabel_(entry) {
 
 function progFindPlanEx_(day, name) {
   const list = WEEKLY_PLAN_DATA[day] || [];
-  for (let i = 0; i < list.length; i++) { if (list[i].name === name) return list[i]; }
+  const target = String(name).trim().toLowerCase();
+  for (let i = 0; i < list.length; i++) { if (list[i].name.trim().toLowerCase() === target) return list[i]; }
   return null;
 }
 
@@ -23046,6 +23130,7 @@ function progRenderChip_(card) {
 
 function progRenderAllChips_() {
   document.querySelectorAll('.day-panel .exercise-card').forEach(function (card) { progRenderChip_(card); });
+  renderHistoryProgression_();
 }
 
 /* ---------- Adding sets / exercises + live totals ---------- */
