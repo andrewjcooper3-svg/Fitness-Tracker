@@ -785,6 +785,13 @@
      shadowed boxes) - the Apple Health "summary row" pattern instead of
      three identical tiles sitting side by side. */
   .ov-grid { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-radius: 18px; padding: 14px 0; margin-bottom: 12px; border: 1px solid var(--border); }
+  /* A separate grid rather than a 4th/5th/6th .ov-grid tile - the
+     landscape-phone tier's JS relocates "the" .ov-grid (document.
+     querySelector, first match) into a body-level pill and its CSS
+     assumes exactly 3 tiles (hides the 2nd by nth-child); reusing the
+     class here would either get silently skipped by that relocation or
+     have one of these three hidden under it. Same look, own class. */
+  .pu-year-days-grid { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-radius: 18px; padding: 14px 0; margin-bottom: 12px; border: 1px solid var(--border); }
   .ov-tile { padding: 0 14px; border-left: 1px solid var(--border); }
   .ov-tile:first-child { border-left: none; }
   .ov-tile-label { font-family: var(--font); font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px; }
@@ -3035,6 +3042,21 @@
   <div class="ov-tile">
     <div class="ov-tile-label">Days Active</div>
     <div class="ov-tile-value" id="ovDaysActive">0 / 7</div>
+  </div>
+</div>
+
+<div class="pu-year-days-grid">
+  <div class="ov-tile">
+    <div class="ov-tile-label">Days Left</div>
+    <div class="ov-tile-value" id="yearDaysLeft">0</div>
+  </div>
+  <div class="ov-tile">
+    <div class="ov-tile-label">Excl. Sundays</div>
+    <div class="ov-tile-value" id="yearDaysLeftNoSun">0</div>
+  </div>
+  <div class="ov-tile">
+    <div class="ov-tile-label">Work Days Left</div>
+    <div class="ov-tile-value" id="yearWorkDaysLeft">0</div>
   </div>
 </div>
 </div>
@@ -19588,6 +19610,33 @@ function renderPushupsTab() {
   badgeEl.classList.toggle('behind', !ahead);
   badgeEl.textContent = ahead ? 'On Pace' : 'Behind';
   subEl.textContent = ahead ? 'reps ahead of pace' : 'reps behind pace';
+
+  renderYearDaysLeft_();
+}
+
+// Counts today itself and Dec 31 both as remaining - "5 days left" on
+// Dec 27 means Dec 27-31 inclusive, not just the 4 days after today.
+function renderYearDaysLeft_() {
+  const elDays = document.getElementById('yearDaysLeft');
+  const elExclSun = document.getElementById('yearDaysLeftNoSun');
+  const elWork = document.getElementById('yearWorkDaysLeft');
+  if (!elDays || !elExclSun || !elWork) return;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dec31 = new Date(now.getFullYear(), 11, 31);
+
+  let totalDays = 0, exclSundays = 0, workDays = 0;
+  for (let d = new Date(today); d <= dec31; d.setDate(d.getDate() + 1)) {
+    const dow = d.getDay(); // 0 = Sunday, 6 = Saturday
+    totalDays++;
+    if (dow !== 0) exclSundays++;
+    if (dow !== 0 && dow !== 6) workDays++;
+  }
+
+  elDays.textContent = totalDays.toLocaleString();
+  elExclSun.textContent = exclSundays.toLocaleString();
+  elWork.textContent = workDays.toLocaleString();
 }
 
 /* ---------- Calendar tab (reads iCloud Calendar via the Apps Script backend) ---------- */
