@@ -22379,18 +22379,50 @@ function renderExerciseHistoryNotes() {
   refreshAllExerciseNameSelects_();
 }
 
+// Finds the Progression Engine's tracked entry for a given exercise
+// name wherever it's actually scheduled - preferring the day passed in
+// (typically the card's own day, so a same-day swap keeps behaving
+// exactly as it did before this existed), falling back to the first
+// other day that has it. This is what lets the swap dropdown answer
+// "what's next for this exercise" for anything in the list, not just
+// what's scheduled today.
+function progFindEntryAcrossDays_(name, preferDay) {
+  const order = preferDay ? [preferDay].concat(dayKeys.filter(d => d !== preferDay)) : dayKeys;
+  for (let i = 0; i < order.length; i++) {
+    const planEx = progFindPlanEx_(order[i], name);
+    if (planEx) return { day: order[i], planEx: planEx };
+  }
+  return null;
+}
+
+// Adds or removes .set-row elements so the card has exactly targetCount
+// sets, reusing the same addSet()/row-removal the manual +Add Set and
+// swipe-to-delete controls already use.
+function setExerciseSetCount_(card, targetCount) {
+  const count = Math.max(1, targetCount);
+  const addBtn = card.querySelector('.add-set-btn');
+  let rows = card.querySelectorAll('.set-row');
+  while (rows.length < count && addBtn) {
+    addSet(addBtn);
+    rows = card.querySelectorAll('.set-row');
+  }
+  while (rows.length > count) {
+    rows[rows.length - 1].remove();
+    rows = card.querySelectorAll('.set-row');
+  }
+  renumberSets(card);
+}
+
 // Swapping an exercise's name is swapping what's actually being logged,
 // not just relabeling it - the old exercise's typed weights/reps/checks/
 // quality belong to a different lift, so they're cleared rather than
-// carried over, and the placeholders (and unit) reset to the newly
-// picked exercise's next planned numbers. If the new name is itself
-// scheduled on this same day, that's the Progression Engine's own
-// tracked target (more current than a raw last-logged number - it may
-// already reflect a confirmed bump or drop); otherwise falls back to
-// the last actually-logged weight/reps for that name from any day, the
-// same source the "last time you did this" delta note reads from. Sets
-// count is left alone either way - guessing it wrong is worse than
-// leaving whatever this card already had.
+// carried over, and the weight/reps/sets (and unit) reset to the newly
+// picked exercise's next planned numbers from the Progression Engine -
+// wherever in the week that exercise is actually tracked, not just
+// today's plan, so this works for any exercise in the dropdown. Falls
+// back to the last actually-logged weight/reps for that name (no sets
+// count available there, so sets are left alone) only when the engine
+// has never seen it at all - a brand new name with no history yet.
 function onExerciseNameChange_(select) {
   const card = select.closest('.exercise-card');
   if (!card) return;
@@ -22398,28 +22430,26 @@ function onExerciseNameChange_(select) {
   const panel = card.closest('.day-panel');
   const day = panel ? panel.id.replace('day-', '') : '';
 
-  let unit = 'Reps', weightPh = '', repsPh = '';
-  const planEx = day ? progFindPlanEx_(day, newName) : null;
+  let unit = 'Reps', weightPh = '', repsPh = '', setsCount = null;
+  const found = progFindEntryAcrossDays_(newName, day);
 
-  if (planEx) {
-    unit = (planEx.rows[0] && planEx.rows[0][1]) || 'Reps';
-    const entry = progGetEntry_(day, planEx);
+  if (found) {
+    unit = (found.planEx.rows[0] && found.planEx.rows[0][1]) || 'Reps';
+    const entry = progGetEntry_(found.day, found.planEx);
     if (entry.type === 'weighted') {
       weightPh = entry.state.weight + ' lb';
       repsPh = String(entry.cfg.repRange[entry.state.repIdx]);
+      setsCount = entry.cfg.setRange[entry.state.setIdx];
     } else if (entry.type === 'time') {
       repsPh = entry.state.duration + 's';
+      setsCount = entry.state.sets;
     } else {
-      const firstRow = planEx.rows[0];
+      const firstRow = found.planEx.rows[0];
       weightPh = (firstRow && firstRow[0]) || '';
       repsPh = (firstRow && firstRow[2]) || '';
+      setsCount = found.planEx.rows.length;
     }
   } else {
-    Object.keys(WEEKLY_PLAN_DATA).some(d => {
-      const match = WEEKLY_PLAN_DATA[d].find(e => e.name.toLowerCase() === newName.toLowerCase());
-      if (match) { unit = (match.rows[0] && match.rows[0][1]) || 'Reps'; return true; }
-      return false;
-    });
     let historyMap = {};
     try { historyMap = JSON.parse(localStorage.getItem(STORAGE_EXERCISE_HISTORY_KEY) || '{}'); } catch (e) {}
     const hist = historyMap[newName.trim().toLowerCase()];
@@ -22429,6 +22459,8 @@ function onExerciseNameChange_(select) {
 
   const unitBadge = card.querySelector('.unit-badge');
   if (unitBadge) unitBadge.textContent = unit;
+
+  if (setsCount != null) setExerciseSetCount_(card, setsCount);
 
   card.querySelectorAll('.set-row').forEach(row => {
     const inputs = row.querySelectorAll('.set-input');
@@ -22442,8 +22474,8 @@ function onExerciseNameChange_(select) {
 
   const metaEl = card.querySelector('.exercise-meta');
   if (metaEl) {
-    const setsCount = card.querySelectorAll('.set-row').length;
-    metaEl.textContent = (weightPh || '—') + ' · ' + setsCount + ' × ' + (repsPh || '—');
+    const rowCount = card.querySelectorAll('.set-row').length;
+    metaEl.textContent = (weightPh || '—') + ' · ' + rowCount + ' × ' + (repsPh || '—');
   }
 
   updateExerciseHistoryNote(card);
