@@ -250,6 +250,8 @@
   .add-exercise-btn:hover, .add-exercise-btn:active { background: var(--surface2); }
   .exercise-name-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 15px; font-weight: 600; font-family: inherit; outline: none; padding: 2px 0; }
   .exercise-name-input:focus { border-bottom-color: var(--accent); }
+  .exercise-name-select { width: 100%; max-width: 100%; background: var(--surface); border: none; border-bottom: 1px solid var(--border); color: var(--text); font-size: 15px; font-weight: 600; font-family: inherit; outline: none; padding: 2px 0; cursor: pointer; }
+  .exercise-name-select:focus { border-bottom-color: var(--accent); }
   .card { background: var(--surface); border-radius: 16px; overflow: hidden; margin-bottom: 10px; }
   .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; -webkit-user-select: none; }
   .check-item:last-child { border-bottom: none; }
@@ -5069,7 +5071,58 @@ function escapeText_(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, 
 // siblings inside exercise-card, set-row/set-input-group/set-checkbox
 // structure) since none of that code changed, only where the markup
 // comes from.
+// Every distinct exercise name this app knows about: everything in this
+// week's plan, plus everything the remote exercise-history endpoint has
+// ever seen logged (across all past weeks, regardless of which day it
+// fell on) - the same "all previous workouts" the swap dropdown below
+// draws from. Plan names win on casing where both sources have the same
+// exercise (nicer than the lowercase keys history is stored under).
+function allKnownExerciseNames_() {
+  const map = new Map();
+  Object.keys(WEEKLY_PLAN_DATA).forEach(day => {
+    WEEKLY_PLAN_DATA[day].forEach(ex => {
+      map.set(ex.name.trim().toLowerCase(), ex.name.trim());
+    });
+  });
+  try {
+    const historyMap = JSON.parse(localStorage.getItem(STORAGE_EXERCISE_HISTORY_KEY) || '{}');
+    Object.keys(historyMap).forEach(rawName => {
+      const key = rawName.trim().toLowerCase();
+      if (!map.has(key)) map.set(key, titleCaseExerciseName_(rawName));
+    });
+  } catch (e) {}
+  return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+}
+
+function titleCaseExerciseName_(s) {
+  return String(s).replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1));
+}
+
+function exerciseNameOptionsHtml_() {
+  return allKnownExerciseNames_().map(n => `<option value="${escapeAttr_(n)}">${escapeText_(n)}</option>`).join('');
+}
+
+// Re-populates every exercise-name dropdown already on the page - called
+// whenever the remote history list changes, since that's the "all
+// previous workouts" source and can grow after initial render (a page
+// that's been open a while, or history arriving after a slow first load).
+function refreshAllExerciseNameSelects_() {
+  const optionsHtml = exerciseNameOptionsHtml_();
+  document.querySelectorAll('.exercise-name-select').forEach(select => {
+    const current = select.value;
+    select.innerHTML = optionsHtml;
+    if (!Array.from(select.options).some(o => o.value === current)) {
+      const opt = document.createElement('option');
+      opt.value = current;
+      opt.textContent = current;
+      select.insertBefore(opt, select.firstChild);
+    }
+    select.value = current;
+  });
+}
+
 function renderWeeklyPlan_() {
+  const optionsHtml = exerciseNameOptionsHtml_();
   Object.keys(WEEKLY_PLAN_DATA).forEach(day => {
     const panel = document.getElementById('day-' + day);
     const anchor = panel && panel.querySelector(':scope > .exercise-anchor');
@@ -5095,8 +5148,9 @@ function renderWeeklyPlan_() {
 
       const card = document.createElement('div');
       card.className = 'exercise-card';
-      card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name">${escapeText_(ex.name)}</div><div class="unit-badge">${escapeText_(unitLabel)}</div><div class="exercise-meta">${escapeText_(ex.meta)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
+      card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onExerciseNameChange_(this)">${optionsHtml}</select></div><div class="unit-badge">${escapeText_(unitLabel)}</div><div class="exercise-meta">${escapeText_(ex.meta)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
       panel.insertBefore(card, anchor);
+      card.querySelector('.exercise-name-select').value = ex.name;
     });
   });
 }
@@ -22233,6 +22287,8 @@ function getCalendarWorkerUrl() {
 function getExerciseName(card) {
   const nameInput = card.querySelector('.exercise-name-input');
   if (nameInput) return nameInput.value.trim();
+  const nameSelect = card.querySelector('.exercise-name-select');
+  if (nameSelect) return nameSelect.value.trim();
   return card.querySelector('.exercise-name').textContent.trim();
 }
 
@@ -22320,6 +22376,79 @@ function updateExerciseHistoryNote(card) {
 
 function renderExerciseHistoryNotes() {
   document.querySelectorAll('.exercise-card').forEach(updateExerciseHistoryNote);
+  refreshAllExerciseNameSelects_();
+}
+
+// Swapping an exercise's name is swapping what's actually being logged,
+// not just relabeling it - the old exercise's typed weights/reps/checks/
+// quality belong to a different lift, so they're cleared rather than
+// carried over, and the placeholders (and unit) reset to the newly
+// picked exercise's next planned numbers. If the new name is itself
+// scheduled on this same day, that's the Progression Engine's own
+// tracked target (more current than a raw last-logged number - it may
+// already reflect a confirmed bump or drop); otherwise falls back to
+// the last actually-logged weight/reps for that name from any day, the
+// same source the "last time you did this" delta note reads from. Sets
+// count is left alone either way - guessing it wrong is worse than
+// leaving whatever this card already had.
+function onExerciseNameChange_(select) {
+  const card = select.closest('.exercise-card');
+  if (!card) return;
+  const newName = select.value;
+  const panel = card.closest('.day-panel');
+  const day = panel ? panel.id.replace('day-', '') : '';
+
+  let unit = 'Reps', weightPh = '', repsPh = '';
+  const planEx = day ? progFindPlanEx_(day, newName) : null;
+
+  if (planEx) {
+    unit = (planEx.rows[0] && planEx.rows[0][1]) || 'Reps';
+    const entry = progGetEntry_(day, planEx);
+    if (entry.type === 'weighted') {
+      weightPh = entry.state.weight + ' lb';
+      repsPh = String(entry.cfg.repRange[entry.state.repIdx]);
+    } else if (entry.type === 'time') {
+      repsPh = entry.state.duration + 's';
+    } else {
+      const firstRow = planEx.rows[0];
+      weightPh = (firstRow && firstRow[0]) || '';
+      repsPh = (firstRow && firstRow[2]) || '';
+    }
+  } else {
+    Object.keys(WEEKLY_PLAN_DATA).some(d => {
+      const match = WEEKLY_PLAN_DATA[d].find(e => e.name.toLowerCase() === newName.toLowerCase());
+      if (match) { unit = (match.rows[0] && match.rows[0][1]) || 'Reps'; return true; }
+      return false;
+    });
+    let historyMap = {};
+    try { historyMap = JSON.parse(localStorage.getItem(STORAGE_EXERCISE_HISTORY_KEY) || '{}'); } catch (e) {}
+    const hist = historyMap[newName.trim().toLowerCase()];
+    weightPh = hist && typeof hist.weight === 'number' ? hist.weight + ' lb' : '';
+    repsPh = hist && typeof hist.reps === 'number' ? String(hist.reps) : '';
+  }
+
+  const unitBadge = card.querySelector('.unit-badge');
+  if (unitBadge) unitBadge.textContent = unit;
+
+  card.querySelectorAll('.set-row').forEach(row => {
+    const inputs = row.querySelectorAll('.set-input');
+    if (inputs[0]) { inputs[0].placeholder = weightPh; inputs[0].value = ''; }
+    if (inputs[1]) { inputs[1].placeholder = repsPh; inputs[1].value = ''; }
+    if (inputs[2]) { inputs[2].value = ''; syncNotesButton_(inputs[2]); }
+    const checkbox = row.querySelector('.set-checkbox');
+    if (checkbox) { checkbox.classList.remove('checked'); delete checkbox.dataset.checkedAt; }
+    row.querySelectorAll('.quality-box').forEach(b => b.classList.remove('active'));
+  });
+
+  const metaEl = card.querySelector('.exercise-meta');
+  if (metaEl) {
+    const setsCount = card.querySelectorAll('.set-row').length;
+    metaEl.textContent = (weightPh || '—') + ' · ' + setsCount + ' × ' + (repsPh || '—');
+  }
+
+  updateExerciseHistoryNote(card);
+  updateExerciseTotal(card);
+  saveState();
 }
 
 async function loadRemoteExerciseHistory() {
