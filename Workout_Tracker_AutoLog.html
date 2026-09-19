@@ -5337,7 +5337,13 @@ function loadSettingsIntoState() {
       const override = saved.drinkAmounts[type];
       if (override && override.rawOz > 0 && override.hydrationOz >= 0) {
         WATER_DRINK_TYPES[type].defaultOz = override.rawOz;
-        WATER_DRINK_TYPES[type].hydrationRatio = override.hydrationOz / override.rawOz;
+        // Plain water is always 1:1 hydration by definition - never let
+        // a stored pair from before this ratio existed (or any other
+        // drift between its rawOz/hydrationOz) knock it off 1, the way
+        // every other drink's ratio is allowed to.
+        if (type !== 'water') {
+          WATER_DRINK_TYPES[type].hydrationRatio = override.hydrationOz / override.rawOz;
+        }
       }
     });
   }
