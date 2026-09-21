@@ -562,6 +562,7 @@
   .ov-hero-progress { height: 6px; background: var(--surface2); border-radius: 3px; margin-top: 7px; overflow: hidden; }
   .ov-hero-progress-fill { height: 100%; background: #e0916f; border-radius: 3px; transition: width 0.6s ease; }
   .ov-hero-card-status { font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--muted); margin-top: 6px; }
+  .ov-hero-card-status b { color: var(--text); font-variant-numeric: tabular-nums; }
   /* Pushups drop-down - same collapse mechanics as the water chart so the
      two hero cards behave identically, but a 7-bar week instead of a
      24-hour day. The chevron lives in its own head row that swallows the
@@ -2553,6 +2554,8 @@
   .rt-habit-cadence { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
   .rt-habit-stats { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
   .rt-habit-stats b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .rt-overall-streaks { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .rt-overall-streaks b { color: var(--text); font-variant-numeric: tabular-nums; }
   .rt-habit-strip { display: flex; gap: 2px; margin-top: 9px; }
   .rt-habit-strip span { flex: 1; height: 16px; border-radius: 3px; background: var(--surface2); }
   .rt-habit-strip span.on { background: var(--accent); }
@@ -2824,6 +2827,7 @@
       <div class="ov-hero-head" onclick="toggleOvRoutinesCal_(event)">
         <div class="ov-hero-card-label" style="margin-bottom:0;">✅ Routines <span class="ov-hero-chevron" id="ovRoutinesChevron">▸</span></div>
       </div>
+      <div class="ov-hero-card-status" id="ovRoutinesStreakStatus"></div>
       <div id="ovRoutinesList" style="margin-top:8px;"></div>
     </div>
     <div class="ov-routines-cal-wrap" id="ovRoutinesCalWrap" onclick="event.stopPropagation()">
@@ -3894,6 +3898,7 @@
           <div class="rt-today-headline" id="rtTodayHeadline">—</div>
           <div class="rt-mini-day-block" id="rtTodayMiniBlock"></div>
         </div>
+        <div class="rt-overall-streaks" id="rtOverallStreaks"></div>
       </div>
     </div>
     <div id="rtTodayList"></div>
@@ -9395,6 +9400,8 @@ function rtRenderToday() {
   if (todayBtn) todayBtn.style.display = isToday ? 'none' : '';
   const miniEl = document.getElementById('rtTodayMiniBlock');
   if (miniEl) miniEl.innerHTML = rtDaySections(k, rtViewDay);
+  const streaksEl = document.getElementById('rtOverallStreaks');
+  if (streaksEl) streaksEl.innerHTML = rtOverallStreakHtml_();
 
   const list = document.getElementById('rtTodayList');
   if (!list) return;
@@ -9548,6 +9555,37 @@ function rtLongestAllCompleteStreak_() {
     }
   }
   return { start: bestStart, end: bestEnd, length: bestLen };
+}
+
+// The current run of "full" days, ending today - same rtDayAllComplete_
+// definition as the longest-streak scan, so this number always matches
+// what's actually gold on the calendar. Today gets the same allowance
+// every per-habit streak already gets (see rtCurrentStreak): not
+// finished yet doesn't break the streak, it just doesn't count until it
+// is.
+function rtCurrentAllCompleteStreak_() {
+  let n = 0;
+  const todayKey = dateKey(rtToday);
+  for (let i = 0; i <= 730; i++) {
+    const d = new Date(rtToday.getTime() - i * ROUTINES_DAY_MS);
+    const k = dateKey(d);
+    if (rtDayAllComplete_(k, d)) { n++; continue; }
+    if (k === todayKey) continue;
+    break;
+  }
+  return n;
+}
+
+function rtStreakDaysLabel_(n) { return n === 1 ? '1 day' : n + ' days'; }
+
+// Shared by the Routines tab's Today card and the Overview hero card, so
+// the two surfaces can never show different numbers for the same thing.
+function rtOverallStreakHtml_() {
+  if (!RT_HABITS.list.some(h => !h.deleted)) return '';
+  const longest = rtLongestAllCompleteStreak_().length;
+  const current = rtCurrentAllCompleteStreak_();
+  return `\u{1F525} Current streak <b>${rtStreakDaysLabel_(current)}</b>` +
+    `&nbsp;&nbsp;&nbsp;\u{1F3C6} Longest <b>${rtStreakDaysLabel_(longest)}</b>`;
 }
 
 let rtSelectedDay = null;
@@ -17783,11 +17821,15 @@ function setOvRoutinesCalMode(mode) {
 function ovRoutinesDayCellHtml_(d) {
   const k = dateKey(d);
   if (d > rtToday) return `<div class="rt-month-cell future"><span class="rt-month-daynum">${d.getDate()}</span></div>`;
-  return `<div class="rt-month-cell" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d)}<span class="rt-month-daynum">${d.getDate()}</span></div>`;
+  return `<div class="rt-month-cell" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d, false, rtInLongestStreak_(k))}<span class="rt-month-daynum">${d.getDate()}</span></div>`;
 }
 function renderOvRoutinesCalendar_() {
   const grid = document.getElementById('ovRoutinesCalGrid');
   if (!grid || typeof RT_HABITS === 'undefined') return;
+  // Recomputed here rather than relying on rtRenderHistory() having run
+  // first - this widget can render (Overview opens straight to it) before
+  // the Routines tab's own History section ever has.
+  rtLongestStreak_ = rtLongestAllCompleteStreak_();
   if (ovRoutinesCalMode_ === 'week') {
     const ws = rtWeekStart(rtToday);
     let cells = '';
@@ -17809,7 +17851,7 @@ function renderOvRoutinesCalendar_() {
     const d = new Date(y, m, day);
     if (d > rtToday) { cells += '<div class="ov-month-sq"></div>'; continue; }
     const k = dateKey(d);
-    cells += `<div class="ov-month-sq" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d, true)}</div>`;
+    cells += `<div class="ov-month-sq" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}">${rtDaySections(k, d, true, rtInLongestStreak_(k))}</div>`;
   }
   grid.innerHTML = `<div class="ov-month-flow">${cells}</div>`;
   if (heroChartsPinned_()) ovFillMonthFlow_(grid.querySelector('.ov-month-flow'), daysInMonth);
@@ -17885,6 +17927,8 @@ function renderOverviewRoutinesWidget_() {
   if (!list || typeof RT_HABITS === 'undefined') return;
   const active = RT_HABITS.list.filter(h => !h.deleted);
   const k = dateKey(rtToday);
+  const streakStatusEl = document.getElementById('ovRoutinesStreakStatus');
+  if (streakStatusEl) streakStatusEl.innerHTML = rtOverallStreakHtml_();
   list.classList.remove('rt-item-list-2col');
   if (!active.length) {
     list.innerHTML = '<div class="ov-mini-empty">No habits yet - add one from the Routines tab</div>';
