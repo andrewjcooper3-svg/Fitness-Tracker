@@ -2552,6 +2552,7 @@
   .rt-habit-strip span.excused { background: var(--blue); opacity: 0.55; }
   .rt-habit-strip span.miss { background: var(--red); opacity: 0.35; }
   .rt-habit-strip span.future { background: transparent; }
+  .rt-habit-strip span.none { background: transparent; }
   .rt-habit-move, .rt-habit-edit, .rt-habit-del { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
   .rt-habit-move { font-size: 13px; }
   .rt-habit-move:disabled { opacity: 0.25; cursor: default; }
@@ -3119,7 +3120,7 @@
 <!-- TUESDAY -->
 <div id="day-tue" class="day-panel" data-pushup-target="165">
 
-  <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Arms + Core.</span></div></div>
+  <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 165/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <div class="day-notes-row">
@@ -3136,7 +3137,7 @@
 
 <!-- WEDNESDAY -->
 <div id="day-wed" class="day-panel" data-pushup-target="165">
-  <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Gym moved to Tue/Thu this week (Sat is recovery). Pushups at 165/day baseline.</span></div></div>
+  <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 45-55 min. Focus: Legs + Back + Shoulders. Left arm emphasis.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <div class="day-notes-row">
@@ -3153,7 +3154,7 @@
 
 <!-- THURSDAY -->
 <div id="day-thu" class="day-panel" data-pushup-target="165">
-  <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 45-50 min. Focus: Legs + Back + Chest. Left arm emphasis. Progressing lifts that were completed clean last week; holding anything marked tough.</span></div></div>
+  <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 165/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <div class="day-notes-row">
@@ -5141,7 +5142,12 @@ function refreshAllExerciseNameSelects_() {
   const optionsHtml = exerciseNameOptionsHtml_();
   document.querySelectorAll('.exercise-name-select').forEach(select => {
     const current = select.value;
-    select.innerHTML = optionsHtml;
+    // A custom "+ Add Exercise" card's dropdown carries a leading
+    // "+ New workout..." option a prescribed card's never has - keep it
+    // across the rebuild, or a card still sitting on it would lose the
+    // real label and show the raw '__new__' value as a fake option.
+    const hasNewOption = !!select.querySelector('option[value="__new__"]');
+    select.innerHTML = (hasNewOption ? '<option value="__new__">+ New workout...</option>' : '') + optionsHtml;
     if (!Array.from(select.options).some(o => o.value === current)) {
       const opt = document.createElement('option');
       opt.value = current;
@@ -9093,10 +9099,31 @@ function rtLinkEffectiveThreshold_(h) {
   if (h.link.weeklyTotal) return Math.max(1, Math.round(h.link.weeklyTotal / rtLinkDaysPerWeek_(h)));
   return h.link.threshold || src.defaultThreshold();
 }
+function rtIsPushupLinked_(h) {
+  return !!(h.link && h.link.source === 'pushups');
+}
+// Sum of the pushups ledger across a Mon-Sun week (7 days from weekStart),
+// including days with nothing logged. Used to grade a day against the
+// week's cumulative target rather than its own slice of it - see rtIsDoneOn.
+function rtPushupWeekTotal_(weekStart) {
+  const src = ROUTINES_LINK_SOURCES.pushups;
+  let total = 0;
+  for (let i = 0; i < 7; i++) total += src.valueOn(dateKey(new Date(weekStart.getTime() + i * ROUTINES_DAY_MS)));
+  return total;
+}
 function rtIsDoneOn(h, dateStr) {
   if (h.link && ROUTINES_LINK_SOURCES[h.link.source]) {
     const src = ROUTINES_LINK_SOURCES[h.link.source];
-    return src.kind === 'logged' ? !!src.doneOn(dateStr) : src.valueOn(dateStr) >= rtLinkEffectiveThreshold_(h);
+    if (src.kind === 'logged') return !!src.doneOn(dateStr);
+    const value = src.valueOn(dateStr);
+    // Pushups is a cumulative weekly target, not a fixed daily one - once
+    // the week's total is met, every day that had any reps logged counts
+    // as done, even if that day alone fell short of an even per-day split.
+    if (rtIsPushupLinked_(h) && value > 0) {
+      const target = h.link.weeklyTotal || src.defaultWeeklyTotal();
+      if (rtPushupWeekTotal_(rtWeekStart(new Date(dateStr + 'T00:00:00'))) >= target) return true;
+    }
+    return value >= rtLinkEffectiveThreshold_(h);
   }
   return !!(RT_LOG[dateStr] && RT_LOG[dateStr][h.id] && RT_LOG[dateStr][h.id].done);
 }
@@ -9596,6 +9623,9 @@ function rtRenderHabits() {
       if (h.cadence === 'week') {
         const dk = dateKey(d);
         const on = rtIsDoneOn(h, dk);
+        if (rtIsPushupLinked_(h) && !rtIsExcusedOn(h, dk) && ROUTINES_LINK_SOURCES.pushups.valueOn(dk) <= 0) {
+          return `<span class="none" title="${dk} (no pushups logged)"></span>`;
+        }
         const ws = rtWeekStart(d);
         const missed = !on && ws.getTime() < rtWeekStart(rtToday).getTime() && rtWeekMissDays_(h, ws).has(dk);
         return `<span class="${on ? 'on' : (missed ? 'miss' : '')}" title="${dk}${missed ? ' (weekly target missed)' : ''}"></span>`;
@@ -9604,6 +9634,9 @@ function rtRenderHabits() {
       const dk = dateKey(d);
       const on = rtIsDoneOn(h, dk);
       const excused = rtIsExcusedOn(h, dk) && !on;
+      if (rtIsPushupLinked_(h) && !excused && ROUTINES_LINK_SOURCES.pushups.valueOn(dk) <= 0) {
+        return `<span class="none" title="${dk} (no pushups logged)"></span>`;
+      }
       return `<span class="${excused ? 'excused' : (on ? 'on' : 'miss')}" title="${dk}${excused ? ' (vacation)' : ''}"></span>`;
     }).join('');
     const pct = rtCompletionPct(h);
@@ -16155,6 +16188,30 @@ function checkForWeekRollover_() {
   if (weekLabelAtLoad_ !== null && getWeekLabel() !== weekLabelAtLoad_) location.reload();
 }
 
+// Logs each day to the Sheet the next time the app is opened after that
+// day has passed, instead of leaving everything to archiveFinishedWeek_'s
+// single end-of-week batch (which fires every unlogged day from that
+// batch concurrently, so rows can land in the Sheet out of date order).
+// One submitWorkout() call per day as it comes due keeps them landing
+// close to in order. archiveFinishedWeek_ stays in place as the safety
+// net for whatever this never got a chance to see live - the app closed
+// for the rest of the week, or Sunday itself, which this never catches
+// since nothing comes "after" it within the same week.
+function checkForDayRollover_() {
+  // A week-rollover reload may be about to happen (see checkForWeekRollover_
+  // above) - if so, getWeekLabel() here would already read the NEW week
+  // while the DOM still shows the old one, mislabeling whatever this queued.
+  // Bail and let the reload (and the fresh boot after it) sort it out.
+  if (weekLabelAtLoad_ !== null && getWeekLabel() !== weekLabelAtLoad_) return;
+  const week = getWeekLabel();
+  const todayIdx = (new Date().getDay() + 6) % 7; // 0 = Monday ... 6 = Sunday
+  for (let i = 0; i < todayIdx; i++) {
+    const day = dayKeys[i];
+    if (isDayLogged_(week, day)) continue;
+    submitWorkout(day, buildPayload(day));
+  }
+}
+
 function dateKey(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -16167,7 +16224,12 @@ function dateKey(d) {
 function serializeDay(day) {
   const panel = document.getElementById('day-' + day);
   const exercises = Array.from(panel.querySelectorAll('.exercise-card')).map(card => {
-    const nameInput = card.querySelector('.exercise-name-input');
+    // A custom "+ Add Exercise" card can show either a text box or (since
+    // the add-exercise dropdown) the same .exercise-name-select a
+    // prescribed card uses, so what's currently rendered inside it can't
+    // tell the two apart - the id assigned at creation (addExercise vs.
+    // renderWeeklyPlan_/tagExerciseIds) can, and never changes afterward.
+    const isCustom = !!(card.dataset.exId && card.dataset.exId.indexOf('custom-') === 0);
     const sets = Array.from(card.querySelectorAll('.set-row')).map(row => {
       const inputs = row.querySelectorAll('.set-input');
       const activeQuality = row.querySelector('.quality-box.active');
@@ -16191,7 +16253,7 @@ function serializeDay(day) {
     // restoreDay only reads it for customs, but the end-of-week archive has
     // no other source: by the time it runs, the DOM holds the NEW week's
     // exercises, so a prescribed card would otherwise archive nameless.
-    return { id: card.dataset.exId, custom: !!nameInput, name: getExerciseName(card),
+    return { id: card.dataset.exId, custom: isCustom, name: getExerciseName(card),
              meta: (card.querySelector('.exercise-meta') || {}).textContent || '', sets: sets };
   });
 
@@ -16831,8 +16893,7 @@ function restoreDay(day, savedDay) {
         const cards = panel.querySelectorAll('.exercise-card');
         card = cards[cards.length - 1];
         card.dataset.exId = savedEx.id;
-        const nameInput = card.querySelector('.exercise-name-input');
-        if (nameInput) nameInput.value = savedEx.name;
+        setRestoredCustomExerciseName_(card, savedEx.name);
       }
       if (addExerciseBtn) panel.insertBefore(card, addExerciseBtn);
 
@@ -16872,8 +16933,7 @@ function restoreDay(day, savedDay) {
       if (!card) {
         addExercise(panel, true);
         card = panel.querySelectorAll('.exercise-card')[i];
-        const nameInput = card.querySelector('.exercise-name-input');
-        if (nameInput) nameInput.value = savedEx.name;
+        setRestoredCustomExerciseName_(card, savedEx.name);
       }
 
       let rows = card.querySelectorAll('.set-row');
@@ -17002,13 +17062,6 @@ function payloadFromSavedDay_(week, day, savedDay) {
   };
 }
 
-// Only days with something actually completed. An untouched rest day, or a
-// day whose sets were all left unchecked, is not worth a row.
-function savedDayHasWork_(savedDay) {
-  return (savedDay && savedDay.exercises || []).some(ex =>
-    (ex.sets || []).some(s => s.checked));
-}
-
 // Same "checked sets only, typed reps else the target" rule sumReps()
 // uses on the live DOM, replayed against a SAVED day snapshot instead -
 // see archiveFinishedWeek_ for why the live version can't be used here.
@@ -17052,9 +17105,8 @@ function archiveFinishedWeek_(saved) {
 
   dayKeys.forEach(day => {
     const savedDay = (saved.days || {})[day];
-    if (!savedDayHasWork_(savedDay)) return;
     if (isDayLogged_(week, day)) return;
-    queuePendingLog(day, payloadFromSavedDay_(week, day, savedDay));
+    queuePendingLog(day, payloadFromSavedDay_(week, day, savedDay || {}));
     markDayLogged_(week, day);
     queued++;
   });
@@ -22377,7 +22429,10 @@ function getExerciseName(card) {
   const nameInput = card.querySelector('.exercise-name-input');
   if (nameInput) return nameInput.value.trim();
   const nameSelect = card.querySelector('.exercise-name-select');
-  if (nameSelect) return nameSelect.value.trim();
+  // '__new__' is the "+ New workout..." placeholder option on a freshly
+  // added custom card that hasn't been swapped to a text box yet (or had
+  // a real name picked) - it's not a name, so this reads as unnamed.
+  if (nameSelect) return nameSelect.value === '__new__' ? '' : nameSelect.value.trim();
   return card.querySelector('.exercise-name').textContent.trim();
 }
 
@@ -23648,11 +23703,45 @@ document.addEventListener('pointerdown', (e) => {
 
 let nextCustomExId = 1;
 
+// Swaps a card's exercise-name dropdown for a plain text box, same shape
+// as the old "+ Add Exercise" card - used both for "+ New workout..." and
+// for a restored custom card whose saved name isn't in the dropdown at
+// all (a one-off typed name from before this existed, or since deleted
+// from history/the plan).
+function swapExerciseNameSelectToInput_(select, focus) {
+  const card = select.closest('.exercise-card');
+  const input = document.createElement('input');
+  input.className = 'exercise-name-input';
+  input.type = 'text';
+  input.placeholder = 'Exercise name';
+  input.addEventListener('click', e => e.stopPropagation());
+  input.addEventListener('input', () => updateExerciseHistoryNote(card));
+  select.replaceWith(input);
+  if (focus) input.focus();
+  return input;
+}
+
+// Change handler for a custom card's exercise-name dropdown (the
+// "+ Add Exercise" button's own select, distinct from a prescribed
+// card's - see onExerciseNameChange_). Picking a known name behaves
+// exactly like renaming a prescribed exercise, right down to the
+// progression-aware autofill; picking "+ New workout..." swaps the
+// dropdown for a text box instead, so a one-off name can still be typed.
+function onNewExerciseNameChange_(select) {
+  if (select.value === '__new__') {
+    swapExerciseNameSelectToInput_(select, true);
+    saveState();
+    return;
+  }
+  onExerciseNameChange_(select);
+}
+
 function addExercise(panel, skipFocus) {
   const card = document.createElement('div');
   card.className = 'exercise-card';
   card.dataset.exId = 'custom-' + Date.now() + '-' + (nextCustomExId++);
-  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><input class="exercise-name-input" type="text" placeholder="Exercise name" onclick="event.stopPropagation()" oninput="updateExerciseHistoryNote(this.closest('.exercise-card'))"></div><div class="unit-badge">Reps</div><div class="exercise-meta">Custom</div></div>` +
+  const optionsHtml = exerciseNameOptionsHtml_();
+  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onNewExerciseNameChange_(this)"><option value="__new__">+ New workout...</option>${optionsHtml}</select></div><div class="unit-badge">Reps</div><div class="exercise-meta">Custom</div></div>` +
     `<div class="exercise-sets expanded"><div class="set-row"><div class="set-num">1</div>` +
     `<div class="set-input-group"><input class="set-input big-num" type="text"></div>` +
     `<div class="set-input-group"><input class="set-input big-num" type="text"></div>` +
@@ -23664,8 +23753,28 @@ function addExercise(panel, skipFocus) {
   const addBtn = panel.querySelector(':scope > .add-exercise-btn');
   panel.insertBefore(card, addBtn);
   initExerciseSets(card);
-  if (!skipFocus) card.querySelector('.exercise-name-input').focus();
+  const select = card.querySelector('.exercise-name-select');
+  select.value = '__new__';
+  if (!skipFocus) select.focus();
   saveState();
+}
+
+// Applies a restored custom card's saved name: picks it in the dropdown
+// when it's a known previous workout (without triggering the
+// progression-autofill onNewExerciseNameChange_ would run - restoreDay
+// replays the actual saved set values right after this), otherwise falls
+// back to a plain text box the way the name was originally typed.
+function setRestoredCustomExerciseName_(card, name) {
+  const select = card.querySelector('.exercise-name-select');
+  if (!select) return;
+  const target = (name || '').trim().toLowerCase();
+  const match = Array.from(select.options).find(o => o.value.toLowerCase() === target);
+  if (match) {
+    select.value = match.value;
+  } else {
+    const input = swapExerciseNameSelectToInput_(select, false);
+    input.value = name || '';
+  }
 }
 
 function initAddExerciseButtons() {
@@ -24118,10 +24227,11 @@ bootLocalSavedAt_ = (() => {
 })();
 restoreState();
 weekLabelAtLoad_ = getWeekLabel();
+checkForDayRollover_();
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') checkForWeekRollover_();
+  if (document.visibilityState === 'visible') { checkForWeekRollover_(); checkForDayRollover_(); }
 });
-setInterval(checkForWeekRollover_, 5 * 60 * 1000);
+setInterval(() => { checkForWeekRollover_(); checkForDayRollover_(); }, 5 * 60 * 1000);
 
 // The Water widget only pulled from the Sheet once, at page load - fine
 // for a page you just opened, but a phone tab left open all day (e.g. a
