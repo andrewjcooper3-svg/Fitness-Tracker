@@ -23,7 +23,7 @@
     --bg: #10141f; --surface: #1a2233; --surface2: #232d42; --border: rgba(210,225,255,0.09);
     --text: #eef2fb; --muted: #8b96ad; --accent: #5b8cff; --green: #34c795;
     --red: #ef5b6b; --amber: #f0b429; --blue: #5b8cff; --purple: #9c8cf5; --teal: #33c2c2;
-    --gold: #e8c547;
+    --gold: #f4c430; --gold-shine: #fff3c4;
     --nav-bg: rgba(16,20,31,0.82);
     /* Chart ink, kept apart from the UI accents above.
        The interface hues are picked to sit on buttons and checkmarks; on a
@@ -63,7 +63,7 @@
       --bg: #f4f6fb; --surface: #ffffff; --surface2: #eef1f8; --border: rgba(20,30,50,0.08);
       --text: #1a2233; --muted: #66738c; --accent: #3d6fe0; --green: #1fa972;
       --red: #d8434f; --amber: #c98a12; --blue: #3d6fe0; --purple: #7c6ae0; --teal: #1aa3a3;
-      --gold: #b8860b;
+      --gold: #c68a00; --gold-shine: #ffdd77;
       --nav-bg: rgba(244,246,251,0.82);
       --logo-ink: #6B4229;
       --chart-1: #2a78d6; --chart-good: #1baf7a; --chart-warn: #eda100; --chart-2: #4a3aa7;
@@ -75,7 +75,7 @@
     --bg: #f4f6fb; --surface: #ffffff; --surface2: #eef1f8; --border: rgba(20,30,50,0.08);
     --text: #1a2233; --muted: #66738c; --accent: #3d6fe0; --green: #1fa972;
     --red: #d8434f; --amber: #c98a12; --blue: #3d6fe0; --purple: #7c6ae0; --teal: #1aa3a3;
-    --gold: #b8860b;
+    --gold: #c68a00; --gold-shine: #ffdd77;
     --nav-bg: rgba(244,246,251,0.82);
     --logo-ink: #6B4229;
     --chart-1: #2a78d6; --chart-good: #1baf7a; --chart-warn: #eda100; --chart-2: #4a3aa7;
@@ -2503,12 +2503,6 @@
   .rt-month-cell.pad { background: transparent; cursor: default; }
   .rt-month-cell.future { cursor: default; }
   .rt-month-cell.selected { outline: 2px solid var(--text); outline-offset: 1px; }
-  /* The single longest run of days where every habit due that day got
-     done - a ring rather than a fill, since the day-sections already own
-     the cell's own background (see .rt-day-sections below) and would
-     otherwise hide a gold fill completely. */
-  .rt-month-cell.streak { box-shadow: 0 0 0 2px var(--gold); }
-  .rt-year-sq.streak { box-shadow: 0 0 0 1.5px var(--gold); }
   .rt-day-sections { position: absolute; inset: 3px; border-radius: 6px; overflow: hidden; display: grid;
     grid-auto-flow: column; grid-template-rows: 1fr; gap: 1px; }
   .rt-day-sections.tiny { inset: 0; border-radius: 2px; gap: 0.5px; }
@@ -2516,6 +2510,10 @@
   .rt-sec-excused { background: var(--blue); }
   .rt-sec-pending { background: var(--amber); }
   .rt-sec-miss { background: var(--red); }
+  /* The single longest run of days where every habit due that day got
+     done - the completed (green) sections on those days turn gold
+     outright instead of just ringing the cell. */
+  .rt-sec-done.gold { background: linear-gradient(135deg, var(--gold-shine), var(--gold) 65%); box-shadow: inset 0 0 3px rgba(255,255,255,0.4); }
   .rt-month-daynum { position: absolute; top: 3px; right: 3px; font-size: 10px; font-weight: 700; color: var(--text);
     background: var(--surface); border-radius: 4px; padding: 0 3px; line-height: 1.5; }
   .rt-month-cell.pad .rt-month-daynum { display: none; }
@@ -3936,7 +3934,7 @@
         <span class="rt-month-cell" style="background:var(--blue); margin-left:10px;"></span><span>Vacation</span>
         <span class="rt-month-cell" style="background:var(--amber); margin-left:10px;"></span><span>Pending</span>
         <span class="rt-month-cell" style="background:var(--red); margin-left:10px;"></span><span>Missed</span>
-        <span class="rt-month-cell" style="background:var(--surface2); box-shadow:0 0 0 2px var(--gold); margin-left:10px;"></span><span>Longest streak</span>
+        <span class="rt-month-cell" style="background:linear-gradient(135deg, var(--gold-shine), var(--gold) 65%); margin-left:10px;"></span><span>Longest streak</span>
       </div>
       <div class="rt-heat-detail" id="rtHeatDetail"></div>
     </div>
@@ -9508,11 +9506,14 @@ function rtDayItems_(k, d) {
   });
 }
 
-function rtDaySections(k, d, tiny) {
+function rtDaySections(k, d, tiny, gold) {
   const order = { 'rt-sec-done': 0, 'rt-sec-excused': 1, 'rt-sec-pending': 2, 'rt-sec-miss': 3 };
   const items = rtDayItems_(k, d).sort((a, b) => order[a.cls] - order[b.cls]);
   if (!items.length) return '';
-  const cells = items.map(it => `<span class="${it.cls}" title="${escapeAttr_(it.name)}"></span>`).join('');
+  // Inside the single longest all-complete streak, the completed (green)
+  // sections turn gold outright rather than the day just carrying some
+  // separate badge - see .rt-sec-done.gold.
+  const cells = items.map(it => `<span class="${it.cls}${gold && it.cls === 'rt-sec-done' ? ' gold' : ''}" title="${escapeAttr_(it.name)}"></span>`).join('');
   return `<div class="rt-day-sections${tiny ? ' tiny' : ''}" style="grid-template-columns:repeat(${items.length},1fr);">${cells}</div>`;
 }
 
@@ -9626,7 +9627,7 @@ function rtRenderMonthGrid() {
     } else {
       html += `<div class="rt-month-cell${sel}${streak}" data-date="${k}" tabindex="0" onclick="rtSelectDay('${k}')"
         title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${streak ? ' (longest streak)' : ''}">
-        ${rtDaySections(k, d)}<span class="rt-month-daynum">${dayNum}</span></div>`;
+        ${rtDaySections(k, d, false, !!streak)}<span class="rt-month-daynum">${dayNum}</span></div>`;
     }
   }
   document.getElementById('rtMonthGrid').innerHTML = html;
@@ -9643,7 +9644,7 @@ function rtRenderYearGrid() {
     if (d > rtToday) { html += `<div class="rt-year-sq"></div>`; continue; }
     const k = dateKey(d);
     const streak = rtInLongestStreak_(k) ? ' streak' : '';
-    html += `<div class="rt-year-sq${streak}" data-date="${k}" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${streak ? ' (longest streak)' : ''}">${rtDaySections(k, d, true)}</div>`;
+    html += `<div class="rt-year-sq${streak}" data-date="${k}" title="${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${streak ? ' (longest streak)' : ''}">${rtDaySections(k, d, true, !!streak)}</div>`;
   }
   document.getElementById('rtYearGrid').innerHTML = html;
 }
