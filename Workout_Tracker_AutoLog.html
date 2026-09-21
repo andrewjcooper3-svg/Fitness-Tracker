@@ -5151,16 +5151,23 @@ function exerciseNameOptionsHtml_() {
 // whenever the remote history list changes, since that's the "all
 // previous workouts" source and can grow after initial render (a page
 // that's been open a while, or history arriving after a slow first load).
+// A custom "+ Add Exercise" card's dropdown carries this pair - a
+// disabled placeholder plus "+ New workout..." - that a prescribed
+// card's never has. Kept together as one constant so the initial markup
+// (addExercise) and the rebuild (refreshAllExerciseNameSelects_) can't
+// drift apart.
+const EXERCISE_NAME_SELECT_NEW_OPTIONS_HTML_ =
+  '<option value="" selected disabled hidden>Choose a workout…</option><option value="__new__">+ New workout...</option>';
+
 function refreshAllExerciseNameSelects_() {
   const optionsHtml = exerciseNameOptionsHtml_();
   document.querySelectorAll('.exercise-name-select').forEach(select => {
     const current = select.value;
-    // A custom "+ Add Exercise" card's dropdown carries a leading
-    // "+ New workout..." option a prescribed card's never has - keep it
-    // across the rebuild, or a card still sitting on it would lose the
-    // real label and show the raw '__new__' value as a fake option.
+    // Keep the placeholder pair across the rebuild, or a card still
+    // sitting on one would lose its real label and show the raw
+    // '__new__'/'' value as a fake option instead.
     const hasNewOption = !!select.querySelector('option[value="__new__"]');
-    select.innerHTML = (hasNewOption ? '<option value="__new__">+ New workout...</option>' : '') + optionsHtml;
+    select.innerHTML = (hasNewOption ? EXERCISE_NAME_SELECT_NEW_OPTIONS_HTML_ : '') + optionsHtml;
     if (!Array.from(select.options).some(o => o.value === current)) {
       const opt = document.createElement('option');
       opt.value = current;
@@ -23849,7 +23856,7 @@ function addExercise(panel, skipFocus) {
   card.className = 'exercise-card';
   card.dataset.exId = 'custom-' + Date.now() + '-' + (nextCustomExId++);
   const optionsHtml = exerciseNameOptionsHtml_();
-  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onNewExerciseNameChange_(this)"><option value="__new__">+ New workout...</option>${optionsHtml}</select></div><div class="unit-badge">Reps</div><div class="exercise-meta">Custom</div></div>` +
+  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▾</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onNewExerciseNameChange_(this)">${EXERCISE_NAME_SELECT_NEW_OPTIONS_HTML_}${optionsHtml}</select></div><div class="unit-badge">Reps</div><div class="exercise-meta">Custom</div></div>` +
     `<div class="exercise-sets expanded"><div class="set-row"><div class="set-num">1</div>` +
     `<div class="set-input-group"><input class="set-input big-num" type="text"></div>` +
     `<div class="set-input-group"><input class="set-input big-num" type="text"></div>` +
@@ -23861,9 +23868,12 @@ function addExercise(panel, skipFocus) {
   const addBtn = panel.querySelector(':scope > .add-exercise-btn');
   panel.insertBefore(card, addBtn);
   initExerciseSets(card);
-  const select = card.querySelector('.exercise-name-select');
-  select.value = '__new__';
-  if (!skipFocus) select.focus();
+  // Left on the disabled placeholder (not '__new__' itself) so the
+  // FIRST real pick - even "+ New workout..." - is an actual value
+  // change and reliably fires onchange. A <select> already sitting on
+  // '__new__' wouldn't fire anything if the user re-picked that same
+  // option, since nothing about its value would have changed.
+  if (!skipFocus) card.querySelector('.exercise-name-select').focus();
   saveState();
 }
 
