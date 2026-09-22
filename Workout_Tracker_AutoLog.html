@@ -5221,6 +5221,7 @@ const STORAGE_SETTINGS_KEY = 'WORKOUT_SETTINGS';
 const STORAGE_WATER_LOG_KEY = 'WORKOUT_WATER_LEDGER';
 const STORAGE_WATER_ENTRIES_KEY = 'WORKOUT_WATER_ENTRIES';
 const STORAGE_WATER_SYNCED_DAYS_KEY = 'WORKOUT_WATER_SYNCED_DAYS';
+const STORAGE_WATER_SENT_ROWS_KEY = 'WORKOUT_WATER_SENT_ROWS';
 
 // Each drink logs its real volume, but only an estimated net hydration
 // value counts toward the daily total/ring, and its caffeine feeds the
@@ -18213,6 +18214,19 @@ function recomputeWaterLedgerForDay_(day, entries) {
   syncWidgetSummary();
 }
 
+// Self-heals STORAGE_WATER_LOG_KEY from the local entries store for
+// every day this device still holds entries for. loadRemoteWaterLedger
+// now trusts those days outright rather than Math.max-ing them against
+// the Sheet's total (see its own comment - a duplicate-row bug there,
+// fixed alongside this, could otherwise inflate a date's total forever,
+// since a bad max only ever goes up and every load re-applies it); this
+// clears out any inflation a device already picked up before that fix
+// shipped, by putting the true recomputed total back.
+function resyncWaterLedgerFromEntries_() {
+  const entryDays = getWaterEntryStore_().days;
+  Object.keys(entryDays).forEach(date => recomputeWaterLedgerForDay_(date, entryDays[date]));
+}
+
 function getSyncedWaterDays_() {
   return JSON.parse(localStorage.getItem(STORAGE_WATER_SYNCED_DAYS_KEY) || 'null');
 }
@@ -18223,6 +18237,25 @@ function markWaterDaySynced_(day) {
   localStorage.setItem(STORAGE_WATER_SYNCED_DAYS_KEY, JSON.stringify(synced.sort().slice(-60)));
 }
 function isWaterDaySynced_(day) { return (getSyncedWaterDays_() || []).indexOf(day) !== -1; }
+
+// Which of a day's rows already landed in the Sheet from an earlier,
+// partially-failed flush attempt - see flushCompletedWaterDays_. Cleared
+// once the day finishes syncing, since nothing will revisit it after
+// that.
+function getWaterSentRows_() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_WATER_SENT_ROWS_KEY) || '{}'); } catch (e) { return {}; }
+}
+function markWaterRowSent_(day, id) {
+  const rows = getWaterSentRows_();
+  rows[day] = rows[day] || [];
+  if (rows[day].indexOf(id) === -1) rows[day].push(id);
+  localStorage.setItem(STORAGE_WATER_SENT_ROWS_KEY, JSON.stringify(rows));
+}
+function clearWaterSentRows_(day) {
+  const rows = getWaterSentRows_();
+  delete rows[day];
+  localStorage.setItem(STORAGE_WATER_SENT_ROWS_KEY, JSON.stringify(rows));
+}
 
 // A single entry posted straight to the Water Log sheet, bypassing the
 // draft mechanism entirely - for a backdated entry added to a day the
@@ -18268,49 +18301,73 @@ function seedWaterSyncedDays_() {
   localStorage.setItem(STORAGE_WATER_SYNCED_DAYS_KEY, JSON.stringify(days.sort()));
 }
 
+// Guards against two overlapping runs both seeing the same day as
+// "pending" and each posting its rows - this is called on page load AND
+// on every visibilitychange back to the tab (foregrounding the app), so
+// a quick app-switch right after load can easily fire it twice before
+// the first run's awaits resolve. Without this, that race double-posts
+// every row of that day to the Sheet.
+let waterFlushInFlight_ = false;
+
 async function flushCompletedWaterDays_() {
+  if (waterFlushInFlight_) return;
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
 
-  const todayKey = dateKey(new Date());
-  const store = getWaterEntryStore_();
-  const synced = getSyncedWaterDays_() || [];
-  const pending = Object.keys(store.days).filter(d => d < todayKey && synced.indexOf(d) === -1).sort();
+  waterFlushInFlight_ = true;
+  try {
+    const todayKey = dateKey(new Date());
+    const store = getWaterEntryStore_();
+    const synced = getSyncedWaterDays_() || [];
+    const pending = Object.keys(store.days).filter(d => d < todayKey && synced.indexOf(d) === -1).sort();
 
-  for (const day of pending) {
-    const entries = store.days[day] || [];
-    try {
-      // Sequential, and only marked synced once every row landed - a
-      // half-sent day stays pending and retries whole next time rather
-      // than leaving the Sheet with part of a day.
-      for (const e of entries) {
-        const res = await fetch(url, {
+    for (const day of pending) {
+      const entries = store.days[day] || [];
+      // Rows an earlier, partially-failed attempt already got onto the
+      // Sheet - skipped here so a retry only sends what's left, instead
+      // of resending the whole day (and duplicating those rows) every
+      // time one entry in the middle fails.
+      const alreadySent = new Set(getWaterSentRows_()[day] || []);
+      try {
+        // Sequential, and only marked synced once every row landed - a
+        // half-sent day stays pending and retries just its remaining
+        // rows next time rather than leaving the Sheet with part of a
+        // day, or resending the part it already has.
+        for (const e of entries) {
+          const id = drinkEntryId_(e);
+          if (alreadySent.has(id)) continue;
+          const res = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify({
+              action: 'logWater', date: day, type: e.type,
+              rawOz: e.rawOz, hydrationOz: e.hydrationOz,
+              // Extra fields the current Apps Script ignores; harmless
+              // now, and already correct if it ever stores them.
+              loggedAt: e.loggedAt || '', endAt: e.endAt || '',
+              caffeineMg: e.caffeineMg || 0, alcoholOz: e.alcoholOz || 0
+            })
+          });
+          const data = await res.json().catch(() => null);
+          if (!data || data.status !== 'success') throw new Error('rejected');
+          markWaterRowSent_(day, id);
+        }
+        markWaterDaySynced_(day);
+        clearWaterSentRows_(day);
+        // The sheet is now the record for this day, so drop its
+        // in-progress copy - otherwise another device could still merge
+        // from it and re-flush the same rows.
+        await fetch(url, {
           method: 'POST',
-          body: JSON.stringify({
-            action: 'logWater', date: day, type: e.type,
-            rawOz: e.rawOz, hydrationOz: e.hydrationOz,
-            // Extra fields the current Apps Script ignores; harmless
-            // now, and already correct if it ever stores them.
-            loggedAt: e.loggedAt || '', endAt: e.endAt || '',
-            caffeineMg: e.caffeineMg || 0, alcoholOz: e.alcoholOz || 0
-          })
-        });
-        const data = await res.json().catch(() => null);
-        if (!data || data.status !== 'success') throw new Error('rejected');
+          body: JSON.stringify({ action: 'saveWaterDraft', date: day, entries: [], deleted: [] })
+        }).catch(() => {});
+      } catch (e) {
+        // Offline or the Sheet rejected it - leave the day pending and
+        // try again on the next load rather than dropping the data.
+        break;
       }
-      markWaterDaySynced_(day);
-      // The sheet is now the record for this day, so drop its
-      // in-progress copy - otherwise another device could still merge
-      // from it and re-flush the same rows.
-      await fetch(url, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'saveWaterDraft', date: day, entries: [], deleted: [] })
-      }).catch(() => {});
-    } catch (e) {
-      // Offline or the Sheet rejected it - leave the day pending and
-      // try again on the next load rather than dropping the data.
-      break;
     }
+  } finally {
+    waterFlushInFlight_ = false;
   }
 }
 
@@ -19377,11 +19434,24 @@ async function loadRemoteWaterLedger() {
     if (data.status === 'success' && data.ledger) {
       const local = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
       const wiped = getWipedWaterDays_();
+      const entryDays = getWaterEntryStore_().days;
       Object.keys(data.ledger).forEach(date => {
         // A deliberately wiped day keeps the local value: the sheet still
         // holds the rows the old instant-logging build wrote, and
         // max-merging them back would silently undo the wipe.
         if (wiped.indexOf(date) !== -1) return;
+        // A day this device has its own logged entries for is trusted
+        // outright over the Sheet's total - that entry list is what the
+        // ledger figure is recomputed from (recomputeWaterLedgerForDay_),
+        // so it's the authoritative source, not a number the Sheet
+        // happens to report. Without this, a Sheet-side bug or a stray
+        // duplicate row inflating that date's total would win a
+        // Math.max against the real figure forever, since a corrupted
+        // total only ever goes up and this runs on every load. The
+        // remote figure only fills in a date this device never recorded
+        // anything for at all (logged from elsewhere, or from before
+        // per-entry tracking existed).
+        if ((entryDays[date] || []).length) return;
         local[date] = Math.max(local[date] || 0, data.ledger[date]);
       });
       localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(local));
@@ -24380,6 +24450,7 @@ loadRemoteSettingsState();
 loadRemoteOverviewLayoutState();
 seedWaterSyncedDays_();
 applyOneTimeWaterWipe20260819_();
+resyncWaterLedgerFromEntries_();
 flushCompletedWaterDays_();
 syncWaterDraft_();
 loadRemoteWaterLedger();
