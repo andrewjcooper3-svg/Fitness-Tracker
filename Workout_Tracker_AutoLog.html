@@ -24128,6 +24128,15 @@ function queuePendingLog(day, payload) {
   localStorage.setItem(STORAGE_PENDING_KEY, JSON.stringify(pending));
 }
 
+// Which days currently have a submitWorkout POST in flight - a day isn't
+// marked logged (isDayLogged_) until the fetch resolves, so without this
+// guard two calls landing close together (the automatic day-rollover
+// check runs on boot, a 5-minute interval AND every visibilitychange,
+// same as the water flush this mirrors - see resyncWaterLedgerFromEntries_
+// et al.) would both see the day as unlogged and each POST it, writing a
+// duplicate row to the Sheet.
+const submitWorkoutInFlight_ = new Set();
+
 function submitWorkout(day, payload) {
   const url = getDeploymentUrl();
   if (!url) {
@@ -24140,6 +24149,9 @@ function submitWorkout(day, payload) {
     setLogStatus(day, 'pending', '📴 Offline — saved locally, will sync when back online.', false);
     return;
   }
+
+  if (submitWorkoutInFlight_.has(day)) return;
+  submitWorkoutInFlight_.add(day);
 
   setLogStatus(day, 'pending', '⏳ Logging to Sheet…', false);
 
@@ -24163,7 +24175,8 @@ function submitWorkout(day, payload) {
     .catch(() => {
       queuePendingLog(day, payload);
       setLogStatus(day, 'error', '⚠ Could not reach Sheet — saved locally, will retry.', true);
-    });
+    })
+    .finally(() => submitWorkoutInFlight_.delete(day));
 }
 
 function flushPendingLogs() {
