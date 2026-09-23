@@ -339,6 +339,81 @@ function deleteLastWaterEntry_() {
   if (lastRow > 1) sheet.deleteRow(lastRow);
 }
 
+// One-time cleanup for the duplicate rows a pre-fix flush/retry race
+// could write before logWaterEntry_'s id check existed to stop it -
+// that check only prevents NEW duplicates, it can't undo rows already
+// on the sheet. Deliberately NOT reachable from the web app (nothing a
+// POST triggers should ever delete rows) - run it once, by hand, from
+// this editor: open the function dropdown next to the Run button
+// (top toolbar), select dedupeWaterLog, click Run, then View > Logs to
+// see what it did. Safe to run more than once; an already-clean sheet
+// just logs that it found nothing.
+//
+// A "duplicate" is any row whose Date, Type, Raw Ounces and Hydration
+// Ounces all exactly match another row within DUPLICATE_WINDOW_MS of
+// it - of each such cluster, every row but the earliest is removed.
+// That time window is what keeps this from being a blunt "same
+// amount twice in a day = delete it" rule, which would also catch a
+// perfectly normal second 32oz glass of water logged hours apart: a
+// retried write lands within seconds to minutes of the original, while
+// two real drinks of the same size essentially never do. Widen or
+// narrow the window below if that assumption doesn't hold for your own
+// logging habits.
+function dedupeWaterLog() {
+  const DUPLICATE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+
+  const sheet = getOrCreateWaterSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) { Logger.log('Water Log is empty - nothing to do.'); return; }
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, WATER_HEADERS.length).getValues();
+  const beforeTotals = {};
+  rows.forEach(function (row) {
+    const key = cellDateKey_(row[0], timeZone);
+    beforeTotals[key] = (beforeTotals[key] || 0) + (Number(row[3]) || 0);
+  });
+
+  // Rows come out of the sheet in the order they were appended, which is
+  // also chronological (every append stamps "now" at write time) - so
+  // the first row seen in a group is always its earliest, no separate
+  // sort needed.
+  const lastSeenAt = {};
+  const toDelete = [];
+  rows.forEach(function (row, i) {
+    const dateKey = cellDateKey_(row[0], timeZone);
+    const groupKey = [dateKey, row[1], row[2], row[3]].join('|');
+    const loggedAt = row[4] instanceof Date ? row[4].getTime() : null;
+    const prior = lastSeenAt[groupKey];
+    if (loggedAt !== null && prior !== undefined && (loggedAt - prior) <= DUPLICATE_WINDOW_MS) {
+      toDelete.push(i);
+    }
+    // Advances on every row in the group, kept or not, so a retry storm
+    // spread across several back-to-back attempts still chains together
+    // even if the whole cluster runs a bit longer than one window.
+    if (loggedAt !== null) lastSeenAt[groupKey] = loggedAt;
+  });
+
+  toDelete.sort(function (a, b) { return b - a; }); // bottom-up, so earlier deletions don't shift later row numbers
+  toDelete.forEach(function (i) { sheet.deleteRow(i + 2); }); // +2: 1-based, plus the header row
+
+  const remainingLastRow = sheet.getLastRow();
+  const afterRows = remainingLastRow > 1
+    ? sheet.getRange(2, 1, remainingLastRow - 1, WATER_HEADERS.length).getValues() : [];
+  const afterTotals = {};
+  afterRows.forEach(function (row) {
+    const key = cellDateKey_(row[0], timeZone);
+    afterTotals[key] = (afterTotals[key] || 0) + (Number(row[3]) || 0);
+  });
+
+  Logger.log('Removed ' + toDelete.length + ' likely-duplicate row(s).');
+  Object.keys(beforeTotals).sort().forEach(function (date) {
+    const before = beforeTotals[date], after = afterTotals[date] || 0;
+    if (before !== after) Logger.log(date + ': ' + before + ' oz -> ' + after + ' oz');
+  });
+  if (!toDelete.length) Logger.log('No changes - nothing looked like a duplicate.');
+}
+
 function getWaterLedgerFromSheets_() {
   const sheet = getOrCreateWaterSheet_();
   const timeZone = sheet.getParent().getSpreadsheetTimeZone();
