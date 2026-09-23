@@ -347,18 +347,32 @@ function deleteLastWaterEntry_() {
 // this editor: open the function dropdown next to the Run button
 // (top toolbar), select dedupeWaterLog, click Run, then View > Logs to
 // see what it did. Safe to run more than once; an already-clean sheet
-// just logs that it found nothing.
+// (or a date it made no changes to) just logs that it found nothing.
 //
-// A "duplicate" is any row whose Date, Type, Raw Ounces and Hydration
-// Ounces all exactly match another row within DUPLICATE_WINDOW_MS of
-// it - of each such cluster, every row but the earliest is removed.
-// That time window is what keeps this from being a blunt "same
-// amount twice in a day = delete it" rule, which would also catch a
-// perfectly normal second 32oz glass of water logged hours apart: a
-// retried write lands within seconds to minutes of the original, while
-// two real drinks of the same size essentially never do. Widen or
-// narrow the window below if that assumption doesn't hold for your own
-// logging habits.
+// Two passes, because a retried write doesn't always look the same:
+//
+// Pass 1 (tight retries): rows sharing a Date/Type/Raw Ounces/Hydration
+// Ounces group within DUPLICATE_WINDOW_MS of the previous one in that
+// group are the same entry re-sent seconds to minutes apart (the normal
+// shape of a retry) - every row but the earliest in each such cluster is
+// removed. The window is what keeps this from also catching a genuine
+// second glass of the same size logged shortly after the first.
+//
+// Pass 2 (older, spread-out duplication): a day duplicated by the
+// original bug this whole thing traces back to - a flush with no
+// protection against running twice - can instead be spread across
+// separate app opens hours or days apart, entirely outside that window.
+// It leaves a different but equally reliable signature: every distinct
+// entry still standing for that date repeats the SAME number of times,
+// because each retry re-sent that day's whole entry list together, not
+// just one row from it. Real drinking essentially never produces that
+// uniform a pattern by coincidence, so wherever a date has two or more
+// distinct entries and every one of them repeats some common count of 2
+// or more, every group on that date is collapsed to its earliest row
+// regardless of timing. A date with only one distinct entry repeated is
+// left to pass 1 alone - with nothing to compare it against, a uniform
+// count of one thing can't be told apart from genuinely drinking that
+// exact size several times that day.
 function dedupeWaterLog() {
   const DUPLICATE_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -377,16 +391,17 @@ function dedupeWaterLog() {
   // Rows come out of the sheet in the order they were appended, which is
   // also chronological (every append stamps "now" at write time) - so
   // the first row seen in a group is always its earliest, no separate
-  // sort needed.
+  // sort needed, in either pass.
+  const toDelete = {}; // original row index -> true
+
   const lastSeenAt = {};
-  const toDelete = [];
   rows.forEach(function (row, i) {
     const dateKey = cellDateKey_(row[0], timeZone);
     const groupKey = [dateKey, row[1], row[2], row[3]].join('|');
     const loggedAt = row[4] instanceof Date ? row[4].getTime() : null;
     const prior = lastSeenAt[groupKey];
     if (loggedAt !== null && prior !== undefined && (loggedAt - prior) <= DUPLICATE_WINDOW_MS) {
-      toDelete.push(i);
+      toDelete[i] = true;
     }
     // Advances on every row in the group, kept or not, so a retry storm
     // spread across several back-to-back attempts still chains together
@@ -394,8 +409,30 @@ function dedupeWaterLog() {
     if (loggedAt !== null) lastSeenAt[groupKey] = loggedAt;
   });
 
-  toDelete.sort(function (a, b) { return b - a; }); // bottom-up, so earlier deletions don't shift later row numbers
-  toDelete.forEach(function (i) { sheet.deleteRow(i + 2); }); // +2: 1-based, plus the header row
+  const byDate = {}; // dateKey -> { 'type|rawOz|hydrationOz' -> [row indices still standing after pass 1] }
+  rows.forEach(function (row, i) {
+    if (toDelete[i]) return;
+    const dateKey = cellDateKey_(row[0], timeZone);
+    const groupKey = [row[1], row[2], row[3]].join('|');
+    byDate[dateKey] = byDate[dateKey] || {};
+    byDate[dateKey][groupKey] = byDate[dateKey][groupKey] || [];
+    byDate[dateKey][groupKey].push(i);
+  });
+  Object.keys(byDate).forEach(function (dateKey) {
+    const groups = byDate[dateKey];
+    const groupKeys = Object.keys(groups);
+    if (groupKeys.length < 2) return; // nothing to compare a uniform pattern against
+    const counts = groupKeys.map(function (k) { return groups[k].length; });
+    const uniformCount = counts[0];
+    const isUniform = uniformCount >= 2 && counts.every(function (c) { return c === uniformCount; });
+    if (!isUniform) return;
+    groupKeys.forEach(function (k) {
+      groups[k].slice(1).forEach(function (i) { toDelete[i] = true; });
+    });
+  });
+
+  const deleteIndices = Object.keys(toDelete).map(Number).sort(function (a, b) { return b - a; });
+  deleteIndices.forEach(function (i) { sheet.deleteRow(i + 2); }); // +2: 1-based, plus the header row
 
   const remainingLastRow = sheet.getLastRow();
   const afterRows = remainingLastRow > 1
@@ -406,12 +443,12 @@ function dedupeWaterLog() {
     afterTotals[key] = (afterTotals[key] || 0) + (Number(row[3]) || 0);
   });
 
-  Logger.log('Removed ' + toDelete.length + ' likely-duplicate row(s).');
+  Logger.log('Removed ' + deleteIndices.length + ' likely-duplicate row(s).');
   Object.keys(beforeTotals).sort().forEach(function (date) {
     const before = beforeTotals[date], after = afterTotals[date] || 0;
     if (before !== after) Logger.log(date + ': ' + before + ' oz -> ' + after + ' oz');
   });
-  if (!toDelete.length) Logger.log('No changes - nothing looked like a duplicate.');
+  if (!deleteIndices.length) Logger.log('No changes - nothing looked like a duplicate.');
 }
 
 function getWaterLedgerFromSheets_() {
