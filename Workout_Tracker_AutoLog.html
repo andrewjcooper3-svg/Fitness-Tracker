@@ -17770,7 +17770,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-23-water-cross-device-sync';
+const APP_BUILD_VERSION = '2026-09-23-water-beacon-dedup';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -18148,11 +18148,63 @@ function getRecentDrinkDoses_() {
 // Debounced because it fires on every tap: several quick logs collapse
 // into one round trip.
 let waterDraftSyncTimer_ = null;
+// The day a debounced sync is currently waiting to send - always today,
+// since this is only ever scheduled from same-day logging/undo. Tracked
+// so a hide/backgrounding event (see the visibilitychange handler below)
+// knows there's something to flush right now instead of waiting on a
+// timer that may never get to fire.
+let pendingWaterDraftDay_ = null;
 
 function scheduleWaterDraftSync_() {
+  pendingWaterDraftDay_ = dateKey(new Date());
   clearTimeout(waterDraftSyncTimer_);
-  waterDraftSyncTimer_ = setTimeout(() => syncWaterDraft_(), 1200);
+  waterDraftSyncTimer_ = setTimeout(() => {
+    waterDraftSyncTimer_ = null;
+    pendingWaterDraftDay_ = null;
+    syncWaterDraft_();
+  }, 1200);
 }
+
+// The emergency counterpart to syncWaterDraft_ for when there's no time
+// left for its normal pull-then-merge-then-push round trip - fired right
+// as the page is about to be backgrounded (see the visibilitychange
+// handler below), the exact moment logging a drink and immediately
+// locking the phone would otherwise lose the debounced sync entirely.
+// sendBeacon (unlike fetch) is built specifically to survive that. Skips
+// the pull+merge and just pushes this device's own current entries for
+// the day; reconciling with whatever another device has happens on the
+// next ordinary sync, same as it always does.
+function sendWaterDraftBeacon_(day) {
+  const url = getDeploymentUrl();
+  if (!url) return;
+  const store = getWaterEntryStore_();
+  const payload = JSON.stringify({
+    action: 'saveWaterDraft', date: day,
+    entries: store.days[day] || [],
+    deleted: (store.deleted || {})[day] || []
+  });
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(url, new Blob([payload], { type: 'text/plain;charset=utf-8' }));
+  } else {
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: payload, keepalive: true }).catch(() => {});
+  }
+}
+
+// Mirrors the workout draft's own hidden-tab flush (see sendDraftNow's
+// visibilitychange handler above) - mobile browsers commonly suspend JS
+// timers the instant a tab/PWA is backgrounded or the screen locks,
+// which silently drops a still-pending setTimeout with no error and no
+// second chance. This is what actually gets a drink logged right before
+// putting the phone away onto the Sheet at all.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && pendingWaterDraftDay_) {
+    clearTimeout(waterDraftSyncTimer_);
+    waterDraftSyncTimer_ = null;
+    const day = pendingWaterDraftDay_;
+    pendingWaterDraftDay_ = null;
+    sendWaterDraftBeacon_(day);
+  }
+});
 
 async function syncWaterDraft_(dayKey) {
   const url = getDeploymentUrl();
@@ -18299,7 +18351,8 @@ async function postSingleWaterEntryDirect_(day, entry) {
         action: 'logWater', date: day, type: entry.type,
         rawOz: entry.rawOz, hydrationOz: entry.hydrationOz,
         loggedAt: entry.loggedAt || '', endAt: entry.endAt || '',
-        caffeineMg: entry.caffeineMg || 0, alcoholOz: entry.alcoholOz || 0
+        caffeineMg: entry.caffeineMg || 0, alcoholOz: entry.alcoholOz || 0,
+        id: drinkEntryId_(entry)
       })
     });
   } catch (e) {
@@ -18368,7 +18421,12 @@ async function flushCompletedWaterDays_() {
               // Extra fields the current Apps Script ignores; harmless
               // now, and already correct if it ever stores them.
               loggedAt: e.loggedAt || '', endAt: e.endAt || '',
-              caffeineMg: e.caffeineMg || 0, alcoholOz: e.alcoholOz || 0
+              caffeineMg: e.caffeineMg || 0, alcoholOz: e.alcoholOz || 0,
+              // Lets the backend itself refuse a duplicate row outright -
+              // the last line of defense if this same entry ever gets
+              // flushed from more than one device (exactly what the
+              // cross-device draft pull below makes newly possible).
+              id: id
             })
           });
           const data = await res.json().catch(() => null);

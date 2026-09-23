@@ -274,7 +274,7 @@ function getWeightLog_() {
 }
 
 const WATER_SHEET_NAME = 'Water Log';
-const WATER_HEADERS = ['Date', 'Type', 'Raw Ounces', 'Hydration Ounces', 'Logged At'];
+const WATER_HEADERS = ['Date', 'Type', 'Raw Ounces', 'Hydration Ounces', 'Logged At', 'Entry Id'];
 
 /**
  * Unlike the weight log (one upserted row per day, since only the latest
@@ -313,9 +313,24 @@ function getOrCreateWaterSheet_() {
   return sheet;
 }
 
-function logWaterEntry_(date, type, rawOz, hydrationOz) {
+// A retried or duplicated write (two devices independently finalizing
+// the same day's drafts, or a request that actually landed but appeared
+// to fail) must not become a second row - appendRow alone has no way to
+// tell one call from another, so this checks the Entry Id column first
+// and silently skips the append if that id is already there. Entries
+// logged before this id column existed have nothing to check against,
+// so only new writes going forward are protected - which is also the
+// only place a new duplicate can occur.
+function logWaterEntry_(date, type, rawOz, hydrationOz, id) {
   const sheet = getOrCreateWaterSheet_();
-  sheet.appendRow([date, type || 'water', rawOz, hydrationOz, new Date()]);
+  if (id) {
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      const ids = sheet.getRange(2, 6, lastRow - 1, 1).getValues();
+      if (ids.some(function (row) { return row[0] === id; })) return;
+    }
+  }
+  sheet.appendRow([date, type || 'water', rawOz, hydrationOz, new Date(), id || '']);
 }
 
 function deleteLastWaterEntry_() {
@@ -360,7 +375,11 @@ function getWaterEntriesForDate_(date) {
       type: row[1] || 'water',
       rawOz: Number(row[2]) || hydrationOz,
       hydrationOz: hydrationOz,
-      loggedAt: Utilities.formatDate(row[4], timeZone, "yyyy-MM-dd'T'HH:mm:ss")
+      loggedAt: Utilities.formatDate(row[4], timeZone, "yyyy-MM-dd'T'HH:mm:ss"),
+      // Kept so a client re-saving these (e.g. seeding a fresh device's
+      // local copy) preserves the same id logWaterEntry_ already has on
+      // file, rather than minting a new one that dedup could never match.
+      id: row[5] || undefined
     });
   });
   return entries;
@@ -2295,7 +2314,7 @@ function doPost(e) {
       if (!data.date || isNaN(hydrationOz)) {
         throw new Error('logWater requires a date and a numeric hydrationOz');
       }
-      logWaterEntry_(data.date, data.type, Number(data.rawOz) || hydrationOz, hydrationOz);
+      logWaterEntry_(data.date, data.type, Number(data.rawOz) || hydrationOz, hydrationOz, data.id);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
