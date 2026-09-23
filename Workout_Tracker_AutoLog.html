@@ -18202,6 +18202,30 @@ async function syncWaterDraft_(dayKey) {
   }
 }
 
+// syncWaterDraft_() with no argument only ever covers TODAY - a day
+// logged entirely on another device (say, last night on your phone) sits
+// on the Sheet as a draft until that SAME device reopens the app after
+// the day has ended and flushes it (flushCompletedWaterDays_). A device
+// that never sees that day locally - a laptop that only opened today,
+// for instance - has nothing to flush and never asks about that draft on
+// its own, so it never finds out. This pulls the last several days'
+// drafts too, not just today's, so any device picks up what any other
+// device logged recently, whether or not the originating device ever
+// comes back to finish the job itself. Each already-flushed day returns
+// almost instantly (see syncWaterDraft_'s own guard), so this only does
+// real work for whichever day, if any, is still genuinely open somewhere.
+async function syncRecentWaterDrafts_() {
+  const days = Array.from({ length: WATER_ENTRY_RETENTION_DAYS },
+    (_, i) => dateKey(new Date(Date.now() - i * ROUTINES_DAY_MS)));
+  await Promise.all(days.map(d => syncWaterDraft_(d)));
+  // Routines reads the water ledger straight from localStorage on every
+  // render rather than watching it, so a day corrected here needs an
+  // explicit nudge - a habit that was showing red/incomplete for
+  // yesterday otherwise stays that way until something unrelated happens
+  // to re-render the tab.
+  if (typeof rtRenderAll === 'function') rtRenderAll();
+}
+
 // The day total is derived from the merged entry list rather than
 // nudged up and down per tap, so an entry arriving from another device
 // can't leave the ring disagreeing with the entries behind it.
@@ -18740,11 +18764,21 @@ function toggleWaterChart_() {
 // today (see wtDayNext) - there's nothing to view or log ahead of now.
 let wtViewDay = new Date();
 function wtDayKey_() { return dateKey(wtViewDay); }
-function wtDayPrev() { wtViewDay = new Date(wtViewDay.getTime() - ROUTINES_DAY_MS); renderOverviewWaterWidget(); }
+// Also re-checks that day's draft directly, rather than waiting on the
+// next boot/visibilitychange sweep (syncRecentWaterDrafts_) - looking at
+// a specific day is exactly the moment you'd want it caught up right
+// now, and a day further back than that sweep's window otherwise has no
+// other way to pull it in at all.
+function wtDayPrev() {
+  wtViewDay = new Date(wtViewDay.getTime() - ROUTINES_DAY_MS);
+  renderOverviewWaterWidget();
+  syncWaterDraft_(wtDayKey_());
+}
 function wtDayNext() {
   if (wtDayKey_() === dateKey(new Date())) return;
   wtViewDay = new Date(wtViewDay.getTime() + ROUTINES_DAY_MS);
   renderOverviewWaterWidget();
+  syncWaterDraft_(wtDayKey_());
 }
 function wtDayJumpToday() { wtViewDay = new Date(); renderOverviewWaterWidget(); }
 
@@ -24447,7 +24481,7 @@ document.addEventListener('visibilitychange', () => {
     // over, so this is where a finished day gets pushed to the Sheet -
     // and where drinks logged on another device get picked up.
     flushCompletedWaterDays_();
-    syncWaterDraft_();
+    syncRecentWaterDrafts_();
     loadRemoteWaterLedger();
   }
 });
@@ -24465,7 +24499,7 @@ seedWaterSyncedDays_();
 applyOneTimeWaterWipe20260819_();
 resyncWaterLedgerFromEntries_();
 flushCompletedWaterDays_();
-syncWaterDraft_();
+syncRecentWaterDrafts_();
 loadRemoteWaterLedger();
 
 document.getElementById('weekLabel').textContent = getWeekLabel();
