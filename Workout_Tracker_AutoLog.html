@@ -17770,7 +17770,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-23-water-beacon-dedup';
+const APP_BUILD_VERSION = '2026-09-23-water-ledger-self-heal';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -19526,25 +19526,31 @@ async function loadRemoteWaterLedger() {
     if (data.status === 'success' && data.ledger) {
       const local = JSON.parse(localStorage.getItem(STORAGE_WATER_LOG_KEY) || '{}');
       const wiped = getWipedWaterDays_();
-      const entryDays = getWaterEntryStore_().days;
       Object.keys(data.ledger).forEach(date => {
         // A deliberately wiped day keeps the local value: the sheet still
-        // holds the rows the old instant-logging build wrote, and
-        // max-merging them back would silently undo the wipe.
+        // holds the rows the old instant-logging build wrote, and pulling
+        // them back in would silently undo the wipe.
         if (wiped.indexOf(date) !== -1) return;
-        // A day this device has its own logged entries for is trusted
-        // outright over the Sheet's total - that entry list is what the
-        // ledger figure is recomputed from (recomputeWaterLedgerForDay_),
-        // so it's the authoritative source, not a number the Sheet
-        // happens to report. Without this, a Sheet-side bug or a stray
-        // duplicate row inflating that date's total would win a
-        // Math.max against the real figure forever, since a corrupted
-        // total only ever goes up and this runs on every load. The
-        // remote figure only fills in a date this device never recorded
-        // anything for at all (logged from elsewhere, or from before
-        // per-entry tracking existed).
-        if ((entryDays[date] || []).length) return;
-        local[date] = Math.max(local[date] || 0, data.ledger[date]);
+        // Today's total comes from the live draft/entries, which are
+        // always more current than a finalized ledger that (by design)
+        // has nothing for today until tonight's flush.
+        if (date === todayKey) return;
+        // Every row behind this figure now carries an id the backend
+        // refuses to append twice (see logWaterEntry_), so a PAST day's
+        // reported total is the real, de-duplicated sum across every
+        // device that's ever logged to it - taken directly rather than
+        // weighed against whatever this device happens to have cached.
+        // Math.max used to sit here so a corrupted remote total couldn't
+        // permanently win, but that ratchet cut both ways: it also meant
+        // a device that had only ever seen an INCOMPLETE snapshot of a
+        // day (e.g. it pulled the draft before another device finished
+        // logging to it) could never recover the real total once that
+        // day finished elsewhere - the draft a later pull would normally
+        // correct from is gone by then, cleared the moment the day
+        // flushes. A straight assignment self-corrects in both
+        // directions as the Sheet's own state changes, instead of only
+        // ever being able to go up.
+        local[date] = data.ledger[date];
       });
       localStorage.setItem(STORAGE_WATER_LOG_KEY, JSON.stringify(local));
     }
