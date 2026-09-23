@@ -487,6 +487,55 @@ function diagnoseWaterLog() {
   });
 }
 
+// One-time override, by explicit request: replaces every existing row
+// for each of the last OVERRIDE_DAYS days (yesterday back OVERRIDE_DAYS
+// days - today itself is left alone, since it's still actively being
+// logged rather than part of a finished streak) with a single clean row
+// totaling OVERRIDE_OUNCES. This is a deliberate reset rather than
+// another detection pass: dedupeWaterLog's two heuristics fixed one date
+// but under-trusted another and, on a wider run, ended up removing rows
+// that were real - eating into what should have been an 11-day streak.
+// Rather than chasing a third heuristic blind, this just sets the
+// record straight for the affected range directly. Deliberately NOT
+// reachable from the web app. Run once by hand (function dropdown >
+// overrideWaterLog > Run), then View > Logs for a per-day confirmation.
+// Adjust OVERRIDE_DAYS/OVERRIDE_OUNCES below if the range or figure
+// needs to change before running it.
+function overrideWaterLog() {
+  const OVERRIDE_DAYS = 11;
+  const OVERRIDE_OUNCES = 110;
+
+  const sheet = getOrCreateWaterSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const today = new Date();
+
+  const targetDates = [];
+  for (let i = 1; i <= OVERRIDE_DAYS; i++) {
+    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    targetDates.push(Utilities.formatDate(d, timeZone, 'yyyy-MM-dd'));
+  }
+  const targetSet = {};
+  targetDates.forEach(function (d) { targetSet[d] = true; });
+
+  const lastRow = sheet.getLastRow();
+  const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, WATER_HEADERS.length).getValues() : [];
+
+  // Bottom-up, so row numbers stay valid for what's still queued as
+  // earlier rows disappear.
+  let removed = 0;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (targetSet[cellDateKey_(rows[i][0], timeZone)]) { sheet.deleteRow(i + 2); removed++; }
+  }
+
+  targetDates.sort().forEach(function (dateKey) {
+    sheet.appendRow([dateKey, 'water', OVERRIDE_OUNCES, OVERRIDE_OUNCES, new Date(dateKey + 'T12:00:00'), '']);
+    Logger.log(dateKey + ': set to ' + OVERRIDE_OUNCES + ' oz');
+  });
+
+  Logger.log('Removed ' + removed + ' existing row(s) across ' + OVERRIDE_DAYS
+    + ' day(s), replaced with one ' + OVERRIDE_OUNCES + ' oz row each.');
+}
+
 function getWaterLedgerFromSheets_() {
   const sheet = getOrCreateWaterSheet_();
   const timeZone = sheet.getParent().getSpreadsheetTimeZone();
