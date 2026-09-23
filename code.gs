@@ -451,6 +451,42 @@ function dedupeWaterLog() {
   if (!deleteIndices.length) Logger.log('No changes - nothing looked like a duplicate.');
 }
 
+// Read-only companion to dedupeWaterLog, for when it reports no changes
+// but a date is still visibly wrong - rather than asking you to go dig
+// through the sheet and describe what's there, this just prints every
+// row for every date (Type, Raw/Hydration Ounces, Logged At) so the
+// whole thing can be copied out of View > Logs and handed over for a
+// closer look, with zero sorting or interpretation needed on your end.
+// Touches nothing on the sheet.
+function diagnoseWaterLog() {
+  const sheet = getOrCreateWaterSheet_();
+  const timeZone = sheet.getParent().getSpreadsheetTimeZone();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) { Logger.log('Water Log is empty.'); return; }
+  const rows = sheet.getRange(2, 1, lastRow - 1, WATER_HEADERS.length).getValues();
+
+  const byDate = {};
+  rows.forEach(function (row) {
+    const dateKey = cellDateKey_(row[0], timeZone);
+    byDate[dateKey] = byDate[dateKey] || [];
+    byDate[dateKey].push(row);
+  });
+
+  Object.keys(byDate).sort().forEach(function (dateKey) {
+    const dayRows = byDate[dateKey];
+    let total = 0;
+    Logger.log('--- ' + dateKey + ' (' + dayRows.length + ' rows) ---');
+    dayRows.forEach(function (row) {
+      const loggedAt = row[4] instanceof Date
+        ? Utilities.formatDate(row[4], timeZone, 'yyyy-MM-dd HH:mm:ss')
+        : String(row[4]);
+      total += Number(row[3]) || 0;
+      Logger.log(row[1] + ' | raw ' + row[2] + ' | hydration ' + row[3] + ' | ' + loggedAt + (row[5] ? ' | id ' + row[5] : ''));
+    });
+    Logger.log('Total: ' + total + ' oz');
+  });
+}
+
 function getWaterLedgerFromSheets_() {
   const sheet = getOrCreateWaterSheet_();
   const timeZone = sheet.getParent().getSpreadsheetTimeZone();
