@@ -2522,8 +2522,12 @@
      the two never touch or read as one smudged signal. */
   .rt-shortfall-lines { position: absolute; top: 2px; right: 3px; left: 3px; display: flex; flex-direction: column; gap: 1px; z-index: 1; }
   .rt-shortfall-lines.tiny { top: 1px; right: 1px; left: 1px; gap: 0.5px; }
-  .rt-shortfall-line { height: 2px; border-radius: 1px; background: var(--red); flex-shrink: 0; }
-  .rt-shortfall-line.tiny { height: 1.5px; border-radius: 0.5px; }
+  /* As thick as a proper bar rather than a hairline - matched by
+     rtShortfallBarsTopOffset_, which shrinks the day-sections bars by
+     the same amount so the two split the cell's fixed height rather
+     than the line growing the cell. */
+  .rt-shortfall-line { height: 6px; border-radius: 2px; background: var(--red); flex-shrink: 0; }
+  .rt-shortfall-line.tiny { height: 3px; border-radius: 1px; }
   .rt-month-daynum { position: absolute; top: 3px; right: 3px; font-size: 10px; font-weight: 700; color: var(--text);
     background: var(--surface); border-radius: 4px; padding: 0 3px; line-height: 1.5; }
   .rt-month-cell.pad .rt-month-daynum { display: none; }
@@ -9551,7 +9555,8 @@ function rtDayItems_(k, d) {
 // the .rt-shortfall-lines/.rt-day-sections CSS below (both start from
 // the same top inset and use the same per-line height + gap).
 function rtShortfallBarsTopOffset_(lineCount, tiny) {
-  return tiny ? 1 + lineCount * 2 + 1 : 2 + lineCount * 3 + 2;
+  const topPad = tiny ? 1 : 2, lineHeight = tiny ? 3 : 6, lineGap = tiny ? 0.5 : 1, bottomPad = tiny ? 1 : 2;
+  return topPad + lineCount * lineHeight + Math.max(0, lineCount - 1) * lineGap + bottomPad;
 }
 
 function rtShortfallLinesHtml_(lineCount, tiny) {
@@ -17819,7 +17824,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-24-shortfall-line-cap';
+const APP_BUILD_VERSION = '2026-09-24-shortfall-line-thicker';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
