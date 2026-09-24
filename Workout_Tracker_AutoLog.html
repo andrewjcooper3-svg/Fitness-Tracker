@@ -2504,9 +2504,9 @@
   .rt-month-cell.pad { background: transparent; cursor: default; }
   .rt-month-cell.future { cursor: default; }
   .rt-month-cell.selected { outline: 2px solid var(--text); outline-offset: 1px; }
-  .rt-day-sections { position: absolute; inset: 3px; border-radius: 6px; overflow: hidden; display: grid;
-    grid-auto-flow: column; grid-template-rows: 1fr; gap: 1px; }
-  .rt-day-sections.tiny { inset: 0; border-radius: 2px; gap: 0.5px; }
+  .rt-day-sections { position: absolute; top: 3px; right: 3px; bottom: 3px; left: 3px; border-radius: 6px; overflow: hidden;
+    display: grid; grid-auto-flow: column; grid-template-rows: 1fr; gap: 1px; }
+  .rt-day-sections.tiny { top: 0; right: 0; bottom: 0; left: 0; border-radius: 2px; gap: 0.5px; }
   .rt-sec-done { background: var(--green); }
   .rt-sec-excused { background: var(--blue); }
   .rt-sec-pending { background: var(--amber); }
@@ -2515,6 +2515,15 @@
      done - the completed (green) sections on those days turn gold
      outright instead of just ringing the cell. */
   .rt-sec-done.gold { background: linear-gradient(135deg, var(--gold-shine), var(--gold) 65%); box-shadow: inset 0 0 3px rgba(255,255,255,0.4); }
+  /* A weekly-target habit's shortfall, spread across every day of that
+     week that didn't contribute (see rtWeekShortfallLineCount_) - drawn
+     above the day-sections bars with a clear gap (see
+     rtShortfallBarsTopOffset_, which pushes the bars down to match) so
+     the two never touch or read as one smudged signal. */
+  .rt-shortfall-lines { position: absolute; top: 2px; right: 3px; left: 3px; display: flex; flex-direction: column; gap: 1px; z-index: 1; }
+  .rt-shortfall-lines.tiny { top: 1px; right: 1px; left: 1px; gap: 0.5px; }
+  .rt-shortfall-line { height: 2px; border-radius: 1px; background: var(--red); flex-shrink: 0; }
+  .rt-shortfall-line.tiny { height: 1.5px; border-radius: 0.5px; }
   .rt-month-daynum { position: absolute; top: 3px; right: 3px; font-size: 10px; font-weight: 700; color: var(--text);
     background: var(--surface); border-radius: 4px; padding: 0 3px; line-height: 1.5; }
   .rt-month-cell.pad .rt-month-daynum { display: none; }
@@ -9466,77 +9475,115 @@ function rtRenderWeek() {
 // One vertical section per due habit, filling left to right in a fixed
 // order (done, then today's still-open, then a real miss) so the color
 // story reads as one glance across the cell.
-// A weekly-target habit isn't "due" on any particular day, so a shortfall
-// has no day of its own to land on the way a daily/specific-days miss
-// does - it only exists once the week is over and the count came up
-// short. Rather than let that just disappear, the deficit (target minus
-// however many days it was actually done) gets attributed to that many
-// of the week's OTHER days, working backward from Sunday so the marks
-// land where the week ran out rather than at the start of it. Only ever
+// A weekly-target habit isn't "due" on any particular day, so a
+// shortfall has no day of its own to land on the way a daily/
+// specific-days miss does - it only exists once the week is over and
+// the count came up short, and it isn't really about any ONE day within
+// that week either. Rather than arbitrarily picking a handful of days to
+// paint fully red (the old behavior here - always the LAST unfilled
+// days of the week, regardless of which days you actually happened to
+// use), this reports the shortfall itself; see rtWeekShortfallLineCount_
+// for how it actually gets drawn, spread across every day that didn't
+// contribute rather than singled out onto a chosen few. Only ever
 // computed for a week that has already ended - rtCurrentStreak uses the
 // same "current week is never judged" rule, since there's still time to
 // hit the target until the week is actually over.
-function rtWeekMissDays_(h, weekStart) {
-  if (h.created && weekStart < new Date(h.created + 'T00:00:00')) return new Set(); // didn't exist for this whole week
+function rtWeekShortfall_(h, d) {
+  if (h.cadence !== 'week' || !rtIsDue(h, d)) return null;
+  const weekStart = rtWeekStart(d);
+  if (weekStart.getTime() >= rtWeekStart(rtToday).getTime()) return null; // still in progress - nothing to judge yet
+  if (h.created && weekStart < new Date(h.created + 'T00:00:00')) return null; // didn't exist for this whole week
   const doneKeys = new Set();
   for (let i = 0; i < 7; i++) {
     const dk = dateKey(new Date(weekStart.getTime() + i * ROUTINES_DAY_MS));
     if (rtIsDoneOn(h, dk)) doneKeys.add(dk);
   }
   const deficit = Math.max(0, (h.weekTarget || 0) - doneKeys.size);
-  if (!deficit) return new Set();
-  const missable = [];
-  for (let i = 6; i >= 0; i--) {
-    const dk = dateKey(new Date(weekStart.getTime() + i * ROUTINES_DAY_MS));
-    if (!doneKeys.has(dk)) missable.push(dk);
-  }
-  return new Set(missable.slice(0, deficit));
+  return deficit > 0 ? { deficit: deficit, doneKeys: doneKeys } : null;
+}
+
+// How many "this week came up short" lines day k/d should carry - one
+// per missed occurrence, from every weekly-cadence habit whose week
+// ended short, on every day that ISN'T one of the days that actually
+// counted toward it. A day that did contribute stays plain green with
+// no line at all; every day it didn't gets the line instead, regardless
+// of how many of the week's other days also carry it - the shortfall is
+// a property of the WEEK, not of any single day within it.
+function rtWeekShortfallLineCount_(k, d) {
+  let count = 0;
+  RT_HABITS.list.forEach(h => {
+    const shortfall = rtWeekShortfall_(h, d);
+    if (shortfall && !shortfall.doneKeys.has(k)) count += shortfall.deficit;
+  });
+  return count;
 }
 
 // What was due on this day and how each one landed - the shared basis
 // for both the day-cell sections (rtDaySections) and the "every habit
 // completed" streak check (rtDayAllComplete_), so the two can never
-// silently disagree about what a "full" day even means.
+// silently disagree about what a "full" day even means. A weekly
+// shortfall is NOT represented here - it isn't a per-habit section, it's
+// the separate line rtDaySections/rtDayAllComplete_ each account for on
+// their own (see rtWeekShortfallLineCount_).
 function rtDayItems_(k, d) {
   const isToday = dateKey(d) === dateKey(rtToday);
   const due = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
   // A weekly-target habit isn't "due" on any particular day, so it never
-  // adds a pending/missed section on its own - but the day it actually
-  // got checked off is real progress, so THAT day earns a green section
-  // same as any other completed habit.
+  // adds a pending section on its own - but the day it actually got
+  // checked off is real progress, so THAT day earns a green section same
+  // as any other completed habit.
   const weeklyDone = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtIsDoneOn(h, k));
-  const weekStart = rtWeekStart(d);
-  const weekIsOver = weekStart.getTime() < rtWeekStart(rtToday).getTime();
-  const weeklyMissed = weekIsOver
-    ? RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtWeekMissDays_(h, weekStart).has(k))
-    : [];
-  const all = due.concat(weeklyDone).concat(weeklyMissed);
+  const all = due.concat(weeklyDone);
   return all.map(h => {
     const doneOn = rtIsDoneOn(h, k);
     const excused = h.cadence !== 'week' && rtIsExcusedOn(h, k) && !doneOn;
-    const cls = weeklyMissed.includes(h) ? 'rt-sec-miss'
-      : excused ? 'rt-sec-excused'
+    const cls = excused ? 'rt-sec-excused'
       : h.cadence === 'week' ? 'rt-sec-done' : (doneOn ? 'rt-sec-done' : (isToday ? 'rt-sec-pending' : 'rt-sec-miss'));
     return { cls, name: h.name };
   });
 }
 
+// How far down (px) the day-sections bars need to start to leave room
+// for lineCount shortfall lines stacked above them - kept in sync with
+// the .rt-shortfall-lines/.rt-day-sections CSS below (both start from
+// the same top inset and use the same per-line height + gap).
+function rtShortfallBarsTopOffset_(lineCount, tiny) {
+  return tiny ? 1 + lineCount * 2 + 1 : 2 + lineCount * 3 + 2;
+}
+
+function rtShortfallLinesHtml_(lineCount, tiny) {
+  const wrapCls = tiny ? 'rt-shortfall-lines tiny' : 'rt-shortfall-lines';
+  const lineCls = tiny ? 'rt-shortfall-line tiny' : 'rt-shortfall-line';
+  const lines = Array.from({ length: lineCount }, () => `<span class="${lineCls}"></span>`).join('');
+  return `<div class="${wrapCls}">${lines}</div>`;
+}
+
 function rtDaySections(k, d, tiny, gold) {
   const order = { 'rt-sec-done': 0, 'rt-sec-excused': 1, 'rt-sec-pending': 2, 'rt-sec-miss': 3 };
   const items = rtDayItems_(k, d).sort((a, b) => order[a.cls] - order[b.cls]);
-  if (!items.length) return '';
+  const lineCount = rtWeekShortfallLineCount_(k, d);
+  if (!items.length && !lineCount) return '';
   // Inside the single longest all-complete streak, the completed (green)
   // sections turn gold outright rather than the day just carrying some
   // separate badge - see .rt-sec-done.gold.
   const cells = items.map(it => `<span class="${it.cls}${gold && it.cls === 'rt-sec-done' ? ' gold' : ''}" title="${escapeAttr_(it.name)}"></span>`).join('');
-  return `<div class="rt-day-sections${tiny ? ' tiny' : ''}" style="grid-template-columns:repeat(${items.length},1fr);">${cells}</div>`;
+  // The bars start further down whenever there are shortfall lines to
+  // clear, so the two never touch or overlap - a real gap keeps them
+  // reading as two separate signals instead of one smudged one.
+  const barsTopStyle = lineCount ? ` top:${rtShortfallBarsTopOffset_(lineCount, tiny)}px;` : '';
+  const barsHtml = items.length
+    ? `<div class="rt-day-sections${tiny ? ' tiny' : ''}" style="grid-template-columns:repeat(${items.length},1fr);${barsTopStyle}">${cells}</div>`
+    : '';
+  return (lineCount ? rtShortfallLinesHtml_(lineCount, tiny) : '') + barsHtml;
 }
 
-// A "full" day: something was actually due, and every one of those items
+// A "full" day: something was actually due, every one of those items
 // came in done or excused (excused counts as a pass everywhere else in
-// Routines - a vacation day isn't a broken streak). A day with nothing
-// scheduled at all doesn't count either way.
+// Routines - a vacation day isn't a broken streak), AND no weekly habit's
+// shortfall line lands on it. A day with nothing scheduled at all
+// doesn't count either way.
 function rtDayAllComplete_(k, d) {
+  if (rtWeekShortfallLineCount_(k, d) > 0) return false;
   const items = rtDayItems_(k, d);
   return items.length > 0 && items.every(it => it.cls === 'rt-sec-done' || it.cls === 'rt-sec-excused');
 }
@@ -9700,21 +9747,20 @@ function rtRenderHeatDetail() {
   const d = new Date(rtSelectedDay + 'T00:00:00');
   const fixedDue = RT_HABITS.list.filter(h => h.cadence !== 'week' && rtIsDue(h, d));
   const weeklyDone = RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtIsDoneOn(h, rtSelectedDay));
-  const weekStart = rtWeekStart(d);
-  const weekIsOver = weekStart.getTime() < rtWeekStart(rtToday).getTime();
-  const weeklyMissed = weekIsOver
-    ? RT_HABITS.list.filter(h => h.cadence === 'week' && rtIsDue(h, d) && rtWeekMissDays_(h, weekStart).has(rtSelectedDay))
-    : [];
-  const due = fixedDue.concat(weeklyDone).concat(weeklyMissed);
+  const weeklyShortfall = RT_HABITS.list.filter(h => {
+    const s = rtWeekShortfall_(h, d);
+    return s && !s.doneKeys.has(rtSelectedDay);
+  });
+  const due = fixedDue.concat(weeklyDone).concat(weeklyShortfall);
   const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   if (!due.length) { box.innerHTML = `<div class="rt-heat-detail-date">${label}</div><div class="rt-empty">Nothing scheduled.</div>`; return; }
   const isToday = rtSelectedDay === dateKey(rtToday);
   box.innerHTML = `<div class="rt-heat-detail-date">${label}</div>` + due.map(h => {
     const on = rtIsDoneOn(h, rtSelectedDay);
     const excused = h.cadence !== 'week' && rtIsExcusedOn(h, rtSelectedDay) && !on;
-    const isWeeklyMiss = weeklyMissed.includes(h);
-    const cls = isWeeklyMiss ? 'miss' : excused ? 'excused' : (on ? 'on' : (isToday ? 'pending' : 'miss'));
-    const doneTime = on ? rtCompletedTimeText_(h, rtSelectedDay) : (excused ? 'On vacation' : (isWeeklyMiss ? 'Weekly target missed' : ''));
+    const isWeeklyShortfall = weeklyShortfall.includes(h);
+    const cls = isWeeklyShortfall ? 'miss' : excused ? 'excused' : (on ? 'on' : (isToday ? 'pending' : 'miss'));
+    const doneTime = on ? rtCompletedTimeText_(h, rtSelectedDay) : (excused ? 'On vacation' : (isWeeklyShortfall ? 'Weekly target missed' : ''));
     return `<div class="rt-heat-detail-item ${cls}"><span class="rt-heat-detail-dot ${cls}"></span>` +
       `<span class="rt-heat-detail-name">${escapeText_(h.name)}</span>` +
       (doneTime ? `<span class="rt-heat-detail-time">${doneTime}</span>` : '') + `</div>`;
@@ -9736,8 +9782,8 @@ function rtRenderHabits() {
         if (rtIsPushupLinked_(h) && !rtIsExcusedOn(h, dk) && ROUTINES_LINK_SOURCES.pushups.valueOn(dk) <= 0) {
           return `<span class="none" title="${dk} (no pushups logged)"></span>`;
         }
-        const ws = rtWeekStart(d);
-        const missed = !on && ws.getTime() < rtWeekStart(rtToday).getTime() && rtWeekMissDays_(h, ws).has(dk);
+        const shortfall = rtWeekShortfall_(h, d);
+        const missed = !on && shortfall && !shortfall.doneKeys.has(dk);
         return `<span class="${on ? 'on' : (missed ? 'miss' : '')}" title="${dk}${missed ? ' (weekly target missed)' : ''}"></span>`;
       }
       if (!rtIsDue(h, d)) return `<span class="future" title="not scheduled"></span>`;
@@ -17770,7 +17816,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-23-water-ledger-self-heal';
+const APP_BUILD_VERSION = '2026-09-24-weekly-shortfall-lines';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
