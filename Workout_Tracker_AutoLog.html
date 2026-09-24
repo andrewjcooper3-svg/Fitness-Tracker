@@ -9503,17 +9503,20 @@ function rtWeekShortfall_(h, d) {
 }
 
 // How many "this week came up short" lines day k/d should carry - one
-// per missed occurrence, from every weekly-cadence habit whose week
-// ended short, on every day that ISN'T one of the days that actually
-// counted toward it. A day that did contribute stays plain green with
-// no line at all; every day it didn't gets the line instead, regardless
-// of how many of the week's other days also carry it - the shortfall is
-// a property of the WEEK, not of any single day within it.
+// per weekly-cadence habit whose week ended short, on every day that
+// ISN'T one of the days that actually counted toward it, capped at one
+// line per habit regardless of how far short it landed (missed by 1 or
+// missed by 3 both read as a single line - the line means "this week
+// came up short," not a literal tally of how short). A day that did
+// contribute stays plain green with no line at all; every day it didn't
+// gets the line instead, regardless of how many of the week's other days
+// also carry it - the shortfall is a property of the WEEK, not of any
+// single day within it.
 function rtWeekShortfallLineCount_(k, d) {
   let count = 0;
   RT_HABITS.list.forEach(h => {
     const shortfall = rtWeekShortfall_(h, d);
-    if (shortfall && !shortfall.doneKeys.has(k)) count += shortfall.deficit;
+    if (shortfall && !shortfall.doneKeys.has(k)) count += 1;
   });
   return count;
 }
@@ -17816,7 +17819,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-24-weekly-shortfall-lines';
+const APP_BUILD_VERSION = '2026-09-24-shortfall-line-cap';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
