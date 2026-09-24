@@ -2526,10 +2526,10 @@
      rtShortfallBarsTopOffset_, which shrinks the day-sections bars by
      the same amount so the two split the cell's fixed height rather
      than the line growing the cell. */
-  .rt-shortfall-line { height: 6px; border-radius: 2px; background: var(--red); flex-shrink: 0; }
-  .rt-shortfall-line.tiny { height: 3px; border-radius: 1px; }
+  .rt-shortfall-line { height: 11px; border-radius: 3px; background: var(--red); flex-shrink: 0; }
+  .rt-shortfall-line.tiny { height: 5px; border-radius: 1.5px; }
   .rt-month-daynum { position: absolute; top: 3px; right: 3px; font-size: 10px; font-weight: 700; color: var(--text);
-    background: var(--surface); border-radius: 4px; padding: 0 3px; line-height: 1.5; }
+    background: var(--surface); border-radius: 4px; padding: 0 3px; line-height: 1.5; z-index: 2; }
   .rt-month-cell.pad .rt-month-daynum { display: none; }
 
   .rt-year-flow { display: flex; flex-wrap: wrap; gap: 3px; }
@@ -9555,7 +9555,7 @@ function rtDayItems_(k, d) {
 // the .rt-shortfall-lines/.rt-day-sections CSS below (both start from
 // the same top inset and use the same per-line height + gap).
 function rtShortfallBarsTopOffset_(lineCount, tiny) {
-  const topPad = tiny ? 1 : 2, lineHeight = tiny ? 3 : 6, lineGap = tiny ? 0.5 : 1, bottomPad = tiny ? 1 : 2;
+  const topPad = tiny ? 1 : 2, lineHeight = tiny ? 5 : 11, lineGap = tiny ? 0.5 : 1, bottomPad = tiny ? 1 : 2;
   return topPad + lineCount * lineHeight + Math.max(0, lineCount - 1) * lineGap + bottomPad;
 }
 
@@ -17824,7 +17824,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-24-shortfall-line-thicker';
+const APP_BUILD_VERSION = '2026-09-24-shortfall-line-v3';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
