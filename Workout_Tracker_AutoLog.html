@@ -5199,26 +5199,33 @@ function renderWeeklyPlan_() {
     if (!panel || !anchor) return;
 
     WEEKLY_PLAN_DATA[day].forEach(ex => {
-      const rowsHtml = ex.rows.map((row, i) => {
-        const [weightPh, , repsPh, notePh] = row;
+      // The exercise is tracked by name, not by day (see the Progression
+      // Engine), so its card always shows whatever that shared entry
+      // currently says the target is - not this day's originally-
+      // authored numbers - meaning a bump confirmed on one occurrence
+      // (say, Monday's Leg Press) already reads correctly here for every
+      // other day's card of the same exercise (Wednesday's), on this and
+      // every future render, rather than only from next week onward.
+      const target = progTargetForEntry_(ex, progGetEntry_(ex));
+      const setsCount = target.setsCount || ex.rows.length;
+
+      const rowsHtml = Array.from({ length: setsCount }, (_, i) => {
+        const notePh = ex.rows[i] && ex.rows[i][3];
         const noteAttr = notePh ? ` placeholder="${escapeAttr_(notePh)}"` : '';
         return `<div class="set-row"><div class="set-num">${i + 1}</div>` +
-          `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(weightPh)}"></div>` +
-          `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(repsPh)}"></div>` +
+          `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(target.weightPh)}"></div>` +
+          `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(target.repsPh)}"></div>` +
           `<div class="set-input-group"><button type="button" class="notes-btn" onclick="toggleSetNotesUI(this)">Notes</button></div>` +
           `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>` +
           `<div class="notes-panel" style="display:none;"><input class="set-input notes-input" type="text"${noteAttr} oninput="syncNotesButton_(this)"><button type="button" class="notes-panel-done" onclick="toggleSetNotesUI(this)">Done</button></div>` +
           `</div>`;
       }).join('');
 
-      // Reps-vs-Time is the same for every set of a real exercise (it's
-      // never "10 reps" on set 1 and "45s" on set 2), so it's a single
-      // badge on the card, not a caption repeated on every row.
-      const unitLabel = (ex.rows[0] && ex.rows[0][1]) || 'Reps';
+      const metaText = (target.weightPh || '—') + ' · ' + setsCount + ' × ' + (target.repsPh || '—');
 
       const card = document.createElement('div');
       card.className = 'exercise-card';
-      card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onExerciseNameChange_(this)">${optionsHtml}</select></div><div class="unit-badge">${escapeText_(unitLabel)}</div><div class="exercise-meta">${escapeText_(ex.meta)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
+      card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onExerciseNameChange_(this)">${optionsHtml}</select></div><div class="unit-badge">${escapeText_(target.unit)}</div><div class="exercise-meta">${escapeText_(metaText)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
       panel.insertBefore(card, anchor);
       card.querySelector('.exercise-name-select').value = ex.name;
     });
@@ -17824,7 +17831,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-24-shortfall-line-v3';
+const APP_BUILD_VERSION = '2026-09-28-progression-live-sync';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -22893,32 +22900,19 @@ function onExerciseNameChange_(select) {
   if (!card) return;
   const newName = select.value;
 
-  let unit = 'Reps', weightPh = '', repsPh = '', setsCount = null;
+  let target = { unit: 'Reps', weightPh: '', repsPh: '', setsCount: null };
   const planEx = progFindAnyPlanEx_(newName);
 
   if (planEx) {
-    unit = (planEx.rows[0] && planEx.rows[0][1]) || 'Reps';
-    const entry = progGetEntry_(planEx);
-    if (entry.type === 'weighted') {
-      weightPh = entry.state.weight + ' lb';
-      repsPh = String(entry.cfg.repRange[entry.state.repIdx]);
-      setsCount = entry.cfg.setRange[entry.state.setIdx];
-    } else if (entry.type === 'time') {
-      repsPh = entry.state.duration + 's';
-      setsCount = entry.state.sets;
-    } else {
-      const firstRow = planEx.rows[0];
-      weightPh = (firstRow && firstRow[0]) || '';
-      repsPh = (firstRow && firstRow[2]) || '';
-      setsCount = planEx.rows.length;
-    }
+    target = progTargetForEntry_(planEx, progGetEntry_(planEx));
   } else {
     let historyMap = {};
     try { historyMap = JSON.parse(localStorage.getItem(STORAGE_EXERCISE_HISTORY_KEY) || '{}'); } catch (e) {}
     const hist = historyMap[newName.trim().toLowerCase()];
-    weightPh = hist && typeof hist.weight === 'number' ? hist.weight + ' lb' : '';
-    repsPh = hist && typeof hist.reps === 'number' ? String(hist.reps) : '';
+    target.weightPh = hist && typeof hist.weight === 'number' ? hist.weight + ' lb' : '';
+    target.repsPh = hist && typeof hist.reps === 'number' ? String(hist.reps) : '';
   }
+  const { unit, weightPh, repsPh, setsCount } = target;
 
   const unitBadge = card.querySelector('.unit-badge');
   if (unitBadge) unitBadge.textContent = unit;
@@ -23178,6 +23172,68 @@ function progGetEntry_(planEx) {
     progSave_();
   }
   return entry;
+}
+
+// The exercise's CURRENT target - weight/reps/sets for a weighted lift,
+// duration/sets for a time-based one, or the plan's own fixed numbers
+// for anything else - derived from its shared (by name, not day) entry.
+// The one place renderWeeklyPlan_, onExerciseNameChange_ and
+// progSyncCardsForExercise_ all draw from, so a confirmed bump reads
+// identically wherever this exercise's card shows up.
+function progTargetForEntry_(planEx, entry) {
+  if (entry.type === 'weighted') {
+    return {
+      unit: (planEx && planEx.rows[0] && planEx.rows[0][1]) || 'Reps',
+      weightPh: entry.state.weight + ' lb',
+      repsPh: String(entry.cfg.repRange[entry.state.repIdx]),
+      setsCount: entry.cfg.setRange[entry.state.setIdx]
+    };
+  }
+  if (entry.type === 'time') {
+    return { unit: 'Time', weightPh: '', repsPh: entry.state.duration + 's', setsCount: entry.state.sets };
+  }
+  const firstRow = planEx && planEx.rows[0];
+  return {
+    unit: (firstRow && firstRow[1]) || 'Reps',
+    weightPh: (firstRow && firstRow[0]) || '',
+    repsPh: (firstRow && firstRow[2]) || '',
+    setsCount: planEx ? planEx.rows.length : null
+  };
+}
+
+// Refreshes every OTHER currently-rendered card for this exercise name
+// (not the one the confirmation just happened on) to the entry's newly
+// confirmed target - so the exercise's other scheduled day THIS week (if
+// it has one, e.g. Leg Press on both Monday and Wednesday) shows the
+// bumped/dropped number right away, rather than only from next week's
+// fresh render onward. Skipped for a card that's already been attempted
+// this session (progNothingAttempted_ false) - only a still-untouched
+// occurrence gets its target moved out from under it.
+function progSyncCardsForExercise_(name, skipCard) {
+  const entry = progressionDB.exercises[progKey_(name)];
+  if (!entry) return;
+  const planEx = progFindAnyPlanEx_(name);
+  const target = progTargetForEntry_(planEx, entry);
+  document.querySelectorAll('.day-panel .exercise-card').forEach(function (card) {
+    if (card === skipCard) return;
+    if (getExerciseName(card).trim().toLowerCase() !== name.trim().toLowerCase()) return;
+    const liveSets = progReadCardSets_(card, entry.type);
+    if (!progNothingAttempted_(liveSets)) return;
+
+    const unitBadge = card.querySelector('.unit-badge');
+    if (unitBadge) unitBadge.textContent = target.unit;
+    if (target.setsCount != null) setExerciseSetCount_(card, target.setsCount);
+    card.querySelectorAll('.set-row').forEach(row => {
+      const inputs = row.querySelectorAll('.set-input');
+      if (inputs[0]) inputs[0].placeholder = target.weightPh;
+      if (inputs[1]) inputs[1].placeholder = target.repsPh;
+    });
+    const metaEl = card.querySelector('.exercise-meta');
+    if (metaEl) {
+      const rowCount = card.querySelectorAll('.set-row').length;
+      metaEl.textContent = (target.weightPh || '—') + ' · ' + rowCount + ' × ' + (target.repsPh || '—');
+    }
+  });
 }
 
 /* ---- evaluators - same rules and field names as Progression Bench,
@@ -23450,6 +23506,7 @@ function progConfirmPending_(name) {
   Object.assign(entry.state, entry.pendingAction.applyPatch);
   delete entry.pendingAction;
   progSave_();
+  progSyncCardsForExercise_(name);
   progRenderAllChips_();
 }
 
