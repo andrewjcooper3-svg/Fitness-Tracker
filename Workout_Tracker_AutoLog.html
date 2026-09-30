@@ -116,6 +116,8 @@
   .day-picker-name { font-family: var(--font); font-size: 16px; font-weight: 700; flex: 1; min-width: 0; }
   .day-picker-type { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
   .day-picker-today { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--accent); background: rgba(61, 111, 224, 0.14); border-radius: 6px; padding: 3px 6px; white-space: nowrap; }
+  .day-picker-swap-btn { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface2); border: none; border-radius: 8px; padding: 5px 9px; white-space: nowrap; cursor: pointer; flex-shrink: 0; transition: all 0.15s; }
+  .day-picker-swap-btn:hover, .day-picker-swap-btn:active { color: var(--text); background: var(--border); }
   .day-picker-chevron { color: var(--muted); font-size: 11px; flex-shrink: 0; transition: transform 0.15s; }
   .day-picker-btn.open .day-picker-chevron { transform: rotate(180deg); }
   .day-picker-list { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.14); padding: 6px; margin: -8px 0 14px; }
@@ -164,8 +166,6 @@
   .section-label-row .section-label { margin: 0; }
   .collapse-all-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; }
   .collapse-all-btn:hover, .collapse-all-btn:active { background: var(--surface2); color: var(--text); }
-  .day-swap-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; }
-  .day-swap-btn:hover, .day-swap-btn:active { background: var(--surface2); color: var(--text); }
   /* position:fixed and appended to <body> (see toggleDaySwapMenu), not
      positioned relative to the row that opened it - a rest day's panel
      (no exercise cards) sits inside an outer container that's auto-sized
@@ -3131,6 +3131,7 @@
   <div class="day-picker-name" id="dayPickerName">&nbsp;</div>
   <div class="day-picker-type" id="dayPickerType"></div>
   <div class="day-picker-today" id="dayPickerTodayBadge" style="display:none;">Today</div>
+  <button type="button" class="day-picker-swap-btn" onclick="event.stopPropagation(); toggleDaySwapMenu(this, activeDayKey_())">Swap</button>
   <div class="day-picker-chevron">▾</div>
 </div>
 <div class="day-picker-list" id="dayPickerList" style="display:none;"></div>
@@ -3146,7 +3147,7 @@
     <button class="summary-btn" onclick="generateSummary('mon')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'mon')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('mon')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('mon')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="mon-summary"></div>
   <button class="copy-btn" id="mon-copy" onclick="copySummary('mon')">📎 Copy to Clipboard</button>
@@ -3164,7 +3165,7 @@
     <button class="summary-btn" onclick="generateSummary('tue')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'tue')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('tue')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('tue')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="tue-summary"></div>
   <button class="copy-btn" id="tue-copy" onclick="copySummary('tue')">📎 Copy to Clipboard</button>
@@ -3181,7 +3182,7 @@
     <button class="summary-btn" onclick="generateSummary('wed')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'wed')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('wed')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('wed')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="wed-summary"></div>
   <button class="copy-btn" id="wed-copy" onclick="copySummary('wed')">📎 Copy to Clipboard</button>
@@ -3198,7 +3199,7 @@
     <button class="summary-btn" onclick="generateSummary('thu')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'thu')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('thu')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('thu')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="thu-summary"></div>
   <button class="copy-btn" id="thu-copy" onclick="copySummary('thu')">📎 Copy to Clipboard</button>
@@ -3215,7 +3216,7 @@
     <button class="summary-btn" onclick="generateSummary('fri')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'fri')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('fri')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('fri')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="fri-summary"></div>
   <button class="copy-btn" id="fri-copy" onclick="copySummary('fri')">📎 Copy to Clipboard</button>
@@ -3243,7 +3244,7 @@
   <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Cat-Cow Spinal Mobility — 10 reps</div></div></div>
   <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Child's Pose — 60s</div></div></div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'sat')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sat')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sat')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="sat-summary"></div>
   <button class="copy-btn" id="sat-copy" onclick="copySummary('sat')">📎 Copy to Clipboard</button>
@@ -3260,7 +3261,7 @@
     <button class="summary-btn" onclick="generateSummary('sun')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'sun')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sun')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sun')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
 
   <div class="summary-output" id="sun-summary"></div>
@@ -17896,7 +17897,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-30-day-swap-menu-fix';
+const APP_BUILD_VERSION = '2026-09-30-day-swap-reposition';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -22584,9 +22585,18 @@ function updateDayPickerButton(day) {
   document.getElementById('dayPickerTodayBadge').style.display = (day === todayKey) ? '' : 'none';
 }
 
+// Whichever day's panel is currently showing - the single source of
+// truth "current day" already implicitly lives in the DOM (the one
+// .day-panel with the active class), so this reads that instead of
+// tracking a second, separately-maintained variable that could drift
+// out of sync with it.
+function activeDayKey_() {
+  return dayKeys.find(d => document.getElementById('day-' + d).classList.contains('active')) || dayKeys[0];
+}
+
 function renderDayPicker_() {
   const list = document.getElementById('dayPickerList');
-  const activeDay = dayKeys.find(d => document.getElementById('day-' + d).classList.contains('active')) || dayKeys[0];
+  const activeDay = activeDayKey_();
   const todayKey = dayKeys[(new Date().getDay() + 6) % 7];
   list.innerHTML = dayKeys.map(day => {
     const info = dayPickerInfo_(day);
