@@ -164,6 +164,15 @@
   .section-label-row .section-label { margin: 0; }
   .collapse-all-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; }
   .collapse-all-btn:hover, .collapse-all-btn:active { background: var(--surface2); color: var(--text); }
+  .day-swap-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; position: relative; }
+  .day-swap-btn:hover, .day-swap-btn:active { background: var(--surface2); color: var(--text); }
+  /* Positioned relative to the .section-label-row (the nearest ancestor
+     the swap button doesn't itself establish positioning on) so it drops
+     directly under the row regardless of which day's button opened it. */
+  .section-label-row { position: relative; }
+  .day-swap-menu { position: absolute; top: 100%; right: 0; margin-top: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 6px; min-width: 180px; z-index: 5; }
+  .day-swap-menu-item { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 9px 10px; border-radius: 8px; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600; }
+  .day-swap-menu-item:hover, .day-swap-menu-item:active { background: var(--surface2); }
   .day-notes-input { width: 100%; box-sizing: border-box; background: var(--surface); border: none; border-radius: 14px; color: var(--text); font-family: var(--font); font-size: 14px; padding: 12px 14px; outline: none; resize: vertical; min-height: 60px; margin-bottom: 4px; }
   .day-notes-input:focus { box-shadow: 0 0 0 1.5px var(--accent); }
   .day-notes-input::placeholder { color: var(--muted); }
@@ -3134,7 +3143,7 @@
     <button class="summary-btn" onclick="generateSummary('mon')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('mon')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'mon')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('mon')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="mon-summary"></div>
   <button class="copy-btn" id="mon-copy" onclick="copySummary('mon')">📎 Copy to Clipboard</button>
@@ -3152,7 +3161,7 @@
     <button class="summary-btn" onclick="generateSummary('tue')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('tue')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'tue')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('tue')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="tue-summary"></div>
   <button class="copy-btn" id="tue-copy" onclick="copySummary('tue')">📎 Copy to Clipboard</button>
@@ -3169,7 +3178,7 @@
     <button class="summary-btn" onclick="generateSummary('wed')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('wed')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'wed')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('wed')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="wed-summary"></div>
   <button class="copy-btn" id="wed-copy" onclick="copySummary('wed')">📎 Copy to Clipboard</button>
@@ -3186,7 +3195,7 @@
     <button class="summary-btn" onclick="generateSummary('thu')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('thu')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'thu')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('thu')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="thu-summary"></div>
   <button class="copy-btn" id="thu-copy" onclick="copySummary('thu')">📎 Copy to Clipboard</button>
@@ -3203,7 +3212,7 @@
     <button class="summary-btn" onclick="generateSummary('fri')">📋 Generate</button>
   </div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('fri')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'fri')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('fri')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="fri-summary"></div>
   <button class="copy-btn" id="fri-copy" onclick="copySummary('fri')">📎 Copy to Clipboard</button>
@@ -3231,7 +3240,7 @@
   <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Cat-Cow Spinal Mobility — 10 reps</div></div></div>
   <div class="check-item" onclick="toggleCheck(this)"><div class="checkbox"></div><div class="item-body"><div class="item-name">Child's Pose — 60s</div></div></div>
 
-  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sat')">Collapse All</button></div>
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'sat')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sat')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
   <div class="summary-output" id="sat-summary"></div>
   <button class="copy-btn" id="sat-copy" onclick="copySummary('sat')">📎 Copy to Clipboard</button>
@@ -3247,6 +3256,8 @@
     <textarea class="day-notes-input" placeholder="General notes for the day - energy, sleep, soreness, anything not tied to a specific set..."></textarea>
     <button class="summary-btn" onclick="generateSummary('sun')">📋 Generate</button>
   </div>
+
+  <div class="section-label-row"><div class="section-label">Workouts</div><button type="button" class="day-swap-btn" onclick="toggleDaySwapMenu(this,'sun')">🔁 Swap</button><button type="button" class="collapse-all-btn" onclick="collapseAllExercises('sun')">Collapse All</button></div>
   <div class="exercise-anchor" style="display:none"></div>
 
   <div class="summary-output" id="sun-summary"></div>
@@ -16420,7 +16431,8 @@ function serializeDay(day) {
   }));
 
   const dayNotesEl = panel.querySelector('.day-notes-input');
-  return { exercises: exercises, checkItems: checkItems, dayNotes: dayNotesEl ? dayNotesEl.value : '' };
+  return { exercises: exercises, checkItems: checkItems, dayNotes: dayNotesEl ? dayNotesEl.value : '',
+           planSwapped: panel.dataset.planSwapped === '1' };
 }
 
 // Every saveState() call re-serializes all 7 days (it's a full DOM read),
@@ -17009,7 +17021,16 @@ function restoreDay(day, savedDay) {
   const defaultNames = (WEEKLY_PLAN_DATA[day] || []).map(ex => ex.name);
   const savedPrescribed = (savedDay.exercises || []).filter(ex => !ex.custom);
   const exIdIndex_ = id => { const m = /^ex(\d+)$/.exec(id || ''); return m ? parseInt(m[1], 10) : -1; };
-  const planChanged = savedPrescribed.some((ex, arrayIdx) => {
+  // A day swapped with another day (see swapDayPlans_) is DELIBERATELY
+  // running a different day's plan for the rest of this week - comparing
+  // its saved exercises against THIS day's own template would always
+  // read as "the template changed shape" and wipe it, the same failure
+  // mode a plain rename used to trigger. savedDay.planSwapped, carried
+  // through from saveState(), tells this guard to trust the saved
+  // exercises wholesale instead - the panel gets the same trust back so
+  // it round-trips through another reload this week.
+  if (savedDay.planSwapped) panel.dataset.planSwapped = '1';
+  const planChanged = !savedDay.planSwapped && savedPrescribed.some((ex, arrayIdx) => {
     // Legacy saved data predating ids has no id to check by - fall back
     // to its position within the (custom-excluded) saved array, the same
     // positional assumption the id-less restore path below already makes.
@@ -17872,7 +17893,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-30-perday-sync-and-rename-fix';
+const APP_BUILD_VERSION = '2026-09-30-day-swap';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -22700,6 +22721,90 @@ function toggleCheck(el) {
   el.classList.toggle('checked');
   el.querySelector('.checkbox').textContent = el.classList.contains('checked') ? '✓' : '';
   saveState();
+}
+
+/* ---------- Swap a day's plan with another day's (this week only) ----------
+   "Can't get to the gym today, do Friday's workout instead" - moves the
+   exercise cards themselves between the two day panels (a real swap: both
+   days end up with the OTHER's plan), so progression tracking (by name,
+   not by day) and everything else about those exercises works exactly as
+   if they'd always been scheduled there. Deliberately does NOT touch Day
+   Notes or a day's own checklist (Saturday's stretch list) - those are
+   about how that CALENDAR day went, not the plan, and the user's own
+   wording ("swap the plans") is about the workout content specifically. */
+function toggleDaySwapMenu(btn, day) {
+  const existing = document.querySelector('.day-swap-menu');
+  const wasOpenForThisDay = existing && existing.dataset.forDay === day;
+  if (existing) existing.remove();
+  if (wasOpenForThisDay) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'day-swap-menu';
+  menu.dataset.forDay = day;
+  dayKeys.filter(d => d !== day).forEach(otherDay => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'day-swap-menu-item';
+    item.textContent = 'Swap with ' + dayNames[otherDay];
+    item.onclick = (e) => {
+      e.stopPropagation();
+      swapDayPlans_(day, otherDay);
+      menu.remove();
+    };
+    menu.appendChild(item);
+  });
+  btn.closest('.section-label-row').appendChild(menu);
+
+  // Closes on any click elsewhere, same pattern as the exercise swipe-row
+  // outside-tap handling above.
+  setTimeout(() => {
+    document.addEventListener('pointerdown', function closeOnce(e) {
+      if (!menu.contains(e.target)) {
+        menu.remove();
+        document.removeEventListener('pointerdown', closeOnce, true);
+      }
+    }, true);
+  }, 0);
+}
+
+function swapDayPlans_(dayA, dayB) {
+  if (!dayA || !dayB || dayA === dayB) return;
+  const panelA = document.getElementById('day-' + dayA);
+  const panelB = document.getElementById('day-' + dayB);
+  if (!panelA || !panelB) return;
+
+  const anchorA = panelA.querySelector(':scope > .exercise-anchor');
+  const anchorB = panelB.querySelector(':scope > .exercise-anchor');
+  const addBtnA = panelA.querySelector(':scope > .add-exercise-btn');
+  const addBtnB = panelB.querySelector(':scope > .add-exercise-btn');
+  // Cards insert right before the "+ Add Exercise" button when one exists
+  // (matches every other card-insertion site in this file); a day with no
+  // add-exercise button yet (rare - it's added on first render) falls
+  // back to the anchor, then to the end of the panel.
+  const insertPointA = addBtnA || anchorA || null;
+  const insertPointB = addBtnB || anchorB || null;
+
+  const cardsA = Array.from(panelA.querySelectorAll(':scope > .exercise-card'));
+  const cardsB = Array.from(panelB.querySelectorAll(':scope > .exercise-card'));
+
+  cardsA.forEach(c => panelB.insertBefore(c, insertPointB));
+  cardsB.forEach(c => panelA.insertBefore(c, insertPointA));
+
+  // Marks both panels as running a swapped-in plan for the rest of this
+  // week - read by serializeDay/restoreDay so a reload trusts the
+  // swapped content as-is instead of comparing it against THIS day's own
+  // template (which restoreDay's plan-changed guard would otherwise read
+  // as "the template changed shape" and wipe, exactly the bug just fixed
+  // for a plain exercise rename - a whole-day transplant trips the same
+  // guard even harder). Left set even if swapped back later this week;
+  // by then the content genuinely matches the template again, so trusting
+  // it wholesale is still correct, just unnecessary.
+  panelA.dataset.planSwapped = '1';
+  panelB.dataset.planSwapped = '1';
+
+  saveState();
+  progRenderAllChips_();
+  renderTrainerStats();
 }
 
 /* ---------- Config: deployment URL ---------- */
