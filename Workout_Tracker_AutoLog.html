@@ -164,13 +164,16 @@
   .section-label-row .section-label { margin: 0; }
   .collapse-all-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; }
   .collapse-all-btn:hover, .collapse-all-btn:active { background: var(--surface2); color: var(--text); }
-  .day-swap-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; position: relative; }
+  .day-swap-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; }
   .day-swap-btn:hover, .day-swap-btn:active { background: var(--surface2); color: var(--text); }
-  /* Positioned relative to the .section-label-row (the nearest ancestor
-     the swap button doesn't itself establish positioning on) so it drops
-     directly under the row regardless of which day's button opened it. */
-  .section-label-row { position: relative; }
-  .day-swap-menu { position: absolute; top: 100%; right: 0; margin-top: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 6px; min-width: 180px; z-index: 5; }
+  /* position:fixed and appended to <body> (see toggleDaySwapMenu), not
+     positioned relative to the row that opened it - a rest day's panel
+     (no exercise cards) sits inside an outer container that's auto-sized
+     to that panel's own short height with overflow:hidden, which clipped
+     an absolutely-positioned menu the moment it needed more room than a
+     short day panel had. Fixed positioning in viewport coordinates, with
+     placement computed in JS, sidesteps that entirely. */
+  .day-swap-menu { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 6px; min-width: 180px; z-index: 9000; }
   .day-swap-menu-item { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 9px 10px; border-radius: 8px; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600; }
   .day-swap-menu-item:hover, .day-swap-menu-item:active { background: var(--surface2); }
   .day-notes-input { width: 100%; box-sizing: border-box; background: var(--surface); border: none; border-radius: 14px; color: var(--text); font-family: var(--font); font-size: 14px; padding: 12px 14px; outline: none; resize: vertical; min-height: 60px; margin-bottom: 4px; }
@@ -17893,7 +17896,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-30-day-swap';
+const APP_BUILD_VERSION = '2026-09-30-day-swap-menu-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -22753,17 +22756,44 @@ function toggleDaySwapMenu(btn, day) {
     };
     menu.appendChild(item);
   });
-  btn.closest('.section-label-row').appendChild(menu);
+
+  // Appended to <body>, not the button's own row - see the .day-swap-menu
+  // CSS comment for why. Position is computed from the button's actual
+  // screen location (fixed/viewport coordinates), clamped so it always
+  // stays fully on screen: pinned right-aligned to the button but pulled
+  // left if that would run off the right edge, and flipped to open
+  // upward if there isn't room below (a day near the bottom of a short
+  // page, or the page scrolled down).
+  document.body.appendChild(menu);
+  const btnRect = btn.getBoundingClientRect();
+  const menuRect = menu.getBoundingClientRect();
+  const margin = 8;
+  let left = btnRect.right - menuRect.width;
+  left = Math.max(margin, Math.min(left, window.innerWidth - menuRect.width - margin));
+  let top = btnRect.bottom + 6;
+  if (top + menuRect.height > window.innerHeight - margin) {
+    top = btnRect.top - menuRect.height - 6;
+    if (top < margin) top = margin;
+  }
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
 
   // Closes on any click elsewhere, same pattern as the exercise swipe-row
-  // outside-tap handling above.
+  // outside-tap handling above - and on scroll, since a fixed-position
+  // menu would otherwise stay put in the viewport while the button it's
+  // anchored to scrolls away underneath it.
   setTimeout(() => {
-    document.addEventListener('pointerdown', function closeOnce(e) {
-      if (!menu.contains(e.target)) {
-        menu.remove();
-        document.removeEventListener('pointerdown', closeOnce, true);
-      }
-    }, true);
+    function closeOnClick(e) {
+      if (!menu.contains(e.target)) close();
+    }
+    function closeOnScroll() { close(); }
+    function close() {
+      menu.remove();
+      document.removeEventListener('pointerdown', closeOnClick, true);
+      window.removeEventListener('scroll', closeOnScroll, true);
+    }
+    document.addEventListener('pointerdown', closeOnClick, true);
+    window.addEventListener('scroll', closeOnScroll, true);
   }, 0);
 }
 
