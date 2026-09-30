@@ -5228,6 +5228,15 @@ function renderWeeklyPlan_() {
       card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onExerciseNameChange_(this)">${optionsHtml}</select></div><div class="unit-badge">${escapeText_(target.unit)}</div><div class="exercise-meta">${escapeText_(metaText)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
       panel.insertBefore(card, anchor);
       card.querySelector('.exercise-name-select').value = ex.name;
+      // The template's own name for THIS slot, fixed for the card's whole
+      // life - unlike the select's value, never changed by picking a
+      // different exercise from the dropdown. serializeDay() carries it
+      // through as originalName so restoreDay's plan-changed guard can
+      // tell "the user renamed this slot" apart from "the code's template
+      // actually changed shape," which look identical if you only compare
+      // against the currently-displayed name (see restoreDay for why that
+      // distinction matters).
+      card.dataset.origName = ex.name;
     });
   });
 }
@@ -16295,8 +16304,6 @@ function closeBodyHealthDetailModal(event) {
 
 let isRestoringState = false;
 let calendarLoadedOnce = false;
-// Set once, at boot, before restoreState() runs - see that call site for why.
-let bootLocalSavedAt_ = null;
 
 // Baked-in default so the tracker works out of the box (e.g. a Home
 // Screen icon, whose storage doesn't share with regular Safari tabs)
@@ -16400,7 +16407,11 @@ function serializeDay(day) {
     // restoreDay only reads it for customs, but the end-of-week archive has
     // no other source: by the time it runs, the DOM holds the NEW week's
     // exercises, so a prescribed card would otherwise archive nameless.
+    // originalName is the template's fixed name for this slot (see
+    // renderWeeklyPlan_) - absent/blank for a genuinely custom card, which
+    // never had a template slot to begin with.
     return { id: card.dataset.exId, custom: isCustom, name: getExerciseName(card),
+             originalName: card.dataset.origName || '',
              meta: (card.querySelector('.exercise-meta') || {}).textContent || '', sets: sets };
   });
 
@@ -16412,14 +16423,35 @@ function serializeDay(day) {
   return { exercises: exercises, checkItems: checkItems, dayNotes: dayNotesEl ? dayNotesEl.value : '' };
 }
 
+// Every saveState() call re-serializes all 7 days (it's a full DOM read),
+// but a sync/merge across devices needs to know WHICH day actually has new
+// information, not just which device happened to save most recently.
+// Stamping every day with "now" on every keystroke - the old behavior -
+// made a stale device's untouched Tuesday look newer than another
+// device's real Tuesday edit the instant it saved anything at all, which
+// is what let one device's sync silently overwrite another's. Each day
+// keeps its OWN savedAt now, bumped only when that day's own content
+// actually changed since the last save; an untouched day keeps carrying
+// whatever timestamp it already had, so a per-day comparison (see
+// pullRemoteDraftAndMerge_) can tell a real edit from a stale re-save.
 function saveState() {
   if (isRestoringState) return;
-  // Stamped on every save (so on every keystroke, effectively) - lets
-  // fetchAndApplyRemoteDraft tell whether the cloud's copy actually has
-  // anything newer before overwriting what's on screen with it. See that
-  // function for why this matters.
-  const state = { week: getWeekLabel(), savedAt: new Date().toISOString(), days: {} };
-  dayKeys.forEach(day => { state.days[day] = serializeDay(day); });
+  const week = getWeekLabel();
+  let prevDays = {};
+  try {
+    const prevRaw = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null');
+    if (prevRaw && prevRaw.week === week) prevDays = prevRaw.days || {};
+  } catch (e) {}
+
+  const now = new Date().toISOString();
+  const state = { week: week, days: {} };
+  dayKeys.forEach(day => {
+    const serialized = serializeDay(day);
+    const prevDay = prevDays[day];
+    const prevContent = prevDay ? JSON.stringify(Object.assign({}, prevDay, { savedAt: undefined })) : null;
+    const changed = prevContent === null || prevContent !== JSON.stringify(serialized);
+    state.days[day] = Object.assign({}, serialized, { savedAt: changed ? now : prevDay.savedAt });
+  });
   localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
   updatePushupLedger();
   renderTrainerStats();
@@ -16478,53 +16510,37 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Runs once at page load, after the fast local (localStorage) restore -
-// pulls whatever the most recent save from any device left in the cloud
-// and applies it on top, so a phone-then-laptop (or vice versa) session
-// picks up mid-week edits rather than only whatever this exact device
-// last saved locally. Silently gives up if offline or unconfigured; the
-// already-restored local state stands as-is in that case.
+// Pulls whatever the cloud's draft currently holds and merges it in DAY
+// BY DAY, rather than the old all-or-nothing "is the whole week's cloud
+// copy newer than the whole week's local copy" gate. That whole-blob gate
+// was the actual source of the cross-device bugs this exists to prevent:
+// any device's save re-stamped a single savedAt covering every day, so
+// the LAST device to sync anything - even a single set on one day - could
+// silently win for every OTHER day too, discarding real edits another
+// device had made to them. Comparing per day (each day's own savedAt,
+// from saveState()'s per-day stamping) means a stale device touching
+// Wednesday can never stomp a fresher Monday edit sitting in the cloud,
+// and vice versa.
 //
-// Real bug this guards against: saveState() writes to localStorage
-// immediately, but the matching push to the cloud (syncDraftToCloud) is
-// debounced 1.5s and still needs a network round trip. Refresh in that
-// window - a very normal thing to do mid-workout - and this function
-// used to fetch whatever the cloud's last-synced (now stale) draft was
-// and unconditionally overwrite every input with it via restoreDay,
-// discarding the edit that just hadn't finished syncing yet. It looked
-// like "refreshing wipes my inputs," repeatably, since every save
-// re-triggers the same debounce window. Comparing savedAt timestamps -
-// the server's own stamp of when it last received a draft, against this
-// device's own last local save - before applying anything closes that
-// race: the cloud only wins when it genuinely has something newer (the
-// real cross-device case this function exists for), never when it's
-// simply behind on syncing this device's own most recent edit.
-//
-// Compares against bootLocalSavedAt_ (captured before restoreState() ran,
-// at the very top of boot) rather than re-reading localStorage here -
-// restoreState() itself calls saveState() the instant there is no saved
-// state yet for this week, which stamps a brand new savedAt on what is
-// otherwise an empty, just-initialized placeholder. Comparing against
-// THAT would make a device opening the tracker for the first time this
-// week look "newer" than any real remote draft (which, having been saved
-// in a past session, necessarily has an older timestamp) and skip
-// applying it - silently breaking cross-device sync for exactly the
-// device that most needs it.
-async function fetchAndApplyRemoteDraft() {
+// Called at boot (after the fast local restore), whenever the tab/app
+// comes back into view, and on a light periodic poll while visible - see
+// the three call sites below. Safe to call repeatedly during an active
+// session because of two guards restoreDay-level timestamp comparison
+// alone can't provide: it skips a day if this device's local copy is not
+// older, and it skips a day the user is actively typing into RIGHT NOW
+// (focus is inside that day's panel), so a background pull can never
+// interrupt mid-edit or overwrite an edit that just hasn't been stamped
+// as "saved" through a blur/change event yet.
+let pullDraftInFlight_ = false;
+async function pullRemoteDraftAndMerge_() {
+  if (pullDraftInFlight_) return;
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
+  pullDraftInFlight_ = true;
   try {
     const res = await fetch(url + '?action=loadDraft');
     const data = await res.json();
     if (data.status !== 'success' || !data.draft || data.draft.week !== getWeekLabel()) return;
-
-    if (bootLocalSavedAt_ && data.draft.savedAt && data.draft.savedAt <= bootLocalSavedAt_) {
-      // The cloud's copy is not actually newer than what this device
-      // already had before this page load (most likely: this device's
-      // own edit just hasn't finished its debounced push yet) - nothing
-      // to apply.
-      return;
-    }
 
     // Deliberately NOT calling the one-time stripStale*_ migration
     // helpers here (unlike the local-state migration functions below,
@@ -16550,32 +16566,53 @@ async function fetchAndApplyRemoteDraft() {
     // content alone, so it has to fall on the side of clearing it. The
     // one-time local migration below handles this device's own
     // localStorage, but this fetch pulls a SEPARATE, independently-
-    // stamped cloud copy straight past it - if that copy was synced
-    // before the device that wrote it had the fix (very likely right
-    // after this shipped: any reload in the preceding hours would have
-    // re-saved Monday's pre-fix empty state and pushed it to the cloud
-    // with a fresh timestamp), it would win the savedAt comparison above
-    // and re-wipe Monday again on this very page load, moments after the
-    // local migration just fixed it. Unlike the flag-based helpers above,
-    // this check is purely about the fetched draft's own content - once
-    // Monday's cloud copy genuinely holds real exercises (any device has
-    // saved for real since getting the fix), length is no longer 0 and
-    // this stops applying on its own; it does not depend on, or get
-    // confused by, this device's migration history.
+    // stamped cloud copy straight past it - stripped here the same way,
+    // so a pre-fix cloud copy can never re-wipe Monday after the local
+    // migration already fixed it.
     if (data.draft.days.mon && Array.isArray(data.draft.days.mon.exercises) &&
         data.draft.days.mon.exercises.length === 0) {
       delete data.draft.days.mon.exercises;
     }
 
+    let local;
+    try { local = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null'); } catch (e) { local = null; }
+    const localDays = (local && local.week === getWeekLabel() && local.days) || {};
+
+    // Only on the very first pull of a week this device has never saved
+    // any state for yet: restoreState() just called saveState() to seed
+    // an empty placeholder, stamping every day with "now" purely because
+    // it had to write SOMETHING. Comparing that placeholder's timestamp
+    // against a genuine remote save (necessarily made in the past) would
+    // always lose and skip applying it - exactly backwards for the one
+    // device that most needs the pull. Treated as "no local timestamp yet"
+    // for every day, this one time only.
+    const ignoreLocalStamps = weekBootstrappedFresh_;
+    weekBootstrappedFresh_ = false;
+
+    let appliedAny = false;
     isRestoringState = true;
-    dayKeys.forEach(day => restoreDay(day, data.draft.days[day]));
+    dayKeys.forEach(day => {
+      const remoteDay = data.draft.days[day];
+      if (!remoteDay) return;
+      const localDay = localDays[day];
+      if (!ignoreLocalStamps && localDay && localDay.savedAt && remoteDay.savedAt &&
+          remoteDay.savedAt <= localDay.savedAt) return;
+      const panel = document.getElementById('day-' + day);
+      if (panel && panel.contains(document.activeElement)) return;
+      restoreDay(day, remoteDay);
+      appliedAny = true;
+    });
     isRestoringState = false;
 
-    saveState();
-    progRenderAllChips_();
-    if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
+    if (appliedAny) {
+      saveState();
+      progRenderAllChips_();
+      if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
+    }
   } catch (e) {
-    // Offline/unreachable - the local-only restore already in place stands.
+    // Offline/unreachable - whatever's already on screen stands.
+  } finally {
+    pullDraftInFlight_ = false;
   }
 }
 
@@ -16978,7 +17015,16 @@ function restoreDay(day, savedDay) {
     // positional assumption the id-less restore path below already makes.
     const i = exIdIndex_(ex.id);
     const slot = i >= 0 ? i : arrayIdx;
-    return slot >= defaultNames.length || defaultNames[slot] !== ex.name;
+    // originalName - the template's fixed name for this slot, unaffected
+    // by picking a different exercise from the dropdown - is what this
+    // guard actually needs to ask about: does the CODE's template still
+    // agree with what this saved snapshot assumed was at this slot.
+    // ex.name is only a fallback for saved data from before originalName
+    // existed; using it for everything else would make a legitimate
+    // rename look exactly like a real template change and wipe the whole
+    // day, which is the bug this guard exists to prevent, not cause.
+    const nameToCheck = ex.originalName || ex.name;
+    return slot >= defaultNames.length || defaultNames[slot] !== nameToCheck;
   });
 
   if (planChanged) {
@@ -17041,6 +17087,18 @@ function restoreDay(day, savedDay) {
         card = cards[cards.length - 1];
         card.dataset.exId = savedEx.id;
         setRestoredCustomExerciseName_(card, savedEx.name);
+      } else if (!savedEx.custom) {
+        // A prescribed card that already exists (renderWeeklyPlan_ always
+        // builds one for every template slot) but was renamed via the
+        // exercise dropdown last session - re-apply that rename before
+        // restoring its sets below, or the card would silently show the
+        // template's original name again despite the planChanged guard
+        // above correctly having let this saved data through.
+        const select = card.querySelector('.exercise-name-select');
+        if (select && savedEx.name && select.value !== savedEx.name) {
+          select.value = savedEx.name;
+          onExerciseNameChange_(select);
+        }
       }
       if (addExerciseBtn) panel.insertBefore(card, addExerciseBtn);
 
@@ -17121,6 +17179,12 @@ function restoreDay(day, savedDay) {
   if (dayNotesEl && savedDay.dayNotes) dayNotesEl.value = savedDay.dayNotes;
 }
 
+// Set when restoreState() has to seed a brand-new week's placeholder
+// state (see below) - read once by the next pullRemoteDraftAndMerge_()
+// call and then cleared, so only that first pull treats every day as
+// having no real local timestamp yet.
+let weekBootstrappedFresh_ = false;
+
 function restoreState() {
   let saved;
   try {
@@ -17136,6 +17200,7 @@ function restoreState() {
     // both cases (the app left open across the rollover, and the app
     // opened fresh on Monday).
     if (saved) archiveFinishedWeek_(saved);
+    weekBootstrappedFresh_ = true;
     saveState();
     return;
   }
@@ -17807,7 +17872,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-30-surface-reject-reason';
+const APP_BUILD_VERSION = '2026-09-30-perday-sync-and-rename-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -24602,22 +24667,6 @@ migrateStaleDayTemplates20260727();
 migrateStaleDayTemplates20260824();
 migrateStaleDayTemplates20260831();
 migrateStaleDayTemplates20260914();
-// Captured BEFORE restoreState() runs, not read fresh inside
-// fetchAndApplyRemoteDraft() later - restoreState() itself calls
-// saveState() (stamping a brand new savedAt) the moment there is no
-// saved state yet for this week, which would otherwise make an empty,
-// just-initialized local placeholder look "newer" than any real remote
-// draft (which, having been saved in a past session, necessarily carries
-// an older timestamp) purely because of when its bookkeeping timestamp
-// happens to be written - silently breaking "pull my data onto a device
-// that's opening the tracker for the first time this week." See
-// fetchAndApplyRemoteDraft for how this is actually used.
-bootLocalSavedAt_ = (() => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null');
-    return (raw && raw.week === getWeekLabel() && raw.savedAt) || null;
-  } catch (e) { return null; }
-})();
 restoreState();
 weekLabelAtLoad_ = getWeekLabel();
 document.addEventListener('visibilitychange', () => {
@@ -24631,7 +24680,8 @@ setInterval(checkForWeekRollover_, 5 * 60 * 1000);
 // device afterward without a manual full reload. Re-pulling whenever
 // the tab/app comes back into view (foregrounded, app-switched back to)
 // closes that gap the same way the week-rollover check above already
-// does, without needing a constant background poll.
+// does, without needing a constant background poll. The workout draft
+// pull rides along here too, for the same reason.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     // Coming back to the tab is also the moment a day may have rolled
@@ -24640,9 +24690,21 @@ document.addEventListener('visibilitychange', () => {
     flushCompletedWaterDays_();
     syncRecentWaterDrafts_();
     loadRemoteWaterLedger();
+    pullRemoteDraftAndMerge_();
   }
 });
-fetchAndApplyRemoteDraft();
+// A light backstop poll for the workout draft, on top of the
+// coming-back-into-view pull above - catches a device left open and
+// foregrounded the whole time (never backgrounded, so visibilitychange
+// never fires) while another device logs something. Gated on the tab
+// actually being visible so a backgrounded phone doesn't keep firing
+// requests nobody's there to see; 40s is frequent enough to feel
+// seamless without hammering the endpoint the way a multi-second poll
+// would.
+setInterval(() => {
+  if (document.visibilityState === 'visible') pullRemoteDraftAndMerge_();
+}, 40 * 1000);
+pullRemoteDraftAndMerge_();
 loadRemoteWeightLog();
 loadRemoteBodyHealthLog();
 loadRemoteKitchenState();

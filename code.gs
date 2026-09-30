@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-09-30-fix-delete-all-rows';
+const BACKEND_BUILD_VERSION = '2026-09-30-perday-draft-merge';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -769,9 +769,27 @@ function getSheetId() {
 // before a day's "Generate Summary" actually logs anything to the Sheet.
 const DRAFT_STATE_KEY = 'DRAFT_STATE';
 
+// Merges the incoming days in DAY BY DAY, rather than overwriting the
+// whole stored blob - the client now stamps each day with its OWN
+// savedAt (see saveState() client-side), bumped only when that day's
+// content actually changed. A push from a device that hasn't touched
+// Tuesday in a while carries an old savedAt for Tuesday, so it can no
+// longer clobber a fresher Tuesday another device already stored here
+// just because this device's overall save happened more recently - only
+// a day whose incoming savedAt is genuinely newer replaces what's
+// already stored for that day.
 function saveDraftState_(week, days) {
   const props = PropertiesService.getScriptProperties();
-  props.setProperty(DRAFT_STATE_KEY, JSON.stringify({ week: week, days: days, savedAt: new Date().toISOString() }));
+  const existing = loadDraftState_();
+  const mergedDays = (existing && existing.week === week && existing.days) ? existing.days : {};
+  Object.keys(days || {}).forEach(function (day) {
+    const incoming = days[day];
+    const current = mergedDays[day];
+    if (!current || !current.savedAt || !incoming || !incoming.savedAt || incoming.savedAt > current.savedAt) {
+      mergedDays[day] = incoming;
+    }
+  });
+  props.setProperty(DRAFT_STATE_KEY, JSON.stringify({ week: week, days: mergedDays, savedAt: new Date().toISOString() }));
 }
 
 function loadDraftState_() {
