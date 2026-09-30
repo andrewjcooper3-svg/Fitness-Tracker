@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-09-30-day-write-lock';
+const BACKEND_BUILD_VERSION = '2026-09-30-fix-delete-all-rows';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1898,13 +1898,31 @@ function getExerciseHistory_() {
 // bottom-to-top so deleting a row doesn't shift the index of ones still
 // to be checked.
 function deleteRowsForDay_(sheet, day) {
-  if (!day) return;
+  if (!day) return false;
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
+  if (lastRow < 2) return false;
   const dayColumn = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
-  for (let i = dayColumn.length - 1; i >= 0; i--) {
-    if (dayColumn[i][0] === day) sheet.deleteRow(i + 2);
+  const matches = [];
+  for (let i = 0; i < dayColumn.length; i++) {
+    if (dayColumn[i][0] === day) matches.push(i + 2);
   }
+  if (matches.length === 0) return false;
+
+  // Google Sheets refuses to delete every remaining row below a frozen
+  // header ("Sorry, it is not possible to delete all non-frozen rows") -
+  // hit whenever this day's rows are the ONLY data currently in the
+  // sheet, e.g. re-tapping Generate for the very first day logged in a
+  // brand-new week's tab. A throwaway blank row right after the header
+  // keeps at least one row alive through the delete; the caller removes
+  // it once the fresh rows for this day have been appended elsewhere.
+  const needsPlaceholder = matches.length === lastRow - 1;
+  if (needsPlaceholder) {
+    sheet.insertRowAfter(1);
+    for (let i = 0; i < matches.length; i++) matches[i]++;
+  }
+
+  for (let i = matches.length - 1; i >= 0; i--) sheet.deleteRow(matches[i]);
+  return needsPlaceholder;
 }
 
 // One row per set, replacing whatever was already logged for that day
@@ -1932,7 +1950,7 @@ function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
 
 function writeSessionRowsLocked_(weekLabel, day, exercises, notes, timestamp) {
   const sheet = getOrCreateWeekSheet_(weekLabel);
-  deleteRowsForDay_(sheet, day);
+  const hasPlaceholderRow = deleteRowsForDay_(sheet, day);
 
   const color = DAY_COLORS[day];
   const priorLastRow = sheet.getLastRow();
@@ -2007,6 +2025,12 @@ function writeSessionRowsLocked_(weekLabel, day, exercises, notes, timestamp) {
     appendRow([timestamp, day, '', '', '', '', '', '', '', notes || '', '', '']);
     rowsAdded = 1;
   }
+
+  // The fresh rows above are appended (and guaranteed non-empty - a
+  // rest day still gets its own placeholder row), so it's now safe to
+  // remove deleteRowsForDay_'s throwaway blank row without re-hitting
+  // the same "can't delete every remaining row" restriction.
+  if (hasPlaceholderRow) sheet.deleteRow(2);
 
   // Every route into the log passes through here - the manual "Generate
   // Session Summary" and the end-of-week archive both POST the same
