@@ -16359,30 +16359,6 @@ function checkForWeekRollover_() {
   if (weekLabelAtLoad_ !== null && getWeekLabel() !== weekLabelAtLoad_) location.reload();
 }
 
-// Logs each day to the Sheet the next time the app is opened after that
-// day has passed, instead of leaving everything to archiveFinishedWeek_'s
-// single end-of-week batch (which fires every unlogged day from that
-// batch concurrently, so rows can land in the Sheet out of date order).
-// One submitWorkout() call per day as it comes due keeps them landing
-// close to in order. archiveFinishedWeek_ stays in place as the safety
-// net for whatever this never got a chance to see live - the app closed
-// for the rest of the week, or Sunday itself, which this never catches
-// since nothing comes "after" it within the same week.
-function checkForDayRollover_() {
-  // A week-rollover reload may be about to happen (see checkForWeekRollover_
-  // above) - if so, getWeekLabel() here would already read the NEW week
-  // while the DOM still shows the old one, mislabeling whatever this queued.
-  // Bail and let the reload (and the fresh boot after it) sort it out.
-  if (weekLabelAtLoad_ !== null && getWeekLabel() !== weekLabelAtLoad_) return;
-  const week = getWeekLabel();
-  const todayIdx = (new Date().getDay() + 6) % 7; // 0 = Monday ... 6 = Sunday
-  for (let i = 0; i < todayIdx; i++) {
-    const day = dayKeys[i];
-    if (isDayLogged_(week, day)) continue;
-    submitWorkout(day, buildPayload(day));
-  }
-}
-
 function dateKey(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -17831,7 +17807,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-28-progression-live-sync';
+const APP_BUILD_VERSION = '2026-09-30-remove-auto-daylog';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -24388,24 +24364,30 @@ function submitWorkout(day, payload) {
     .finally(() => submitWorkoutInFlight_.delete(day));
 }
 
+let flushPendingLogsInFlight_ = false;
 function flushPendingLogs() {
   const url = getDeploymentUrl();
-  if (!url || !navigator.onLine) return;
+  if (!url || !navigator.onLine || flushPendingLogsInFlight_) return;
 
   const pending = JSON.parse(localStorage.getItem(STORAGE_PENDING_KEY) || '[]');
   if (pending.length === 0) return;
 
   localStorage.setItem(STORAGE_PENDING_KEY, '[]');
+  flushPendingLogsInFlight_ = true;
 
-  pending.forEach(entry => {
+  // Sent one at a time, in order, rather than all at once - concurrent
+  // doPost executions for the same week's Sheet tab can interleave their
+  // delete-then-append sequences and corrupt each other's rows (this is
+  // what caused Tuesday's log to wipe Monday's rows).
+  pending.reduce((chain, entry) => chain.then(() =>
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(entry.payload)
     }).catch(() => {
       queuePendingLog(entry.day, entry.payload);
-    });
-  });
+    })
+  ), Promise.resolve()).finally(() => { flushPendingLogsInFlight_ = false; });
 }
 
 window.addEventListener('online', flushPendingLogs);
@@ -24637,11 +24619,10 @@ bootLocalSavedAt_ = (() => {
 })();
 restoreState();
 weekLabelAtLoad_ = getWeekLabel();
-checkForDayRollover_();
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { checkForWeekRollover_(); checkForDayRollover_(); }
+  if (document.visibilityState === 'visible') checkForWeekRollover_();
 });
-setInterval(() => { checkForWeekRollover_(); checkForDayRollover_(); }, 5 * 60 * 1000);
+setInterval(checkForWeekRollover_, 5 * 60 * 1000);
 
 // The Water widget only pulled from the Sheet once, at page load - fine
 // for a page you just opened, but a phone tab left open all day (e.g. a

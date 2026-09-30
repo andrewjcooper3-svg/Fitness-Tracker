@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-09-04-day-notes-upload';
+const BACKEND_BUILD_VERSION = '2026-09-30-day-write-lock';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -1912,6 +1912,25 @@ function deleteRowsForDay_(sheet, day) {
 // tapping "Generate Summary" more than once for the same day never
 // leaves duplicate rows behind.
 function writeSessionRows_(weekLabel, day, exercises, notes, timestamp) {
+  // doPost executions are not serialized by Apps Script - two overlapping
+  // requests (e.g. one day's manual "Generate Session Summary" tap landing
+  // while another day's retry/queue flush is still in flight) can otherwise
+  // interleave their delete-then-append sequences on the same week tab and
+  // corrupt each other's rows - this is what let a Tuesday log wipe
+  // Monday's rows. A script-wide lock makes the whole
+  // delete-existing-rows-for-this-day + append-fresh-rows + rollup sequence
+  // atomic, so submissions for different days queue up and run one at a
+  // time instead of racing.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    return writeSessionRowsLocked_(weekLabel, day, exercises, notes, timestamp);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function writeSessionRowsLocked_(weekLabel, day, exercises, notes, timestamp) {
   const sheet = getOrCreateWeekSheet_(weekLabel);
   deleteRowsForDay_(sheet, day);
 
