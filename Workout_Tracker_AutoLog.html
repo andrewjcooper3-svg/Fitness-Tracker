@@ -17807,7 +17807,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-30-remove-auto-daylog';
+const APP_BUILD_VERSION = '2026-09-30-surface-reject-reason';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -24354,7 +24354,8 @@ function submitWorkout(day, payload) {
         markDayLogged_(payload.week || getWeekLabel(), day);
       } else {
         queuePendingLog(day, payload);
-        setLogStatus(day, 'error', '⚠ Sheet rejected the entry — saved locally.', true);
+        const detail = data && data.message ? ' — ' + data.message : '';
+        setLogStatus(day, 'error', '⚠ Sheet rejected the entry — saved locally.' + detail, true);
       }
     })
     .catch(() => {
