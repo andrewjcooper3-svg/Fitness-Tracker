@@ -16835,6 +16835,49 @@ function migrateStaleDayTemplates20260914() {
   }
 }
 
+// One-time repair for the swap-placeholder bug fixed alongside this (see
+// restoreDay's wasNewlyCreated handling) - any day swapped before that
+// fix landed had its incoming exercises recreated as bare custom cards
+// with no weight/rep target at all. Unlike the migrations above, this
+// runs AFTER restoreState() (called from the boot sequence below, not
+// alongside them) since it repairs the live, already-restored DOM rather
+// than the saved JSON - there's no template-slot card to fall back to
+// for a swapped-in exercise, so the only way back to the right numbers
+// is the same live progression target a fresh render would show.
+const PLACEHOLDER_BACKFILL_20261001_KEY = 'WORKOUT_PLACEHOLDER_BACKFILL_20261001';
+function backfillMissingPlaceholders20261001_() {
+  if (localStorage.getItem(PLACEHOLDER_BACKFILL_20261001_KEY)) return;
+  localStorage.setItem(PLACEHOLDER_BACKFILL_20261001_KEY, '1');
+  let changed = false;
+  document.querySelectorAll('.day-panel .exercise-card').forEach(card => {
+    const rows = card.querySelectorAll('.set-row');
+    if (!rows.length) return;
+    const firstInputs = rows[0].querySelectorAll('.set-input');
+    if (!firstInputs[0] || !firstInputs[1]) return;
+    // Already has a target - nothing to repair. Catches both an
+    // untouched template card and a genuinely custom one-off exercise
+    // that was never prescribed anywhere (progFindAnyPlanEx_ below would
+    // find nothing for it anyway).
+    if (firstInputs[0].placeholder || firstInputs[1].placeholder) return;
+    const name = getExerciseName(card);
+    if (!name) return;
+    const planEx = progFindAnyPlanEx_(name);
+    if (!planEx) return;
+    const target = progTargetForEntry_(planEx, progGetEntry_(planEx));
+    rows.forEach(row => {
+      const inputs = row.querySelectorAll('.set-input');
+      if (inputs[0]) inputs[0].placeholder = target.weightPh;
+      if (inputs[1]) inputs[1].placeholder = target.repsPh;
+    });
+    const metaEl = card.querySelector('.exercise-meta');
+    if (metaEl) metaEl.textContent = (target.weightPh || '—') + ' · ' + rows.length + ' × ' + (target.repsPh || '—');
+    const unitBadge = card.querySelector('.unit-badge');
+    if (unitBadge) unitBadge.textContent = target.unit;
+    changed = true;
+  });
+  if (changed) saveState();
+}
+
 // Unlike WORKOUT_TRACKER_STATE (which resets every new week), this ledger
 // accumulates indefinitely - it's the only thing that lets the Pushups tab
 // show week/month/year/deficit totals that span past week resets.
@@ -18000,7 +18043,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-01-swap-restore-placeholders';
+const APP_BUILD_VERSION = '2026-10-01-backfill-swap-placeholders';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -24938,6 +24981,7 @@ migrateStaleDayTemplates20260824();
 migrateStaleDayTemplates20260831();
 migrateStaleDayTemplates20260914();
 restoreState();
+backfillMissingPlaceholders20261001_();
 weekLabelAtLoad_ = getWeekLabel();
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkForWeekRollover_();
