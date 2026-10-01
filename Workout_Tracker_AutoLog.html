@@ -9176,7 +9176,20 @@ function rtPushupWeekTotal_(weekStart) {
   for (let i = 0; i < 7; i++) total += src.valueOn(dateKey(new Date(weekStart.getTime() + i * ROUTINES_DAY_MS)));
   return total;
 }
+// A manual override of a linked habit's otherwise-automatic done state
+// (see rtToggleLinkedOverride) - null when the habit isn't linked, or
+// hasn't been overridden for this date. Checked first by rtIsDoneOn, so
+// a deliberate override always wins over whatever the link source itself
+// says, same as an actual completion always wins over a leftover
+// vacation mark elsewhere in this file.
+function rtOverrideRecord_(h, dateStr) {
+  if (!h.link) return null;
+  const rec = RT_LOG[dateStr] && RT_LOG[dateStr][h.id];
+  return (rec && rec.override) ? rec : null;
+}
 function rtIsDoneOn(h, dateStr) {
+  const override = rtOverrideRecord_(h, dateStr);
+  if (override) return !!override.done;
   if (h.link && ROUTINES_LINK_SOURCES[h.link.source]) {
     const src = ROUTINES_LINK_SOURCES[h.link.source];
     if (src.kind === 'logged') return !!src.doneOn(dateStr);
@@ -9215,14 +9228,26 @@ function rtExcusedMetaOverride_(h, k) {
 // loggedAt), synced to the Routines Log sheet the same way. Linked habits
 // (Water/Pushups/Weight) have no single check-off moment of their own -
 // their "done" state is read live off another log - so this returns
-// nothing for them rather than a misleading time.
+// nothing for them, UNLESS a manual override (see rtToggleLinkedOverride)
+// gave this particular day a real check-off moment after all.
 function rtCompletedTimeText_(h, k) {
-  if (h.link) return '';
-  const entry = RT_LOG[k] && RT_LOG[k][h.id];
+  const override = rtOverrideRecord_(h, k);
+  if (h.link && !override) return '';
+  const entry = override || (RT_LOG[k] && RT_LOG[k][h.id]);
   if (!entry || !entry.done || !entry.loggedAt) return '';
   const t = new Date(entry.loggedAt);
   if (isNaN(t.getTime())) return '';
   return t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+// "Manually overridden" outranks whatever meta text a linked row would
+// otherwise show (the value/threshold fraction, "Logged today") - same
+// precedence pattern as rtExcusedMetaOverride_. Null when this habit
+// isn't linked or isn't overridden for this date, so callers can just
+// `||` it in front of their normal fallback the same way.
+function rtOverrideMetaOverride_(h, k) {
+  const override = rtOverrideRecord_(h, k);
+  if (!override) return null;
+  return override.done ? 'Overridden - marked done' : 'Overridden - marked not done';
 }
 // Meta text for a linked habit's row - "logged" sources are yes/no, so
 // they show a plain status instead of a value/threshold fraction.
@@ -9372,10 +9397,49 @@ function rtToggleExcused(habitId, dateObj) {
   rtRenderAll();
   rtLogToggleRemote_(k, habitId, nextDone, nextExcused);
 }
-function rtLogToggleRemote_(dateStr, habitId, done, excused) {
+// A linked habit (Water/Pushups/Weight) has no checkbox of its own to tap
+// day to day - it's read live off another log - but that log is
+// sometimes wrong for a given day (a missed sync, a shortcut that didn't
+// fire) and there's no way to fix just that one day short of editing the
+// other feature's data directly. This is the escape hatch: confirm, then
+// record a real RT_LOG entry flagged `override: true`, which rtIsDoneOn
+// checks before it ever looks at the link source. Click again to remove
+// the override and go back to automatic tracking, rather than flipping
+// it a second time - an override is a deliberate, occasional correction,
+// not a second manual checkbox sitting on top of the automatic one.
+function rtToggleLinkedOverride(habitId, dateObj) {
+  const h = RT_HABITS.list.find(x => x.id === habitId);
+  if (!h || !h.link) return;
+  const k = dateKey(dateObj);
+  const existingOverride = rtOverrideRecord_(h, k);
+
+  if (existingOverride) {
+    if (!confirm('Remove the override for "' + h.name + '" and go back to automatic tracking for this day?')) return;
+    delete RT_LOG[k][habitId];
+    rtSaveLogLocal();
+    rtRenderAll();
+    // The Sheet is append-only (newest loggedAt wins per habit/day - see
+    // getRoutinesLedgerFromSheets_), so "removing" an override can't just
+    // delete a row the way it does locally - it has to log one more row
+    // with override explicitly false, which supersedes the earlier
+    // override:true row once any device pulls the ledger again.
+    rtLogToggleRemote_(k, habitId, false, false, false);
+    return;
+  }
+
+  const proposedDone = !rtIsDoneOn(h, k);
+  const verb = proposedDone ? 'mark it complete' : 'mark it not complete';
+  if (!confirm('Override "' + h.name + '" for this day and ' + verb + '? This replaces the automatic tracking until you remove the override.')) return;
+  RT_LOG[k] = RT_LOG[k] || {};
+  RT_LOG[k][habitId] = { done: proposedDone, loggedAt: new Date().toISOString(), excused: false, override: true };
+  rtSaveLogLocal();
+  rtRenderAll();
+  rtLogToggleRemote_(k, habitId, proposedDone, false, true);
+}
+function rtLogToggleRemote_(dateStr, habitId, done, excused, isOverride) {
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return; // best-effort; the next pull reconciles if this drops
-  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'logRoutine', date: dateStr, habitId, done, excused: !!excused }) })
+  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'logRoutine', date: dateStr, habitId, done, excused: !!excused, override: !!isOverride }) })
     .catch(() => {});
 }
 
@@ -9411,17 +9475,27 @@ function rtItemRowHtml(h, k, metaText, showStreak) {
   const done = rawDone;
   const streak = showStreak ? rtCurrentStreak(h) : 0;
   const linked = !!h.link;
-  const checkAttrs = linked ? 'disabled' : `onclick="rtToggle('${h.id}', rtViewDay)"`;
+  const overridden = !!rtOverrideRecord_(h, k);
+  // A linked habit's checkbox is still clickable, just routed through the
+  // confirm-first override flow instead of a plain toggle - see
+  // rtToggleLinkedOverride for why a linked habit can't just be toggled
+  // like a normal one.
+  const checkAttrs = linked ? `onclick="rtToggleLinkedOverride('${h.id}', rtViewDay)"` : `onclick="rtToggle('${h.id}', rtViewDay)"`;
   const progress = (done || excused) ? null : rtLinkProgressRatio_(h, k);
   const progressStyle = progress != null ? ` style="--fill:${progress.toFixed(3)}"` : '';
   const checkCls = excused ? 'excused' : (done ? 'done' : '');
   const checkLabel = done ? 'Marked done' : (excused ? 'On vacation' : 'Not done');
+  // The meta text already says "Overridden - ..." once overridden (see
+  // rtOverrideMetaOverride_) - the chip's job is just flagging "linked"
+  // for the common case, so it stays out of the way rather than
+  // repeating the same word a second time right next to it.
+  const linkChip = (linked && !overridden) ? ' <span class="rt-link-chip">🔗 linked</span>' : '';
   return `<div class="rt-item-row">
     <button class="rt-check ${checkCls}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${checkLabel}">
       ${excused ? RT_VACATION_ICON_SVG_ : RT_CHECK_ICON_SVG_}
     </button>
     <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
-    <div class="rt-item-meta">${metaText}${linked ? ' <span class="rt-link-chip">🔗 linked</span>' : ''}</div>
+    <div class="rt-item-meta">${metaText}${linkChip}</div>
     ${showStreak && streak > 1 ? `<div class="rt-streak-chip">${streak} day streak</div>` : ''}
     <button class="rt-vacation-btn${excused ? ' active' : ''}" onclick="event.stopPropagation(); rtToggleExcused('${h.id}', rtViewDay)"
       title="${excused ? 'Remove vacation mark' : 'Mark as vacation - not possible today'}" aria-label="${excused ? 'Remove vacation mark' : 'Mark as vacation'}">${RT_VACATION_ICON_SVG_}</button>
@@ -9466,7 +9540,7 @@ function rtRenderToday() {
     // Once it's done, the time it got checked off is more useful than the
     // cadence label that was only ever there to say when it's due.
     const doneTime = rtCompletedTimeText_(h, k);
-    const meta = rtExcusedMetaOverride_(h, k) || (h.link ? rtLinkMetaText_(h, k) : (doneTime || rtCadenceLabel(h)));
+    const meta = rtOverrideMetaOverride_(h, k) || rtExcusedMetaOverride_(h, k) || (h.link ? rtLinkMetaText_(h, k) : (doneTime || rtCadenceLabel(h)));
     return rtItemRowHtml(h, k, meta, isToday);
   }).join('');
   // X-times-a-week items aren't "due" on any one day, so they get their
@@ -9475,7 +9549,7 @@ function rtRenderToday() {
     html += '<div class="rt-item-group-label">This week, any day</div>';
     html += weeklyToday.map(h => {
       const doneTime = rtCompletedTimeText_(h, k);
-      const meta = rtExcusedMetaOverride_(h, k) || doneTime || `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`;
+      const meta = rtOverrideMetaOverride_(h, k) || rtExcusedMetaOverride_(h, k) || doneTime || `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`;
       return rtItemRowHtml(h, k, meta, false);
     }).join('');
   }
@@ -10124,7 +10198,7 @@ function rtMergeRemoteLedger_(remoteLedger) {
       RT_LOG[dateStr] = RT_LOG[dateStr] || {};
       const localCell = RT_LOG[dateStr][habitId];
       if (!localCell || String(remoteCell.loggedAt) > String(localCell.loggedAt)) {
-        RT_LOG[dateStr][habitId] = { done: !!remoteCell.done, loggedAt: remoteCell.loggedAt, excused: !!remoteCell.excused };
+        RT_LOG[dateStr][habitId] = { done: !!remoteCell.done, loggedAt: remoteCell.loggedAt, excused: !!remoteCell.excused, override: !!remoteCell.override };
         changed = true;
       }
     });
@@ -17897,7 +17971,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-09-30-day-swap-reposition';
+const APP_BUILD_VERSION = '2026-10-01-routines-override';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -18033,26 +18107,33 @@ function ovRoutinesItemRowHtml_(h, k, weekly) {
   const excused = rtIsExcusedOn(h, k) && !rawDone;
   const done = rawDone;
   const linked = !!h.link;
+  const overridden = !!rtOverrideRecord_(h, k);
   const doneTime = done ? rtCompletedTimeText_(h, k) : '';
   const fallbackMeta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : (linked ? rtLinkMetaText_(h, k) : rtCadenceLabel(h));
-  const meta = excused ? 'On vacation' : (doneTime || fallbackMeta);
-  const checkAttrs = linked ? 'disabled' : `onclick="event.stopPropagation(); ovToggleRoutine_('${h.id}')"`;
+  const meta = rtOverrideMetaOverride_(h, k) || (excused ? 'On vacation' : (doneTime || fallbackMeta));
+  const checkAttrs = linked
+    ? `onclick="event.stopPropagation(); ovToggleLinkedOverride_('${h.id}')"`
+    : `onclick="event.stopPropagation(); ovToggleRoutine_('${h.id}')"`;
   const progress = (done || excused) ? null : rtLinkProgressRatio_(h, k);
   const progressStyle = progress != null ? ` style="--fill:${progress.toFixed(3)}"` : '';
   const checkCls = excused ? 'excused' : (done ? 'done' : '');
   const checkLabel = done ? 'Marked done' : (excused ? 'On vacation' : 'Not done');
+  const linkChip = (linked && !overridden) ? ' <span class="rt-link-chip">🔗</span>' : '';
   return `<div class="rt-item-row">
     <button class="rt-check ${checkCls}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${checkLabel}">
       ${excused ? RT_VACATION_ICON_SVG_ : RT_CHECK_ICON_SVG_}
     </button>
     <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
-    <div class="rt-item-meta">${meta}${linked ? ' <span class="rt-link-chip">🔗</span>' : ''}</div>
+    <div class="rt-item-meta">${meta}${linkChip}</div>
     <button class="rt-vacation-btn${excused ? ' active' : ''}" onclick="event.stopPropagation(); ovToggleExcusedRoutine_('${h.id}')"
       title="${excused ? 'Remove vacation mark' : 'Mark as vacation - not possible today'}" aria-label="${excused ? 'Remove vacation mark' : 'Mark as vacation'}">${RT_VACATION_ICON_SVG_}</button>
   </div>`;
 }
 function ovToggleRoutine_(id) {
   rtToggle(id, rtToday); // rtToggle already calls rtRenderAll(), which re-enters here too
+}
+function ovToggleLinkedOverride_(id) {
+  rtToggleLinkedOverride(id, rtToday); // rtToggleLinkedOverride already calls rtRenderAll(), which re-enters here too
 }
 function ovToggleExcusedRoutine_(id) {
   rtToggleExcused(id, rtToday); // rtToggleExcused already calls rtRenderAll(), which re-enters here too

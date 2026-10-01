@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-09-30-perday-draft-merge';
+const BACKEND_BUILD_VERSION = '2026-10-01-routines-override';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -583,7 +583,7 @@ function getWaterEntriesForDate_(date) {
 }
 
 const ROUTINES_SHEET_NAME = 'Routines Log';
-const ROUTINES_HEADERS = ['Date', 'Habit Id', 'Done', 'Logged At', 'Excused'];
+const ROUTINES_HEADERS = ['Date', 'Habit Id', 'Done', 'Logged At', 'Excused', 'Override'];
 
 /**
  * Habit check-offs work like the water log, not the weight log: every tap
@@ -628,9 +628,9 @@ function migrateRoutinesSheetHeader_(sheet) {
   range.setFontColor('#ffffff');
 }
 
-function logRoutineEntry_(date, habitId, done, excused) {
+function logRoutineEntry_(date, habitId, done, excused, override) {
   const sheet = getOrCreateRoutinesSheet_();
-  sheet.appendRow([date, habitId, !!done, new Date(), !!excused]);
+  sheet.appendRow([date, habitId, !!done, new Date(), !!excused, !!override]);
 }
 
 function getRoutinesLedgerFromSheets_() {
@@ -651,7 +651,10 @@ function getRoutinesLedgerFromSheets_() {
     // wins the fold when its own timestamp is actually later - defends
     // against a sheet that was ever hand-edited out of chronological order.
     if (!existing || loggedAt >= existing.loggedAt) {
-      ledger[key][habitId] = { done: !!row[2], loggedAt: loggedAt, excused: !!row[4] };
+      // row[5] (Override) predates this column on a sheet created before
+      // it existed - reads back undefined/blank there, which is exactly
+      // "not an override" and needs no migration of its own.
+      ledger[key][habitId] = { done: !!row[2], loggedAt: loggedAt, excused: !!row[4], override: !!row[5] };
     }
   });
   return ledger;
@@ -2589,7 +2592,7 @@ function doPost(e) {
       if (!data.date || !data.habitId) {
         throw new Error('logRoutine requires a date and a habitId');
       }
-      logRoutineEntry_(data.date, data.habitId, data.done, data.excused);
+      logRoutineEntry_(data.date, data.habitId, data.done, data.excused, data.override);
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
         .setMimeType(ContentService.MimeType.JSON);
