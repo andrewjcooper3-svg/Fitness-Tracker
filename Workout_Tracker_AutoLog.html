@@ -17179,6 +17179,16 @@ function restoreDay(day, savedDay) {
   if (hasIds) {
     savedExercises.forEach(savedEx => {
       let card = Array.from(panel.querySelectorAll('.exercise-card')).find(c => c.dataset.exId === savedEx.id);
+      // Tracked before card gets reassigned below - a genuinely custom
+      // exercise ALWAYS takes this branch (it was never in the template to
+      // begin with), but so does a PRESCRIBED exercise swapped in from a
+      // day whose own template has fewer slots than the source day (see
+      // swapDayPlans_) - addExercise() builds a bare card with no target
+      // placeholder at all, unlike a real template slot, which gets its
+      // placeholder from renderWeeklyPlan_ at creation. Needed below to
+      // know whether this card still needs that placeholder restored from
+      // the saved snapshot instead of leaving it genuinely blank.
+      const wasNewlyCreated = !card;
       if (!card) {
         // No matching id left - it was a custom "+ Add Exercise" card.
         addExercise(panel, true);
@@ -17186,6 +17196,17 @@ function restoreDay(day, savedDay) {
         card = cards[cards.length - 1];
         card.dataset.exId = savedEx.id;
         setRestoredCustomExerciseName_(card, savedEx.name);
+        // A genuinely custom exercise never had a meta line worth keeping
+        // ("Custom"), but a swapped-in prescribed exercise's saved meta
+        // ("265 lb · 3 × 10") is real, lost information this card has no
+        // other way to recover - restored here so it reads the same as it
+        // did before the swap, not like a blank one-off addition. Earlier
+        // than updateExerciseTotal(card) below, which only ever rewrites
+        // the set-count segment of whatever text is already here.
+        if (!savedEx.custom && savedEx.meta) {
+          const metaEl = card.querySelector('.exercise-meta');
+          if (metaEl) metaEl.textContent = savedEx.meta;
+        }
       } else if (!savedEx.custom) {
         // A prescribed card that already exists (renderWeeklyPlan_ always
         // builds one for every template slot) but was renamed via the
@@ -17216,6 +17237,14 @@ function restoreDay(day, savedDay) {
         const savedSet = savedEx.sets[si];
         if (!savedSet) return;
         const inputs = row.querySelectorAll('.set-input');
+        // A real template slot already has its placeholder from
+        // renderWeeklyPlan_ - only a newly-created card (see
+        // wasNewlyCreated above) needs it recovered from the saved
+        // snapshot, or every set would show no target at all.
+        if (wasNewlyCreated) {
+          if (inputs[0]) inputs[0].placeholder = savedSet.targetWeight || '';
+          if (inputs[1]) inputs[1].placeholder = savedSet.targetReps || '';
+        }
         if (inputs[0]) inputs[0].value = savedSet.weight || '';
         if (inputs[1]) inputs[1].value = savedSet.reps || '';
         if (inputs[2]) { inputs[2].value = savedSet.notes || ''; syncNotesButton_(inputs[2]); }
@@ -17971,7 +18000,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-01-water-ledger-pending-guard';
+const APP_BUILD_VERSION = '2026-10-01-swap-restore-placeholders';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
