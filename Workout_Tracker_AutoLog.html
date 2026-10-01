@@ -17971,7 +17971,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-01-routines-override';
+const APP_BUILD_VERSION = '2026-10-01-water-ledger-pending-guard';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -19743,6 +19743,21 @@ async function loadRemoteWaterLedger() {
         // always more current than a finalized ledger that (by design)
         // has nothing for today until tonight's flush.
         if (date === todayKey) return;
+        // A day THIS device still has queued to flush (flushCompletedWaterDays_
+        // hasn't gotten every row onto the Sheet yet - a dropped connection
+        // partway through is enough) has a Sheet total that's KNOWN
+        // incomplete right now. Overwriting the local total - already the
+        // real, complete sum of this device's own entries, recomputed by
+        // recomputeWaterLedgerForDay_ - with that partial figure shows an
+        // already-logged amount as lower than it actually is, every single
+        // load, until the flush finally finishes. The chart (driven
+        // straight off the entries, never off this ledger) would keep
+        // showing the true total the whole time, which is exactly the
+        // "chart's right, the number's wrong" split this guards against.
+        // Only skipped when there are local entries to stand on - a day
+        // with none at all (logged entirely from another device) has
+        // nothing better to show than the Sheet's own total, partial or not.
+        if (!isWaterDaySynced_(date) && getWaterEntriesForDay_(date).entries.length) return;
         // Every row behind this figure now carries an id the backend
         // refuses to append twice (see logWaterEntry_), so a PAST day's
         // reported total is the real, de-duplicated sum across every
