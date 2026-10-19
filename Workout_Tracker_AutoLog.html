@@ -5129,7 +5129,7 @@ const dayNames = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday',
 // rest days with no exercise list at all. Gym days are Monday/Wednesday
 // (moved from Wednesday/Friday on 2026-09-14); Tuesday/Thursday are
 // bodyweight-only pushup days.
-const WEEKLY_PLAN_DATA = {"mon":[{"name":"Leg Press","meta":"265 lb · 3 × 10","rows":[["265 lb","Reps","10","Up from 255 - all three clean"],["265 lb","Reps","10",null],["265 lb","Reps","10",null]]},{"name":"Dumbbell Romanian Deadlift","meta":"90 lb · 3 × 10","rows":[["90 lb","Reps","10","Switched to a bar and plates after set 1 felt awkward with just dumbbells - sets 2 and 3 were noticeably smoother and clean. Sticking with the bar"],["90 lb","Reps","10",null],["90 lb","Reps","10",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 12","rows":[["80 lb","Reps","12","Holding 80 - sets 2 and 3 tough"],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Lat Pulldown","meta":"110 lb · 3 × 10","rows":[["110 lb","Reps","10","Holding 110 - set 1 was an accidental 125, set 3 corrected down to 90. Aim for 110 clean across all three"],["110 lb","Reps","10",null],["110 lb","Reps","10",null]]},{"name":"CS DB Row (Left Arm Focus)","meta":"45 lb ea · 4 × 10","rows":[["45 lb ea","Reps","10","Holding 45 - last set went red, getting fatigued by the fourth. LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"],["45 lb ea","Reps","10","LEFT focus"]]},{"name":"Face Pull","meta":"35 lb · 4 × 15","rows":[["35 lb","Reps","15","Adding a 4th set - more rear delt volume this week"],["35 lb","Reps","15",null],["35 lb","Reps","15",null],["35 lb","Reps","15",null]]},{"name":"Cable Bicep Curl","meta":"45 lb · 3 × 12","rows":[["45 lb","Reps","12","Holding 45 - all three tough again"],["45 lb","Reps","12",null],["45 lb","Reps","12",null]]},{"name":"Standing Calf Raise","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Skipped mid-session again but caught up afterward with all three clean - keep it in the flow"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Cable Crunch","meta":"60 lb · 3 × 12","rows":[["60 lb","Reps","12","Up from 55 - all three clean, adding some back now that the deload paid off"],["60 lb","Reps","12",null],["60 lb","Reps","12",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]}],"tue":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Bodyweight day now that lifting moved to Monday/Wednesday"],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Reverse Crunch","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Moved here from Wednesday - kept getting skipped there for time"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Plank","meta":"BW · 3 × 65s","rows":[["BW","Time","65s","Moved here from Wednesday - same reasoning, more room on a home day"],["BW","Time","65s",null],["BW","Time","65s",null]]}],"wed":[{"name":"Leg Press","meta":"265 lb · 3 × 10","rows":[["265 lb","Reps","10","Matched to Monday's weight - Leg Press is now tracked as one progression across both days instead of two"],["265 lb","Reps","10",null],["265 lb","Reps","10",null]]},{"name":"Leg Extension","meta":"110 lb · 3 × 12","rows":[["110 lb","Reps","12","Holding 110 - all four sets tough again"],["110 lb","Reps","12",null],["110 lb","Reps","12",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 12","rows":[["80 lb","Reps","12","Holding 80 - sets 2 and 3 tough"],["80 lb","Reps","12",null],["80 lb","Reps","12",null]]},{"name":"Glute Kickback","meta":"30 lb · 4 × 10","rows":[["30 lb","Reps","10","Each leg - holding 30, all four tough, reps crept to 12 on the first"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"],["30 lb","Reps","10","Each leg"]]},{"name":"Lat Pulldown","meta":"110 lb · 3 × 10","rows":[["110 lb","Reps","10","New here too - same weight you're already handling Monday, more weekly pulling volume to balance the pushup load"],["110 lb","Reps","10",null],["110 lb","Reps","10",null]]},{"name":"Single Arm DB Row (Left Emphasis)","meta":"50 lb · 3 × 10","rows":[["50 lb","Reps","10","Holding 50 - all three tough, still adjusting to the new weight. LEFT catch-up"],["50 lb","Reps","10",null],["50 lb","Reps","10",null]]},{"name":"Lateral Raise","meta":"15 lb · 3 × 12","rows":[["15 lb","Reps","12","Holding 15 - shoulder health, last set tough again"],["15 lb","Reps","12",null],["15 lb","Reps","12",null]]},{"name":"Reverse Pec Deck Fly","meta":"20 lb · 3 × 15","rows":[["20 lb","Reps","15","Corrected down from 40 - that start was too heavy, still building toward clean 15s here"],["20 lb","Reps","15",null],["20 lb","Reps","15",null]]},{"name":"Face Pull","meta":"35 lb · 3 × 15","rows":[["35 lb","Reps","15","Matched to Monday's weight - Face Pull is now tracked as one progression across both days instead of two"],["35 lb","Reps","15",null],["35 lb","Reps","15",null]]},{"name":"Pull-ups","meta":"BW · 3 × 4","rows":[["BW","Reps","4","Switched from AMRAP to a fixed target now that there's real data - 4 clean reps is the baseline to build from"],["BW","Reps","4",null],["BW","Reps","4",null]]},{"name":"Cable Bicep Curl","meta":"45 lb · 3 × 12","rows":[["45 lb","Reps","12","Matched to Monday's weight - Cable Bicep Curl is now tracked as one progression across both days instead of two"],["45 lb","Reps","12",null],["45 lb","Reps","12",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"thu":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Bodyweight day now that lifting moved to Monday/Wednesday"],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Reverse Crunch","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Moved here from Wednesday - kept getting skipped there for time"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Plank","meta":"BW · 3 × 65s","rows":[["BW","Time","65s","Moved here from Wednesday - same reasoning, more room on a home day"],["BW","Time","65s",null],["BW","Time","65s",null]]}],"sat":[{"name":"Pushups","meta":"BW · 4 × 55 · Rest 60s","rows":[["BW","Reps","55","455 on Saturday last week. Impressive, but it is covering for Tue/Thu"],["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55","Catch-up set for the year deficit"]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]},{"name":"Sauna","meta":"BW · 1 × 10-20 min","rows":[["BW","Time","10-20 min","Post-workout, not counted in workout time"]]}]};
+const WEEKLY_PLAN_DATA = {"mon":[{"name":"Leg Press","meta":"265 lb · 3 × 8","rows":[["265 lb","Reps","8","Up from 255 - all three clean"],["265 lb","Reps","8",null],["265 lb","Reps","8",null]]},{"name":"Dumbbell Romanian Deadlift","meta":"90 lb · 3 × 8","rows":[["90 lb","Reps","8","Switched to a bar and plates after set 1 felt awkward with just dumbbells - sets 2 and 3 were noticeably smoother and clean. Sticking with the bar"],["90 lb","Reps","8",null],["90 lb","Reps","8",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 8","rows":[["80 lb","Reps","8","Holding 80 - sets 2 and 3 tough"],["80 lb","Reps","8",null],["80 lb","Reps","8",null]]},{"name":"Lat Pulldown","meta":"110 lb · 3 × 8","rows":[["110 lb","Reps","8","Holding 110 - set 1 was an accidental 125, set 3 corrected down to 90. Aim for 110 clean across all three"],["110 lb","Reps","8",null],["110 lb","Reps","8",null]]},{"name":"CS DB Row (Left Arm Focus)","meta":"45 lb ea · 3 × 8","rows":[["45 lb ea","Reps","8","Holding 45 - last two sets have been tough. LEFT focus. Capped at 3 sets now (was 4); reps restart at 8 under the new 8/10/12 ladder - weight bumps once 12x3 lands clean instead of reps climbing indefinitely."],["45 lb ea","Reps","8","LEFT focus"],["45 lb ea","Reps","8","LEFT focus"]]},{"name":"Face Pull","meta":"35 lb · 3 × 8","rows":[["35 lb","Reps","8","Capped at 3 sets now (was heading to a 4th) - reps restart at 8 under the new 8/10/12 ladder instead of climbing past 15 toward 19."],["35 lb","Reps","8",null],["35 lb","Reps","8",null]]},{"name":"Cable Bicep Curl","meta":"45 lb · 3 × 8","rows":[["45 lb","Reps","8","Holding 45 - all three tough again"],["45 lb","Reps","8",null],["45 lb","Reps","8",null]]},{"name":"Standing Calf Raise","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Skipped mid-session again but caught up afterward with all three clean - keep it in the flow"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Cable Crunch","meta":"60 lb · 3 × 8","rows":[["60 lb","Reps","8","Up from 55 - all three clean, adding some back now that the deload paid off"],["60 lb","Reps","8",null],["60 lb","Reps","8",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]}],"tue":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Bodyweight day now that lifting moved to Monday/Wednesday"],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Reverse Crunch","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Moved here from Wednesday - kept getting skipped there for time"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Plank","meta":"BW · 3 × 65s","rows":[["BW","Time","65s","Moved here from Wednesday - same reasoning, more room on a home day"],["BW","Time","65s",null],["BW","Time","65s",null]]}],"wed":[{"name":"Leg Press","meta":"265 lb · 3 × 8","rows":[["265 lb","Reps","8","Matched to Monday's weight - Leg Press is now tracked as one progression across both days instead of two"],["265 lb","Reps","8",null],["265 lb","Reps","8",null]]},{"name":"Leg Extension","meta":"110 lb · 3 × 8","rows":[["110 lb","Reps","8","Holding 110 - all three sets tough again."],["110 lb","Reps","8",null],["110 lb","Reps","8",null]]},{"name":"Leg Curl","meta":"80 lb · 3 × 8","rows":[["80 lb","Reps","8","Holding 80 - sets 2 and 3 tough"],["80 lb","Reps","8",null],["80 lb","Reps","8",null]]},{"name":"Glute Kickback","meta":"30 lb · 3 × 8","rows":[["30 lb","Reps","8","Each leg - capped at 3 sets now (was 4). Reps restart at 8 under the new 8/10/12 ladder."],["30 lb","Reps","8","Each leg"],["30 lb","Reps","8","Each leg"]]},{"name":"Lat Pulldown","meta":"110 lb · 3 × 8","rows":[["110 lb","Reps","8","New here too - same weight you're already handling Monday, more weekly pulling volume to balance the pushup load"],["110 lb","Reps","8",null],["110 lb","Reps","8",null]]},{"name":"Single Arm DB Row (Left Emphasis)","meta":"50 lb · 3 × 8","rows":[["50 lb","Reps","8","Holding 50 - all three tough, still adjusting to the new weight. LEFT catch-up"],["50 lb","Reps","8",null],["50 lb","Reps","8",null]]},{"name":"Lateral Raise","meta":"15 lb · 3 × 8","rows":[["15 lb","Reps","8","Holding 15 - shoulder health, last set tough again"],["15 lb","Reps","8",null],["15 lb","Reps","8",null]]},{"name":"Reverse Pec Deck Fly","meta":"20 lb · 3 × 8","rows":[["20 lb","Reps","8","Corrected down from 40 - that start was too heavy. Rebuilding from 8 reps under the new 8/10/12 ladder."],["20 lb","Reps","8",null],["20 lb","Reps","8",null]]},{"name":"Face Pull","meta":"35 lb · 3 × 8","rows":[["35 lb","Reps","8","Matched to Monday's weight - Face Pull is now tracked as one progression across both days instead of two"],["35 lb","Reps","8",null],["35 lb","Reps","8",null]]},{"name":"Pull-ups","meta":"BW · 3 × 4","rows":[["BW","Reps","4","Switched from AMRAP to a fixed target now that there's real data - 4 clean reps is the baseline to build from"],["BW","Reps","4",null],["BW","Reps","4",null]]},{"name":"Cable Bicep Curl","meta":"45 lb · 3 × 8","rows":[["45 lb","Reps","8","Matched to Monday's weight - Cable Bicep Curl is now tracked as one progression across both days instead of two"],["45 lb","Reps","8",null],["45 lb","Reps","8",null]]},{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55",null]]}],"thu":[{"name":"Pushups","meta":"BW · 3 × 55","rows":[["BW","Reps","55","Bodyweight day now that lifting moved to Monday/Wednesday"],["BW","Reps","55",null],["BW","Reps","55",null]]},{"name":"Reverse Crunch","meta":"BW · 3 × 15","rows":[["BW","Reps","15","Moved here from Wednesday - kept getting skipped there for time"],["BW","Reps","15",null],["BW","Reps","15",null]]},{"name":"Plank","meta":"BW · 3 × 65s","rows":[["BW","Time","65s","Moved here from Wednesday - same reasoning, more room on a home day"],["BW","Time","65s",null],["BW","Time","65s",null]]}],"sat":[{"name":"Pushups","meta":"BW · 4 × 55 · Rest 60s","rows":[["BW","Reps","55","455 on Saturday last week. Impressive, but it is covering for Tue/Thu"],["BW","Reps","55",null],["BW","Reps","55",null],["BW","Reps","55","Catch-up set for the year deficit"]]},{"name":"Walk","meta":"BW · 1 × 10 min","rows":[["BW","Time","10 minutes","10.5 incline, 2.5 speed"]]},{"name":"Sauna","meta":"BW · 1 × 10-20 min","rows":[["BW","Time","10-20 min","Post-workout, not counted in workout time"]]}]};
 
 function escapeAttr_(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
 function escapeText_(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -18043,7 +18043,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-01-backfill-swap-placeholders';
+const APP_BUILD_VERSION = '2026-10-19-standard-progression-ladder';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -23393,9 +23393,50 @@ function parseExerciseCard(card) {
    sync across devices the way logged sets do. */
 
 const PROG_STORE_KEY = 'PROGRESSION_ENGINE_V1';
+const PROG_LADDER_MIGRATION_20261019_KEY = 'PROG_LADDER_MIGRATED_20261019';
 let progressionDB = progLoad_();
 progMigrateOldDayScopedEntries_();
 progApplyManualCorrection20260921_();
+progMigrateToStandardLadder20261019_();
+
+// Standardizes every already-tracked weighted exercise onto the same
+// reps/sets ladder - a flat 8/10/12 rep band at a fixed 3 sets, weight
+// bumping once a session clears 12x3 clean, reps dropping back to 8 at
+// the new weight - instead of each exercise climbing its own
+// base+2/+4 rep ladder (and, for anything that started at 4 sets,
+// never dropping below 4) from wherever it first happened to be
+// bootstrapped. That drift is what let Face Pull's working set reach
+// 19 reps before a bump ever reset it, and let CS DB Row/Face Pull/
+// Glute Kickback sit at a permanent 4 sets just because that's what
+// they started at. progBootstrapEntry_ already uses this ladder for
+// any exercise tracked for the first time from here on - this is the
+// one-time catch-up for entries that already existed before it did.
+function progMigrateToStandardLadder20261019_() {
+  if (localStorage.getItem(PROG_LADDER_MIGRATION_20261019_KEY)) return;
+  localStorage.setItem(PROG_LADDER_MIGRATION_20261019_KEY, '1');
+  let changed = false;
+  Object.keys(progressionDB.exercises).forEach(key => {
+    const entry = progressionDB.exercises[key];
+    if (!entry || entry.type !== 'weighted') return;
+    entry.cfg.repRange = [8, 10, 12];
+    entry.cfg.setRange = [3];
+    // The rung this exercise was actually sitting on doesn't mean the
+    // same thing under the new ladder - clamped into range rather than
+    // carried over literally; sets always lands on the one rung that
+    // still exists.
+    entry.state.repIdx = Math.max(0, Math.min(entry.state.repIdx, entry.cfg.repRange.length - 1));
+    entry.state.setIdx = 0;
+    entry.state.repStreak = 0;
+    entry.state.topStreak = 0;
+    // A pending confirmation (a bump/drop prompt) was phrased against
+    // the old ladder's numbers - stale the moment the ladder changes
+    // under it, so it's dropped rather than shown, or applied, with the
+    // wrong numbers baked into its own text.
+    delete entry.pendingAction;
+    changed = true;
+  });
+  if (changed) progSave_();
+}
 
 // Reverse Pec Deck Fly was planned starting at 40 lb, but real sessions
 // showed that was too heavy from the start (still short on reps even
@@ -23503,11 +23544,20 @@ function progBootstrapEntry_(planEx) {
     if (!weight || !baseReps) {
       return { type: 'static', cfg: { fixedSets: baseSets, fixedReps: baseReps || null }, state: { painFlag: false } };
     }
+    // Standard ladder for every weighted exercise: 8/10/12 reps at a
+    // flat 3 sets, weight bump once 12x3 lands clean, reps back to 8 at
+    // the new weight - rather than climbing from wherever this
+    // exercise's own plan happened to start (baseReps/baseSets), which
+    // is what let different exercises drift onto different, sometimes
+    // much higher, rep ceilings purely by accident of their starting
+    // numbers. baseReps/baseSets still gate whether this bootstraps as
+    // 'weighted' at all (just above) - only the ladder itself no longer
+    // comes from them.
     return {
       type: 'weighted',
       cfg: {
-        repRange: [baseReps, baseReps + 2, baseReps + 4],
-        setRange: baseSets < 4 ? [baseSets, baseSets + 1] : [baseSets],
+        repRange: [8, 10, 12],
+        setRange: [3],
         repStreakNeeded: 2, weightStreakNeeded: 3, weightIncrement: 5
       },
       state: { weight: weight, repIdx: 0, setIdx: 0, repStreak: 0, topStreak: 0, shortfallStreak: 0, painFlag: false }
