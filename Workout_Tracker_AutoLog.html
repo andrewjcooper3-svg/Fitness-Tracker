@@ -3157,7 +3157,7 @@
 <!-- TUESDAY -->
 <div id="day-tue" class="day-panel" data-pushup-target="165">
 
-  <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 165/day baseline.</span></div></div>
+  <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 220/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <div class="day-notes-row">
@@ -3191,7 +3191,7 @@
 
 <!-- THURSDAY -->
 <div id="day-thu" class="day-panel" data-pushup-target="165">
-  <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 165/day baseline.</span></div></div>
+  <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 220/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
   <div class="day-notes-row">
@@ -16970,6 +16970,89 @@ function repairSwappedDayBadges20261026_() {
   if (changed) { saveState(); updateDayPickerButton(activeDayKey_()); }
 }
 
+// Clones a day's current exercise cards onto another day, replacing
+// whatever that day already has - used below to turn a gym day into a
+// Pushups day without a pairwise swap (a swap would just relocate the
+// extra gym day instead of removing it). Clears any logged values/notes/
+// quality off the clones so a future day doesn't start pre-filled with
+// the template day's numbers, and re-runs initExerciseSets on each clone
+// since its add-set button and drag handle are wired up with real
+// listeners (cloneNode can't carry those over).
+function replaceDayWithTemplateOf_(day, templateDay) {
+  const panel = document.getElementById('day-' + day);
+  const templatePanel = document.getElementById('day-' + templateDay);
+  if (!panel || !templatePanel) return;
+  const anchor = panel.querySelector(':scope > .exercise-anchor');
+  const addBtn = panel.querySelector(':scope > .add-exercise-btn');
+  const insertPoint = addBtn || anchor || null;
+
+  panel.querySelectorAll(':scope > .exercise-card').forEach(c => c.remove());
+  Array.from(templatePanel.querySelectorAll(':scope > .exercise-card')).forEach(tc => {
+    const clone = tc.cloneNode(true);
+    // cloneNode doesn't carry over a <select>'s current selection when it
+    // was set via the JS .value property (as the name dropdown is, on
+    // render) rather than the option's "selected" attribute - without
+    // this, every cloned card's name reverts to the dropdown's first
+    // option instead of the exercise it's actually supposed to be.
+    const srcSelect = tc.querySelector('.exercise-name-select');
+    const cloneSelect = clone.querySelector('.exercise-name-select');
+    if (srcSelect && cloneSelect) cloneSelect.value = srcSelect.value;
+    clone.querySelectorAll('.add-set-btn, .exercise-drag-handle').forEach(el => el.remove());
+    clone.querySelectorAll('.set-input').forEach(inp => { inp.value = ''; });
+    clone.querySelectorAll('.set-checkbox').forEach(cb => { cb.classList.remove('checked'); delete cb.dataset.checkedAt; });
+    clone.querySelectorAll('.quality-box').forEach(b => b.classList.remove('active'));
+    clone.querySelectorAll('.notes-panel').forEach(p => { p.style.display = 'none'; });
+    clone.querySelectorAll('.notes-btn').forEach(b => { b.classList.remove('has-note'); b.textContent = 'Notes'; });
+    panel.insertBefore(clone, insertPoint);
+  });
+  panel.querySelectorAll(':scope > .exercise-card').forEach(initExerciseSets);
+  tagExerciseIds();
+
+  const badgeEl = panel.querySelector(':scope > .day-header > .day-badge');
+  const alertEl = panel.querySelector(':scope > .day-header > .alert');
+  const templateBadge = templatePanel.querySelector(':scope > .day-header > .day-badge');
+  const templateAlert = templatePanel.querySelector(':scope > .day-header > .alert');
+  if (badgeEl && templateBadge) { badgeEl.className = templateBadge.className; badgeEl.innerHTML = templateBadge.innerHTML; }
+  if (alertEl && templateAlert) { alertEl.className = templateAlert.className; alertEl.innerHTML = templateAlert.innerHTML; }
+  panel.dataset.planSwapped = '1';
+}
+
+// One-time setup for the "gym Tuesday, pushups every other day" week
+// requested for Oct 26 2026 - the pairwise swap feature can't produce
+// this on its own (swapping Wednesday with anything just relocates the
+// 2nd gym day instead of removing it), so this does it directly: swaps
+// Monday with Tuesday (gives Monday the pushups routine, Tuesday the
+// gym routine - the one pairing the swap feature CAN do), then clones
+// Thursday's already-correct Pushups routine onto Wednesday, Friday and
+// Sunday. Saturday is left as its existing Pushups+Walk+Sauna recovery
+// day - it already has pushups. Gated to the week it was requested for,
+// so loading the app in a later week (a fresh, un-swapped template)
+// leaves that week alone.
+const GYM_TUESDAY_SCHEDULE_20261026_KEY = 'WORKOUT_GYM_TUESDAY_SCHEDULE_20261026';
+function applyGymTuesdaySchedule20261026_() {
+  if (localStorage.getItem(GYM_TUESDAY_SCHEDULE_20261026_KEY)) return;
+  localStorage.setItem(GYM_TUESDAY_SCHEDULE_20261026_KEY, '1');
+  if (dateKey(getWeekMonday()) !== '2026-10-26') return;
+
+  const monBadge = document.querySelector('#day-mon .day-badge');
+  if (monBadge && monBadge.classList.contains('badge-gym')) {
+    swapDayPlans_('mon', 'tue');
+  }
+  ['wed', 'fri', 'sun'].forEach(day => {
+    // Same "is this actually a Pushups day" test as the badge repair
+    // above: a short list with Pushups in it is a Pushups day; a longer
+    // list is a gym day even if it also happens to end with a Pushups
+    // accessory set (Wednesday's gym routine does).
+    const names = Array.from(document.querySelectorAll('#day-' + day + ' .exercise-card')).map(getExerciseName);
+    const isPushupDay = names.length > 0 && names.length <= 4 && names.some(n => n.trim().toLowerCase() === 'pushups');
+    if (!isPushupDay) replaceDayWithTemplateOf_(day, 'thu');
+  });
+  saveState();
+  progRenderAllChips_();
+  renderTrainerStats();
+  updateDayPickerButton(activeDayKey_());
+}
+
 // Unlike WORKOUT_TRACKER_STATE (which resets every new week), this ledger
 // accumulates indefinitely - it's the only thing that lets the Pushups tab
 // show week/month/year/deficit totals that span past week resets.
@@ -18148,7 +18231,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-26-swap-badge-repair';
+const APP_BUILD_VERSION = '2026-10-26-gym-tuesday-schedule';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -25164,6 +25247,7 @@ migratePushupSetCount20261026_();
 restoreState();
 backfillMissingPlaceholders20261001_();
 repairSwappedDayBadges20261026_();
+applyGymTuesdaySchedule20261026_();
 weekLabelAtLoad_ = getWeekLabel();
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkForWeekRollover_();
