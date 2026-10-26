@@ -9195,9 +9195,16 @@ function rtIsDoneOn(h, dateStr) {
     if (src.kind === 'logged') return !!src.doneOn(dateStr);
     const value = src.valueOn(dateStr);
     // Pushups is a cumulative weekly target, not a fixed daily one - once
-    // the week's total is met, every day that had any reps logged counts
-    // as done, even if that day alone fell short of an even per-day split.
-    if (rtIsPushupLinked_(h) && value > 0) {
+    // the week's total is met, EVERY day the habit was due that week
+    // counts as done, whether or not reps were logged on that specific
+    // day. Hitting 990 across 2 big days instead of 7 even ones is still
+    // hitting the week's actual goal - the other 5 days shouldn't read
+    // as misses or break a streak just because the volume landed
+    // unevenly. Never applied to a day that hasn't happened yet, even if
+    // the rest of the week already cleared the total by then - tomorrow
+    // isn't "done" before it arrives just because today was big enough
+    // to cover it on its own.
+    if (rtIsPushupLinked_(h) && dateStr <= dateKey(rtToday)) {
       const target = h.link.weeklyTotal || src.defaultWeeklyTotal();
       if (rtPushupWeekTotal_(rtWeekStart(new Date(dateStr + 'T00:00:00'))) >= target) return true;
     }
@@ -18043,7 +18050,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-19-standard-progression-ladder';
+const APP_BUILD_VERSION = '2026-10-26-pushup-week-credit';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
