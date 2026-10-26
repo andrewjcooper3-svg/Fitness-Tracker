@@ -16516,8 +16516,18 @@ function serializeDay(day) {
   }));
 
   const dayNotesEl = panel.querySelector('.day-notes-input');
+  // Captured so a swapped day's GYM/HOME/REST identity (the badge the day
+  // picker bar actually reads - see dayPickerInfo_) survives a reload the
+  // same way the swapped exercise cards do. swapDayPlans_ exchanges these
+  // live; without saving them too, a reload would rebuild the day-header
+  // fresh from the static markup and silently revert the badge/alert to
+  // this calendar day's ORIGINAL type while the exercises stayed swapped -
+  // exactly the "today still shows as gym" bug this fixes.
+  const badgeEl = panel.querySelector(':scope > .day-header > .day-badge');
+  const alertEl = panel.querySelector(':scope > .day-header > .alert');
   return { exercises: exercises, checkItems: checkItems, dayNotes: dayNotesEl ? dayNotesEl.value : '',
-           planSwapped: panel.dataset.planSwapped === '1' };
+           planSwapped: panel.dataset.planSwapped === '1',
+           badgeHtml: badgeEl ? badgeEl.outerHTML : '', alertHtml: alertEl ? alertEl.outerHTML : '' };
 }
 
 // Every saveState() call re-serializes all 7 days (it's a full DOM read),
@@ -17189,7 +17199,20 @@ function restoreDay(day, savedDay) {
   // through from saveState(), tells this guard to trust the saved
   // exercises wholesale instead - the panel gets the same trust back so
   // it round-trips through another reload this week.
-  if (savedDay.planSwapped) panel.dataset.planSwapped = '1';
+  if (savedDay.planSwapped) {
+    panel.dataset.planSwapped = '1';
+    // The exercises are trusted wholesale once planSwapped is set (see
+    // below) - the GYM/HOME/REST badge and alert text need the same
+    // treatment, or a reload rebuilds the day-header fresh from the
+    // static markup and silently reverts to this calendar day's
+    // ORIGINAL type while the exercises stay swapped. Missing on saved
+    // state from before this shipped (legacy planSwapped days) - left
+    // alone rather than guessing, same as any other absent field.
+    const badgeEl = panel.querySelector(':scope > .day-header > .day-badge');
+    if (badgeEl && savedDay.badgeHtml) badgeEl.outerHTML = savedDay.badgeHtml;
+    const alertEl = panel.querySelector(':scope > .day-header > .alert');
+    if (alertEl && savedDay.alertHtml) alertEl.outerHTML = savedDay.alertHtml;
+  }
   const planChanged = !savedDay.planSwapped && savedPrescribed.some((ex, arrayIdx) => {
     // Legacy saved data predating ids has no id to check by - fall back
     // to its position within the (custom-excluded) saved array, the same
@@ -18082,7 +18105,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-26-pushup-setcount-migration';
+const APP_BUILD_VERSION = '2026-10-26-swap-badge-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -23037,6 +23060,27 @@ function swapDayPlans_(dayA, dayB) {
   cardsA.forEach(c => panelB.insertBefore(c, insertPointB));
   cardsB.forEach(c => panelA.insertBefore(c, insertPointA));
 
+  // The day picker's dot/label reads each day's own .day-badge live
+  // (see dayPickerInfo_) - without swapping these too, the exercises
+  // move but the visible GYM/HOME/REST type stays put on the calendar
+  // day it started on. Swap class+content in place rather than moving
+  // the nodes themselves, since they're simple (no nested state) and
+  // this keeps each day-header's own element identity stable.
+  const badgeA = panelA.querySelector(':scope > .day-header > .day-badge');
+  const badgeB = panelB.querySelector(':scope > .day-header > .day-badge');
+  if (badgeA && badgeB) {
+    const cls = badgeA.className, html = badgeA.innerHTML;
+    badgeA.className = badgeB.className; badgeA.innerHTML = badgeB.innerHTML;
+    badgeB.className = cls; badgeB.innerHTML = html;
+  }
+  const alertA = panelA.querySelector(':scope > .day-header > .alert');
+  const alertB = panelB.querySelector(':scope > .day-header > .alert');
+  if (alertA && alertB) {
+    const cls = alertA.className, html = alertA.innerHTML;
+    alertA.className = alertB.className; alertA.innerHTML = alertB.innerHTML;
+    alertB.className = cls; alertB.innerHTML = html;
+  }
+
   // Marks both panels as running a swapped-in plan for the rest of this
   // week - read by serializeDay/restoreDay so a reload trusts the
   // swapped content as-is instead of comparing it against THIS day's own
@@ -23052,6 +23096,10 @@ function swapDayPlans_(dayA, dayB) {
   saveState();
   progRenderAllChips_();
   renderTrainerStats();
+  // Refresh the visible day-picker bar immediately if either swapped
+  // day is the one currently on screen - otherwise it keeps showing
+  // the pre-swap type until the next unrelated re-render.
+  if (activeDayKey_() === dayA || activeDayKey_() === dayB) updateDayPickerButton(activeDayKey_());
 }
 
 /* ---------- Config: deployment URL ---------- */
