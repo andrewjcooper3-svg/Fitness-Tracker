@@ -16927,6 +16927,49 @@ function backfillMissingPlaceholders20261001_() {
   if (changed) saveState();
 }
 
+// One-time repair for days swapped BEFORE the swap-badge fix shipped
+// (see swapDayPlans_) - those days already carry the right exercises
+// and dataset.planSwapped='1', but their day-badge/alert were never
+// swapped (the bug just fixed), and there's no saved badgeHtml/alertHtml
+// to restore from either since that capture didn't exist yet when they
+// were swapped. Infers each such day's real type from its own exercises
+// (already correct) rather than guessing from the calendar date - a
+// short list (<=4 exercises) including a Pushups card means a
+// Pushups/home day; a longer list is a gym day even when it also ends
+// with a Pushups accessory exercise (several gym days do). Only touches
+// the badge pill and a short generic alert line (the exact
+// original per-day wording, e.g. "Focus: Legs + Back + Arms", can't be
+// recovered). A day with no exercises (Rest/Recovery) is left alone
+// rather than guessed at.
+const SWAP_BADGE_REPAIR_20261026_KEY = 'WORKOUT_SWAP_BADGE_REPAIR_20261026';
+function repairSwappedDayBadges20261026_() {
+  if (localStorage.getItem(SWAP_BADGE_REPAIR_20261026_KEY)) return;
+  localStorage.setItem(SWAP_BADGE_REPAIR_20261026_KEY, '1');
+  let changed = false;
+  document.querySelectorAll('.day-panel').forEach(panel => {
+    if (panel.dataset.planSwapped !== '1') return;
+    const badgeEl = panel.querySelector(':scope > .day-header > .day-badge');
+    const alertEl = panel.querySelector(':scope > .day-header > .alert');
+    if (!badgeEl) return;
+    const names = Array.from(panel.querySelectorAll(':scope > .exercise-card')).map(getExerciseName);
+    if (!names.length) return;
+    const isPushupDay = names.length <= 4 && names.some(n => n.trim().toLowerCase() === 'pushups');
+    const currentIsHome = badgeEl.classList.contains('badge-home');
+    if (isPushupDay === currentIsHome) return;
+    if (isPushupDay) {
+      badgeEl.className = 'day-badge badge-home';
+      badgeEl.innerHTML = '🏠 PUSHUPS';
+      if (alertEl) { alertEl.className = 'alert amber'; alertEl.innerHTML = '💪 <span>Pushups + core.</span>'; }
+    } else {
+      badgeEl.className = 'day-badge badge-gym';
+      badgeEl.innerHTML = '🏋 GYM';
+      if (alertEl) { alertEl.className = 'alert amber'; alertEl.innerHTML = '⏱ <span>Gym day — lifting session.</span>'; }
+    }
+    changed = true;
+  });
+  if (changed) { saveState(); updateDayPickerButton(activeDayKey_()); }
+}
+
 // Unlike WORKOUT_TRACKER_STATE (which resets every new week), this ledger
 // accumulates indefinitely - it's the only thing that lets the Pushups tab
 // show week/month/year/deficit totals that span past week resets.
@@ -18105,7 +18148,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-26-swap-badge-fix';
+const APP_BUILD_VERSION = '2026-10-26-swap-badge-repair';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -25120,6 +25163,7 @@ migrateStaleDayTemplates20260914();
 migratePushupSetCount20261026_();
 restoreState();
 backfillMissingPlaceholders20261001_();
+repairSwappedDayBadges20261026_();
 weekLabelAtLoad_ = getWeekLabel();
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkForWeekRollover_();
