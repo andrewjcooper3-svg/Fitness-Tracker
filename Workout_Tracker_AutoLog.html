@@ -161,21 +161,16 @@
   .badge-home { background: rgba(124, 154, 94, 0.16); color: var(--green); }
   .badge-travel { background: rgba(91, 154, 148, 0.16); color: var(--teal); }
   .badge-rest { background: rgba(156, 107, 122, 0.16); color: var(--purple); }
+  .badge-cardio { background: rgba(91, 140, 255, 0.16); color: var(--blue); }
   .section-label { font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin: 14px 0 8px; }
   .section-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0 8px; }
   .section-label-row .section-label { margin: 0; }
   .collapse-all-btn { background: var(--surface); border: none; color: var(--muted); padding: 5px 10px; border-radius: 10px; cursor: pointer; font-family: var(--font); font-size: 11px; font-weight: 600; transition: all 0.15s; }
   .collapse-all-btn:hover, .collapse-all-btn:active { background: var(--surface2); color: var(--text); }
-  /* position:fixed and appended to <body> (see toggleDaySwapMenu), not
-     positioned relative to the row that opened it - a rest day's panel
-     (no exercise cards) sits inside an outer container that's auto-sized
-     to that panel's own short height with overflow:hidden, which clipped
-     an absolutely-positioned menu the moment it needed more room than a
-     short day panel had. Fixed positioning in viewport coordinates, with
-     placement computed in JS, sidesteps that entirely. */
-  .day-swap-menu { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 6px; min-width: 180px; z-index: 9000; }
-  .day-swap-menu-item { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 9px 10px; border-radius: 8px; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600; }
-  .day-swap-menu-item:hover, .day-swap-menu-item:active { background: var(--surface2); }
+  .day-sched-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .day-sched-row:last-child { border-bottom: none; }
+  .day-sched-name { font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--text); }
+  .day-sched-row .day-sched-select { width: auto; min-width: 140px; flex-shrink: 0; }
   .day-notes-input { width: 100%; box-sizing: border-box; background: var(--surface); border: none; border-radius: 14px; color: var(--text); font-family: var(--font); font-size: 14px; padding: 12px 14px; outline: none; resize: vertical; min-height: 60px; margin-bottom: 4px; }
   .day-notes-input:focus { box-shadow: 0 0 0 1.5px var(--accent); }
   .day-notes-input::placeholder { color: var(--muted); }
@@ -3131,13 +3126,13 @@
   <div class="day-picker-name" id="dayPickerName">&nbsp;</div>
   <div class="day-picker-type" id="dayPickerType"></div>
   <div class="day-picker-today" id="dayPickerTodayBadge" style="display:none;">Today</div>
-  <button type="button" class="day-picker-swap-btn" onclick="event.stopPropagation(); toggleDaySwapMenu(this, activeDayKey_())">Swap</button>
+  <button type="button" class="day-picker-swap-btn" onclick="event.stopPropagation(); openScheduleModal_()">Schedule</button>
   <div class="day-picker-chevron">▾</div>
 </div>
 <div class="day-picker-list" id="dayPickerList" style="display:none;"></div>
 
 <!-- MONDAY -->
-<div id="day-mon" class="day-panel active" data-pushup-target="165">
+<div id="day-mon" class="day-panel active" data-pushup-target="220">
 
   <div class="day-header"><div class="day-title">MONDAY</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 40-50 min. Focus: Legs + Back + Arms. Left arm emphasis. Lifting moved here from Friday.</span></div></div>
 
@@ -3155,7 +3150,7 @@
 </div>
 
 <!-- TUESDAY -->
-<div id="day-tue" class="day-panel" data-pushup-target="165">
+<div id="day-tue" class="day-panel" data-pushup-target="220">
 
   <div class="day-header"><div class="day-title">TUESDAY</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 220/day baseline.</span></div></div>
 
@@ -3173,7 +3168,7 @@
 </div>
 
 <!-- WEDNESDAY -->
-<div id="day-wed" class="day-panel" data-pushup-target="165">
+<div id="day-wed" class="day-panel" data-pushup-target="220">
   <div class="day-header"><div class="day-title">WED</div><div class="day-badge badge-gym">🏋 GYM</div><div class="alert amber">⏱ <span>Est. time: 45-55 min. Focus: Legs + Back + Shoulders. Left arm emphasis.</span></div></div>
 
   <div class="section-label">Day Notes</div>
@@ -3190,7 +3185,7 @@
 </div>
 
 <!-- THURSDAY -->
-<div id="day-thu" class="day-panel" data-pushup-target="165">
+<div id="day-thu" class="day-panel" data-pushup-target="220">
   <div class="day-header"><div class="day-title">THU</div><div class="day-badge badge-home">🏠 PUSHUPS</div><div class="alert amber">💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 220/day baseline.</span></div></div>
 
   <div class="section-label">Day Notes</div>
@@ -4430,6 +4425,21 @@
   </div>
 </div>
 
+<div class="wi-modal-overlay" id="daySchedModal" style="display:none;">
+  <div class="wi-modal-panel">
+    <div class="wi-modal-head">
+      <h3>Training Schedule</h3>
+      <button type="button" class="wi-icon-btn" aria-label="Close" onclick="closeScheduleModal_()">&times;</button>
+    </div>
+    <div class="wi-modal-sub">Set what each day is. Changes apply right away and stay until you change them again - a day you don't touch here keeps running whatever it's already set to, week after week.</div>
+    <div id="daySchedList"></div>
+    <div class="wi-modal-actions">
+      <button type="button" class="wi-btn-ghost" onclick="closeScheduleModal_()">Cancel</button>
+      <button type="button" class="wi-btn-primary" onclick="saveScheduleModal_()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="wi-modal-overlay" id="wiDetailModal" style="display:none;">
   <div class="wi-modal-panel">
     <div class="wi-modal-head">
@@ -5206,54 +5216,145 @@ function refreshAllExerciseNameSelects_() {
   });
 }
 
-function renderWeeklyPlan_() {
+// Builds one exercise card from a plan entry ({name, meta, rows}, the
+// shape every WEEKLY_PLAN_DATA[day] array holds) without inserting it
+// anywhere - shared by the initial per-day-type render below and
+// anything else that needs a fresh card for a prescribed exercise.
+function buildExerciseCardFromPlanEntry_(ex) {
   const optionsHtml = exerciseNameOptionsHtml_();
-  Object.keys(WEEKLY_PLAN_DATA).forEach(day => {
-    const panel = document.getElementById('day-' + day);
-    const anchor = panel && panel.querySelector(':scope > .exercise-anchor');
-    if (!panel || !anchor) return;
+  // The exercise is tracked by name, not by day (see the Progression
+  // Engine), so its card always shows whatever that shared entry
+  // currently says the target is - not this day's originally-authored
+  // numbers - meaning a bump confirmed on one occurrence (say, Monday's
+  // Leg Press) already reads correctly here for every other day's card
+  // of the same exercise, on this and every future render, rather than
+  // only from next week onward.
+  const target = progTargetForEntry_(ex, progGetEntry_(ex));
+  const setsCount = target.setsCount || ex.rows.length;
 
-    WEEKLY_PLAN_DATA[day].forEach(ex => {
-      // The exercise is tracked by name, not by day (see the Progression
-      // Engine), so its card always shows whatever that shared entry
-      // currently says the target is - not this day's originally-
-      // authored numbers - meaning a bump confirmed on one occurrence
-      // (say, Monday's Leg Press) already reads correctly here for every
-      // other day's card of the same exercise (Wednesday's), on this and
-      // every future render, rather than only from next week onward.
-      const target = progTargetForEntry_(ex, progGetEntry_(ex));
-      const setsCount = target.setsCount || ex.rows.length;
+  const rowsHtml = Array.from({ length: setsCount }, (_, i) => {
+    const notePh = ex.rows[i] && ex.rows[i][3];
+    const noteAttr = notePh ? ` placeholder="${escapeAttr_(notePh)}"` : '';
+    return `<div class="set-row"><div class="set-num">${i + 1}</div>` +
+      `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(target.weightPh)}"></div>` +
+      `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(target.repsPh)}"></div>` +
+      `<div class="set-input-group"><button type="button" class="notes-btn" onclick="toggleSetNotesUI(this)">Notes</button></div>` +
+      `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>` +
+      `<div class="notes-panel" style="display:none;"><input class="set-input notes-input" type="text"${noteAttr} oninput="syncNotesButton_(this)"><button type="button" class="notes-panel-done" onclick="toggleSetNotesUI(this)">Done</button></div>` +
+      `</div>`;
+  }).join('');
 
-      const rowsHtml = Array.from({ length: setsCount }, (_, i) => {
-        const notePh = ex.rows[i] && ex.rows[i][3];
-        const noteAttr = notePh ? ` placeholder="${escapeAttr_(notePh)}"` : '';
-        return `<div class="set-row"><div class="set-num">${i + 1}</div>` +
-          `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(target.weightPh)}"></div>` +
-          `<div class="set-input-group"><input class="set-input big-num" type="text" placeholder="${escapeAttr_(target.repsPh)}"></div>` +
-          `<div class="set-input-group"><button type="button" class="notes-btn" onclick="toggleSetNotesUI(this)">Notes</button></div>` +
-          `<div class="set-checkbox" onclick="toggleSetCheck(this)"></div>` +
-          `<div class="notes-panel" style="display:none;"><input class="set-input notes-input" type="text"${noteAttr} oninput="syncNotesButton_(this)"><button type="button" class="notes-panel-done" onclick="toggleSetNotesUI(this)">Done</button></div>` +
-          `</div>`;
-      }).join('');
+  const metaText = (target.weightPh || '—') + ' · ' + setsCount + ' × ' + (target.repsPh || '—');
 
-      const metaText = (target.weightPh || '—') + ' · ' + setsCount + ' × ' + (target.repsPh || '—');
+  const card = document.createElement('div');
+  card.className = 'exercise-card';
+  card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onExerciseNameChange_(this)">${optionsHtml}</select></div><div class="unit-badge">${escapeText_(target.unit)}</div><div class="exercise-meta">${escapeText_(metaText)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
+  card.querySelector('.exercise-name-select').value = ex.name;
+  // The template's own name for THIS slot, fixed for the card's whole
+  // life - unlike the select's value, never changed by picking a
+  // different exercise from the dropdown. serializeDay() carries it
+  // through as originalName so restoreDay's plan-changed guard can tell
+  // "the user renamed this slot" apart from "the code's template
+  // actually changed shape," which look identical if you only compare
+  // against the currently-displayed name (see restoreDay for why that
+  // distinction matters).
+  card.dataset.origName = ex.name;
+  return card;
+}
 
-      const card = document.createElement('div');
-      card.className = 'exercise-card';
-      card.innerHTML = `<div class="exercise-header" onclick="toggleExercise(this)"><div class="exercise-toggle">▸</div><div class="exercise-name"><select class="exercise-name-select" onclick="event.stopPropagation()" onchange="onExerciseNameChange_(this)">${optionsHtml}</select></div><div class="unit-badge">${escapeText_(target.unit)}</div><div class="exercise-meta">${escapeText_(metaText)}</div></div><div class="exercise-sets">${rowsHtml}</div>`;
-      panel.insertBefore(card, anchor);
-      card.querySelector('.exercise-name-select').value = ex.name;
-      // The template's own name for THIS slot, fixed for the card's whole
-      // life - unlike the select's value, never changed by picking a
-      // different exercise from the dropdown. serializeDay() carries it
-      // through as originalName so restoreDay's plan-changed guard can
-      // tell "the user renamed this slot" apart from "the code's template
-      // actually changed shape," which look identical if you only compare
-      // against the currently-displayed name (see restoreDay for why that
-      // distinction matters).
-      card.dataset.origName = ex.name;
-    });
+// Named, reusable day-type templates - a day no longer owns its
+// exercises outright (see DAY_SCHEDULE below); it's assigned one of
+// these. gymA/gymB/pushups/recovery alias the existing weekday entries
+// in WEEKLY_PLAN_DATA directly rather than duplicating them, so a
+// template edit there (a progression bump, a swapped exercise) is
+// still the one place to make it. vo2max/running start empty - the
+// Training Schedule panel fills them in the first time you build that
+// day, and from then on they're remembered like any other template.
+const DAY_TEMPLATES = {
+  gymA: WEEKLY_PLAN_DATA.mon || [],
+  gymB: WEEKLY_PLAN_DATA.wed || [],
+  pushups: WEEKLY_PLAN_DATA.tue || [],
+  recovery: WEEKLY_PLAN_DATA.sat || [],
+  rest: [],
+  vo2max: [],
+  running: []
+};
+const DAY_TYPE_LABELS = { gymA: 'Gym A', gymB: 'Gym B', pushups: 'Pushups', recovery: 'Recovery', rest: 'Rest', vo2max: 'VO2 Max', running: 'Running' };
+const DAY_TYPE_META = {
+  gymA: { badgeClass: 'badge-gym', badgeHtml: '🏋 GYM', alertHtml: '⏱ <span>Est. time: 40-50 min. Focus: Legs + Back + Arms. Left arm emphasis.</span>' },
+  gymB: { badgeClass: 'badge-gym', badgeHtml: '🏋 GYM', alertHtml: '⏱ <span>Est. time: 45-55 min. Focus: Legs + Back + Shoulders. Left arm emphasis.</span>' },
+  pushups: { badgeClass: 'badge-home', badgeHtml: '🏠 PUSHUPS', alertHtml: '💪 <span>Pushups + core (Reverse Crunch, Plank). Pushups at 220/day baseline.</span>' },
+  recovery: { badgeClass: 'badge-travel', badgeHtml: '🧘 RECOVERY', alertHtml: '🧘 <span>Lighter day — stretching + a pushup catch-up set.</span>' },
+  rest: { badgeClass: 'badge-rest', badgeHtml: '😴 REST', alertHtml: '🧘 <span>Full rest day. Let the week\'s work absorb.</span>' },
+  vo2max: { badgeClass: 'badge-cardio', badgeHtml: '💓 VO2 MAX', alertHtml: '💓 <span>VO2 max work.</span>' },
+  running: { badgeClass: 'badge-cardio', badgeHtml: '🏃 RUNNING', alertHtml: '🏃 <span>Running.</span>' }
+};
+// What each day was before the Training Schedule panel existed - used
+// only to seed DAY_SCHEDULE's fallback and to decide whether a day
+// still matches its own WEEKLY_PLAN_DATA entry (see populateDayFromTemplate_).
+const NATURAL_DAY_TYPE = { mon: 'gymA', tue: 'pushups', wed: 'gymB', thu: 'pushups', fri: 'rest', sat: 'recovery', sun: 'rest' };
+
+const STORAGE_DAY_SCHEDULE_KEY = 'WORKOUT_DAY_SCHEDULE';
+// What's actually live right now (the gym-Tuesday week set up for Oct
+// 26 2026) - the fallback default once the Training Schedule panel
+// ships, so shipping it doesn't silently flip Monday back to gym.
+const DEFAULT_DAY_SCHEDULE = { mon: 'pushups', tue: 'gymA', wed: 'pushups', thu: 'pushups', fri: 'pushups', sat: 'recovery', sun: 'pushups' };
+function getDaySchedule_() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_DAY_SCHEDULE_KEY) || 'null');
+    if (saved) return Object.assign({}, NATURAL_DAY_TYPE, saved);
+  } catch (e) {}
+  return Object.assign({}, NATURAL_DAY_TYPE, DEFAULT_DAY_SCHEDULE);
+}
+function saveDaySchedule_(schedule) {
+  localStorage.setItem(STORAGE_DAY_SCHEDULE_KEY, JSON.stringify(schedule));
+}
+const DAY_SCHEDULE_SEED_KEY = 'WORKOUT_DAY_SCHEDULE_SEEDED';
+function seedDayScheduleOnce_() {
+  if (localStorage.getItem(DAY_SCHEDULE_SEED_KEY)) return;
+  localStorage.setItem(DAY_SCHEDULE_SEED_KEY, '1');
+  if (!localStorage.getItem(STORAGE_DAY_SCHEDULE_KEY)) saveDaySchedule_(DEFAULT_DAY_SCHEDULE);
+}
+
+// Clears a day's panel and rebuilds it from a named template - the one
+// place a day's exercises and badge/alert actually get set. Marks the
+// panel as swapped away from its own WEEKLY_PLAN_DATA entry whenever
+// the assigned type isn't that day's natural one, which is what tells
+// restoreDay's plan-changed guard to trust the saved exercises wholesale
+// instead of comparing them against this day's own template (see
+// restoreDay) - without it, any day running a type other than its
+// natural one would get wiped back to that template on the next reload.
+function populateDayFromTemplate_(day, type) {
+  const panel = document.getElementById('day-' + day);
+  const anchor = panel && panel.querySelector(':scope > .exercise-anchor');
+  if (!panel || !anchor) return;
+
+  panel.querySelectorAll(':scope > .exercise-card').forEach(c => c.remove());
+  (DAY_TEMPLATES[type] || []).forEach(ex => {
+    panel.insertBefore(buildExerciseCardFromPlanEntry_(ex), anchor);
   });
+  panel.querySelectorAll(':scope > .exercise-card').forEach(initExerciseSets);
+  tagExerciseIds();
+
+  const meta = DAY_TYPE_META[type];
+  if (meta) {
+    const badgeEl = panel.querySelector(':scope > .day-header > .day-badge');
+    const alertEl = panel.querySelector(':scope > .day-header > .alert');
+    if (badgeEl) { badgeEl.className = 'day-badge ' + meta.badgeClass; badgeEl.innerHTML = meta.badgeHtml; }
+    if (alertEl) { alertEl.className = 'alert amber'; alertEl.innerHTML = meta.alertHtml; }
+  }
+  if (type !== NATURAL_DAY_TYPE[day]) panel.dataset.planSwapped = '1';
+  else delete panel.dataset.planSwapped;
+}
+
+// Boot-time (and Training-Schedule-Save-time) render: every day is
+// rebuilt from whatever DAY_SCHEDULE currently says it is, rather than
+// each weekday owning a fixed WEEKLY_PLAN_DATA entry - this is what
+// makes a type assignment persist indefinitely instead of resetting
+// with the rest of the week's exercise log.
+function applyDaySchedule_() {
+  const schedule = getDaySchedule_();
+  dayKeys.forEach(day => populateDayFromTemplate_(day, schedule[day] || NATURAL_DAY_TYPE[day]));
 }
 const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
 const STORAGE_CALENDAR_WORKER_KEY = 'WORKOUT_CALENDAR_WORKER_URL';
@@ -16516,13 +16617,12 @@ function serializeDay(day) {
   }));
 
   const dayNotesEl = panel.querySelector('.day-notes-input');
-  // Captured so a swapped day's GYM/HOME/REST identity (the badge the day
-  // picker bar actually reads - see dayPickerInfo_) survives a reload the
-  // same way the swapped exercise cards do. swapDayPlans_ exchanges these
-  // live; without saving them too, a reload would rebuild the day-header
-  // fresh from the static markup and silently revert the badge/alert to
-  // this calendar day's ORIGINAL type while the exercises stayed swapped -
-  // exactly the "today still shows as gym" bug this fixes.
+  // Carried along mostly for legacy saved days - applyDaySchedule_ now
+  // sets the badge/alert fresh from DAY_TYPE_META on every load (and
+  // populateDayFromTemplate_ updates it immediately on a Training
+  // Schedule change), so this mostly just restores the same thing that
+  // was already set. Harmless to keep: a day whose type hasn't changed
+  // since last save gets the identical badge/alert back either way.
   const badgeEl = panel.querySelector(':scope > .day-header > .day-badge');
   const alertEl = panel.querySelector(':scope > .day-header > .alert');
   return { exercises: exercises, checkItems: checkItems, dayNotes: dayNotesEl ? dayNotesEl.value : '',
@@ -16927,132 +17027,6 @@ function backfillMissingPlaceholders20261001_() {
   if (changed) saveState();
 }
 
-// One-time repair for days swapped BEFORE the swap-badge fix shipped
-// (see swapDayPlans_) - those days already carry the right exercises
-// and dataset.planSwapped='1', but their day-badge/alert were never
-// swapped (the bug just fixed), and there's no saved badgeHtml/alertHtml
-// to restore from either since that capture didn't exist yet when they
-// were swapped. Infers each such day's real type from its own exercises
-// (already correct) rather than guessing from the calendar date - a
-// short list (<=4 exercises) including a Pushups card means a
-// Pushups/home day; a longer list is a gym day even when it also ends
-// with a Pushups accessory exercise (several gym days do). Only touches
-// the badge pill and a short generic alert line (the exact
-// original per-day wording, e.g. "Focus: Legs + Back + Arms", can't be
-// recovered). A day with no exercises (Rest/Recovery) is left alone
-// rather than guessed at.
-const SWAP_BADGE_REPAIR_20261026_KEY = 'WORKOUT_SWAP_BADGE_REPAIR_20261026';
-function repairSwappedDayBadges20261026_() {
-  if (localStorage.getItem(SWAP_BADGE_REPAIR_20261026_KEY)) return;
-  localStorage.setItem(SWAP_BADGE_REPAIR_20261026_KEY, '1');
-  let changed = false;
-  document.querySelectorAll('.day-panel').forEach(panel => {
-    if (panel.dataset.planSwapped !== '1') return;
-    const badgeEl = panel.querySelector(':scope > .day-header > .day-badge');
-    const alertEl = panel.querySelector(':scope > .day-header > .alert');
-    if (!badgeEl) return;
-    const names = Array.from(panel.querySelectorAll(':scope > .exercise-card')).map(getExerciseName);
-    if (!names.length) return;
-    const isPushupDay = names.length <= 4 && names.some(n => n.trim().toLowerCase() === 'pushups');
-    const currentIsHome = badgeEl.classList.contains('badge-home');
-    if (isPushupDay === currentIsHome) return;
-    if (isPushupDay) {
-      badgeEl.className = 'day-badge badge-home';
-      badgeEl.innerHTML = '🏠 PUSHUPS';
-      if (alertEl) { alertEl.className = 'alert amber'; alertEl.innerHTML = '💪 <span>Pushups + core.</span>'; }
-    } else {
-      badgeEl.className = 'day-badge badge-gym';
-      badgeEl.innerHTML = '🏋 GYM';
-      if (alertEl) { alertEl.className = 'alert amber'; alertEl.innerHTML = '⏱ <span>Gym day — lifting session.</span>'; }
-    }
-    changed = true;
-  });
-  if (changed) { saveState(); updateDayPickerButton(activeDayKey_()); }
-}
-
-// Clones a day's current exercise cards onto another day, replacing
-// whatever that day already has - used below to turn a gym day into a
-// Pushups day without a pairwise swap (a swap would just relocate the
-// extra gym day instead of removing it). Clears any logged values/notes/
-// quality off the clones so a future day doesn't start pre-filled with
-// the template day's numbers, and re-runs initExerciseSets on each clone
-// since its add-set button and drag handle are wired up with real
-// listeners (cloneNode can't carry those over).
-function replaceDayWithTemplateOf_(day, templateDay) {
-  const panel = document.getElementById('day-' + day);
-  const templatePanel = document.getElementById('day-' + templateDay);
-  if (!panel || !templatePanel) return;
-  const anchor = panel.querySelector(':scope > .exercise-anchor');
-  const addBtn = panel.querySelector(':scope > .add-exercise-btn');
-  const insertPoint = addBtn || anchor || null;
-
-  panel.querySelectorAll(':scope > .exercise-card').forEach(c => c.remove());
-  Array.from(templatePanel.querySelectorAll(':scope > .exercise-card')).forEach(tc => {
-    const clone = tc.cloneNode(true);
-    // cloneNode doesn't carry over a <select>'s current selection when it
-    // was set via the JS .value property (as the name dropdown is, on
-    // render) rather than the option's "selected" attribute - without
-    // this, every cloned card's name reverts to the dropdown's first
-    // option instead of the exercise it's actually supposed to be.
-    const srcSelect = tc.querySelector('.exercise-name-select');
-    const cloneSelect = clone.querySelector('.exercise-name-select');
-    if (srcSelect && cloneSelect) cloneSelect.value = srcSelect.value;
-    clone.querySelectorAll('.add-set-btn, .exercise-drag-handle').forEach(el => el.remove());
-    clone.querySelectorAll('.set-input').forEach(inp => { inp.value = ''; });
-    clone.querySelectorAll('.set-checkbox').forEach(cb => { cb.classList.remove('checked'); delete cb.dataset.checkedAt; });
-    clone.querySelectorAll('.quality-box').forEach(b => b.classList.remove('active'));
-    clone.querySelectorAll('.notes-panel').forEach(p => { p.style.display = 'none'; });
-    clone.querySelectorAll('.notes-btn').forEach(b => { b.classList.remove('has-note'); b.textContent = 'Notes'; });
-    panel.insertBefore(clone, insertPoint);
-  });
-  panel.querySelectorAll(':scope > .exercise-card').forEach(initExerciseSets);
-  tagExerciseIds();
-
-  const badgeEl = panel.querySelector(':scope > .day-header > .day-badge');
-  const alertEl = panel.querySelector(':scope > .day-header > .alert');
-  const templateBadge = templatePanel.querySelector(':scope > .day-header > .day-badge');
-  const templateAlert = templatePanel.querySelector(':scope > .day-header > .alert');
-  if (badgeEl && templateBadge) { badgeEl.className = templateBadge.className; badgeEl.innerHTML = templateBadge.innerHTML; }
-  if (alertEl && templateAlert) { alertEl.className = templateAlert.className; alertEl.innerHTML = templateAlert.innerHTML; }
-  panel.dataset.planSwapped = '1';
-}
-
-// One-time setup for the "gym Tuesday, pushups every other day" week
-// requested for Oct 26 2026 - the pairwise swap feature can't produce
-// this on its own (swapping Wednesday with anything just relocates the
-// 2nd gym day instead of removing it), so this does it directly: swaps
-// Monday with Tuesday (gives Monday the pushups routine, Tuesday the
-// gym routine - the one pairing the swap feature CAN do), then clones
-// Thursday's already-correct Pushups routine onto Wednesday, Friday and
-// Sunday. Saturday is left as its existing Pushups+Walk+Sauna recovery
-// day - it already has pushups. Gated to the week it was requested for,
-// so loading the app in a later week (a fresh, un-swapped template)
-// leaves that week alone.
-const GYM_TUESDAY_SCHEDULE_20261026_KEY = 'WORKOUT_GYM_TUESDAY_SCHEDULE_20261026';
-function applyGymTuesdaySchedule20261026_() {
-  if (localStorage.getItem(GYM_TUESDAY_SCHEDULE_20261026_KEY)) return;
-  localStorage.setItem(GYM_TUESDAY_SCHEDULE_20261026_KEY, '1');
-  if (dateKey(getWeekMonday()) !== '2026-10-26') return;
-
-  const monBadge = document.querySelector('#day-mon .day-badge');
-  if (monBadge && monBadge.classList.contains('badge-gym')) {
-    swapDayPlans_('mon', 'tue');
-  }
-  ['wed', 'fri', 'sun'].forEach(day => {
-    // Same "is this actually a Pushups day" test as the badge repair
-    // above: a short list with Pushups in it is a Pushups day; a longer
-    // list is a gym day even if it also happens to end with a Pushups
-    // accessory set (Wednesday's gym routine does).
-    const names = Array.from(document.querySelectorAll('#day-' + day + ' .exercise-card')).map(getExerciseName);
-    const isPushupDay = names.length > 0 && names.length <= 4 && names.some(n => n.trim().toLowerCase() === 'pushups');
-    if (!isPushupDay) replaceDayWithTemplateOf_(day, 'thu');
-  });
-  saveState();
-  progRenderAllChips_();
-  renderTrainerStats();
-  updateDayPickerButton(activeDayKey_());
-}
-
 // Unlike WORKOUT_TRACKER_STATE (which resets every new week), this ledger
 // accumulates indefinitely - it's the only thing that lets the Pushups tab
 // show week/month/year/deficit totals that span past week resets.
@@ -17317,14 +17291,15 @@ function restoreDay(day, savedDay) {
   const defaultNames = (WEEKLY_PLAN_DATA[day] || []).map(ex => ex.name);
   const savedPrescribed = (savedDay.exercises || []).filter(ex => !ex.custom);
   const exIdIndex_ = id => { const m = /^ex(\d+)$/.exec(id || ''); return m ? parseInt(m[1], 10) : -1; };
-  // A day swapped with another day (see swapDayPlans_) is DELIBERATELY
-  // running a different day's plan for the rest of this week - comparing
-  // its saved exercises against THIS day's own template would always
-  // read as "the template changed shape" and wipe it, the same failure
-  // mode a plain rename used to trigger. savedDay.planSwapped, carried
+  // A day assigned a non-natural type in the Training Schedule panel
+  // (see populateDayFromTemplate_/NATURAL_DAY_TYPE) is DELIBERATELY
+  // running a different template than this weekday's own - comparing
+  // its saved exercises against WEEKLY_PLAN_DATA[day] would always read
+  // as "the template changed shape" and wipe it, the same failure mode
+  // a plain rename used to trigger. savedDay.planSwapped, carried
   // through from saveState(), tells this guard to trust the saved
   // exercises wholesale instead - the panel gets the same trust back so
-  // it round-trips through another reload this week.
+  // it round-trips through another reload.
   if (savedDay.planSwapped) {
     panel.dataset.planSwapped = '1';
     // The exercises are trusted wholesale once planSwapped is set (see
@@ -18231,7 +18206,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-26-gym-tuesday-schedule';
+const APP_BUILD_VERSION = '2026-10-26-training-schedule';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -23092,140 +23067,50 @@ function toggleCheck(el) {
   saveState();
 }
 
-/* ---------- Swap a day's plan with another day's (this week only) ----------
-   "Can't get to the gym today, do Friday's workout instead" - moves the
-   exercise cards themselves between the two day panels (a real swap: both
-   days end up with the OTHER's plan), so progression tracking (by name,
-   not by day) and everything else about those exercises works exactly as
-   if they'd always been scheduled there. Deliberately does NOT touch Day
-   Notes or a day's own checklist (Saturday's stretch list) - those are
-   about how that CALENDAR day went, not the plan, and the user's own
-   wording ("swap the plans") is about the workout content specifically. */
-function toggleDaySwapMenu(btn, day) {
-  const existing = document.querySelector('.day-swap-menu');
-  const wasOpenForThisDay = existing && existing.dataset.forDay === day;
-  if (existing) existing.remove();
-  if (wasOpenForThisDay) return;
-
-  const menu = document.createElement('div');
-  menu.className = 'day-swap-menu';
-  menu.dataset.forDay = day;
-  dayKeys.filter(d => d !== day).forEach(otherDay => {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'day-swap-menu-item';
-    item.textContent = 'Swap with ' + dayNames[otherDay];
-    item.onclick = (e) => {
-      e.stopPropagation();
-      swapDayPlans_(day, otherDay);
-      menu.remove();
-    };
-    menu.appendChild(item);
-  });
-
-  // Appended to <body>, not the button's own row - see the .day-swap-menu
-  // CSS comment for why. Position is computed from the button's actual
-  // screen location (fixed/viewport coordinates), clamped so it always
-  // stays fully on screen: pinned right-aligned to the button but pulled
-  // left if that would run off the right edge, and flipped to open
-  // upward if there isn't room below (a day near the bottom of a short
-  // page, or the page scrolled down).
-  document.body.appendChild(menu);
-  const btnRect = btn.getBoundingClientRect();
-  const menuRect = menu.getBoundingClientRect();
-  const margin = 8;
-  let left = btnRect.right - menuRect.width;
-  left = Math.max(margin, Math.min(left, window.innerWidth - menuRect.width - margin));
-  let top = btnRect.bottom + 6;
-  if (top + menuRect.height > window.innerHeight - margin) {
-    top = btnRect.top - menuRect.height - 6;
-    if (top < margin) top = margin;
-  }
-  menu.style.left = left + 'px';
-  menu.style.top = top + 'px';
-
-  // Closes on any click elsewhere, same pattern as the exercise swipe-row
-  // outside-tap handling above - and on scroll, since a fixed-position
-  // menu would otherwise stay put in the viewport while the button it's
-  // anchored to scrolls away underneath it.
-  setTimeout(() => {
-    function closeOnClick(e) {
-      if (!menu.contains(e.target)) close();
-    }
-    function closeOnScroll() { close(); }
-    function close() {
-      menu.remove();
-      document.removeEventListener('pointerdown', closeOnClick, true);
-      window.removeEventListener('scroll', closeOnScroll, true);
-    }
-    document.addEventListener('pointerdown', closeOnClick, true);
-    window.addEventListener('scroll', closeOnScroll, true);
-  }, 0);
+/* ---------- Training Schedule (what each day of the week IS) ----------
+   Replaces the old per-week day-swap feature - a pairwise swap could
+   only ever relocate a day's content, never actually remove a type from
+   the week, which doesn't cover "one gym day, pushups every other day."
+   This assigns each weekday a type from DAY_TEMPLATES directly; see
+   DAY_SCHEDULE/populateDayFromTemplate_/applyDaySchedule_ above. The
+   assignment persists indefinitely - it's deliberately NOT part of the
+   weekly-reset exercise log, so a day you don't touch here keeps
+   whatever it was already set to, same as any other setting. */
+function openScheduleModal_() {
+  const schedule = getDaySchedule_();
+  const list = document.getElementById('daySchedList');
+  list.innerHTML = dayKeys.map(day => {
+    const options = Object.keys(DAY_TYPE_LABELS).map(type =>
+      `<option value="${type}"${type === schedule[day] ? ' selected' : ''}>${DAY_TYPE_LABELS[type]}</option>`
+    ).join('');
+    return `<div class="day-sched-row"><div class="day-sched-name">${dayNames[day]}</div>` +
+      `<select class="day-sched-select rt-link-select" data-day="${day}">${options}</select></div>`;
+  }).join('');
+  document.getElementById('daySchedModal').style.display = 'flex';
 }
 
-function swapDayPlans_(dayA, dayB) {
-  if (!dayA || !dayB || dayA === dayB) return;
-  const panelA = document.getElementById('day-' + dayA);
-  const panelB = document.getElementById('day-' + dayB);
-  if (!panelA || !panelB) return;
+function closeScheduleModal_() {
+  document.getElementById('daySchedModal').style.display = 'none';
+}
 
-  const anchorA = panelA.querySelector(':scope > .exercise-anchor');
-  const anchorB = panelB.querySelector(':scope > .exercise-anchor');
-  const addBtnA = panelA.querySelector(':scope > .add-exercise-btn');
-  const addBtnB = panelB.querySelector(':scope > .add-exercise-btn');
-  // Cards insert right before the "+ Add Exercise" button when one exists
-  // (matches every other card-insertion site in this file); a day with no
-  // add-exercise button yet (rare - it's added on first render) falls
-  // back to the anchor, then to the end of the panel.
-  const insertPointA = addBtnA || anchorA || null;
-  const insertPointB = addBtnB || anchorB || null;
-
-  const cardsA = Array.from(panelA.querySelectorAll(':scope > .exercise-card'));
-  const cardsB = Array.from(panelB.querySelectorAll(':scope > .exercise-card'));
-
-  cardsA.forEach(c => panelB.insertBefore(c, insertPointB));
-  cardsB.forEach(c => panelA.insertBefore(c, insertPointA));
-
-  // The day picker's dot/label reads each day's own .day-badge live
-  // (see dayPickerInfo_) - without swapping these too, the exercises
-  // move but the visible GYM/HOME/REST type stays put on the calendar
-  // day it started on. Swap class+content in place rather than moving
-  // the nodes themselves, since they're simple (no nested state) and
-  // this keeps each day-header's own element identity stable.
-  const badgeA = panelA.querySelector(':scope > .day-header > .day-badge');
-  const badgeB = panelB.querySelector(':scope > .day-header > .day-badge');
-  if (badgeA && badgeB) {
-    const cls = badgeA.className, html = badgeA.innerHTML;
-    badgeA.className = badgeB.className; badgeA.innerHTML = badgeB.innerHTML;
-    badgeB.className = cls; badgeB.innerHTML = html;
+function saveScheduleModal_() {
+  const current = getDaySchedule_();
+  const next = Object.assign({}, current);
+  const changedDays = [];
+  document.querySelectorAll('.day-sched-select').forEach(sel => {
+    const day = sel.dataset.day;
+    if (sel.value !== current[day]) changedDays.push(day);
+    next[day] = sel.value;
+  });
+  saveDaySchedule_(next);
+  changedDays.forEach(day => populateDayFromTemplate_(day, next[day]));
+  if (changedDays.length) {
+    saveState();
+    progRenderAllChips_();
+    renderTrainerStats();
+    updateDayPickerButton(activeDayKey_());
   }
-  const alertA = panelA.querySelector(':scope > .day-header > .alert');
-  const alertB = panelB.querySelector(':scope > .day-header > .alert');
-  if (alertA && alertB) {
-    const cls = alertA.className, html = alertA.innerHTML;
-    alertA.className = alertB.className; alertA.innerHTML = alertB.innerHTML;
-    alertB.className = cls; alertB.innerHTML = html;
-  }
-
-  // Marks both panels as running a swapped-in plan for the rest of this
-  // week - read by serializeDay/restoreDay so a reload trusts the
-  // swapped content as-is instead of comparing it against THIS day's own
-  // template (which restoreDay's plan-changed guard would otherwise read
-  // as "the template changed shape" and wipe, exactly the bug just fixed
-  // for a plain exercise rename - a whole-day transplant trips the same
-  // guard even harder). Left set even if swapped back later this week;
-  // by then the content genuinely matches the template again, so trusting
-  // it wholesale is still correct, just unnecessary.
-  panelA.dataset.planSwapped = '1';
-  panelB.dataset.planSwapped = '1';
-
-  saveState();
-  progRenderAllChips_();
-  renderTrainerStats();
-  // Refresh the visible day-picker bar immediately if either swapped
-  // day is the one currently on screen - otherwise it keeps showing
-  // the pre-swap type until the next unrelated re-render.
-  if (activeDayKey_() === dayA || activeDayKey_() === dayB) updateDayPickerButton(activeDayKey_());
+  closeScheduleModal_();
 }
 
 /* ---------- Config: deployment URL ---------- */
@@ -25124,7 +25009,8 @@ window.addEventListener('online', flushPendingLogs);
   }, { passive: true });
 })();
 
-renderWeeklyPlan_();
+seedDayScheduleOnce_();
+applyDaySchedule_();
 
 // In the 768-1099px landscape-phone/tablet tier, every view's page
 // header is hidden (see the matching @media block in <style> above) and
@@ -25221,7 +25107,14 @@ function updateTopBar_(view) {
 document.querySelectorAll('.exercise-sets').forEach((el, i) => {
   if (i === 0) {
     el.classList.add('expanded');
-    el.previousElementSibling.querySelector('.exercise-toggle').textContent = '▾';
+    // Not el.previousElementSibling - populateDayFromTemplate_ already
+    // runs initExerciseSets (and so initExerciseSwipe, which wraps the
+    // header+sets in an .exercise-card-inner) on its cards before this
+    // runs, unlike the old renderWeeklyPlan_ which left that for later -
+    // so .exercise-header is no longer necessarily this element's direct
+    // previous sibling. closest('.exercise-card') finds the toggle
+    // regardless of whatever wrapper sits in between.
+    el.closest('.exercise-card').querySelector('.exercise-toggle').textContent = '▾';
   }
 });
 
@@ -25246,8 +25139,6 @@ migrateStaleDayTemplates20260914();
 migratePushupSetCount20261026_();
 restoreState();
 backfillMissingPlaceholders20261001_();
-repairSwappedDayBadges20261026_();
-applyGymTuesdaySchedule20261026_();
 weekLabelAtLoad_ = getWeekLabel();
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkForWeekRollover_();
