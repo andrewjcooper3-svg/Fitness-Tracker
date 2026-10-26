@@ -16842,6 +16842,38 @@ function migrateStaleDayTemplates20260914() {
   }
 }
 
+// One-time fix for the Oct 26 Pushups bump (3 sets -> 4 - see
+// WEEKLY_PLAN_DATA). renderWeeklyPlan_ builds the new 4th row fine, but
+// restoreDay then syncs the card's row count DOWN to match whatever was
+// already saved for this week (its own built-in rule for "the user
+// deliberately removed a set by hand") - a day that already had a saved
+// 3-set Pushups entry from before this shipped gets its fresh 4th row
+// trimmed right back off, so the bump never actually shows up despite
+// the template being correct. Extends the saved array to 4 sets instead
+// so restoreDay has nothing to trim - appends a blank, unchecked set and
+// never touches sets 1-3, so nothing already logged this week is lost.
+function stripStalePushupSetCount20261026_(days) {
+  if (!days) return;
+  ['mon', 'tue', 'wed', 'thu'].forEach(day => {
+    const d = days[day];
+    if (!d || !Array.isArray(d.exercises)) return;
+    const pushups = d.exercises.find(ex => !ex.custom && (ex.name || '').trim().toLowerCase() === 'pushups');
+    if (pushups && Array.isArray(pushups.sets) && pushups.sets.length === 3) {
+      pushups.sets.push({ weight: '', reps: '', notes: '', checked: false, checkedAt: '', quality: '', targetWeight: '', targetReps: '' });
+    }
+  });
+}
+const PUSHUP_SET_COUNT_MIGRATION_20261026_KEY = 'WORKOUT_PUSHUP_SETCOUNT_MIGRATED_20261026';
+function migratePushupSetCount20261026_() {
+  if (localStorage.getItem(PUSHUP_SET_COUNT_MIGRATION_20261026_KEY)) return;
+  localStorage.setItem(PUSHUP_SET_COUNT_MIGRATION_20261026_KEY, '1');
+  const state = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null');
+  if (state && state.days) {
+    stripStalePushupSetCount20261026_(state.days);
+    localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify(state));
+  }
+}
+
 // One-time repair for the swap-placeholder bug fixed alongside this (see
 // restoreDay's wasNewlyCreated handling) - any day swapped before that
 // fix landed had its incoming exercises recreated as bare custom cards
@@ -18050,7 +18082,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-26-pushup-baseline-220';
+const APP_BUILD_VERSION = '2026-10-26-pushup-setcount-migration';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -25037,6 +25069,7 @@ migrateStaleDayTemplates20260727();
 migrateStaleDayTemplates20260824();
 migrateStaleDayTemplates20260831();
 migrateStaleDayTemplates20260914();
+migratePushupSetCount20261026_();
 restoreState();
 backfillMissingPlaceholders20261001_();
 weekLabelAtLoad_ = getWeekLabel();
