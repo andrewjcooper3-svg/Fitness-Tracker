@@ -17684,6 +17684,40 @@ function archiveFinishedWeek_(saved) {
   }
 }
 
+// One-time emergency reset for Nov 2 2026 - a load sometime this
+// morning, before the DST rollover fix above shipped, apparently
+// restored last week's checked boxes and then re-saved them under
+// THIS week's (correct) label/weekMonday. Once that happens, every
+// later load's rollover check sees a stored week that genuinely
+// matches the current one and has no way to tell the data underneath
+// is actually stale - the fix above stops it from happening again, but
+// can't undo a bad save that already happened. Forces a correctly-dated
+// week once, regardless of what's currently stored. Whatever pushups
+// were logged still get credited to the real previous calendar week in
+// the ledger first; this does not re-queue anything to the Sheet, since
+// the point of this one-off is a clean, correctly-dated display reset,
+// not a substitute for "Generate Session Summary" during the week.
+const FORCE_WEEK_RESET_20261102_KEY = 'WORKOUT_FORCE_WEEK_RESET_20261102';
+function forceWeekResetOnce20261102_() {
+  if (localStorage.getItem(FORCE_WEEK_RESET_20261102_KEY)) return;
+  localStorage.setItem(FORCE_WEEK_RESET_20261102_KEY, '1');
+  if (getWeekMondayKey_() !== '2026-11-02') return;
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(STORAGE_STATE_KEY) || 'null'); } catch (e) { saved = null; }
+  if (!saved) return;
+
+  const oldMonday = new Date(getWeekMonday());
+  oldMonday.setDate(oldMonday.getDate() - 7);
+  const pushupLedger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
+  dayKeys.forEach((day, i) => {
+    const dateObj = new Date(oldMonday);
+    dateObj.setDate(oldMonday.getDate() + i);
+    pushupLedger[dateKey(dateObj)] = pushupTotalFromSavedDay_((saved.days || {})[day]);
+  });
+  localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(pushupLedger));
+  localStorage.removeItem(STORAGE_STATE_KEY);
+}
+
 // The archive runs during startup, before Overview has rendered, so the
 // result is left in localStorage and picked up here.
 const STORAGE_ARCHIVE_NOTICE_KEY = 'WORKOUT_ARCHIVE_NOTICE';
@@ -18226,7 +18260,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-02-dst-week-rollover-fix';
+const APP_BUILD_VERSION = '2026-11-02-force-week-reset';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -25157,6 +25191,7 @@ migrateStaleDayTemplates20260824();
 migrateStaleDayTemplates20260831();
 migrateStaleDayTemplates20260914();
 migratePushupSetCount20261026_();
+forceWeekResetOnce20261102_();
 restoreState();
 backfillMissingPlaceholders20261001_();
 weekLabelAtLoad_ = getWeekLabel();
