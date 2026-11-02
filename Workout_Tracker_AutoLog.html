@@ -16749,8 +16749,14 @@ document.addEventListener('visibilitychange', () => {
 // interrupt mid-edit or overwrite an edit that just hasn't been stamped
 // as "saved" through a blur/change event yet.
 let pullDraftInFlight_ = false;
+// Set by forceCloudDraftResetOnce20261102_ while it's overwriting the
+// cloud draft - without this, a pull landing in that same window (the
+// boot-time pull, a visibilitychange, or the 40s poll all fire
+// independently of it) would fetch the OLD, not-yet-overwritten draft
+// and re-apply last week's stale content right back on top of the fix.
+let cloudDraftFixPending_ = false;
 async function pullRemoteDraftAndMerge_() {
-  if (pullDraftInFlight_) return;
+  if (pullDraftInFlight_ || cloudDraftFixPending_) return;
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
   pullDraftInFlight_ = true;
@@ -17718,6 +17724,41 @@ function forceWeekResetOnce20261102_() {
   localStorage.removeItem(STORAGE_STATE_KEY);
 }
 
+// One-time follow-up fix for Nov 2 2026 - the local-only reset above
+// couldn't fully fix this on its own: the app also syncs a draft of the
+// current state to the cloud, so it follows across devices (see
+// pullRemoteDraftAndMerge_), and that remote copy got corrupted the
+// same way the local one did - stale content, re-stamped with this
+// week's own label. Every load since has pulled that stale draft right
+// back down and re-applied it, even across the reset above, since from
+// the pull's point of view the draft's week genuinely matches this
+// week's. Rebuilds every day fresh from the current Training Schedule,
+// saves it locally, and overwrites the cloud draft with that same
+// fresh copy - gated to today only, and to cloudDraftFixPending_ above
+// so a pull landing in this same window can't re-apply the old draft
+// before the overwrite actually lands.
+const FORCE_CLOUD_DRAFT_RESET_20261102_KEY = 'WORKOUT_FORCE_CLOUD_DRAFT_RESET_20261102';
+function forceCloudDraftResetOnce20261102_() {
+  if (localStorage.getItem(FORCE_CLOUD_DRAFT_RESET_20261102_KEY)) return;
+  localStorage.setItem(FORCE_CLOUD_DRAFT_RESET_20261102_KEY, '1');
+  if (getWeekMondayKey_() !== '2026-11-02') return;
+
+  applyDaySchedule_();
+  const week = getWeekLabel();
+  const days = {};
+  dayKeys.forEach(day => { days[day] = serializeDay(day); });
+  localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify({ week: week, weekMonday: getWeekMondayKey_(), days: days }));
+
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
+  cloudDraftFixPending_ = true;
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'saveDraft', week: week, days: days })
+  }).catch(() => {}).finally(() => { cloudDraftFixPending_ = false; });
+}
+
 // The archive runs during startup, before Overview has rendered, so the
 // result is left in localStorage and picked up here.
 const STORAGE_ARCHIVE_NOTICE_KEY = 'WORKOUT_ARCHIVE_NOTICE';
@@ -18260,7 +18301,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-02-force-week-reset';
+const APP_BUILD_VERSION = '2026-11-02-force-cloud-draft-reset';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -25194,6 +25235,7 @@ migratePushupSetCount20261026_();
 forceWeekResetOnce20261102_();
 restoreState();
 backfillMissingPlaceholders20261001_();
+forceCloudDraftResetOnce20261102_();
 weekLabelAtLoad_ = getWeekLabel();
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') checkForWeekRollover_();
