@@ -16519,6 +16519,16 @@ function getWeekMonday() {
   return monday;
 }
 
+// A plain YYYY-MM-DD identity for "which week is it," used alongside
+// getWeekLabel() to decide whether the tracker has rolled into a new
+// week - see restoreState(). The locale-formatted label is still what's
+// shown/sent to the Sheet, but this is what the rollover check actually
+// trusts, since it can't be thrown off by anything about how that label
+// happens to render.
+function getWeekMondayKey_() {
+  return dateKey(getWeekMonday());
+}
+
 // Monday-Sunday of the current week, e.g. "Week of Jul 13 - Jul 19, 2026".
 // Sent with every submission so the Apps Script can file it into a
 // matching weekly Sheet tab.
@@ -16651,7 +16661,7 @@ function saveState() {
   } catch (e) {}
 
   const now = new Date().toISOString();
-  const state = { week: week, days: {} };
+  const state = { week: week, weekMonday: getWeekMondayKey_(), days: {} };
   dayKeys.forEach(day => {
     const serialized = serializeDay(day);
     const prevDay = prevDays[day];
@@ -17527,7 +17537,11 @@ function restoreState() {
     saved = null;
   }
 
-  if (!saved || saved.week !== getWeekLabel()) {
+  // Saved state from before weekMonday existed has no key to compare -
+  // falls back to the locale label it does have rather than treating a
+  // missing field as an automatic rollover.
+  const rolledOver = saved && (saved.weekMonday ? saved.weekMonday !== getWeekMondayKey_() : saved.week !== getWeekLabel());
+  if (!saved || rolledOver) {
     // No saved state, or the week has rolled over - start this week fresh.
     // Anything from the finished week goes to the Sheet BEFORE it is
     // discarded; this is the only place the wipe happens, and it covers
@@ -17641,10 +17655,16 @@ function archiveFinishedWeek_(saved) {
   // week's ring, the History chart. Written for all 7 days (not just the
   // ones queued to the Sheet below), since a day can have real pushups
   // recorded even if nothing else on it was checked off.
-  const oldMonday = new Date(getWeekMonday().getTime() - 7 * ROUTINES_DAY_MS);
+  // Calendar-date arithmetic (setDate), not a fixed 7*24h subtraction -
+  // a raw millisecond offset lands on the wrong calendar day (and so
+  // the wrong dateKey()) whenever the week being archived spans a DST
+  // transition, since one of its days was actually 23 or 25 hours long.
+  const oldMonday = new Date(getWeekMonday());
+  oldMonday.setDate(oldMonday.getDate() - 7);
   const pushupLedger = JSON.parse(localStorage.getItem(STORAGE_PUSHUP_LEDGER_KEY) || '{}');
   dayKeys.forEach((day, i) => {
-    const dateObj = new Date(oldMonday.getTime() + i * ROUTINES_DAY_MS);
+    const dateObj = new Date(oldMonday);
+    dateObj.setDate(oldMonday.getDate() + i);
     pushupLedger[dateKey(dateObj)] = pushupTotalFromSavedDay_((saved.days || {})[day]);
   });
   localStorage.setItem(STORAGE_PUSHUP_LEDGER_KEY, JSON.stringify(pushupLedger));
@@ -18206,7 +18226,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-10-26-training-schedule';
+const APP_BUILD_VERSION = '2026-11-02-dst-week-rollover-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
