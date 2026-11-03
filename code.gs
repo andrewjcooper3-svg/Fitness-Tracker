@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-10-01-routines-override';
+const BACKEND_BUILD_VERSION = '2026-11-03-draft-merge-timestamp-fix';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -785,14 +785,24 @@ function saveDraftState_(week, days) {
   const props = PropertiesService.getScriptProperties();
   const existing = loadDraftState_();
   const mergedDays = (existing && existing.week === week && existing.days) ? existing.days : {};
+  const now = new Date().toISOString();
   Object.keys(days || {}).forEach(function (day) {
     const incoming = days[day];
+    if (!incoming) return;
     const current = mergedDays[day];
-    if (!current || !current.savedAt || !incoming || !incoming.savedAt || incoming.savedAt > current.savedAt) {
-      mergedDays[day] = incoming;
+    if (!current || !current.savedAt || !incoming.savedAt || incoming.savedAt > current.savedAt) {
+      // A day pushed with no savedAt of its own (an older client, or any
+      // call that bypasses the client's normal saveState()) used to get
+      // stored exactly as received - still missing one - which left it
+      // permanently open to being overwritten by literally anything that
+      // arrived after, even something genuinely stale, since a missing
+      // savedAt on either side always won the comparison above. Stamping
+      // one here when it's absent means it only loses from this point on
+      // to something that can actually prove it's newer.
+      mergedDays[day] = incoming.savedAt ? incoming : Object.assign({}, incoming, { savedAt: now });
     }
   });
-  props.setProperty(DRAFT_STATE_KEY, JSON.stringify({ week: week, days: mergedDays, savedAt: new Date().toISOString() }));
+  props.setProperty(DRAFT_STATE_KEY, JSON.stringify({ week: week, days: mergedDays, savedAt: now }));
 }
 
 function loadDraftState_() {

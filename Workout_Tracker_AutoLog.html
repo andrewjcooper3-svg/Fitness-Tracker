@@ -17757,25 +17757,28 @@ function forceCloudDraftResetOnce20261102_() {
 // data back on its own poll/visibility cycle, though - that only stops
 // once that device is actually closed or reloaded.
 function rebuildWeekFreshAndSyncCloud_(holdMs) {
+  // The cloud push goes through the normal saveState()/syncDraftToCloud
+  // path deliberately, not a hand-rolled fetch - saveDraftState_ on the
+  // backend only accepts a day whose incoming savedAt is genuinely
+  // NEWER than what it already has for that day (see its comment), but
+  // trivially accepts ANYTHING when either side's savedAt is missing.
+  // A push that skips saveState() never gets a savedAt stamped at all,
+  // which leaves it wide open to being silently overwritten by the next
+  // thing that arrives - even something hours late - instead of
+  // actually winning the "most recent" comparison it's supposed to.
+  // Dropping STORAGE_STATE_KEY first makes saveState() treat every day
+  // as freshly changed (its own prevDays/changed check would otherwise
+  // just carry this week's already-stale stamps forward unchanged).
+  localStorage.removeItem(STORAGE_STATE_KEY);
   applyDaySchedule_();
-  const week = getWeekLabel();
-  const days = {};
-  dayKeys.forEach(day => { days[day] = serializeDay(day); });
-  localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify({ week: week, weekMonday: getWeekMondayKey_(), days: days }));
-  progRenderAllChips_();
-  renderTrainerStats();
+  saveState();
   if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
 
-  const url = getDeploymentUrl();
-  if (!url || !navigator.onLine) return;
+  // syncDraftToCloud's push is debounced 1.5s - held well past that so
+  // a poll landing moments later from THIS tab can't re-fetch whatever
+  // the cloud still held before that debounced push actually lands.
   cloudDraftFixPending_ = true;
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'saveDraft', week: week, days: days })
-  }).catch(() => {}).finally(() => {
-    setTimeout(() => { cloudDraftFixPending_ = false; }, holdMs);
-  });
+  setTimeout(() => { cloudDraftFixPending_ = false; }, holdMs);
 }
 
 // Manual escape hatch for "this week's checked boxes are stuck wrong
@@ -18332,7 +18335,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-03-reset-week-button';
+const APP_BUILD_VERSION = '2026-11-03-draft-savedat-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
