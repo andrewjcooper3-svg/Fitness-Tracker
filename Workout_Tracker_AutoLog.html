@@ -17757,43 +17757,62 @@ function forceCloudDraftResetOnce20261102_() {
 // data back on its own poll/visibility cycle, though - that only stops
 // once that device is actually closed or reloaded.
 function rebuildWeekFreshAndSyncCloud_(holdMs) {
-  // The cloud push goes through the normal saveState()/syncDraftToCloud
-  // path deliberately, not a hand-rolled fetch - saveDraftState_ on the
-  // backend only accepts a day whose incoming savedAt is genuinely
-  // NEWER than what it already has for that day (see its comment), but
-  // trivially accepts ANYTHING when either side's savedAt is missing.
-  // A push that skips saveState() never gets a savedAt stamped at all,
-  // which leaves it wide open to being silently overwritten by the next
-  // thing that arrives - even something hours late - instead of
-  // actually winning the "most recent" comparison it's supposed to.
-  // Dropping STORAGE_STATE_KEY first makes saveState() treat every day
-  // as freshly changed (its own prevDays/changed check would otherwise
-  // just carry this week's already-stale stamps forward unchanged).
+  // Dropping STORAGE_STATE_KEY first so every day is treated as freshly
+  // built below, with nothing carried over from whatever was there.
   localStorage.removeItem(STORAGE_STATE_KEY);
   applyDaySchedule_();
   // applyDaySchedule_ only rebuilds .exercise-card elements - Saturday's
   // stretch checklist (.check-item, static markup, no render function
   // of its own) and every day's own .day-notes-input (same thing - static,
   // never touched by applyDaySchedule_) are left exactly as they were
-  // sitting in the DOM. Without clearing them here too, saveState() below
-  // would faithfully snapshot whatever was still checked/typed from last
-  // time and stamp THAT as fresh, which looks indistinguishable from a
-  // genuine save from this point on - it would never again lose a
-  // timestamp comparison to anything, stale content and all.
+  // sitting in the DOM. Without clearing them here too, the snapshot
+  // below would faithfully capture whatever was still checked/typed
+  // from last time and stamp THAT as fresh.
   document.querySelectorAll('.check-item.checked').forEach(item => {
     item.classList.remove('checked');
     const cb = item.querySelector('.checkbox');
     if (cb) cb.textContent = '';
   });
   document.querySelectorAll('.day-notes-input').forEach(el => { el.value = ''; });
-  saveState();
-  if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
 
-  // syncDraftToCloud's push is debounced 1.5s - held well past that so
-  // a poll landing moments later from THIS tab can't re-fetch whatever
-  // the cloud still held before that debounced push actually lands.
+  // Stamps savedAt on every day itself, rather than going through
+  // saveState()'s normal debounced syncDraftToCloud (1.5s, via
+  // sendBeacon/fetch with no completion signal either way) - that path
+  // gives no way to know when, or whether, the push actually landed, so
+  // cloudDraftFixPending_ below would just be a guess at how long to
+  // wait. A day pushed with NO savedAt is accepted by the backend's
+  // merge unconditionally (see saveDraftState_'s comment) regardless of
+  // how stale it actually is, which is exactly the bug that let the
+  // first version of this fix get silently overwritten again - so every
+  // day here gets a real one, and the push itself is awaited, so the
+  // guard clears only once it's actually confirmed one way or the other.
+  const week = getWeekLabel();
+  const now = new Date().toISOString();
+  const days = {};
+  dayKeys.forEach(day => { days[day] = Object.assign({}, serializeDay(day), { savedAt: now }); });
+  localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify({ week: week, weekMonday: getWeekMondayKey_(), days: days }));
+
+  updatePushupLedger();
+  renderTrainerStats();
+  if (viewOrder[currentViewIndex] === 'tracker') renderPushupsTab();
+  renderOverviewPushupMini();
+  if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
+  syncWidgetSummary();
+
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine) return;
   cloudDraftFixPending_ = true;
-  setTimeout(() => { cloudDraftFixPending_ = false; }, holdMs);
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'saveDraft', week: week, days: days })
+  }).catch(() => {}).finally(() => {
+    // Held a little past the request itself, not cleared the instant it
+    // resolves - a poll firing in the same tick as this .finally() could
+    // still land ahead of the backend's own write actually being
+    // readable on a subsequent GET.
+    setTimeout(() => { cloudDraftFixPending_ = false; }, holdMs);
+  });
 }
 
 // Manual escape hatch for "this week's checked boxes are stuck wrong
@@ -18350,7 +18369,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-03-reset-checklist-notes-fix';
+const APP_BUILD_VERSION = '2026-11-03-reset-push-race-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
