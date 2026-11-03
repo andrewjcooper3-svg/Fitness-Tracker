@@ -17771,6 +17771,21 @@ function rebuildWeekFreshAndSyncCloud_(holdMs) {
   // just carry this week's already-stale stamps forward unchanged).
   localStorage.removeItem(STORAGE_STATE_KEY);
   applyDaySchedule_();
+  // applyDaySchedule_ only rebuilds .exercise-card elements - Saturday's
+  // stretch checklist (.check-item, static markup, no render function
+  // of its own) and every day's own .day-notes-input (same thing - static,
+  // never touched by applyDaySchedule_) are left exactly as they were
+  // sitting in the DOM. Without clearing them here too, saveState() below
+  // would faithfully snapshot whatever was still checked/typed from last
+  // time and stamp THAT as fresh, which looks indistinguishable from a
+  // genuine save from this point on - it would never again lose a
+  // timestamp comparison to anything, stale content and all.
+  document.querySelectorAll('.check-item.checked').forEach(item => {
+    item.classList.remove('checked');
+    const cb = item.querySelector('.checkbox');
+    if (cb) cb.textContent = '';
+  });
+  document.querySelectorAll('.day-notes-input').forEach(el => { el.value = ''; });
   saveState();
   if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
 
@@ -18335,7 +18350,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-03-draft-savedat-fix';
+const APP_BUILD_VERSION = '2026-11-03-reset-checklist-notes-fix';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
