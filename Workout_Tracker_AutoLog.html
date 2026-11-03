@@ -2712,6 +2712,7 @@
     <div class="ov-page-head-actions">
       <button class="ov-gear-btn" id="ovEditBtn" onclick="toggleOverviewEdit()" title="Rearrange the blocks on this page">Edit</button>
       <button class="ov-gear-btn" onclick="forceFullRefresh()" aria-label="Refresh" title="Force a fresh reload">↻</button>
+      <button class="ov-gear-btn" onclick="resetThisWeekNow_()" aria-label="Reset this week" title="Clear every day's checked sets and logged weights back to blank">⟲</button>
       <button class="ov-gear-btn" onclick="openSettingsModal()" aria-label="Settings">⚙</button>
     </div>
   </div>
@@ -17742,12 +17743,28 @@ function forceCloudDraftResetOnce20261102_() {
   if (localStorage.getItem(FORCE_CLOUD_DRAFT_RESET_20261102_KEY)) return;
   localStorage.setItem(FORCE_CLOUD_DRAFT_RESET_20261102_KEY, '1');
   if (getWeekMondayKey_() !== '2026-11-02') return;
+  rebuildWeekFreshAndSyncCloud_(10000);
+}
 
+// Rebuilds every day fresh from the current Training Schedule, saves it
+// locally, and overwrites the cloud draft with that same fresh copy -
+// the shared core of the one-off migration above and the "Reset this
+// week" button below. cloudDraftFixPending_ is held for holdMs (not
+// just until this one request resolves) so a poll landing moments
+// later from THIS tab can't immediately re-fetch and re-apply whatever
+// the cloud still held a second ago. It can't do anything about a
+// genuinely stale SECOND device or tab that keeps pushing its own old
+// data back on its own poll/visibility cycle, though - that only stops
+// once that device is actually closed or reloaded.
+function rebuildWeekFreshAndSyncCloud_(holdMs) {
   applyDaySchedule_();
   const week = getWeekLabel();
   const days = {};
   dayKeys.forEach(day => { days[day] = serializeDay(day); });
   localStorage.setItem(STORAGE_STATE_KEY, JSON.stringify({ week: week, weekMonday: getWeekMondayKey_(), days: days }));
+  progRenderAllChips_();
+  renderTrainerStats();
+  if (document.getElementById('view-overview').classList.contains('active')) renderOverview();
 
   const url = getDeploymentUrl();
   if (!url || !navigator.onLine) return;
@@ -17756,7 +17773,21 @@ function forceCloudDraftResetOnce20261102_() {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action: 'saveDraft', week: week, days: days })
-  }).catch(() => {}).finally(() => { cloudDraftFixPending_ = false; });
+  }).catch(() => {}).finally(() => {
+    setTimeout(() => { cloudDraftFixPending_ = false; }, holdMs);
+  });
+}
+
+// Manual escape hatch for "this week's checked boxes are stuck wrong
+// and I just need it blank" - the Overview ⟲ button. Unlike the
+// one-off, date-gated migration above, this is always available: it
+// doesn't depend on guessing which day something went wrong, and it
+// can be run again if a stale second device pushes old data back
+// before the user gets to close it.
+function resetThisWeekNow_() {
+  if (!confirm("Reset this week? Every day's checked sets and logged weights go back to blank. This can't be undone.")) return;
+  rebuildWeekFreshAndSyncCloud_(10000);
+  alert('This week has been reset. If this app is open on another tab, window, or device, close or reload it there too - otherwise it may push the old data back here once it next syncs.');
 }
 
 // The archive runs during startup, before Overview has rendered, so the
@@ -18301,7 +18332,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-02-force-cloud-draft-reset';
+const APP_BUILD_VERSION = '2026-11-03-reset-week-button';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
