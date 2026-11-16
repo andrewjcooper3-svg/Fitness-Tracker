@@ -28,7 +28,7 @@
 // expected value, so a stale deployment (redeploy skipped or missed)
 // shows up as a clear warning in Settings instead of silently breaking
 // whichever feature changed since the last real deploy.
-const BACKEND_BUILD_VERSION = '2026-11-03-draft-merge-timestamp-fix';
+const BACKEND_BUILD_VERSION = '2026-11-16-event-log-capture';
 
 // Quality is a per-set "Green"/"Yellow"/"Red" self-rating (easy weight /
 // tough but done / too tough or had to lower the weight) - the same
@@ -191,6 +191,89 @@ function getOrCreateWeightSheet_() {
   headerRange.setFontColor('#ffffff');
   sheet.setFrozenRows(1);
   return sheet;
+}
+
+const EVENT_LOG_SHEET_NAME = 'Event Log';
+const EVENT_LOG_HEADERS = ['EventId', 'ReceivedAt', 'WeekKey', 'Day', 'Type', 'Payload', 'DeviceId'];
+
+/**
+ * One persistent, append-only sheet (not split by week, same reasoning as
+ * getOrCreateWeightSheet_ above) - the shared source of truth the workout
+ * tracker's day-to-day sync is moving to, event by event, instead of
+ * whole-day snapshots racing each other on a timestamp. The sheet's own
+ * row order IS the sequence number: "events since seq N" is just "rows
+ * after row N+1," so nothing else needs to assign or track one.
+ */
+function getOrCreateEventLogSheet_() {
+  const ss = getOrCreateSpreadsheet_();
+  let sheet = ss.getSheetByName(EVENT_LOG_SHEET_NAME);
+  if (sheet) return sheet;
+
+  sheet = ss.insertSheet(EVENT_LOG_SHEET_NAME);
+  sheet.appendRow(EVENT_LOG_HEADERS);
+  const headerRange = sheet.getRange(1, 1, 1, EVENT_LOG_HEADERS.length);
+  headerRange.setFontWeight('bold');
+  headerRange.setBackground('#1a1d24');
+  headerRange.setFontColor('#ffffff');
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+// Appends one event, de-duplicating by EventId so a client retrying a
+// request it isn't sure landed (flaky connection, no response received)
+// can never double-append - same shape as logWaterEntry_'s id check
+// below. A 'weekStarted' event is additionally idempotent PER WEEK: only
+// the first one for a given WeekKey is ever stored, and every later
+// attempt (from any device) gets that same original one hand back
+// instead of appending a duplicate "fresh start" for a week that's
+// already in progress - this is what lets a device starting a week
+// adopt whatever's already there instead of racing to overwrite it.
+function appendEvent_(eventId, weekKey, day, type, payload, deviceId) {
+  const sheet = getOrCreateEventLogSheet_();
+  const lastRow = sheet.getLastRow();
+  const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, EVENT_LOG_HEADERS.length).getValues() : [];
+
+  if (type === 'weekStarted') {
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][2] === weekKey && rows[i][4] === 'weekStarted') {
+        return { eventId: rows[i][0], seq: i + 2, receivedAt: rows[i][1], weekKey: rows[i][2],
+                 day: rows[i][3], type: rows[i][4], payload: rows[i][5] };
+      }
+    }
+  } else {
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][0] === eventId) {
+        return { eventId: rows[i][0], seq: i + 2, receivedAt: rows[i][1], weekKey: rows[i][2],
+                 day: rows[i][3], type: rows[i][4], payload: rows[i][5] };
+      }
+    }
+  }
+
+  const receivedAt = new Date();
+  const payloadJson = JSON.stringify(payload || {});
+  sheet.appendRow([eventId, receivedAt, weekKey, day || '', type, payloadJson, deviceId || '']);
+  return { eventId: eventId, seq: sheet.getLastRow(), receivedAt: receivedAt.toISOString(),
+           weekKey: weekKey, day: day || '', type: type, payload: payloadJson };
+}
+
+// sinceSeq is the row number (1-based, header is row 1) the client last
+// saw - rows after it are "new." Reads the whole range in one call and
+// filters in memory; fine at this app's volume (low hundreds of events a
+// week), and simpler/cheaper than maintaining a separate per-week index.
+function getEventsSince_(weekKey, sinceSeq) {
+  const sheet = getOrCreateEventLogSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return { events: [], latestSeq: 1 };
+  const rows = sheet.getRange(2, 1, lastRow - 1, EVENT_LOG_HEADERS.length).getValues();
+  const events = [];
+  rows.forEach((row, i) => {
+    const seq = i + 2;
+    if (seq <= sinceSeq) return;
+    if (row[2] !== weekKey) return;
+    events.push({ eventId: row[0], seq: seq, receivedAt: row[1] instanceof Date ? row[1].toISOString() : row[1],
+                  weekKey: row[2], day: row[3], type: row[4], payload: row[5] });
+  });
+  return { events: events, latestSeq: lastRow };
 }
 
 /**
@@ -2377,6 +2460,17 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // Step 1 of the event-sourced sync migration (see Event Log sheet
+  // above) - capture-only for now, nothing reads from this yet.
+  if (action === 'getEventsSince') {
+    const weekKey = e.parameter.weekKey || '';
+    const sinceSeq = parseInt(e.parameter.sinceSeq, 10) || 1;
+    const result = getEventsSince_(weekKey, sinceSeq);
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: 'success', events: result.events, latestSeq: result.latestSeq }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'loadWaterDraft') {
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'success', draft: loadWaterDraft_(e.parameter.date) }))
@@ -2577,6 +2671,18 @@ function doPost(e) {
       saveDraftState_(data.week || getCurrentWeekLabel_(), data.days || {});
       return ContentService
         .createTextOutput(JSON.stringify({ status: 'success' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Step 1 of the event-sourced sync migration (see Event Log sheet
+    // above) - capture-only for now, nothing reads from this yet.
+    if (data.action === 'appendEvent') {
+      if (!data.eventId || !data.weekKey || !data.type) {
+        throw new Error('appendEvent requires eventId, weekKey, and type');
+      }
+      const stored = appendEvent_(data.eventId, data.weekKey, data.day || '', data.type, data.payload, data.deviceId);
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: 'success', event: stored }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 

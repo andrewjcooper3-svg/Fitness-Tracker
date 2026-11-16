@@ -16684,6 +16684,131 @@ function saveState() {
   syncWidgetSummary();
 }
 
+/* ---------- Event-sourced sync (Step 1: capture only) ----------
+   The planned replacement for the whole-day-snapshot sync just below
+   this comment (syncDraftToCloud/pullRemoteDraftAndMerge_). That model
+   lets whichever device saves most recently win ENTIRELY - which is how
+   a stale device's blank "fresh week" reset has twice now overwritten
+   real mid-week progress on every other device once it synced. The fix
+   is to stop syncing whole days and start syncing small, specific
+   events instead: two different fields never conflict with each other,
+   and a brand-new week starts blank because nothing has been appended
+   under its key yet, not because a wipe-and-resync step happened to win
+   a race.
+
+   This step only RECORDS events, alongside the existing snapshot sync -
+   nothing reads from them yet, and the app's behavior is unchanged.
+   Once real usage confirms the captured events look right, the weekly-
+   rollover decision (the actual bug) cuts over to reading from this log,
+   and later the day-to-day sync does too. */
+const STORAGE_EVENT_OUTBOX_KEY = 'WORKOUT_EVENT_OUTBOX';
+const STORAGE_DEVICE_ID_KEY = 'WORKOUT_DEVICE_ID';
+
+function getDeviceId_() {
+  let id = localStorage.getItem(STORAGE_DEVICE_ID_KEY);
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'dev-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    localStorage.setItem(STORAGE_DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+function newEventId_() {
+  return crypto.randomUUID ? crypto.randomUUID() : 'ev-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+}
+
+function eventOutbox_() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_EVENT_OUTBOX_KEY) || '[]'); } catch (e) { return []; }
+}
+
+// Queues the event locally FIRST (so it survives a crash or closed tab
+// before the network call completes), then tries to send it right away.
+// weekKey is read live at append time, not passed in, so every event
+// this device produces is honest about which week it actually happened
+// in - the same getWeekMondayKey_() the rollover check itself uses.
+function appendEvent_(type, day, payload) {
+  const event = {
+    eventId: newEventId_(), weekKey: getWeekMondayKey_(), day: day || '',
+    type: type, payload: payload || {}, deviceId: getDeviceId_()
+  };
+  const outbox = eventOutbox_();
+  outbox.push(event);
+  localStorage.setItem(STORAGE_EVENT_OUTBOX_KEY, JSON.stringify(outbox));
+  flushEventOutbox_();
+}
+
+let flushEventOutboxInFlight_ = false;
+function flushEventOutbox_() {
+  const url = getDeploymentUrl();
+  if (!url || !navigator.onLine || flushEventOutboxInFlight_) return;
+  const outbox = eventOutbox_();
+  if (!outbox.length) return;
+  flushEventOutboxInFlight_ = true;
+  // Sent one at a time, in order - mirrors flushPendingLogs below, which
+  // sends the Sheet-logging queue the same way.
+  outbox.reduce((chain, event) => chain.then(() =>
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'appendEvent', eventId: event.eventId, weekKey: event.weekKey,
+                              day: event.day, type: event.type, payload: event.payload, deviceId: event.deviceId })
+    }).then(() => {
+      // Removes just this one event from whatever's CURRENTLY queued -
+      // not the array captured when this flush started - so an event
+      // appended mid-flush (the user kept typing) isn't lost even if it
+      // wasn't part of this particular batch.
+      const remaining = eventOutbox_().filter(e => e.eventId !== event.eventId);
+      localStorage.setItem(STORAGE_EVENT_OUTBOX_KEY, JSON.stringify(remaining));
+    }).catch(() => {
+      // Left in the outbox - picked up by the next flush (reconnect, or
+      // the next event appended).
+    })
+  ), Promise.resolve()).finally(() => { flushEventOutboxInFlight_ = false; });
+}
+
+window.addEventListener('online', flushEventOutbox_);
+
+// Finds the (day, exerciseId, setIndex) a set-row element (or anything
+// inside one) belongs to - the same way serializeDay/restoreDay already
+// address a set: by the card's own stable exId, not DOM position, plus
+// the row's current position within that card.
+function eventLocationForSetInput_(el) {
+  const panel = el.closest('.day-panel');
+  const card = el.closest('.exercise-card');
+  const row = el.closest('.set-row');
+  if (!panel || !card || !row) return null;
+  const setIndex = Array.from(card.querySelectorAll('.set-row')).indexOf(row);
+  if (setIndex < 0) return null;
+  return { day: panel.id.replace('day-', ''), exerciseId: card.dataset.exId, setIndex: setIndex };
+}
+
+// The event-form counterpart of the generic delegated input handler
+// below - same field mapping serializeDay uses (inputs[0]=weight,
+// [1]=reps, [2]=notes), plus the two text inputs that live in a
+// .day-panel but outside any .set-row (day notes, and a custom
+// exercise's typed-in name).
+function captureInputEvent_(target) {
+  if (target.classList.contains('day-notes-input')) {
+    const panel = target.closest('.day-panel');
+    if (panel) appendEvent_('dayNotesChanged', panel.id.replace('day-', ''), { text: target.value });
+    return;
+  }
+  if (target.classList.contains('exercise-name-input')) {
+    const panel = target.closest('.day-panel');
+    const card = target.closest('.exercise-card');
+    if (panel && card) appendEvent_('exerciseRenamed', panel.id.replace('day-', ''), { exerciseId: card.dataset.exId, name: target.value });
+    return;
+  }
+  if (!target.classList.contains('set-input')) return;
+  const loc = eventLocationForSetInput_(target);
+  if (!loc) return;
+  const row = target.closest('.set-row');
+  const idx = Array.from(row.querySelectorAll('.set-input')).indexOf(target);
+  const field = idx === 0 ? 'weight' : idx === 1 ? 'reps' : idx === 2 ? 'notes' : null;
+  if (!field) return;
+  appendEvent_('setField', loc.day, { exerciseId: loc.exerciseId, setIndex: loc.setIndex, field: field, value: target.value });
+}
+
 // Mirrors the in-progress state (everything typed/checked so far, before
 // any "Generate Summary" actually logs to the Sheet) to the same Apps
 // Script backend, so opening the tracker on a different device picks up
@@ -18369,7 +18494,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-03-reset-push-race-fix';
+const APP_BUILD_VERSION = '2026-11-16-event-log-capture';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -23153,6 +23278,8 @@ function toggleSetCheck(el) {
   else delete el.dataset.checkedAt;
   const card = el.closest('.exercise-card');
   if (card) updateExerciseTotal(card);
+  const loc = eventLocationForSetInput_(el);
+  if (loc) appendEvent_('setField', loc.day, { exerciseId: loc.exerciseId, setIndex: loc.setIndex, field: 'checked', value: nowChecked });
   saveState();
 }
 
@@ -23227,6 +23354,11 @@ function collapseAllExercises(day) {
 function toggleCheck(el) {
   el.classList.toggle('checked');
   el.querySelector('.checkbox').textContent = el.classList.contains('checked') ? '✓' : '';
+  const panel = el.closest('.day-panel');
+  if (panel) {
+    const itemIndex = Array.from(panel.querySelectorAll('.check-item')).indexOf(el);
+    appendEvent_('checkItemToggled', panel.id.replace('day-', ''), { itemIndex: itemIndex, checked: el.classList.contains('checked') });
+  }
   saveState();
 }
 
@@ -23552,6 +23684,8 @@ function onExerciseNameChange_(select) {
 
   updateExerciseHistoryNote(card);
   updateExerciseTotal(card);
+  const panel = card.closest('.day-panel');
+  if (panel) appendEvent_('exerciseRenamed', panel.id.replace('day-', ''), { exerciseId: card.dataset.exId, name: newName });
   saveState();
 }
 
@@ -24499,15 +24633,20 @@ function deleteSet(btn) {
   const card = row.closest('.exercise-card');
   const rows = card.querySelectorAll('.set-row');
   if (rows.length <= 1) return;
+  const loc = eventLocationForSetInput_(row);
   row.remove();
   renumberSets(card);
   updateExerciseTotal(card);
+  if (loc) appendEvent_('setRemoved', loc.day, { exerciseId: loc.exerciseId, setIndex: loc.setIndex });
   saveState();
 }
 
 function deleteExercise(card) {
   if (!confirm('Delete this exercise?')) return;
+  const panel = card.closest('.day-panel');
+  const exerciseId = card.dataset.exId;
   card.remove();
+  if (panel) appendEvent_('exerciseRemoved', panel.id.replace('day-', ''), { exerciseId: exerciseId });
   saveState();
 }
 
@@ -24518,6 +24657,7 @@ function addSet(btn) {
   const lastInputs = lastRow.querySelectorAll('.set-input');
   const weightPlaceholder = lastInputs[0] ? lastInputs[0].placeholder : '';
   const repsPlaceholder = lastInputs[1] ? lastInputs[1].placeholder : '';
+  const newSetIndex = rows.length;
 
   const row = document.createElement('div');
   row.className = 'set-row';
@@ -24530,7 +24670,10 @@ function addSet(btn) {
   container.insertBefore(row, btn);
   initSetQuality(row);
   initSetSwipe(row);
-  updateExerciseTotal(container.closest('.exercise-card'));
+  const card = container.closest('.exercise-card');
+  updateExerciseTotal(card);
+  const panel = container.closest('.day-panel');
+  if (panel && card) appendEvent_('setAdded', panel.id.replace('day-', ''), { exerciseId: card.dataset.exId, setIndex: newSetIndex });
   saveState();
 }
 
@@ -24818,6 +24961,7 @@ function addExercise(panel, skipFocus) {
   // '__new__' wouldn't fire anything if the user re-picked that same
   // option, since nothing about its value would have changed.
   if (!skipFocus) card.querySelector('.exercise-name-select').focus();
+  appendEvent_('exerciseAdded', panel.id.replace('day-', ''), { exerciseId: card.dataset.exId, custom: true, name: '' });
   saveState();
 }
 
@@ -24875,6 +25019,7 @@ document.addEventListener('input', function (e) {
   }
   if (e.target.closest('.day-panel')) {
     saveState();
+    captureInputEvent_(e.target);
   }
 });
 
