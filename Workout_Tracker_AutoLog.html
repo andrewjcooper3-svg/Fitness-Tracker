@@ -2717,7 +2717,7 @@
     </div>
   </div>
   <div class="ov-build-stamp" id="ovBuildStamp"></div>
-  <div class="ov-build-stamp" id="ovEventDebugStamp"></div>
+  <div class="ov-build-stamp" id="ovEventDebugStamp" onclick="clearEventOutboxPrompt_()"></div>
   <!-- Shown once after a week rolls over, so the archive is visible
        rather than something you have to trust happened. -->
   <div class="ov-archive-notice" id="ovArchiveNotice" onclick="dismissArchiveNotice_()"></div>
@@ -16731,9 +16731,26 @@ function renderEventDebugStamp_() {
   const queued = eventOutbox_().length;
   let lastError = null;
   try { lastError = localStorage.getItem(STORAGE_EVENT_LAST_ERROR_KEY); } catch (e) { /* ignore */ }
-  let text = 'Events: ' + (queued === 0 ? 'all sent' : queued + ' queued');
+  let text = 'Events: ' + (queued === 0 ? 'all sent' : queued + ' queued (tap to clear)');
   if (lastError) text += ' · last error: ' + lastError;
   el.textContent = text;
+}
+
+// This queue is background bookkeeping for the new event-sourced sync
+// (nothing reads from it yet - see the long comment above appendEvent_
+// below) - it never holds the actual workout data, which is saved and
+// synced the normal way regardless of whether this drains. Safe to
+// discard entirely; the only cost is not having a record of whichever
+// background events hadn't made it out yet.
+function clearEventOutboxPrompt_() {
+  const queued = eventOutbox_().length;
+  if (!queued) return;
+  if (!confirm('Clear ' + queued + ' queued event' + (queued === 1 ? '' : 's') + '? This only affects background sync bookkeeping - your actual workout data and Sheet log are untouched.')) return;
+  try {
+    localStorage.removeItem(STORAGE_EVENT_OUTBOX_KEY);
+    localStorage.removeItem(STORAGE_EVENT_LAST_ERROR_KEY);
+  } catch (e) { /* ignore */ }
+  renderEventDebugStamp_();
 }
 
 function getDeviceId_() {
@@ -18558,7 +18575,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-16-flush-events-on-refocus';
+const APP_BUILD_VERSION = '2026-11-16-clear-event-outbox-button';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
