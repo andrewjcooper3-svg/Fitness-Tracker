@@ -5359,6 +5359,7 @@ function applyDaySchedule_() {
   dayKeys.forEach(day => populateDayFromTemplate_(day, schedule[day] || NATURAL_DAY_TYPE[day]));
 }
 const STORAGE_URL_KEY = 'WORKOUT_DEPLOYMENT_URL';
+const STORAGE_URL_VERSION_KEY = 'WORKOUT_DEPLOYMENT_URL_VERSION';
 const STORAGE_CALENDAR_WORKER_KEY = 'WORKOUT_CALENDAR_WORKER_URL';
 const STORAGE_PENDING_KEY = 'WORKOUT_PENDING_LOGS';
 const STORAGE_STATE_KEY = 'WORKOUT_TRACKER_STATE';
@@ -16507,8 +16508,20 @@ let calendarLoadedOnce = false;
 // Baked-in default so the tracker works out of the box (e.g. a Home
 // Screen icon, whose storage doesn't share with regular Safari tabs)
 // without needing to re-paste this after every fresh install. The
-// config box below can still override it per-device via localStorage.
+// config box below can still override it per-device via localStorage -
+// but see DEPLOYMENT_URL_VERSION right below: a manual override only
+// survives until the NEXT time that version bumps.
 const DEFAULT_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbzibd9VwYYvj8pcmApGKplDNW70tiZZjnT54K8kVHJJKQOxMEp21CNdWUYz2KVvPzxr/exec';
+
+// Bump this whenever DEFAULT_DEPLOYMENT_URL above points at a genuinely
+// different Apps Script deployment (a new deployment ID, not just a new
+// version of the same one - that case keeps the same URL already).
+// getDeploymentUrl() compares this against what each device last
+// adopted and, on a mismatch, drops that device's stored override and
+// re-adopts the new default automatically - so swapping deployments is
+// a single edit here instead of pasting the new URL into every phone,
+// browser, and home-screen icon this app runs on.
+const DEPLOYMENT_URL_VERSION = 1;
 const DEFAULT_CALENDAR_WORKER_URL = 'https://personalassistant.andrewjcooper3.workers.dev';
 
 function getWeekMonday() {
@@ -18529,7 +18542,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-16-event-capture-hardening';
+const APP_BUILD_VERSION = '2026-11-16-deployment-url-auto-sync';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -23454,7 +23467,7 @@ function toggleConfig() {
 }
 
 function loadDeploymentUrl() {
-  const url = localStorage.getItem(STORAGE_URL_KEY) || DEFAULT_DEPLOYMENT_URL;
+  const url = getDeploymentUrl();
   document.getElementById('deploymentUrl').value = url;
   updateConfigStatus(url);
 }
@@ -23462,6 +23475,10 @@ function loadDeploymentUrl() {
 function saveDeploymentUrl() {
   const url = document.getElementById('deploymentUrl').value.trim();
   localStorage.setItem(STORAGE_URL_KEY, url);
+  // A URL saved here is a deliberate choice for right now - pin it to
+  // the current version so it isn't immediately treated as a stale
+  // leftover and dropped again on the next load.
+  try { localStorage.setItem(STORAGE_URL_VERSION_KEY, String(DEPLOYMENT_URL_VERSION)); } catch (e) { /* ignore */ }
   updateConfigStatus(url);
   flushPendingLogs();
 }
@@ -23510,6 +23527,18 @@ async function checkBackendVersion(url) {
 }
 
 function getDeploymentUrl() {
+  let storedVersion = 0;
+  try { storedVersion = parseInt(localStorage.getItem(STORAGE_URL_VERSION_KEY), 10) || 0; } catch (e) { /* ignore */ }
+  if (storedVersion < DEPLOYMENT_URL_VERSION) {
+    // The canonical URL moved since this device last checked in - drop
+    // whatever it had saved (even a manually-pasted one) and adopt the
+    // new default, same as a device that's never been configured.
+    try {
+      localStorage.removeItem(STORAGE_URL_KEY);
+      localStorage.setItem(STORAGE_URL_VERSION_KEY, String(DEPLOYMENT_URL_VERSION));
+    } catch (e) { /* ignore */ }
+    return DEFAULT_DEPLOYMENT_URL;
+  }
   return localStorage.getItem(STORAGE_URL_KEY) || DEFAULT_DEPLOYMENT_URL;
 }
 
