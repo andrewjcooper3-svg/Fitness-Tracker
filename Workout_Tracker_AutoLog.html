@@ -18548,7 +18548,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-16-new-deployment-cutover';
+const APP_BUILD_VERSION = '2026-11-16-flush-events-on-load';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -25577,6 +25577,7 @@ document.getElementById('weekLabel').textContent = getWeekLabel();
 loadDeploymentUrl();
 loadCalendarWorkerUrl();
 flushPendingLogs();
+flushEventOutbox_();
 setTrainerSubTab('workout');
 showDay(dayKeys[(new Date().getDay() + 6) % 7]);
 progRenderAllChips_();
