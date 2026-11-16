@@ -16511,7 +16511,13 @@ let calendarLoadedOnce = false;
 // config box below can still override it per-device via localStorage -
 // but see DEPLOYMENT_URL_VERSION right below: a manual override only
 // survives until the NEXT time that version bumps.
-const DEFAULT_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbzibd9VwYYvj8pcmApGKplDNW70tiZZjnT54K8kVHJJKQOxMEp21CNdWUYz2KVvPzxr/exec';
+// 2026-11-16: moved off the AKfycbzibd9V... deployment - its /exec URL's
+// doGet answered with the current backendVersion, but its doPost kept
+// executing stale code (still answering as 2026-10-01-routines-override)
+// no matter how many times it was redeployed. Whatever was wrong with
+// it lived entirely on Google's serving side, not in anything here, so
+// the fix was a brand new deployment rather than chasing that further.
+const DEFAULT_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbzWLG8T9sizKTgSnkaHezVCUDW_ekYnQssLbUB3pKRyblJ34o91a_328J8ztSQhS_YA/exec';
 
 // Bump this whenever DEFAULT_DEPLOYMENT_URL above points at a genuinely
 // different Apps Script deployment (a new deployment ID, not just a new
@@ -16521,7 +16527,7 @@ const DEFAULT_DEPLOYMENT_URL = 'https://script.google.com/macros/s/AKfycbzibd9Vw
 // re-adopts the new default automatically - so swapping deployments is
 // a single edit here instead of pasting the new URL into every phone,
 // browser, and home-screen icon this app runs on.
-const DEPLOYMENT_URL_VERSION = 1;
+const DEPLOYMENT_URL_VERSION = 2;
 const DEFAULT_CALENDAR_WORKER_URL = 'https://personalassistant.andrewjcooper3.workers.dev';
 
 function getWeekMonday() {
@@ -18542,7 +18548,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-16-deployment-url-auto-sync';
+const APP_BUILD_VERSION = '2026-11-16-new-deployment-cutover';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
