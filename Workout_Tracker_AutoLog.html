@@ -2717,6 +2717,7 @@
     </div>
   </div>
   <div class="ov-build-stamp" id="ovBuildStamp"></div>
+  <div class="ov-build-stamp" id="ovEventDebugStamp"></div>
   <!-- Shown once after a week rolls over, so the archive is visible
        rather than something you have to trust happened. -->
   <div class="ov-archive-notice" id="ovArchiveNotice" onclick="dismissArchiveNotice_()"></div>
@@ -16703,6 +16704,18 @@ function saveState() {
    and later the day-to-day sync does too. */
 const STORAGE_EVENT_OUTBOX_KEY = 'WORKOUT_EVENT_OUTBOX';
 const STORAGE_DEVICE_ID_KEY = 'WORKOUT_DEVICE_ID';
+const STORAGE_EVENT_LAST_ERROR_KEY = 'WORKOUT_EVENT_LAST_ERROR';
+
+function renderEventDebugStamp_() {
+  const el = document.getElementById('ovEventDebugStamp');
+  if (!el) return;
+  const queued = eventOutbox_().length;
+  let lastError = null;
+  try { lastError = localStorage.getItem(STORAGE_EVENT_LAST_ERROR_KEY); } catch (e) { /* ignore */ }
+  let text = 'Events: ' + (queued === 0 ? 'all sent' : queued + ' queued');
+  if (lastError) text += ' · last error: ' + lastError;
+  el.textContent = text;
+}
 
 function getDeviceId_() {
   let id = localStorage.getItem(STORAGE_DEVICE_ID_KEY);
@@ -16726,15 +16739,26 @@ function eventOutbox_() {
 // weekKey is read live at append time, not passed in, so every event
 // this device produces is honest about which week it actually happened
 // in - the same getWeekMondayKey_() the rollover check itself uses.
+//
+// Every call site fires this BEFORE its own saveState() (same pattern
+// as the Sheet-logging queue elsewhere in this file) - so this can
+// NEVER be allowed to throw, or the real save right after it would
+// never run. Wrapped as a whole rather than at each of the ~10 call
+// sites for that guarantee.
 function appendEvent_(type, day, payload) {
-  const event = {
-    eventId: newEventId_(), weekKey: getWeekMondayKey_(), day: day || '',
-    type: type, payload: payload || {}, deviceId: getDeviceId_()
-  };
-  const outbox = eventOutbox_();
-  outbox.push(event);
-  localStorage.setItem(STORAGE_EVENT_OUTBOX_KEY, JSON.stringify(outbox));
-  flushEventOutbox_();
+  try {
+    const event = {
+      eventId: newEventId_(), weekKey: getWeekMondayKey_(), day: day || '',
+      type: type, payload: payload || {}, deviceId: getDeviceId_()
+    };
+    const outbox = eventOutbox_();
+    outbox.push(event);
+    localStorage.setItem(STORAGE_EVENT_OUTBOX_KEY, JSON.stringify(outbox));
+    flushEventOutbox_();
+  } catch (err) {
+    try { localStorage.setItem(STORAGE_EVENT_LAST_ERROR_KEY, String((err && err.message) || err)); } catch (e2) { /* ignore */ }
+    renderEventDebugStamp_();
+  }
 }
 
 let flushEventOutboxInFlight_ = false;
@@ -16745,25 +16769,36 @@ function flushEventOutbox_() {
   if (!outbox.length) return;
   flushEventOutboxInFlight_ = true;
   // Sent one at a time, in order - mirrors flushPendingLogs below, which
-  // sends the Sheet-logging queue the same way.
+  // sends the Sheet-logging queue the same way. Unlike that queue, this
+  // one checks the backend's own {status:...} body before clearing an
+  // event - Apps Script answers a thrown server error with a plain 200
+  // and {status:'error'}, which a plain fetch().then() can't tell apart
+  // from a real success, and silently dropping an event that was never
+  // actually stored would defeat the entire point of this step.
   outbox.reduce((chain, event) => chain.then(() =>
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action: 'appendEvent', eventId: event.eventId, weekKey: event.weekKey,
                               day: event.day, type: event.type, payload: event.payload, deviceId: event.deviceId })
-    }).then(() => {
+    }).then(res => res.json()).then(json => {
+      if (!json || json.status !== 'success') {
+        throw new Error((json && json.message) || 'backend did not confirm this event');
+      }
       // Removes just this one event from whatever's CURRENTLY queued -
       // not the array captured when this flush started - so an event
       // appended mid-flush (the user kept typing) isn't lost even if it
       // wasn't part of this particular batch.
       const remaining = eventOutbox_().filter(e => e.eventId !== event.eventId);
       localStorage.setItem(STORAGE_EVENT_OUTBOX_KEY, JSON.stringify(remaining));
-    }).catch(() => {
+      try { localStorage.removeItem(STORAGE_EVENT_LAST_ERROR_KEY); } catch (e3) { /* ignore */ }
+    }).catch(err => {
       // Left in the outbox - picked up by the next flush (reconnect, or
-      // the next event appended).
+      // the next event appended). Recorded so Settings/Overview can show
+      // *why*, instead of a queue that silently never drains.
+      try { localStorage.setItem(STORAGE_EVENT_LAST_ERROR_KEY, String((err && err.message) || err)); } catch (e4) { /* ignore */ }
     })
-  ), Promise.resolve()).finally(() => { flushEventOutboxInFlight_ = false; });
+  ), Promise.resolve()).finally(() => { flushEventOutboxInFlight_ = false; renderEventDebugStamp_(); });
 }
 
 window.addEventListener('online', flushEventOutbox_);
@@ -18494,7 +18529,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-16-event-log-capture';
+const APP_BUILD_VERSION = '2026-11-16-event-capture-hardening';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -18509,6 +18544,7 @@ function renderOverview() {
   document.getElementById('ovWeekLabel').textContent = getWeekLabel();
   const stampEl = document.getElementById('ovBuildStamp');
   if (stampEl) stampEl.textContent = 'Build ' + APP_BUILD_VERSION;
+  renderEventDebugStamp_();
   renderArchiveNotice_();
 
   renderOverviewPushupMini();
@@ -23449,7 +23485,7 @@ function updateConfigStatus(url) {
 // code.gs edit that was pushed here but never actually redeployed as a
 // new Apps Script Web App version, so the two ends silently disagree
 // about what a request/response is supposed to look like.
-const EXPECTED_BACKEND_VERSION = '2026-09-04-day-notes-upload';
+const EXPECTED_BACKEND_VERSION = '2026-11-16-event-log-capture';
 
 async function checkBackendVersion(url) {
   const el = document.getElementById('backendVersionStatus');
