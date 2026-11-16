@@ -16822,6 +16822,16 @@ function flushEventOutbox_() {
 
 window.addEventListener('online', flushEventOutbox_);
 
+// A large backlog (e.g. everything queued while the backend was broken)
+// sends one request at a time and can take a while - mobile browsers
+// commonly suspend a backgrounded tab's JS, pausing that chain wherever
+// it was (nothing lost - each success already persisted before this
+// fires), so resume it as soon as the tab is foregrounded again instead
+// of waiting for a new action or a genuine offline/online transition.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') flushEventOutbox_();
+});
+
 // Finds the (day, exerciseId, setIndex) a set-row element (or anything
 // inside one) belongs to - the same way serializeDay/restoreDay already
 // address a set: by the card's own stable exId, not DOM position, plus
@@ -18548,7 +18558,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-16-flush-events-on-load';
+const APP_BUILD_VERSION = '2026-11-16-flush-events-on-refocus';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
