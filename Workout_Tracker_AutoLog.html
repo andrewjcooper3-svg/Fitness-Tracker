@@ -2467,6 +2467,11 @@
   .rt-item-name { font-size: 13.5px; font-weight: 600; flex: 1; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rt-item-name.done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
+  /* A weekly-cadence item whose target is already met for the week, on
+     one of the days it's showing but doesn't need action - distinct
+     from .done, which is the muted/struck-through look for the day(s)
+     that actually earned it. */
+  .rt-item-name.week-met { color: var(--chart-good); }
   .rt-item-meta { font-size: 11px; color: var(--muted); flex-shrink: 0; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
   .rt-streak-chip { font-size: 10.5px; font-weight: 700; color: var(--amber); flex-shrink: 0; white-space: nowrap; }
   /* The vacation toggle - always visible rather than tucked behind a
@@ -9578,12 +9583,13 @@ function rtDayJumpToday() { rtViewDay = new Date(rtToday); rtRenderToday(); }
 const RT_CHECK_ICON_SVG_ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>';
 const RT_VACATION_ICON_SVG_ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="2"></rect><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>';
 
-function rtItemRowHtml(h, k, metaText, showStreak) {
+function rtItemRowHtml(h, k, metaText, showStreak, weekTargetMet) {
   const rawDone = rtIsDoneOn(h, k);
   // An actual completion always wins over a leftover vacation flag - see
   // rtIsExcusedOn.
   const excused = rtIsExcusedOn(h, k) && !rawDone;
   const done = rawDone;
+  const nameCls = done ? 'done' : (weekTargetMet ? 'week-met' : '');
   const streak = showStreak ? rtCurrentStreak(h) : 0;
   const linked = !!h.link;
   const overridden = !!rtOverrideRecord_(h, k);
@@ -9605,7 +9611,7 @@ function rtItemRowHtml(h, k, metaText, showStreak) {
     <button class="rt-check ${checkCls}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${checkLabel}">
       ${excused ? RT_VACATION_ICON_SVG_ : RT_CHECK_ICON_SVG_}
     </button>
-    <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
+    <div class="rt-item-name ${nameCls}">${escapeText_(h.name)}</div>
     <div class="rt-item-meta">${metaText}${linkChip}</div>
     ${showStreak && streak > 1 ? `<div class="rt-streak-chip">${streak} day streak</div>` : ''}
     <button class="rt-vacation-btn${excused ? ' active' : ''}" onclick="event.stopPropagation(); rtToggleExcused('${h.id}', rtViewDay)"
@@ -9659,9 +9665,11 @@ function rtRenderToday() {
   if (weeklyToday.length) {
     html += '<div class="rt-item-group-label">This week, any day</div>';
     html += weeklyToday.map(h => {
+      const weekCount = rtWeekCountSoFar(h, rtViewDay);
+      const weekTargetMet = weekCount >= h.weekTarget;
       const doneTime = rtCompletedTimeText_(h, k);
-      const meta = rtOverrideMetaOverride_(h, k) || rtExcusedMetaOverride_(h, k) || doneTime || `${rtWeekCountSoFar(h, rtViewDay)} of ${h.weekTarget} this week`;
-      return rtItemRowHtml(h, k, meta, false);
+      const meta = rtOverrideMetaOverride_(h, k) || rtExcusedMetaOverride_(h, k) || doneTime || `${weekCount} of ${h.weekTarget} this week`;
+      return rtItemRowHtml(h, k, meta, false, weekTargetMet);
     }).join('');
   }
   list.classList.toggle('rt-item-list-2col', dueToday.length + weeklyToday.length > ROUTINES_2COL_THRESHOLD);
@@ -18575,7 +18583,7 @@ function renderWeekWheel(days) {
 // after a refresh means the STALE copy is coming from somewhere upstream
 // of this page - a hosting/CDN cache or the wrong URL - not just a
 // simple browser cache needing a clear).
-const APP_BUILD_VERSION = '2026-11-16-clear-event-outbox-button';
+const APP_BUILD_VERSION = '2026-11-18-weekly-target-met-green';
 
 // Forces a genuinely fresh network fetch of this page, bypassing any
 // browser/PWA cache - a plain reload can still be served from cache,
@@ -18714,7 +18722,10 @@ function ovRoutinesItemRowHtml_(h, k, weekly) {
   const linked = !!h.link;
   const overridden = !!rtOverrideRecord_(h, k);
   const doneTime = done ? rtCompletedTimeText_(h, k) : '';
-  const fallbackMeta = weekly ? `${rtWeekCountSoFar(h, rtToday)} of ${h.weekTarget} this week` : (linked ? rtLinkMetaText_(h, k) : rtCadenceLabel(h));
+  const weekCount = weekly ? rtWeekCountSoFar(h, rtToday) : 0;
+  const weekTargetMet = weekly && weekCount >= h.weekTarget;
+  const nameCls = done ? 'done' : (weekTargetMet ? 'week-met' : '');
+  const fallbackMeta = weekly ? `${weekCount} of ${h.weekTarget} this week` : (linked ? rtLinkMetaText_(h, k) : rtCadenceLabel(h));
   const meta = rtOverrideMetaOverride_(h, k) || (excused ? 'On vacation' : (doneTime || fallbackMeta));
   const checkAttrs = linked
     ? `onclick="event.stopPropagation(); ovToggleLinkedOverride_('${h.id}')"`
@@ -18728,7 +18739,7 @@ function ovRoutinesItemRowHtml_(h, k, weekly) {
     <button class="rt-check ${checkCls}${progress != null ? ' rt-link-progress' : ''}" ${checkAttrs}${progressStyle} aria-label="${checkLabel}">
       ${excused ? RT_VACATION_ICON_SVG_ : RT_CHECK_ICON_SVG_}
     </button>
-    <div class="rt-item-name ${done ? 'done' : ''}">${escapeText_(h.name)}</div>
+    <div class="rt-item-name ${nameCls}">${escapeText_(h.name)}</div>
     <div class="rt-item-meta">${meta}${linkChip}</div>
     <button class="rt-vacation-btn${excused ? ' active' : ''}" onclick="event.stopPropagation(); ovToggleExcusedRoutine_('${h.id}')"
       title="${excused ? 'Remove vacation mark' : 'Mark as vacation - not possible today'}" aria-label="${excused ? 'Remove vacation mark' : 'Mark as vacation'}">${RT_VACATION_ICON_SVG_}</button>
